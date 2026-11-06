@@ -18,6 +18,10 @@ import { isWindowsPath, sameDirectory, withinDirectory } from "./paths"
 import { isRunning } from "./transcript/reducer"
 import { applyRevertEvent, revertFromServer, revertedPrompt } from "./transcript/revert"
 import { toPromptFiles, type PromptFile } from "./attachments"
+import { errorMessage as message } from "./errors"
+import { CommandCatalog } from "./commands"
+import { McpManager, type McpHost } from "./mcp"
+import { commandBlock, isClientCommand, isEmptySession, parseSlash } from "./slash"
 import { deriveWorkers, type ChildSession } from "./workers"
 
 export type ControllerOptions = {
@@ -32,6 +36,8 @@ export type ControllerOptions = {
   pins?: { get(): string[]; set(pins: string[]): void }
   /** Diagnostics for the output channel. Never given secrets or message text. */
   log?: (line: string) => void
+  /** What `/mcps` needs from the machine we run on: open a browser, forward a port, ask for a code, confirm. */
+  mcp?: McpHost
 }
 
 /** Something that follows the event stream: worker tabs, the terminal mirror. */
@@ -44,7 +50,6 @@ export type Observer = {
 const EMIT_MS = 30
 const LAST_SESSION_KEY = "lastSession"
 
-const message = (e: unknown): string => (e instanceof Error ? e.message : typeof e === "string" ? e : "Request failed")
 
 /**
  * State for one project. It talks to the server only through the root `@opencode/client` API and keeps no
@@ -92,6 +97,18 @@ export class Controller {
   private draftEpoch = 0
   private abort?: AbortController
   private synced = false
+  private readonly catalog = new CommandCatalog()
+  private readonly mcp = new McpManager({
+    client: () => this.client,
+    directory: () => this.dir,
+    host: () => this.opts.mcp ?? {},
+    changed: () => this.emitNow(),
+    fail: (m) => {
+      this.error = m
+      this.emitNow()
+    },
+    log: (line) => this.opts.log?.(line),
+  })
 
   /** The server's spelling of the project folder (`location.get`), which can differ from VS Code's (e.g. `d:` vs `D:`). */
   private serverDirectory?: string
@@ -155,6 +172,9 @@ export class Controller {
       sentTick: this.sentTick,
       restore: this.restore,
       voice: this.voice,
+      commands: this.catalog.commands,
+      skills: this.catalog.skills,
+      mcp: this.mcp.state,
     }
   }
 
@@ -289,6 +309,7 @@ export class Controller {
     this.detach()
     this.client = client
     this.synced = false
+    this.mcp.reset()
     this.abort = new AbortController()
     void this.follow(client, this.abort.signal)
   }
@@ -297,6 +318,7 @@ export class Controller {
     this.abort?.abort()
     this.abort = undefined
     this.client = undefined
+    this.mcp.reset()
   }
 
   /* -------------------------------------------------------- event stream */
@@ -358,7 +380,8 @@ export class Controller {
     const d = ev.data ?? {}
     const sessionID: string | undefined = d.sessionID ?? d.form?.sessionID
     switch (ev.type) {
-      case "session.created": {
+      case "session.created":
+      case "session.forked": {
         if (!this.client) return
         const s = await this.client.session.get({ sessionID: d.sessionID }).catch(() => undefined)
         if (!s || !this.isListed(s.location?.directory)) return
@@ -369,6 +392,16 @@ export class Controller {
       case "session.renamed":
         this.sessions = this.sessions.map((s) => (s.id === d.sessionID ? { ...s, title: d.title } : s))
         if (this.children.has(d.sessionID)) this.children.set(d.sessionID, { ...this.children.get(d.sessionID)!, title: d.title })
+        break
+      case "mcp.status.changed":
+        this.mcp.statusChanged()
+        break
+      case "command.updated":
+        this.catalog.invalidateCommands()
+        void this.loadCommands()
+        break
+      case "skill.updated":
+        this.catalog.invalidateSkills()
         break
       case "shell.created": {
         const info = d.info
@@ -452,7 +485,9 @@ export class Controller {
     if (!client) return
     try {
       await this.resolveDirectory(client)
-      await Promise.all([this.loadSessions(), this.loadPending(client), this.loadCatalog(client), this.loadShells(client)])
+      this.catalog.invalidateCommands()
+      this.catalog.invalidateSkills()
+      await Promise.all([this.loadSessions(), this.loadPending(client), this.loadCatalog(client), this.loadShells(client), this.catalog.loadCommands(client, this.dir, this.opts.log), this.mcp.refresh()])
       const first = !this.synced
       this.synced = true
       if (first) {
@@ -629,7 +664,8 @@ export class Controller {
   /* -------------------------------------------------------------- actions */
 
   async dispatch(action: Action): Promise<void> {
-    if (action.type !== "dismissError" && action.type !== "ready") this.error = undefined
+    // Refreshing the popup's lists is not something the user did: it must not wipe an error they have not read yet.
+    if (action.type !== "dismissError" && action.type !== "ready" && action.type !== "loadCommands" && action.type !== "loadSkills") this.error = undefined
     try {
       switch (action.type) {
         case "ready":
@@ -640,7 +676,7 @@ export class Controller {
         case "newDraft":
           return this.newDraft(action.hasText)
         case "send":
-          return await this.send(action.text, action.files)
+          return await this.send(action.text, action.files, action.skills)
         case "stop":
           return await this.stop()
         case "queued":
@@ -653,6 +689,17 @@ export class Controller {
           return await this.revert(action.messageID)
         case "redo":
           return await this.redo()
+        case "compact":
+          return await this.compact()
+        case "fork":
+          return await this.fork()
+        case "loadCommands":
+          return await this.loadCommands()
+        case "loadSkills":
+          if (await this.catalog.loadSkills(this.need(), this.dir, this.opts.log)) this.emitNow()
+          return
+        case "mcp":
+          return await this.mcpAction(action)
         case "loadEarlier":
           return await this.loadEarlier()
         case "trimCompacted":
@@ -737,10 +784,20 @@ export class Controller {
     }
   }
 
-  private async send(text: string, files: PromptFile[] = []): Promise<void> {
+  /**
+   * A prompt, or a server slash command (`/review args`) when the text names one we know. Unknown `/xyz` text is an
+   * ordinary prompt. Client commands (`/undo`, …) never get here: the prompt box runs them itself.
+   */
+  private async send(text: string, files: PromptFile[] = [], skills: Array<{ id: string }> = []): Promise<void> {
     const body = text.trim()
     if (!body && files.length === 0) return
     const client = this.need()
+    const slash = parseSlash(body)
+    const command = slash && !isClientCommand(slash.name) && this.catalog.has(slash.name) ? slash : undefined
+    const deliver = (sessionID: string) =>
+      command
+        ? client.session.command({ sessionID, name: command.name, text: command.args, ...filesInput(files), ...skillsInput(skills) })
+        : client.session.prompt({ sessionID, text: body, ...filesInput(files), ...skillsInput(skills) })
     if (this.target.kind === "draft") {
       // First prompt of a draft: create the session, then prompt. This is the only place a session is created.
       this.sending = true
@@ -757,7 +814,7 @@ export class Controller {
       this.children.clear()
       this.sentTick++
       try {
-        await client.session.prompt({ sessionID: created.id, text: body, ...filesInput(files) })
+        await deliver(created.id)
       } finally {
         this.sending = false
         this.emitNow()
@@ -772,7 +829,56 @@ export class Controller {
     this.emitNow()
     // No `delivery`: the server default is `steer`, so a prompt sent while the agent works joins the running turn at
     // its next step (Salim wants this). Prompts queued by other clients still show, with Send now / Remove.
-    await client.session.prompt({ sessionID: id, text: body, ...filesInput(files) })
+    await deliver(id)
+  }
+
+  /* ------------------------------------------------------ slash commands */
+
+  /** The server's commands, for the popup. Cheap: cached for a few seconds. */
+  private async loadCommands(): Promise<void> {
+    if (!this.client) return
+    if (await this.catalog.loadCommands(this.client, this.dir, this.opts.log)) this.emitNow()
+  }
+
+  /** `/compact`: the server queues it like a prompt (steer by default), so it also works while the agent runs. */
+  private async compact(): Promise<void> {
+    const id = this.currentSessionID
+    const block = commandBlock("compact", { hasSession: !!id, running: false, revertStaged: false, canRevert: true })
+    if (!id || block) throw new Error(block)
+    await this.need().session.compact({ sessionID: id })
+  }
+
+  /** `/fork`: a new root session with this history (`fork` metadata), opened right away and added to the list. */
+  private async fork(): Promise<void> {
+    const id = this.currentSessionID
+    if (!id) throw new Error(commandBlock("fork", { hasSession: false, running: false, revertStaged: false, canRevert: true }))
+    let created: SessionInfo
+    try {
+      created = await this.need().session.fork({ sessionID: id })
+    } catch (e) {
+      throw isEmptySession(e) ? new Error("Nothing to fork yet.") : e
+    }
+    this.sessions = this.sort(upsertSession(this.sessions, { ...created, location: created.location ?? { directory: this.dir } } as SessionInfo))
+    await this.open(created.id)
+  }
+
+  private async mcpAction(action: Extract<Action, { type: "mcp" }>): Promise<void> {
+    switch (action.op) {
+      case "open":
+        return this.mcp.open()
+      case "close":
+        return this.mcp.close()
+      case "refresh":
+        return await this.mcp.refresh()
+      case "cancelSignIn":
+        return await this.mcp.cancelSignIn()
+      case "toggle":
+        return await this.mcp.toggle(action.server)
+      case "signIn":
+        return await this.mcp.signIn(action.server)
+      case "signOut":
+        return await this.mcp.signOut(action.server)
+    }
   }
 
   /** Send a queued prompt now (it joins the running turn at the next step) or remove it from the queue. */
@@ -878,6 +984,8 @@ export class Controller {
     await this.need().session.switchModel({ sessionID: id, model })
   }
 }
+
+const skillsInput = (skills: ReadonlyArray<{ id: string }>) => (skills.length > 0 ? { skills: skills.map(({ id }) => ({ id })) } : {})
 
 const filesInput = (files: readonly PromptFile[]) => (files.length > 0 ? { files: toPromptFiles(files as never) } : {})
 

@@ -2,7 +2,9 @@ import type { FormInfo, PermissionRequest, SessionInfo, SlimModel, SlimProvider 
 import type { ViewTarget } from "./draft"
 import type { ModelSelection } from "./models"
 import type { PromptFile } from "./attachments"
+import type { CommandSummary, SkillSummary } from "./commands"
 import type { ImageRef } from "./images"
+import type { McpState } from "./mcp"
 import type { SessionView } from "./transcript/types"
 import type { Worker } from "./workers"
 
@@ -107,17 +109,32 @@ export type AppState = {
    * `capture`: the recording companion is reachable. `recording`: the state of the current dictation.
    */
   voice: { keySet: boolean; capture: boolean; recording: "off" | "starting" | "on" | "stopping" }
+  /** The server's slash commands (`command.list`), refreshed when the popup opens. */
+  commands: CommandSummary[]
+  /** The server's skills (`skill.list`), loaded when `/skills` is used. */
+  skills: SkillSummary[]
+  /** The `/mcps` panel and the status chip. */
+  mcp: McpState
 }
 
 export type Action =
   | { type: "ready" }
   | { type: "openSession"; id: string }
   | { type: "newDraft"; hasText: boolean }
-  | { type: "send"; text: string; files?: PromptFile[] }
+  /** `skills`: skills chosen with `/skills`, sent with this prompt. */
+  | { type: "send"; text: string; files?: PromptFile[]; skills?: Array<{ id: string }> }
   | { type: "rename"; id: string; title: string }
   | { type: "togglePin"; key: string }
   | { type: "revert"; messageID: string }
   | { type: "redo" }
+  /** `/compact` and `/fork` on the current session. */
+  | { type: "compact" }
+  | { type: "fork" }
+  /** The popup opened: refresh the server's commands or skills (cached for a few seconds). */
+  | { type: "loadCommands" }
+  | { type: "loadSkills" }
+  | { type: "mcp"; op: "open" | "close" | "refresh" | "cancelSignIn" }
+  | { type: "mcp"; op: "toggle" | "signIn" | "signOut"; server: string }
   | { type: "loadEarlier" }
   | { type: "trimCompacted" }
   | { type: "stop" }

@@ -2,12 +2,12 @@
   import { isImageMime } from "../../core/attachments"
   import Codicon from "./Codicon.svelte"
 
-  /** A file chip: thumbnail for images, an icon otherwise. `onremove` only in the prompt box (sent chips have none). */
-  let { name, mime, thumb, warn, onremove }: { name: string; mime?: string; thumb?: string; warn?: string; onremove?: () => void } = $props()
+  /** A chip: a file (thumbnail for images, an icon otherwise) or, with `icon`, something else attached to the prompt, like a skill. `onremove` only in the prompt box (sent chips have none). */
+  let { name, mime, thumb, warn, icon, onremove }: { name: string; mime?: string; thumb?: string; warn?: string; icon?: string; onremove?: () => void } = $props()
 </script>
 
 <span class="chip" class:warn={!!warn} title={warn ? `${name} — ${warn}` : name}>
-  {#if thumb}<img src={thumb} alt="" />{:else}<Codicon name={isImageMime(mime) ? "file-media" : "go-to-file"} />{/if}
+  {#if thumb}<img src={thumb} alt="" />{:else if icon}<Codicon name={icon} />{:else}<Codicon name={isImageMime(mime) ? "file-media" : "go-to-file"} />{/if}
   <span class="n">{name}</span>
   {#if warn}<Codicon name="warning" label={warn} />{/if}
   {#if onremove}<button class="x muted" onclick={onremove} aria-label="Remove {name}"><Codicon name="close" /></button>{/if}

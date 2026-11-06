@@ -15,12 +15,27 @@
   import { cycleAgent, findModel } from "../../core/models"
   import { promptHeight } from "../../core/prompt-height"
   import type { AppState } from "../../core/protocol"
+  import {
+    applySuggestion,
+    commandBlock,
+    isClientCommand,
+    parseSlash,
+    skillsFilter,
+    slashQuery,
+    suggestCommands,
+    suggestSkills,
+    undoTarget,
+    type ClientCommandName,
+    type Suggestion,
+  } from "../../core/slash"
   import { isRunning } from "../../core/transcript/reducer"
   import { focusGuarded, focusWhenAllowed, readFocusEnv } from "../focus"
   import { useStore } from "../context"
   import AgentModelPicker from "./AgentModelPicker.svelte"
   import Chip from "./Chip.svelte"
   import Codicon from "./Codicon.svelte"
+  import McpPanel from "./McpPanel.svelte"
+  import SlashPopup from "./SlashPopup.svelte"
 
   let { app, text = $bindable() }: { app: AppState; text: string } = $props()
   const store = useStore()
@@ -31,6 +46,14 @@
   let area: HTMLTextAreaElement | undefined = $state()
   let files = $state<Attachment[]>([])
   let note = $state("")
+  // A short remark about a slash command that cannot run now. Not an error, so it is muted and goes away when typing.
+  let hint = $state("")
+  // Skills chosen with `/skills`: sent with the next prompt.
+  let skills = $state<Array<{ id: string; name: string }>>([])
+  let caret = $state(0)
+  let active = $state(0)
+  // Esc closes the popup for the text it was closed on; any edit brings it back.
+  let dismissedFor = $state<string | undefined>(undefined)
   let dragging = $state(false)
   let seq = 0
   // The text that a revert put into the box, so Redo only clears it when the user did not change it.
@@ -39,6 +62,73 @@
   const running = $derived(isRunning(app.view) || (app.target.kind === "session" && app.running.includes(app.target.id)))
   const canSend = $derived((text.trim().length > 0 || files.length > 0) && app.connection.status === "connected" && !app.sending)
   const imageOK = $derived(modelTakesImages(findModel(app.models, app.model)?.input))
+
+  /* -------------------------------------------------------- slash popup */
+
+  const filter = $derived(skillsFilter(text))
+  const slash = $derived(filter === undefined ? slashQuery(text, caret) : undefined)
+  const items = $derived<Suggestion[]>(
+    filter !== undefined ? suggestSkills(filter, app.skills) : slash ? suggestCommands(slash.query, app.commands) : [],
+  )
+  // An empty command list hides the popup, so a plain "/path/to/file" message just sends. An empty skills list says so.
+  const popup = $derived(dismissedFor !== text && !app.mcp.open && (filter !== undefined || (slash !== undefined && items.length > 0)))
+  const POPUP_ID = "oc-slash"
+  const activeIndex = $derived(Math.min(active, Math.max(0, items.length - 1)))
+  const skillsEmpty = $derived(app.skills.length === 0 ? "This project has no skills." : "No matching skills")
+
+  // Refresh the server's lists when the popup opens (cheap: the controller caches for a few seconds).
+  let listed: "commands" | "skills" | undefined
+  $effect(() => {
+    const which = !popup ? undefined : filter !== undefined ? "skills" : "commands"
+    if (which && which !== listed) store.dispatch({ type: which === "skills" ? "loadSkills" : "loadCommands" })
+    listed = which
+  })
+  $effect(() => { void filter; void slash?.query; active = 0 })
+
+  function syncCaret() { caret = area?.selectionStart ?? text.length }
+
+  async function setText(next: string, at = next.length) {
+    text = next
+    caret = at
+    await tick()
+    area?.setSelectionRange(at, at)
+    resize()
+  }
+
+  /** Accept a row: a command is completed to `/name `, a skill becomes a chip. */
+  function accept(s: Suggestion) {
+    if (s.source === "skill") {
+      if (s.id && !skills.some((k) => k.id === s.id)) skills = [...skills, { id: s.id, name: s.name }]
+      void setText("")
+    } else {
+      const r = applySuggestion(text, s.name)
+      void setText(r.text, r.caret)
+    }
+    hint = ""
+    void tick().then(() => focusGuarded(area))
+  }
+
+  /** Run a built-in command now. The text is already cleared by the caller. */
+  function runClient(name: ClientCommandName) {
+    const view = app.view
+    const block = commandBlock(name, {
+      hasSession: app.target.kind === "session",
+      running,
+      revertStaged: !!view.revert,
+      canRevert: app.features.revert && !app.readOnly,
+      undoTarget: undoTarget(view),
+    })
+    if (block) { hint = block; return }
+    switch (name) {
+      case "mcps": store.dispatch({ type: "mcp", op: "open" }); break
+      case "compact": store.dispatch({ type: "compact" }); break
+      case "fork": store.dispatch({ type: "fork" }); break
+      case "redo": store.dispatch({ type: "redo" }); break
+      // The same confirmation as the revert button on a prompt; the host then runs the revert and restores the prompt text.
+      case "undo": store.bridge.confirmRevert(undoTarget(view)!); break
+      case "skills": void setText("/skills "); break
+    }
+  }
 
   /**
    * Fit the box to its text. Runs synchronously (oninput, mount, restore, new chips, width change) so the old height is
@@ -83,22 +173,52 @@
 
   function send() {
     if (!canSend) return
+    const command = parseSlash(text)
+    if (command && !command.args && files.length === 0 && isClientCommand(command.name)) {
+      const name = command.name
+      if (name === "skills") { runClient(name); return }
+      void setText("")
+      hint = ""
+      runClient(name)
+      return
+    }
     // Sending ends the dictation.
     if (recording !== "off") {
       dropDictation = true
       if (recording === "starting" || recording === "on") store.bridge.voice()
     }
     dictation = undefined
-    store.dispatch({ type: "send", text, files: files.map(({ uri, name }) => ({ uri, name })) })
+    store.dispatch({ type: "send", text, files: files.map(({ uri, name }) => ({ uri, name })), skills: skills.map(({ id }) => ({ id })) })
     text = ""
     files = []
+    skills = []
     note = ""
+    hint = ""
     restored = undefined
     void tick().then(() => { resize(); focusGuarded(area) })
   }
 
   function onkeydown(e: KeyboardEvent) {
-    if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); send() }
+    if (e.isComposing) return
+    if (popup && items.length > 0) {
+      const chosen = items[activeIndex]!
+      // Typing a whole command name and pressing Enter runs it; Enter on a half-typed name completes it first.
+      const typed = chosen.source !== "skill" && slash?.query.toLowerCase() === chosen.name.toLowerCase()
+      if (e.key === "ArrowDown") { e.preventDefault(); active = (activeIndex + 1) % items.length; return }
+      if (e.key === "ArrowUp") { e.preventDefault(); active = (activeIndex - 1 + items.length) % items.length; return }
+      if (e.key === "Tab" && !e.shiftKey) { e.preventDefault(); accept(chosen); return }
+      if (e.key === "Enter" && !e.shiftKey && !typed) { e.preventDefault(); accept(chosen); return }
+    }
+    // `/skills foo` with nothing to choose: Enter must not send the filter as a prompt.
+    if (popup && filter !== undefined && e.key === "Enter" && !e.shiftKey) { e.preventDefault(); return }
+    if (popup && e.key === "Escape") {
+      // Closes the popup only: it must not also stop the agent.
+      e.preventDefault(); e.stopPropagation()
+      dismissedFor = text
+      return
+    }
+    if (e.key === "Escape" && app.mcp.open) { e.preventDefault(); store.dispatch({ type: "mcp", op: "close" }); return }
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send() }
     else if (e.key === "Tab" && !e.shiftKey && text === "" && app.agents.length > 1) {
       e.preventDefault()
       const next = cycleAgent(app.agents.map((a) => a.id), app.agent)
@@ -180,7 +300,7 @@
   /* --------------------------------------------------------------- focus */
 
   // Typing is sized synchronously in `oninput`; this covers text set by code (send clears it, a revert restores it).
-  $effect(() => { void text; void tick().then(resize) })
+  $effect(() => { void text; void tick().then(() => { resize(); syncCaret() }) })
   // A narrower or wider panel re-wraps the text. Only a width change matters: our own height changes also fire the
   // observer and must not loop.
   $effect(() => {
@@ -239,16 +359,41 @@
 </script>
 
 <div class="box">
+  <div class="anchor">
+  {#if popup}
+    <SlashPopup id={POPUP_ID} {items} index={activeIndex} label={filter !== undefined ? "Skills" : "Slash commands"} empty={skillsEmpty} onpick={accept} onhover={(i) => (active = i)} />
+  {/if}
+  {#if app.mcp.open}<McpPanel {app} returnTo={area} />{/if}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="input" class:drag={dragging} {ondragover} ondragleave={() => (dragging = false)} {ondrop}>
-    {#if files.length > 0}
+    {#if files.length > 0 || skills.length > 0}
       <div class="chips">
+        {#each skills as k (k.id)}
+          <Chip name="skill: {k.name}" icon="sparkle" onremove={() => (skills = skills.filter((x) => x.id !== k.id))} />
+        {/each}
         {#each files as f (f.id)}
           <Chip name={f.name} mime={f.mime} thumb={f.thumb} warn={isImageMime(f.mime) && !imageOK ? "This model does not take images" : undefined} onremove={() => (files = files.filter((x) => x.id !== f.id))} />
         {/each}
       </div>
     {/if}
-    <textarea bind:this={area} bind:value={text} {onkeydown} {onpaste} oninput={resize} rows="2" placeholder={running ? "Steer: OpenCode reads it at its next step" : "Ask OpenCode"} aria-label="Message"></textarea>
+    <textarea
+      bind:this={area}
+      bind:value={text}
+      {onkeydown}
+      {onpaste}
+      oninput={() => { resize(); syncCaret(); hint = "" }}
+      onkeyup={syncCaret}
+      onclick={syncCaret}
+      rows="2"
+      placeholder={running ? "Steer: OpenCode reads it at its next step" : "Ask OpenCode, or type / for commands"}
+      aria-label="Message"
+      role="combobox"
+      aria-expanded={popup}
+      aria-haspopup="listbox"
+      aria-controls={popup ? POPUP_ID : undefined}
+      aria-activedescendant={popup && items.length > 0 ? `${POPUP_ID}-${activeIndex}` : undefined}
+      aria-autocomplete="list"
+    ></textarea>
     <div class="actions">
       <button class="clip muted" onclick={pick} title="Attach files" aria-label="Attach files"><Codicon name="attach" /></button>
       <span class="grow"></span>
@@ -270,11 +415,14 @@
       <button class="send" onclick={send} disabled={!canSend} title="Send (Enter)" aria-label="Send"><Codicon name="arrow-up" /></button>
     </div>
   </div>
+  </div>
   {#if note}<div class="note err small" role="alert">{note}</div>{/if}
+  {#if hint}<div class="note muted small" role="status">{hint}</div>{/if}
   <AgentModelPicker {app} />
 </div>
 
 <style>
+  .anchor { position: relative; }
   .box { padding: 0.3em var(--oc-side) 0.7em; display: flex; flex-direction: column; gap: 0.35em; }
   .input { display: flex; flex-direction: column; gap: 0.35em; border: 1px solid var(--vscode-input-border, var(--oc-hairline)); background: var(--vscode-input-background); border-radius: 6px; padding: 0.4em 0.55em; }
   .input:focus-within { border-color: var(--vscode-focusBorder); }

@@ -6,6 +6,7 @@ import { folderName, shortenHome } from "../core/paths"
 import { homedir } from "node:os"
 import { SetupError, connect } from "./connection"
 import { HostActions } from "./host"
+import { createMcpHost } from "./mcp"
 import { VscodeNotifier } from "./notifier"
 import { affectsConnection, affectsView, readConnectionSettings, readNotificationSettings, readTerminalSettings, readViewSettings } from "./settings"
 import { ShellTerminals } from "./terminal"
@@ -41,6 +42,7 @@ export function activate(context: vscode.ExtensionContext): void {
       set: (pins) => void context.globalState.update(PINS_KEY, pins),
     },
     log: (line) => output.info(line),
+    mcp: createMcpHost((line) => output.info(line)),
   })
   context.globalState.setKeysForSync([PINS_KEY])
   // `provider` is created below; dictation text is only posted after a recording starts, long after activation.
@@ -152,6 +154,10 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("opencode.newSession", async () => {
       await vscode.commands.executeCommand(`${VIEW_ID}.focus`)
       provider.newSession()
+    }),
+    vscode.commands.registerCommand("opencode.mcps", async () => {
+      await vscode.commands.executeCommand(`${VIEW_ID}.focus`)
+      await controller.dispatch({ type: "mcp", op: "open" })
     }),
     vscode.commands.registerCommand("opencode.reconnect", () => start()),
     voice,

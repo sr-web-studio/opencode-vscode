@@ -321,6 +321,44 @@ Proposal:
 
   The normal prompt box and agent/model footer stay at the bottom.
 
+## Slash commands and /mcps (added 2026-11-06)
+
+Typing `/` as the first character of the prompt opens a popup above the box. It never takes focus: the popup is a `listbox` driven from the textarea (`combobox`, `aria-activedescendant`), and `mousedown` on a row is cancelled.
+
+### Behavior
+
+- Sources, in precedence order: **client commands** (`/mcps`, `/compact`, `/undo`, `/redo`, `/fork`, `/skills`), then **server commands** from `command.list` (built-in, config, MCP prompts and skills). A client command hides a server command of the same name; the server-side `/compact` is never called.
+- Arrows move, Tab or Enter completes a partial name, Enter on a fully typed client command runs it, Esc closes the popup (and does not stop the agent).
+- `/skills <filter>` lists `skill.list`; choosing one adds a chip under the prompt. The skills go out as `skills: [{ id }]` on the next send.
+- Sending `/name args` for a known server command calls `session.command`. Anything else is a normal prompt. A message sent while the agent works still steers (no `delivery` field).
+- `/undo` uses the same confirmation as the revert button, then the host dispatches `revert`, which puts the prompt text back. A second `/undo` goes one turn further back. `/redo` clears the revert. `/fork` creates a new session from the current one (it appears in the list through `session.forked`). In an empty session `/compact` and `/fork` show a short note instead of calling the server.
+- `/mcps` (also the command **OpenCode: MCP Servers** and the chip in the footer) opens a panel above the prompt box: one row per server with status, tool count, error text, a toggle, and **Sign in** / **Sign out** for OAuth servers. The list refreshes every 3 s while the panel is open.
+
+### API calls
+
+| Need | Call |
+| --- | --- |
+| Commands | `command.list` (cached 15 s, dropped on `command.updated` / `skill.updated`) |
+| Run command | `session.command` (`skills` accepted) |
+| Compact, fork | `session.compact`, `session.fork` |
+| Skills | `skill.list`, plus `skills: [{ id }]` on `session.prompt` / `session.command` |
+| MCP list | `mcp.list` |
+| MCP toggle | `experimental.mcp.connect` / `experimental.mcp.disconnect` |
+| MCP sign in | `integration.get` (find the OAuth method), `integration.oauth.connect`, then poll `integration.oauth.status`, then `integration.oauth.complete`; Cancel calls `integration.oauth.cancel` |
+| MCP sign out | `integration.get` (credential id, fetched once per integration), `credential.remove` |
+
+### Remote SSH and OAuth
+
+The OAuth callback is a loopback port on the machine where the OpenCode server runs. When VS Code runs remote and the server is local to that remote, the host calls `vscode.env.asExternalUri(http://127.0.0.1:<port>)` before `openExternal`, so VS Code forwards the port to the laptop's browser. If the forwarded port differs from the original, it is logged to the output channel and the panel shows a notice. If `opencode.serverUrl` points at another machine, the sign-in finishes on that machine: the panel says so and still opens the URL. This path is covered by unit tests with fakes only; it has not been tried through a real Remote SSH window.
+
+### Runtime-only
+
+Toggling a server (connect/disconnect) changes the running server only. It is not written to config, and the panel says so. OpenCode owns all config; the extension never writes it.
+
+### State and hooks
+
+`AppState` gains `commands`, `skills` and `mcp` (`open`, `loading`, `loaded`, `servers`, `busy`, `signIn`, `notice`, `error`). New actions: `compact`, `fork`, `loadCommands`, `loadSkills`, `mcp` (`open|close|refresh|cancelSignIn|toggle|signIn|signOut`), and `send` with `skills`. Errors use the existing `error` line. VS Code-only effects go through `ControllerOptions.mcp` (`openSignIn`, `askCode`, `confirm`), implemented in `src/extension/mcp.ts`. Logic lives in `src/core/{slash,commands,mcp,errors}.ts`.
+
 ## Notifications (added 2026-11-06)
 
 Goal: tell Salim when OpenCode needs his attention or when work has finished. Use an OS-level notification where possible, otherwise a VS Code notification.

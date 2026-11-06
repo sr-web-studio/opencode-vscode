@@ -23,3 +23,17 @@ export function serverUrlProblem(raw: string): string | undefined {
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return `Use http:// or https://, not ${parsed.protocol}//`
   return undefined
 }
+
+/**
+ * The server runs on the machine of the extension host: no `opencode.serverUrl` (the local service), or one that points
+ * at this machine. Anything else is another computer, which matters for browser sign-in callbacks.
+ */
+export function isLocalServer(raw: string): boolean {
+  const url = normalizeServerUrl(raw)
+  if (!url) return true
+  try {
+    return ["127.0.0.1", "localhost", "[::1]"].includes(new URL(url).hostname)
+  } catch {
+    return false
+  }
+}

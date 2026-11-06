@@ -22,6 +22,7 @@ I'm also working on an Android app with the same UI, for the same always-on setu
 - **Terminal:** shell commands the agent runs show up in a read-only VS Code terminal, without stealing focus. Ctrl+C stops the running command, after asking.
 - **Permissions and questions** inline: `Allow · Always · Deny`, and question forms that stay fully readable.
 - **Agent and model picker**, session switcher, pinned sessions, a floating task list, and background workers in a header chip. Click a worker to open it read-only.
+- **Slash commands** in the prompt box (`/compact`, `/undo`, `/fork`, `/skills`, your own commands) and an **MCP servers** panel (`/mcps`) to check status, switch servers on or off and sign in.
 - **Notifications** when OpenCode needs you or finishes work.
 - **Voice input** (optional, free with your own key): speak Bangla, English or many other languages into the prompt box. See [Voice input](#voice-input).
 

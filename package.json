@@ -74,6 +74,11 @@
         "icon": "$(add)"
       },
       {
+        "command": "opencode.mcps",
+        "title": "MCP Servers",
+        "category": "OpenCode"
+      },
+      {
         "command": "opencode.reconnect",
         "title": "Reconnect",
         "category": "OpenCode"
