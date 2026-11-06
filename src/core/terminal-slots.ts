@@ -49,3 +49,20 @@ export function terminalsToClose(terminals: readonly Slot[], max: number): strin
     .slice(0, excess)
     .map((t) => t.id)
 }
+
+/**
+ * Should a new agent command bring its terminal to the front? `terminal.show(true)` keeps keyboard focus in the editor,
+ * but it still switches the panel's active terminal, so a user typing in their own terminal would lose it.
+ *
+ * Only an explicit "Show terminal" click reveals. Automatic reveal happens only when the user is not in a terminal of
+ * their own: no active terminal, or the active one is already ours (then switching between our terminals is harmless).
+ */
+export function shouldReveal(input: {
+  reveal: "onStart" | "never" | "off"
+  explicit: boolean
+  /** The panel's active terminal is one of ours (read-only, so switching away from it loses nothing), or there is none. */
+  activeIsOursOrNone: boolean
+}): boolean {
+  if (input.explicit) return true
+  return input.reveal === "onStart" && input.activeIsOursOrNone
+}

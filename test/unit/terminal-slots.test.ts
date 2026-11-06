@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { planTerminal, terminalsToClose, type Slot } from "../../src/core/terminal-slots"
+import { planTerminal, shouldReveal, terminalsToClose, type Slot } from "../../src/core/terminal-slots"
 
 const slot = (id: string, sessionID: string, n: number, busy: boolean, lastUsed = 0): Slot => ({ id, sessionID, slot: n, busy, lastUsed })
 
@@ -52,5 +52,22 @@ describe("terminalsToClose (maxOpen)", () => {
   })
   test("a limit below 1 keeps one", () => {
     expect(terminalsToClose([slot("a", "s1", 1, false), slot("b", "s2", 1, false)], 0)).toEqual(["a"])
+  })
+})
+
+describe("shouldReveal", () => {
+  const base = { reveal: "onStart" as const, explicit: false, activeIsOursOrNone: true }
+  test("an explicit Show terminal click always reveals", () => {
+    expect(shouldReveal({ ...base, explicit: true, reveal: "never", activeIsOursOrNone: false })).toBe(true)
+  })
+  test("never switches away from the user's own terminal", () => {
+    expect(shouldReveal({ ...base, activeIsOursOrNone: false })).toBe(false)
+  })
+  test("reveals on start when the panel shows none or one of ours", () => {
+    expect(shouldReveal(base)).toBe(true)
+  })
+  test("never and off do not reveal automatically", () => {
+    expect(shouldReveal({ ...base, reveal: "never" })).toBe(false)
+    expect(shouldReveal({ ...base, reveal: "off" })).toBe(false)
   })
 })

@@ -3,7 +3,7 @@ import { shortenHome } from "../core/paths"
 import type { Controller } from "../core/controller"
 import type { EventEnvelope } from "../core/api"
 import { ShellPager, type ShellPage, type ShellState } from "../core/shell-pager"
-import { planTerminal, terminalsToClose, type Slot } from "../core/terminal-slots"
+import { planTerminal, shouldReveal, terminalsToClose, type Slot } from "../core/terminal-slots"
 import { DEFAULT_COLUMNS, commandBlockText, endText, noticeText, sessionTerminalName, terminalName, toCrlf } from "../core/terminal-text"
 import { homedir } from "node:os"
 import type { TerminalSettings } from "./settings"
@@ -170,7 +170,11 @@ export class ShellTerminals implements vscode.Disposable {
       {},
       0,
     )
-    if (reveal) term.terminal.show(preserveFocus)
+    // `show(true)` keeps keyboard focus but still switches the active terminal: never take the panel from the user's own terminal.
+    const active = vscode.window.activeTerminal
+    const activeIsOursOrNone = !active || this.terms.some((t) => t.terminal === active)
+    const explicit = !preserveFocus
+    if (reveal && shouldReveal({ reveal: explicit ? "onStart" : this.settings().reveal, explicit, activeIsOursOrNone })) term.terminal.show(preserveFocus)
     void run.pager.run()
     this.trim()
     return true
