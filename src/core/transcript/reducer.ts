@@ -1,7 +1,9 @@
 import type { EventEnvelope, SessionMessageInfo } from "../api"
+import { baseName } from "../attachments"
 import { applyRevertEvent } from "./revert"
 import {
   emptyView,
+  type FileChip,
   type Outcome,
   type SessionView,
   type StepItem,
@@ -30,6 +32,17 @@ export function contentText(content: Content): string {
 
 const record = (v: unknown): Record<string, unknown> =>
   v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {}
+
+/** Chips for the files of a user message (history items carry `name`/`mime`/`source`; live payloads carry `uri`/`name`). */
+export function fileChips(files: unknown): FileChip[] | undefined {
+  if (!Array.isArray(files) || files.length === 0) return undefined
+  return files.map((f: any) => {
+    const uri: string = typeof f?.source?.uri === "string" ? f.source.uri : typeof f?.uri === "string" ? f.uri : ""
+    const name = typeof f?.name === "string" && f.name ? f.name : baseName(uri) || "file"
+    const mime = typeof f?.mime === "string" ? f.mime : uri.startsWith("data:") ? /^data:([^;,]+)/.exec(uri)?.[1] : undefined
+    return { name, mime }
+  })
+}
 
 const errorText = (e: unknown): string | undefined => {
   if (!e) return undefined
@@ -91,7 +104,7 @@ export function viewFromMessages(messages: ReadonlyArray<SessionMessageInfo>): S
   for (const raw of messages) {
     const m = raw as any
     if (m.type === "user") {
-      current = { id: m.id, user: { id: m.id, text: m.text ?? "", created: m.time?.created }, steps: [], started: m.time?.created }
+      current = { id: m.id, user: { id: m.id, text: m.text ?? "", created: m.time?.created, files: fileChips(m.files) }, steps: [], started: m.time?.created }
       turns.push(current)
     } else if (m.type === "assistant") {
       if (!current || current.outcome) {
@@ -220,7 +233,7 @@ export function applyEvent(view: SessionView, ev: EventEnvelope): SessionView {
     case "session.inbox.enqueued": {
       const item = d.item
       if (item?.type !== "user" || view.queued.some((q) => q.id === d.inboxID)) return view
-      return { ...view, queued: [...view.queued, { id: d.inboxID, text: item.payload?.text ?? "" }] }
+      return { ...view, queued: [...view.queued, { id: d.inboxID, text: item.payload?.text ?? "", files: fileChips(item.payload?.files) }] }
     }
     case "session.inbox.delivered": {
       const queued = view.queued.find((q) => q.id === d.inboxID)
@@ -229,7 +242,7 @@ export function applyEvent(view: SessionView, ev: EventEnvelope): SessionView {
       const last = view.turns[view.turns.length - 1]
       // A message delivered mid-turn (steer) belongs to the running turn's context, not a new turn.
       if (last && !last.outcome && last.steps.length > 0) return { ...view, queued: rest }
-      const turn: TurnView = { id: d.inboxID, user: { id: d.inboxID, text: queued.text, created: t }, steps: [], started: t }
+      const turn: TurnView = { id: d.inboxID, user: { id: d.inboxID, text: queued.text, created: t, files: queued.files }, steps: [], started: t }
       const turns = last && !last.outcome && !last.user && last.steps.length === 0 ? replaceAt(view.turns, view.turns.length - 1, turn) : [...view.turns, turn]
       return { ...view, queued: rest, turns }
     }

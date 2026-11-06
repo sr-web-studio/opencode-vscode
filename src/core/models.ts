@@ -44,6 +44,18 @@ export function pinnedModels(models: ReadonlyArray<SlimModel>, pins: ReadonlyArr
   return pins.flatMap((k) => (byKey.has(k) ? [byKey.get(k)!] : []))
 }
 
+export type ModelSection = { id: string; title: string; pinned: boolean; models: SlimModel[] }
+
+/** The picker's sections: "Pinned" first (when there are matches), then one group per provider. Pinned models appear in both. */
+export function modelSections(input: ModelQueryInput & { pins: ReadonlyArray<string> }): ModelSection[] {
+  const groups = groupModels(input)
+  const matching = new Set(groups.flatMap((g) => g.models.map((m) => `${m.providerID}/${m.id}`)))
+  const pinned = pinnedModels(input.models, input.pins).filter((m) => matching.has(`${m.providerID}/${m.id}`))
+  const out: ModelSection[] = pinned.length ? [{ id: "pinned", title: "Pinned", pinned: true, models: pinned }] : []
+  for (const g of groups) out.push({ id: g.providerID, title: g.providerName, pinned: false, models: g.models })
+  return out
+}
+
 export type ModelSelection = { id: string; providerID: string; variant?: string }
 
 export const sameModel = (a: ModelSelection | undefined, b: { id: string; providerID: string }) =>

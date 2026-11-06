@@ -40,7 +40,7 @@ export type TurnView = {
   id: string
   /** Set on a marker turn that holds only a compaction summary (no user text, no steps). */
   compaction?: CompactionView
-  user?: { id: string; text: string; created?: number }
+  user?: { id: string; text: string; created?: number; files?: FileChip[] }
   steps: StepView[]
   started?: number
   ended?: number
@@ -49,7 +49,10 @@ export type TurnView = {
   error?: string
 }
 
-export type QueuedMessage = { id: string; text: string }
+/** An attachment of a sent prompt, shown as a chip under its text. Never carries the file data. */
+export type FileChip = { name: string; mime?: string }
+
+export type QueuedMessage = { id: string; text: string; files?: FileChip[] }
 
 /** A staged rollback: the boundary prompt and how many files the server restored (0 = none, or no snapshot). */
 export type RevertState = { messageID: string; files: number }

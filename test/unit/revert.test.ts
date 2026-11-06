@@ -97,3 +97,19 @@ describe("feature detection", () => {
     expect(canRevert({ session: { revert: { stage: () => {} } } })).toBe(true)
   })
 })
+
+describe("attachments on user turns", () => {
+  test("history and live prompts carry chips (names only, never the data)", () => {
+    const v = viewFromMessages([
+      { id: "u", type: "user", text: "look", files: [{ data: "AAAA", mime: "image/png", source: { type: "uri", uri: "file:///c%3A/Users/me/shot%201.png" }, name: "shot 1.png" }, { data: "x", mime: "text/plain", source: { type: "inline" } }] },
+    ] as any)
+    expect(v.turns[0]!.user!.files).toEqual([{ name: "shot 1.png", mime: "image/png" }, { name: "file", mime: "text/plain" }])
+    const live = applyEvent(
+      { turns: [], queued: [], loaded: true },
+      { id: "e", type: "session.inbox.enqueued", created: 1, data: { inboxID: "i1", item: { type: "user", payload: { text: "hi", files: [{ uri: "data:image/png;base64,AAAA", name: "pasted.png" }] } } } },
+    )
+    expect(live.queued[0]!.files).toEqual([{ name: "pasted.png", mime: "image/png" }])
+    const delivered = applyEvent(live, { id: "e2", type: "session.inbox.delivered", created: 2, data: { inboxID: "i1" } })
+    expect(delivered.turns[0]!.user!.files).toEqual([{ name: "pasted.png", mime: "image/png" }])
+  })
+})
