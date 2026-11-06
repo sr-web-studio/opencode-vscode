@@ -140,13 +140,13 @@ describe("DictationSession", () => {
     expect(updates.at(-1)).toMatchObject({ kind: "done" })
   })
 
-  test("a microphone that sends only zeros is reported within 2 s, with the Windows privacy hint", async () => {
+  test("a microphone that sends only zeros is reported within 2 s and points to Test Microphone", async () => {
     const { rec, sock, updates } = setup()
     sock.open()
     for (let i = 0; i < 20; i++) { rec.frame([0, 0, 1]); await wait(1) }
     const done = updates.at(-1)
     expect(done).toMatchObject({ kind: "done", final: "" })
-    expect(done && "error" in done && done.error).toContain("Let desktop apps access your microphone")
+    expect(done && "error" in done && done.error).toContain("Test Microphone")
     expect(sock.closed).toBe(true)
   })
 
