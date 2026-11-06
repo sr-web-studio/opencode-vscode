@@ -27,4 +27,14 @@ Every download is checked against a pinned checksum before it is used.
 - **Diagnostics:** the "OpenCode Voice" output channel (or **OpenCode Voice: Show Log**) lists the engine, platform, VS Code's
   Electron/Node versions, load times and each recognized segment.
 
+## Window attention
+
+When OpenCode finishes or needs your answer while this VS Code window is not in front, the companion makes the window ask for attention on the computer in front of you (setting `opencode.notifications.os`, `auto` by default; `off` keeps notifications inside VS Code):
+
+- **Windows:** the taskbar button of this window flashes until you bring it to the front. A small PowerShell helper (started on first use, stopped after 10 idle minutes) calls the system's `FlashWindowEx`; nothing is installed and the focus is never moved.
+- **Linux (X11):** the window is marked as needing attention with `wmctrl`, else a `notify-send` notification. Wayland: `notify-send` only.
+- **macOS:** a system notification (another program cannot bounce VS Code's Dock icon).
+
+Check it with **OpenCode Voice: Test Window Attention**: switch to another window within 5 seconds. The "OpenCode Voice" output channel lists the windows it saw and the one it picked.
+
 Audio capture uses [`@picovoice/pvrecorder-node`](https://github.com/Picovoice/pvrecorder) (Apache-2.0).

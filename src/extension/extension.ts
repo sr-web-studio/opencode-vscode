@@ -77,7 +77,7 @@ export function activate(context: vscode.ExtensionContext): void {
       await controller.dispatch({ type: "permission", sessionID: cmd.sessionID, requestID: cmd.requestID, decision: cmd.decision })
     }
   }
-  const notifier = new VscodeNotifier(runNotice)
+  const notifier = new VscodeNotifier(runNotice, { os: () => readNotificationSettings().os, log: (line) => output.debug(line) })
   const engine = new NotificationEngine({
     directory,
     settings: readNotificationSettings,

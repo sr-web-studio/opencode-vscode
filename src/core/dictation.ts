@@ -108,6 +108,10 @@ export const COMPANION = {
   chooseMicrophone: "opencode.companion.voice.chooseMicrophone",
   /** Show the companion's "OpenCode Voice" output channel (diagnostics of the on-device engine). */
   showLog: "opencode.companion.voice.showLog",
+  /** Ask the operating system to draw attention to this window (taskbar flash). Argument: `AttentionRequest`. */
+  attention: "opencode.companion.attention",
+  /** Palette command of the companion: waits 5 s, then asks for attention (to test it from another window). */
+  testAttention: "opencode.companion.testAttention",
 } as const
 
 /** Which engine turns speech into text: on this computer (free, offline) or Soniox (cloud, the user's own key). */
@@ -122,7 +126,16 @@ export type VoiceFix = "micSettings" | "chooseMicrophone" | "showLog"
 export const VOICE_FEED_COMMAND = "opencode.voice.feed"
 
 /** `local`: this computer has a build of the on-device engine (the microphone may work without it). */
-export type CompanionInfo = { version: string; capture: boolean; problem?: string; platform?: string; local?: boolean; localProblem?: string }
+export type CompanionInfo = {
+  version: string
+  capture: boolean
+  problem?: string
+  platform?: string
+  local?: boolean
+  localProblem?: string
+  /** The companion can ask the OS to draw attention to the window (`COMPANION.attention`). Missing in older versions. */
+  attention?: boolean
+}
 
 export type VoiceStartArgs = {
   /** Correlates feed updates with this recording. */

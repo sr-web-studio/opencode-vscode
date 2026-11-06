@@ -7,6 +7,8 @@ import { IntegrityError, ensureLocal, isInstalled, localState, missingBytes } fr
 import { envWithNative } from "./sherpa"
 import { WINDOWS_QUERIES, deniedMessage, micSettingsTarget, windowsMicPermission, type MicPermission } from "./privacy"
 import { SILENT_PEAK, type SessionUpdate } from "./session"
+import { identityOf, normalizeRequest, type AttentionRequest } from "../core/attention"
+import { WindowsHelper, askForAttention, type AttentionResult } from "./attention"
 
 /**
  * OpenCode Voice: the laptop side of voice input. It runs where VS Code's window runs (`extensionKind: ["ui"]`), also
@@ -24,6 +26,7 @@ const SUPPORTED = new Set(["win32/x64", "win32/arm64", "darwin/x64", "darwin/arm
 
 let current: { id: string; child: ChildProcess; done: boolean } | undefined
 let log: vscode.LogOutputChannel
+let attentionHelper: WindowsHelper | undefined
 
 export function activate(context: vscode.ExtensionContext): void {
   log = vscode.window.createOutputChannel("OpenCode Voice", { log: true })
@@ -41,6 +44,7 @@ export function activate(context: vscode.ExtensionContext): void {
         platform: process.platform,
         problem: capture ? undefined : `Voice recording is not available on ${platform}.`,
         local,
+        attention: true,
         localProblem: local ? undefined : `The on-device engine is not available on ${platform}${capture ? " (the microphone works: use the Soniox engine)" : ""}. It runs on: ${SHERPA_PLATFORMS.join(", ")}.`,
       }
     }),
@@ -49,12 +53,72 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand(COMPANION.start, (args: VoiceStartArgs) => start(context, args)),
     vscode.commands.registerCommand(COMPANION.stop, (id?: string) => stop(id)),
     vscode.commands.registerCommand(COMPANION.chooseMicrophone, () => chooseMicrophone(context)),
+    vscode.commands.registerCommand(COMPANION.attention, (raw?: unknown) => attention(normalizeRequest(raw))),
+    vscode.commands.registerCommand(COMPANION.testAttention, () => testAttention()),
     { dispose: () => kill() },
+    { dispose: () => disposeAttention() },
   )
 }
 
 export function deactivate(): void {
   kill()
+  disposeAttention()
+}
+
+/* ------------------------------------------------------------ window attention */
+
+/** What this window's title bar shows, as far as this (UI) host can tell. Remote windows may or may not carry ` [SSH: host]`. */
+function windowIdentity() {
+  return identityOf({
+    workspaceName: vscode.workspace.name,
+    appName: vscode.env.appName,
+    remoteName: vscode.env.remoteName,
+    authority: vscode.workspace.workspaceFolders?.[0]?.uri.authority,
+  })
+}
+
+function disposeAttention(): void {
+  attentionHelper?.dispose()
+  attentionHelper = undefined
+}
+
+function describeResult(r: AttentionResult): string {
+  const chosen = r.chosen.length ? ` chosen: ${r.chosen.map((t) => JSON.stringify(t)).join(", ")};` : ""
+  return `${r.ok ? "ok" : "failed"} via ${r.method} in ${r.ms} ms;${chosen}${r.problem ? ` ${r.problem};` : ""} candidates: ${r.candidates.map((t) => JSON.stringify(t)).join(", ") || "-"}`
+}
+
+/** Ask the operating system to draw attention to this window. Does nothing when the window is focused. */
+async function attention(req: AttentionRequest, force = false): Promise<AttentionResult | undefined> {
+  try {
+    if (!force && vscode.window.state.focused) return undefined
+    attentionHelper ??= new WindowsHelper({ log: (l) => log.info(l) })
+    const who = windowIdentity()
+    log.info(`Attention (${req.kind}): asking for it; window ${JSON.stringify({ root: who.rootName, app: who.appName, remote: who.remoteName, host: who.remoteHost })}`)
+    const result = await askForAttention(attentionHelper, who, req, (l) => log.info(l))
+    if (result.ok) log.info(`Attention: ${describeResult(result)}`)
+    else log.warn(`Attention: ${describeResult(result)}`)
+    return result
+  } catch (e) {
+    log.warn(`Attention failed: ${e instanceof Error ? e.message : e}`)
+    return undefined
+  }
+}
+
+/** The palette command: lets the user check the whole path from another window. */
+async function testAttention(): Promise<void> {
+  void vscode.window.showInformationMessage("OpenCode Voice: switch to another window now. This VS Code window will ask for attention in 5 seconds.")
+  await new Promise((resolve) => setTimeout(resolve, 5000))
+  const result = await attention({ kind: "completed", title: "OpenCode", body: "Test: this window asked for attention." })
+  if (!result) {
+    const message = vscode.window.state.focused
+      ? "OpenCode Voice: this window is in front, so it did not ask for attention. Switch to another window during the 5 seconds and try again."
+      : "OpenCode Voice: asking for attention failed."
+    void vscode.window.showWarningMessage(message, "Show Log").then((pick) => pick && log.show(true))
+    return
+  }
+  if (!result.ok) {
+    void vscode.window.showWarningMessage(`OpenCode Voice: could not ask for attention (${result.problem ?? "unknown reason"}).`, "Show Log").then((pick) => pick && log.show(true))
+  }
 }
 
 function feed(update: VoiceFeed): void {

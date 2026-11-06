@@ -43,7 +43,9 @@
     "onCommand:opencode.companion.voice.stop",
     "onCommand:opencode.companion.voice.chooseMicrophone",
     "onCommand:opencode.companion.voice.micSettings",
-    "onCommand:opencode.companion.voice.showLog"
+    "onCommand:opencode.companion.voice.showLog",
+    "onCommand:opencode.companion.attention",
+    "onCommand:opencode.companion.testAttention"
   ],
   "contributes": {
     "commands": [
@@ -60,6 +62,11 @@
       {
         "command": "opencode.companion.voice.micSettings",
         "title": "Open Microphone Settings",
+        "category": "OpenCode Voice"
+      },
+      {
+        "command": "opencode.companion.testAttention",
+        "title": "Test Window Attention",
         "category": "OpenCode Voice"
       }
     ]

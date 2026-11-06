@@ -213,10 +213,10 @@
           ],
           "default": "auto",
           "enumDescriptions": [
-            "Use an OS notifier when one is installed (a later companion extension); VS Code notifications otherwise.",
+            "Also ask the OS for attention through the OpenCode Voice companion when this window is not focused: the taskbar button flashes (Windows), the window is marked as needing attention (Linux X11), or an OS notification appears (macOS).",
             "VS Code notifications only."
           ],
-          "markdownDescription": "Delivery channel. In this version notifications are always shown inside VS Code; `auto` is reserved for the OS-notifier companion."
+          "markdownDescription": "Delivery channel. A VS Code notification is always shown. `auto` also asks the operating system for attention through the OpenCode Voice companion when this window is not focused: the taskbar button flashes (Windows), the window is marked as needing attention (Linux X11) or an OS notification appears (macOS). `off` shows VS Code notifications only."
         },
         "opencode.terminal.reveal": {
           "type": "string",
