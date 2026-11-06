@@ -86,6 +86,20 @@ Salim installed the M1 vsix locally on Windows (OpenCode 2.1.4 there, workspace 
     - Hovering shows the full date and time.
     - A running turn shows no timestamp yet.
     - The `N steps completed` line keeps its own duration. Put the formatter in a pure module with unit tests (fixed clock and time zone).
+17. **Round 2b fixes (after 0.2.0 screenshots):**
+    - **Turn separation:**
+      - The gap between turns grows to ~40px (`--oc-turn-gap`), and a thin hairline divider sits midway between turns.
+      - The user prompt must read as a clearly different speaker. It is a card with:
+        - a header row: `account` codicon + **You** (semibold) on the left, and the prompt's compact time on the right (muted, same formatter, full date on hover)
+        - a visible 1px border (`--vscode-input-border`, falling back to `--oc-hairline`), a 3px accent left border (`--vscode-textLink-foreground`) and `--vscode-input-background`
+        - 10px/14px padding
+      - The agent's part starts with ~12px top space after the card.
+      - The theme background used in 0.2.0 was nearly invisible in dark themes.
+    - **Timestamps everywhere:** every user prompt shows its own time in its header.
+      - Every finished agent turn shows `time · duration`.
+      - When `outcome` is missing (turns loaded from history without an execution event), fall back to the last step or message time. This way no completed turn is left without a time.
+      - A running turn still shows none.
+    - **Full shell command:** when a shell line is expanded, the block starts with the full command: `$ <command>`, wrapped, monospace, with a copy button. The output follows. The collapsed line keeps the one-line ellipsis plus the hover title.
 10. **Edit session title**: a pencil icon on hover next to the header title (and F2 / double-click) turns it into an inline input. Enter saves via `session.update({ title })`, and Esc cancels. The session dropdown rows also get a rename action on hover.
 
 ## Voice input (proposed 2026-11-06, decision pending)
