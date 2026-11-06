@@ -50,7 +50,14 @@ export type TurnView = {
 }
 
 /** An attachment of a sent prompt, shown as a chip under its text. Never carries the file data. */
-export type FileChip = { name: string; mime?: string }
+export type FileChip = {
+  name: string
+  mime?: string
+  /** `file://` URI of an attached file: clicking the chip opens it. Never a `data:` URI. */
+  uri?: string
+  /** Where an image's bytes are. The host serves them on request, so the state never carries base64. */
+  ref?: { messageID: string; index: number }
+}
 
 export type QueuedMessage = { id: string; text: string; files?: FileChip[] }
 

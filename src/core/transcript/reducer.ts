@@ -1,5 +1,6 @@
 import type { EventEnvelope, SessionMessageInfo } from "../api"
-import { baseName } from "../attachments"
+import { baseName, isFileUri, isImageMime, mimeFromName } from "../attachments"
+import { attachmentSource } from "../images"
 import { settledTurn } from "./turn"
 import { applyRevertEvent } from "./revert"
 import {
@@ -34,14 +35,21 @@ export function contentText(content: Content): string {
 const record = (v: unknown): Record<string, unknown> =>
   v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {}
 
-/** Chips for the files of a user message (history items carry `name`/`mime`/`source`; live payloads carry `uri`/`name`). */
-export function fileChips(files: unknown): FileChip[] | undefined {
+/**
+ * Chips for the files of a user message (history items carry `name`/`mime`/`data`/`source`; live payloads carry `uri`/`name`).
+ * The image data itself is never kept: an image gets a `ref` (message id and position) and the host serves the bytes.
+ * A `file://` attachment also keeps its URI so the chip can open the file.
+ */
+export function fileChips(files: unknown, messageID?: string): FileChip[] | undefined {
   if (!Array.isArray(files) || files.length === 0) return undefined
-  return files.map((f: any) => {
-    const uri: string = typeof f?.source?.uri === "string" ? f.source.uri : typeof f?.uri === "string" ? f.uri : ""
-    const name = typeof f?.name === "string" && f.name ? f.name : baseName(uri) || "file"
-    const mime = typeof f?.mime === "string" ? f.mime : uri.startsWith("data:") ? /^data:([^;,]+)/.exec(uri)?.[1] : undefined
-    return { name, mime }
+  return files.map((f: any, index) => {
+    const raw: string = typeof f?.source?.uri === "string" ? f.source.uri : typeof f?.uri === "string" ? f.uri : ""
+    const name = typeof f?.name === "string" && f.name ? f.name : raw && !raw.startsWith("data:") ? baseName(raw) : "file"
+    const mime = typeof f?.mime === "string" ? f.mime : raw.startsWith("data:") ? /^data:([^;,]+)/.exec(raw)?.[1] : mimeFromName(name)
+    const chip: FileChip = { name: name || "file", mime }
+    if (isFileUri(raw)) chip.uri = raw
+    if (messageID && isImageMime(mime) && attachmentSource(f)) chip.ref = { messageID, index }
+    return chip
   })
 }
 
@@ -110,7 +118,7 @@ export function viewFromMessages(messages: ReadonlyArray<SessionMessageInfo>): S
         const done = settledTurn(current, { last: false, running: false })
         turns[turns.indexOf(current)] = done
       }
-      current = { id: m.id, user: { id: m.id, text: m.text ?? "", created: m.time?.created, files: fileChips(m.files) }, steps: [], started: m.time?.created }
+      current = { id: m.id, user: { id: m.id, text: m.text ?? "", created: m.time?.created, files: fileChips(m.files, m.id) }, steps: [], started: m.time?.created }
       turns.push(current)
     } else if (m.type === "assistant") {
       if (!current || current.outcome) {
@@ -239,7 +247,7 @@ export function applyEvent(view: SessionView, ev: EventEnvelope): SessionView {
     case "session.inbox.enqueued": {
       const item = d.item
       if (item?.type !== "user" || view.queued.some((q) => q.id === d.inboxID)) return view
-      return { ...view, queued: [...view.queued, { id: d.inboxID, text: item.payload?.text ?? "", files: fileChips(item.payload?.files) }] }
+      return { ...view, queued: [...view.queued, { id: d.inboxID, text: item.payload?.text ?? "", files: fileChips(item.payload?.files, d.inboxID) }] }
     }
     case "session.inbox.delivered": {
       const queued = view.queued.find((q) => q.id === d.inboxID)

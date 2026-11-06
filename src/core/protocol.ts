@@ -2,6 +2,7 @@ import type { FormInfo, PermissionRequest, SessionInfo, SlimModel, SlimProvider 
 import type { ViewTarget } from "./draft"
 import type { ModelSelection } from "./models"
 import type { PromptFile } from "./attachments"
+import type { ImageRef } from "./images"
 import type { SessionView } from "./transcript/types"
 import type { Worker } from "./workers"
 
@@ -126,6 +127,8 @@ export type ToWebview =
   | { type: "state"; state: AppState }
   | { type: "command"; name: "newSession" }
   | { type: "picked"; requestID: string; files: PickedFile[] }
+  /** The answer to `imageData`: a `data:` URI, or nothing when the image is gone or unreadable. */
+  | { type: "image"; requestID: string; dataUri?: string }
 
 /** A file chosen in the host's file dialog. `uri` is `vscode.Uri.file(path).toString()`. */
 export type PickedFile = { uri: string; name: string; mime?: string }
@@ -133,6 +136,10 @@ export type PickedFile = { uri: string; name: string; mime?: string }
 /** Host-side effects the webview asks for (files, terminals, links). Not state changes. */
 export type HostRequest =
   | { type: "openFile"; path: string; line?: number }
+  /** The bytes of a sent image, asked for lazily when its thumbnail scrolls into view. Answered with `image`. */
+  | { type: "imageData"; requestID: string; ref: ImageRef }
+  /** Open a sent image in the host's viewer (VS Code: the built-in image viewer). */
+  | { type: "openImage"; ref: ImageRef; name?: string }
   | { type: "openDiff"; file: string; patch: string }
   | { type: "showTerminal"; shellID: string; title?: string; sessionID?: string }
   | { type: "openSession"; id: string; readOnly: boolean }

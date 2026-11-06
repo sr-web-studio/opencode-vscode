@@ -120,3 +120,12 @@ export function droppedFileUris(data: { uriList?: string; codeUriList?: string; 
   for (const line of (data.text ?? "").split(/\r?\n/)) push(line)
   return out
 }
+
+/** `data:<mime>;base64,<data>` split into its parts. Undefined for anything that is not a base64 data URI. */
+export function parseDataUri(uri: string): { mime: string; base64: string } | undefined {
+  const m = /^data:([^;,]+)((?:;[^;,]+)*),([\s\S]*)$/.exec(uri)
+  if (!m || !/;base64/i.test(m[2]!)) return undefined
+  return { mime: m[1]!, base64: m[3]! }
+}
+
+export const isFileUri = (s: string): boolean => /^file:\/\//i.test(s)
