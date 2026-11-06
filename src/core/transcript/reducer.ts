@@ -5,6 +5,7 @@ import { settledTurn } from "./turn"
 import { applyRevertEvent } from "./revert"
 import {
   emptyView,
+  type CompactionView,
   type FileChip,
   type Outcome,
   type SessionView,
@@ -134,17 +135,26 @@ export function viewFromMessages(messages: ReadonlyArray<SessionMessageInfo>): S
         current = undefined
       }
     } else if (m.type === "compaction" && m.status === "completed") {
-      turns.push(compactionTurn(m.id, m.summary, m.reason, m.time?.created))
-      current = undefined
+      if (current && !current.outcome) {
+        // An auto compaction runs inside a turn (prompt, compaction, answer): it is a line of that turn.
+        current.compacted = compactionView(m.summary, m.reason, m.time?.created)
+      } else {
+        turns.push(compactionTurn(m.id, m.summary, m.reason, m.time?.created))
+        current = undefined
+      }
     }
   }
   return { turns, queued: [], loaded: true }
 }
 
+function compactionView(summary: unknown, reason: unknown, created: number | undefined): CompactionView {
+  return { summary: typeof summary === "string" ? summary : "", reason: typeof reason === "string" ? reason : undefined, created }
+}
+
 function compactionTurn(id: string, summary: unknown, reason: unknown, created: number | undefined): TurnView {
   return {
     id: `compaction:${id}`,
-    compaction: { summary: typeof summary === "string" ? summary : "", reason: typeof reason === "string" ? reason : undefined, created },
+    compaction: compactionView(summary, reason, created),
     steps: [],
     started: created,
     ended: created,
@@ -312,9 +322,12 @@ export function applyEvent(view: SessionView, ev: EventEnvelope): SessionView {
         })),
       )
     case "session.compaction.ended": {
-      // The summary replaces what came before. Close any open turn first so the marker sits after it.
-      const closed = view.turns.length && !view.turns[view.turns.length - 1]!.outcome ? finishTurn(view, "succeeded", t) : view
-      return { ...closed, turns: [...closed.turns, compactionTurn(`live:${ev.id ?? closed.turns.length}`, d.text, d.reason, t)] }
+      // Inside a running turn (auto compaction) the line belongs to that turn, so the answer that follows keeps its prompt.
+      // Between turns it is a marker turn of its own.
+      const idx = view.turns.length - 1
+      const last = view.turns[idx]
+      if (last && !last.outcome) return { ...view, turns: replaceAt(view.turns, idx, { ...last, compacted: compactionView(d.text, d.reason, t) }) }
+      return { ...view, turns: [...view.turns, compactionTurn(`live:${ev.id ?? view.turns.length}`, d.text, d.reason, t)] }
     }
     case "session.execution.succeeded":
       return finishTurn(view, "succeeded", t)

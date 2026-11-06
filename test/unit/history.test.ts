@@ -3,6 +3,8 @@ import { initialHistory, loadChunk, type FetchPage, type RawMessage } from "../.
 
 const msg = (n: number, type = "assistant", extra: Record<string, unknown> = {}): RawMessage => ({ id: `m${n}`, type, ...extra })
 const compaction = (n: number, status = "completed"): RawMessage => msg(n, "compaction", { status, summary: `summary ${n}` })
+/** A compaction between turns follows the `idle` message that ended the turn before it. */
+const idle = (n: number): RawMessage => msg(n, "idle", { outcome: "succeeded" })
 
 /** Fake `message.list`: `all` is oldest first; pages are served newest first with string cursors. */
 function fake(all: RawMessage[], pageSize = 4) {
@@ -26,10 +28,10 @@ const ids = (c: { messages: RawMessage[] }) => c.messages.map((m) => m.id)
 
 describe("history paging", () => {
   test("stops at the newest completed compaction and includes it, oldest first", async () => {
-    const all = [msg(1), msg(2), compaction(3), msg(4), msg(5), msg(6)]
+    const all = [msg(1), msg(2), idle(3), compaction(4), msg(5), msg(6), msg(7)]
     const { fetch } = fake(all)
     const chunk = await loadChunk(fetch)
-    expect(ids(chunk)).toEqual(["m3", "m4", "m5", "m6"])
+    expect(ids(chunk)).toEqual(["m4", "m5", "m6", "m7"])
     expect(chunk.hasMore).toBe(true)
   })
 
@@ -69,14 +71,14 @@ describe("history paging", () => {
   })
 
   test("'Show earlier messages' continues from the saved state, with no gap and no overlap", async () => {
-    const all = [msg(1), msg(2), compaction(3), msg(4), msg(5), compaction(6), msg(7), msg(8)]
+    const all = [msg(1), msg(2), idle(3), compaction(4), msg(5), msg(6), idle(7), compaction(8), msg(9), msg(10)]
     const { fetch, calls } = fake(all, 3)
     const first = await loadChunk(fetch)
-    expect(ids(first)).toEqual(["m6", "m7", "m8"])
+    expect(ids(first)).toEqual(["m8", "m9", "m10"])
     const second = await loadChunk(fetch, first.state)
-    expect(ids(second)).toEqual(["m3", "m4", "m5"])
+    expect(ids(second)).toEqual(["m4", "m5", "m6", "m7"])
     const third = await loadChunk(fetch, second.state)
-    expect(ids(third)).toEqual(["m1", "m2"])
+    expect(ids(third)).toEqual(["m1", "m2", "m3"])
     expect(third.hasMore).toBe(false)
     const all3 = [...third.messages, ...second.messages, ...first.messages].map((m) => m.id)
     expect(all3).toEqual(all.map((m) => m.id))
@@ -85,13 +87,13 @@ describe("history paging", () => {
   })
 
   test("leftover messages of a page that crossed a boundary are used before fetching again", async () => {
-    const all = [msg(1), compaction(2), msg(3), compaction(4), msg(5)]
+    const all = [msg(1), idle(2), compaction(3), msg(4), idle(5), compaction(6), msg(7)]
     const { fetch, calls } = fake(all, 10)
     const first = await loadChunk(fetch)
-    expect(ids(first)).toEqual(["m4", "m5"])
-    expect(first.state.leftover.length).toBe(3)
+    expect(ids(first)).toEqual(["m6", "m7"])
+    expect(first.state.leftover.length).toBe(5)
     const second = await loadChunk(fetch, first.state)
-    expect(ids(second)).toEqual(["m2", "m3"])
+    expect(ids(second)).toEqual(["m3", "m4", "m5"])
     expect(calls.length).toBe(1)
     expect(second.hasMore).toBe(true)
   })

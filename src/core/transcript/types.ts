@@ -40,6 +40,8 @@ export type TurnView = {
   id: string
   /** Set on a marker turn that holds only a compaction summary (no user text, no steps). */
   compaction?: CompactionView
+  /** An (auto) compaction that happened inside this turn: shown as a muted line between the prompt and the answer. */
+  compacted?: CompactionView
   user?: { id: string; text: string; created?: number; files?: FileChip[] }
   steps: StepView[]
   started?: number

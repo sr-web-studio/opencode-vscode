@@ -1,0 +1,15 @@
+{
+  "_comment": "Shape of an auto compaction inside a turn, from a real session (checked live on OpenCode 2.2.5): types, statuses and ids only. No text, no summary body.",
+  "messages": [
+    { "id": "msg_01", "type": "user", "time": { "created": 1000 } },
+    { "id": "msg_02", "type": "assistant", "time": { "created": 1010 }, "finish": "stop", "content": [] },
+    { "id": "msg_03", "type": "idle", "outcome": "succeeded", "time": { "created": 1020 } },
+    { "id": "msg_04", "type": "user", "time": { "created": 2000 } },
+    { "id": "msg_05", "type": "assistant", "time": { "created": 2010 }, "finish": "tool-calls", "content": [] },
+    { "id": "msg_06", "type": "user", "time": { "created": 3000 } },
+    { "id": "msg_07", "type": "compaction", "status": "completed", "reason": "auto", "time": { "created": 3018 } },
+    { "id": "msg_08", "type": "assistant", "time": { "created": 3100 }, "finish": "tool-calls", "content": [] },
+    { "id": "msg_09", "type": "assistant", "time": { "created": 3200 }, "finish": "stop", "content": [] },
+    { "id": "msg_10", "type": "idle", "outcome": "succeeded", "time": { "created": 3300 } }
+  ]
+}
