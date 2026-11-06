@@ -18,6 +18,31 @@ Chosen UI direction: `docs/mockups/v2/` (compact, Claude Code style). The first 
 - Comfortable spacing, readable font, theme colors only from `--vscode-*` variables. Markdown answers have proper paragraph and list spacing.
 - A slim "Background · 2 workers, 1 shell" row sits above the transcript and expands into a list.
 
+## Round 2 feedback (2026-11-06, after first real use on Windows)
+
+Salim installed the M1 vsix locally on Windows (OpenCode 2.1.4 there, workspace `Downloads`) and used it. Changes:
+
+1. **Worker work must be visible** (moved forward from M4). A `subagent` tool line shows the agent name + description and a status. Clicking it opens the child session as a **read-only editor tab** (WebviewPanel, same transcript components, no prompt box), which updates live. The "Background · N workers, N shells" row above the transcript lists running and finished workers, and each one opens the same tab. In the mobile app this becomes a pushed screen through the `HostBridge` (`openSession(id, {readOnly})`).
+2. **Bigger, airier text.** The default `opencode.transcript.fontSize` = `max(VS Code chat font size, 14)`, line-height 1.6, paragraph spacing ≈ 0.75em, and side padding ≥ 16px. Muted text is never smaller than 0.9em.
+3. **Icons**: use `@vscode/codicons` (font bundled in the webview) for the chevrons, `+`, paperclip, send, stop, edit and the per-tool icons. No Unicode `⌄`/`›` glyphs.
+4. **Display casing**: agent names and tool names are shown capitalized (`Assistant`, `Build`, `Shell`, `Read`). The ids sent to the API stay unchanged.
+5. **Pinned models**: a pin icon on hover in the model popover. Pinned models appear in a "Pinned" group at the top. They are stored in the extension's `globalState` (synced), never in OpenCode config.
+6. **Tool lines with room and color**:
+   - each step row is ~28px high with 4–6px vertical gap
+   - a codicon per tool (terminal, file, search, edit, globe, organization for agents, question)
+   - the tool name is in the normal foreground color, semibold; the target is muted
+   - hovering a row highlights it (`--vscode-list-hoverBackground`)
+   - the steps group gets a left connector with dots
+7. **Shell lines get color**: a `$` prompt in the terminal ANSI green, the command in the editor monospace font with a subtle `--vscode-textCodeBlock-background` chip, and an exit badge (`✓ 0` in `terminal.ansiGreen`, `✗ 1` in `terminal.ansiRed`). Expanded output is shown in a dark code block with ANSI colors rendered (simple ANSI → span converter).
+8. **Prompt box**: at least 2 lines tall, auto-grows to about 12 lines.
+9. **Attachments** (OpenCode V2 `files[]` on `session.prompt`, each `{ uri, name?, description? }`):
+   - a paperclip button opens the VS Code file picker (`showOpenDialog`, multi-select). It sends `file://` URIs, built with `vscode.Uri.file(...).toString()`, so Windows paths work.
+   - paste or drag an image into the prompt box sends it as a `data:<mime>;base64,…` URI (≤ 20 MiB per item)
+   - dragging a file from the Explorer adds it as a `file://` URI
+   - attachments show as small removable chips above the textarea, with an image thumbnail where applicable
+   - if the current model's `capabilities.input` does not include `image`, show a muted warning on image chips
+10. **Edit session title**: a pencil icon on hover next to the header title (and F2 / double-click) turns it into an inline input. Enter saves via `session.update({ title })`, and Esc cancels. The session dropdown rows also get a rename action on hover.
+
 ## Controls (approved 2026-11-06, mockups in `docs/mockups/v3/`)
 
 - **Agent / model** (v3/01, v3/02): one quiet footer row of plain muted text under the prompt textarea: `build ⌄ · Sonnet 5.5 · high ⌄`. No pills, chips or borders. Clicking opens a small popover anchored to that text.
