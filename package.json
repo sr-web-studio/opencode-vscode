@@ -191,14 +191,27 @@
             "Create the terminal but do not reveal it. Use Show terminal on the tool line.",
             "Do not mirror shell commands into terminals."
           ],
-          "markdownDescription": "Mirror OpenCode shell commands into a read-only VS Code terminal named `OpenCode: <command>`. The command itself runs on the OpenCode server."
+          "markdownDescription": "Mirror OpenCode shell commands into read-only VS Code terminals. The command itself runs on the OpenCode server."
+        },
+        "opencode.terminal.mode": {
+          "type": "string",
+          "enum": [
+            "session",
+            "perCommand"
+          ],
+          "default": "session",
+          "enumDescriptions": [
+            "One terminal per session, named `OpenCode: <session title>`. Every command is appended as its own block. A command that starts while another one of the session is still running gets an extra terminal (`#2`), which later commands reuse.",
+            "A new terminal for every command, named `OpenCode: <command>`."
+          ],
+          "markdownDescription": "How shell commands are shown in terminals. Ctrl+C in a terminal stops only the command that is running, after asking."
         },
         "opencode.terminal.maxOpen": {
           "type": "number",
           "default": 5,
           "minimum": 1,
           "maximum": 50,
-          "markdownDescription": "Most OpenCode terminals kept open. When there are more, the oldest finished one is closed. Running commands are never closed."
+          "markdownDescription": "Most OpenCode terminals kept open. When there are more, the least recently used idle one is closed. A terminal with a running command is never closed."
         }
       }
     }

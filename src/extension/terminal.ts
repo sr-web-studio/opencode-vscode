@@ -1,80 +1,112 @@
 import * as vscode from "vscode"
+import { shortenHome } from "../core/paths"
 import type { Controller } from "../core/controller"
 import type { EventEnvelope } from "../core/api"
 import { ShellPager, type ShellPage, type ShellState } from "../core/shell-pager"
-import { exitText, headerText, terminalName, terminalsToClose, toCrlf } from "../core/terminal-text"
+import { planTerminal, terminalsToClose, type Slot } from "../core/terminal-slots"
+import { DEFAULT_COLUMNS, commandBlockText, endText, noticeText, sessionTerminalName, terminalName, toCrlf } from "../core/terminal-text"
+import { homedir } from "node:os"
 import type { TerminalSettings } from "./settings"
 
-type Entry = {
+/** The command a terminal is showing right now. */
+type Run = {
   shellID: string
-  terminal: vscode.Terminal
-  pager: ShellPager
+  command: string
+  pager?: ShellPager
   finished: boolean
   stopping: boolean
+  started: number
+  completed?: number
+  /** Removes the shell on the server (Ctrl+C after the user agreed). */
+  remove: () => Promise<void>
+}
+
+/** One VS Code terminal: a read-only `Pseudoterminal` that shows commands as blocks, one after the other. */
+type Term = Slot & {
+  terminal: vscode.Terminal
+  write: vscode.EventEmitter<string>
+  closed: vscode.EventEmitter<number | void>
+  opened: boolean
+  /** Text written before VS Code called `open`. */
+  pending: string[]
+  columns: number
+  current?: Run
+  lastCwd?: string
+  afterCR: boolean
+  atLineStart: boolean
+  shells: Set<string>
 }
 
 /**
- * Mirrors OpenCode shell commands into VS Code terminals. The command runs on the server; each terminal is a
- * `Pseudoterminal` that only reads: it prints the command, pages `shell.output` by byte cursor, and ends with the
- * exit code. It takes no input. Ctrl+C (or closing it while the command runs) asks before stopping the command.
+ * Mirrors OpenCode shell commands into VS Code terminals. The command runs on the server; the terminal only reads.
+ *
+ * `session` mode (default): one terminal per session, every command appended as a block. A command that starts while
+ * the session's terminal is still running another one gets an extra terminal (`#2`), which later commands reuse.
+ * `perCommand`: a terminal per command. Ctrl+C stops only the running command, after asking.
  */
 export class ShellTerminals implements vscode.Disposable {
-  private readonly entries = new Map<string, Entry>()
+  private readonly terms: Term[] = []
+  /** Shells already mirrored (or deliberately closed). Their progress events do not open anything again. */
+  private readonly seen = new Set<string>()
   private readonly stop: () => void
   private readonly subs: vscode.Disposable[] = []
+  private counter = 0
 
   constructor(private readonly controller: Controller, private readonly settings: () => TerminalSettings) {
     this.stop = controller.observe({
       event: (ev) => this.onEvent(ev),
       resync: () => void this.reattach(),
     })
-    this.subs.push(
-      vscode.window.onDidCloseTerminal((t) => {
-        for (const [id, e] of this.entries) if (e.terminal === t) this.forget(id)
-      }),
-    )
+    this.subs.push(vscode.window.onDidCloseTerminal((t) => this.forget(t)))
   }
 
-  /** A `shell` tool reported its shell id: start mirroring it. Events of shells we already know are ignored. */
+  /** A `shell` tool reported its shell id: start mirroring it. */
   private onEvent(ev: EventEnvelope): void {
     if (ev.type !== "session.tool.progress") return
     const shellID = ev.data?.metadata?.shellID
     const sessionID = ev.data?.sessionID
-    if (typeof shellID !== "string" || typeof sessionID !== "string" || this.entries.has(shellID)) return
+    if (typeof shellID !== "string" || typeof sessionID !== "string" || this.seen.has(shellID)) return
     if (this.settings().reveal === "off") return
-    void this.open(shellID, sessionID, this.settings().reveal === "onStart")
+    this.seen.add(shellID)
+    void this.open(shellID, sessionID, this.settings().reveal === "onStart", true).then((ok) => {
+      // Could not read the shell yet: a later progress event may try again.
+      if (!ok) this.seen.delete(shellID)
+    })
   }
 
-  /** After a reload or a reconnect: attach to commands that are still running, from the start of their output. */
+  /** After a reload or a reconnect: running commands are appended to the session terminal the same way, from the start of their output. */
   private async reattach(): Promise<void> {
     const client = this.controller.api
     if (!client || this.settings().reveal === "off") return
     try {
       const res = await client.shell.list({ location: { directory: this.controller.directory } })
       for (const info of res.data) {
-        if (info.status !== "running" || this.entries.has(info.id)) continue
+        if (info.status !== "running" || this.seen.has(info.id)) continue
+        this.seen.add(info.id)
         const sessionID = typeof info.metadata?.sessionID === "string" ? info.metadata.sessionID : ""
-        await this.open(info.id, sessionID, false)
+        if (!(await this.open(info.id, sessionID, false, true))) this.seen.delete(info.id)
       }
     } catch {
       // Older server without shell.list: nothing to reattach.
     }
   }
 
-  /** "Show terminal" on a tool line: focus the mirror, creating it first if needed (finished commands replay). */
+  /** "Show terminal" on a tool line: focus the terminal that has the command, or append it (finished commands replay). */
   async show(shellID: string, sessionID: string | undefined): Promise<void> {
-    const existing = this.entries.get(shellID)
+    const existing = this.terms.find((t) => t.shells.has(shellID))
     if (existing) {
       existing.terminal.show(false)
       return
     }
+    this.seen.add(shellID)
     const ok = await this.open(shellID, sessionID ?? "", true, false)
+    if (!ok) this.seen.delete(shellID)
     if (!ok) void vscode.window.showWarningMessage("The command output is no longer available.")
   }
 
-  private async open(shellID: string, sessionID: string, reveal: boolean, preserveFocus = true): Promise<boolean> {
+  private async open(shellID: string, sessionID: string, reveal: boolean, preserveFocus: boolean): Promise<boolean> {
     const client = this.controller.api
-    if (!client || this.entries.has(shellID)) return this.entries.has(shellID)
+    if (!client) return false
     const location = this.controller.locationOf(sessionID)
     let info
     try {
@@ -82,16 +114,32 @@ export class ShellTerminals implements vscode.Disposable {
     } catch {
       return false
     }
-    if (this.entries.has(shellID)) return true
 
-    const write = new vscode.EventEmitter<string>()
-    const closed = new vscode.EventEmitter<number | void>()
-    let afterCR = false
-    const print = (text: string) => {
-      const out = toCrlf(text, afterCR)
-      afterCR = out.endsWithCR
-      write.fire(out.text)
+    // From here to the reservation everything is synchronous, so two commands starting together cannot pick the same terminal.
+    const mode = this.settings().mode
+    const plan = planTerminal(this.terms, mode, sessionID)
+    const term = plan.kind === "reuse" ? this.terms.find((t) => t.id === plan.id)! : this.create(sessionID, plan.slot, mode, info.command)
+    const run: Run = {
+      shellID,
+      command: info.command,
+      finished: false,
+      stopping: false,
+      started: info.time.started,
+      remove: async () => {
+        await client.shell.remove({ id: shellID, location })
+      },
     }
+    term.current = run
+    term.busy = true
+    term.lastUsed = Date.now()
+    term.shells.add(shellID)
+
+    const display = shortenHome(info.cwd, homedir())
+    this.emit(term, commandBlockText({ command: info.command, cwd: display, lastCwd: term.lastCwd, columns: term.columns, at: info.time.started }))
+    term.lastCwd = display
+    term.atLineStart = true
+    term.afterCR = false
+
     const source = {
       output: async (input: { cursor: number; limit: number }): Promise<ShellPage> => {
         const r = (await client.shell.output({ id: shellID, location, cursor: input.cursor, limit: input.limit })).data
@@ -99,90 +147,145 @@ export class ShellTerminals implements vscode.Disposable {
       },
       state: async (): Promise<ShellState> => {
         const r = (await client.shell.get({ id: shellID, location })).data
+        run.completed = r.time.completed
         return { status: r.status, exit: r.exit }
       },
     }
-    const entry: Entry = { shellID, terminal: undefined as never, finished: false, stopping: false, pager: undefined as never }
-    entry.pager = new ShellPager(
+    run.pager = new ShellPager(
       source,
       {
-        text: print,
+        text: (chunk) => {
+          const out = toCrlf(chunk, term.afterCR)
+          term.afterCR = out.endsWithCR
+          if (out.text) term.atLineStart = out.text.endsWith("\n")
+          this.emit(term, out.text)
+        },
         exit: (state) => {
-          entry.finished = true
-          write.fire(exitText(state))
+          this.finish(term, run, endText(run.stopping ? { status: "killed" } : state, (run.completed ?? Date.now()) - run.started, term.atLineStart))
         },
         unavailable: (reason) => {
-          entry.finished = true
-          write.fire(entry.stopping ? exitText({ status: "killed" }) : `\r\n\x1b[33m${reason}\x1b[0m\r\n`)
+          this.finish(term, run, run.stopping ? endText({ status: "killed" }, Date.now() - run.started, term.atLineStart) : noticeText(reason, term.atLineStart))
         },
       },
       {},
       0,
     )
+    if (reveal) term.terminal.show(preserveFocus)
+    void run.pager.run()
+    this.trim()
+    return true
+  }
 
-    const confirmStop = async (): Promise<boolean> => {
-      if (entry.finished) return false
-      const stop = "Stop"
-      const pick = await vscode.window.showWarningMessage("Stop this command?", { modal: true, detail: info.command }, stop)
-      if (pick !== stop || entry.finished) return false
-      entry.stopping = true
-      try {
-        await client.shell.remove({ id: shellID, location })
-      } catch {
-        // Already gone: the pager reports it.
-      }
-      return true
+  /** The command ended: print the end line and free the terminal for the next command. */
+  private finish(term: Term, run: Run, text: string): void {
+    if (run.finished) return
+    run.finished = true
+    this.emit(term, text)
+    term.atLineStart = true
+    if (term.current === run) {
+      term.current = undefined
+      term.busy = false
+    }
+    term.lastUsed = Date.now()
+    this.trim()
+  }
+
+  /** Write to the terminal, or hold the text until VS Code has opened it. */
+  private emit(term: Term, text: string): void {
+    if (!text) return
+    if (term.opened) term.write.fire(text)
+    else term.pending.push(text)
+  }
+
+  private create(sessionID: string, slot: number, mode: TerminalSettings["mode"], command: string): Term {
+    const write = new vscode.EventEmitter<string>()
+    const closed = new vscode.EventEmitter<number | void>()
+    const id = `t${++this.counter}`
+    const term: Term = {
+      id,
+      sessionID,
+      slot,
+      busy: false,
+      lastUsed: Date.now(),
+      terminal: undefined as never,
+      write,
+      closed,
+      opened: false,
+      pending: [],
+      columns: DEFAULT_COLUMNS,
+      afterCR: false,
+      atLineStart: true,
+      shells: new Set(),
     }
 
     const pty: vscode.Pseudoterminal = {
       onDidWrite: write.event,
       onDidClose: closed.event,
-      open: () => {
-        write.fire(headerText(info.command, info.cwd))
-        void entry.pager.run()
+      open: (dims) => {
+        if (dims?.columns) term.columns = dims.columns
+        term.opened = true
+        for (const text of term.pending.splice(0)) write.fire(text)
       },
-      // Input-free: Ctrl+C is the only key, and it only asks.
+      setDimensions: (dims) => {
+        if (dims.columns) term.columns = dims.columns
+      },
+      // Input-free: Ctrl+C is the only key, and it only asks. It stops the running command, never the terminal.
       handleInput: (data) => {
-        if (data === "\x03") void confirmStop()
+        if (data === "\x03") void this.confirmStop(term)
       },
       close: () => {
         // The tab was closed. A running command is only stopped when the user says so; otherwise it keeps running
         // on the server and "Show terminal" can attach again.
-        const running = !entry.finished
-        entry.pager.stop()
-        if (running) void confirmStop()
+        const run = term.current
+        run?.pager?.stop()
+        if (run && !run.finished) void this.confirmStop(term, run)
         write.dispose()
         closed.dispose()
       },
     }
 
-    entry.terminal = vscode.window.createTerminal({ name: terminalName(info.command, this.controller.agentOf(sessionID)), pty })
-    this.entries.set(shellID, entry)
-    if (reveal) entry.terminal.show(preserveFocus)
-    this.trim()
+    const name = mode === "session" ? sessionTerminalName(this.controller.sessionMeta(sessionID)?.title, this.controller.agentOf(sessionID), slot) : terminalName(command, this.controller.agentOf(sessionID))
+    term.terminal = vscode.window.createTerminal({ name, pty })
+    this.terms.push(term)
+    return term
+  }
+
+  private async confirmStop(term: Term, given?: Run): Promise<boolean> {
+    const run = given ?? term.current
+    if (!run || run.finished) return false
+    const stop = "Stop"
+    const pick = await vscode.window.showWarningMessage("Stop this command?", { modal: true, detail: run.command }, stop)
+    if (pick !== stop || run.finished) return false
+    run.stopping = true
+    try {
+      await run.remove()
+    } catch {
+      // Already gone: the pager reports it.
+    }
     return true
   }
 
-  private forget(shellID: string): void {
-    this.entries.delete(shellID)
+  private forget(terminal: vscode.Terminal): void {
+    const i = this.terms.findIndex((t) => t.terminal === terminal)
+    if (i === -1) return
+    this.terms[i]!.current?.pager?.stop()
+    this.terms.splice(i, 1)
   }
 
-  /** Keep at most `maxOpen` terminals: the oldest finished ones go first, running ones stay. */
+  /** Keep at most `maxOpen` terminals: the least recently used idle ones go first, running ones stay. */
   private trim(): void {
-    const open = [...this.entries.values()].map((e) => ({ shellID: e.shellID, finished: e.finished }))
-    for (const id of terminalsToClose(open, this.settings().maxOpen)) {
-      this.entries.get(id)?.terminal.dispose()
-      this.forget(id)
+    for (const id of terminalsToClose(this.terms, this.settings().maxOpen)) {
+      const term = this.terms.find((t) => t.id === id)
+      term?.terminal.dispose()
     }
   }
 
   dispose(): void {
     this.stop()
     for (const s of this.subs) s.dispose()
-    for (const e of this.entries.values()) {
-      e.pager.stop()
-      e.terminal.dispose()
+    for (const t of this.terms.splice(0)) {
+      t.current?.pager?.stop()
+      t.terminal.dispose()
     }
-    this.entries.clear()
   }
 }

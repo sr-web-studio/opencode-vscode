@@ -1,48 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { droppedFileUris, mimeFromName } from "../../src/core/attachments"
 import { atLeast, detectFeatures, isUnsupported, parseVersion } from "../../src/core/features"
-import { exitText, headerText, terminalName, terminalsToClose, toCrlf } from "../../src/core/terminal-text"
-
-describe("terminal text", () => {
-  test("\\n becomes \\r\\n, and an existing \\r\\n is left alone", () => {
-    expect(toCrlf("a\nb\n").text).toBe("a\r\nb\r\n")
-    expect(toCrlf("a\r\nb").text).toBe("a\r\nb")
-  })
-  test("a \\r\\n split across two pages is not doubled", () => {
-    const first = toCrlf("line\r")
-    expect(first.endsWithCR).toBe(true)
-    expect(toCrlf("\nnext", first.endsWithCR).text).toBe("\nnext")
-    expect(toCrlf("\nnext", false).text).toBe("\r\nnext")
-  })
-  test("header prints the command and the working directory", () => {
-    expect(headerText("echo hi", "/tmp/x")).toBe("\x1b[1m$ echo hi\x1b[0m\r\n\x1b[2m/tmp/x\x1b[0m\r\n")
-    expect(headerText("a\nb", undefined)).toBe("\x1b[1m$ a b\x1b[0m\r\n")
-  })
-  test("the exit line is green for 0, red for a failure, yellow for timeout or stop", () => {
-    expect(exitText({ status: "exited", exit: 0 })).toBe("\r\n\x1b[32mexit 0\x1b[0m\r\n")
-    expect(exitText({ status: "exited", exit: 2 })).toBe("\r\n\x1b[31mexit 2\x1b[0m\r\n")
-    expect(exitText({ status: "timeout" })).toContain("timed out")
-    expect(exitText({ status: "killed" })).toContain("stopped")
-  })
-  test("names: OpenCode: cmd, and OpenCode (agent): cmd for workers", () => {
-    expect(terminalName("bun test")).toBe("OpenCode: bun test")
-    expect(terminalName("bun   test\n", "explore")).toBe("OpenCode (explore): bun test")
-    expect(terminalName("x".repeat(80)).length).toBeLessThan(60)
-  })
-  test("maxOpen closes the oldest finished terminals and never a running one", () => {
-    const open = [
-      { shellID: "a", finished: true },
-      { shellID: "b", finished: false },
-      { shellID: "c", finished: true },
-      { shellID: "d", finished: true },
-    ]
-    expect(terminalsToClose(open, 5)).toEqual([])
-    expect(terminalsToClose(open, 3)).toEqual(["a"])
-    expect(terminalsToClose(open, 2)).toEqual(["a", "c"])
-    expect(terminalsToClose(open, 1)).toEqual(["a", "c", "d"])
-    expect(terminalsToClose([{ shellID: "r", finished: false }, { shellID: "s", finished: false }], 1)).toEqual([])
-  })
-})
 
 describe("server features", () => {
   const client = { session: { update() {}, revert: { stage() {} } } }

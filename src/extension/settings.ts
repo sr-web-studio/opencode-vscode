@@ -12,13 +12,17 @@ function fontSize(): number {
   return Math.max(chat > 0 ? chat : 0, 14)
 }
 
-export type TerminalSettings = { reveal: "onStart" | "never" | "off"; maxOpen: number }
+export type TerminalSettings = { reveal: "onStart" | "never" | "off"; maxOpen: number; mode: "session" | "perCommand" }
 
 export function readTerminalSettings(): TerminalSettings {
   const c = cfg()
   const reveal = c.get<string>("terminal.reveal", "onStart")
   const max = c.get<number>("terminal.maxOpen", 5)
-  return { reveal: reveal === "never" || reveal === "off" ? reveal : "onStart", maxOpen: Number.isFinite(max) && max >= 1 ? Math.floor(max) : 5 }
+  return {
+    reveal: reveal === "never" || reveal === "off" ? reveal : "onStart",
+    maxOpen: Number.isFinite(max) && max >= 1 ? Math.floor(max) : 5,
+    mode: c.get<string>("terminal.mode", "session") === "perCommand" ? "perCommand" : "session",
+  }
 }
 
 export function readViewSettings(): ViewSettings {
