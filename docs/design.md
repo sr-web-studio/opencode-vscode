@@ -99,6 +99,19 @@ Salim installed the M1 vsix locally on Windows (OpenCode 2.1.4 there, workspace 
       - Every finished agent turn shows `time · duration`.
       - When `outcome` is missing (turns loaded from history without an execution event), fall back to the last step or message time. This way no completed turn is left without a time.
       - A running turn still shows none.
+    - **Workers list bug (0.2.0):**
+      - **Cause:** one child session can be reused by many `subagent` calls (`input.sessionID` continues an existing worker; the lead's own session does this). The Background row then gets several rows with the same `sessionID`. `{#each … (w.sessionID …)}` throws Svelte's duplicate-key error, so the list never opens.
+      - **Fix:** `deriveWorkers` returns **one row per child session**. It shows the latest call's description, a `×N` count when there were several calls, and the status from the child session. Tool-line clicks keep working per call, and all of them open the same tab.
+      - Keys must be unique by construction. Add a test with several calls for one session.
+      - Rows with no session id yet use the tool id as the key.
+    - **Shell preview less plain:**
+      - The `$` is not green; it uses the muted foreground.
+      - The expanded shell preview looks like a small terminal window:
+        - a header bar (`terminal` codicon, the cwd shortened with `~`, the exit badge, duration, and actions `Copy` / `Open in terminal`)
+        - then the full `$ command` line, in the editor font, with the command in the normal foreground
+        - then the output, with ANSI colors, in the terminal font (`terminal.integrated.fontFamily`, falling back to the editor font) on `--vscode-terminal-background`
+        - a footer `Show all N lines` when the output is cut
+      - The exit badge keeps green/red, because that carries meaning.
     - **Full shell command:** when a shell line is expanded, the block starts with the full command: `$ <command>`, wrapped, monospace, with a copy button. The output follows. The collapsed line keeps the one-line ellipsis plus the hover title.
 10. **Edit session title**: a pencil icon on hover next to the header title (and F2 / double-click) turns it into an inline input. Enter saves via `session.update({ title })`, and Esc cancels. The session dropdown rows also get a rename action on hover.
 
