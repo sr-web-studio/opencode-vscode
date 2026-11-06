@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Code blocks** in answers wrap long lines instead of scrolling sideways, and have a **Copy** button (shown on hover or focus, always on touch screens) plus the language label.
 - **Slash commands** in the prompt box: type `/` for a popup of OpenCode commands and skills. Built in: `/mcps`, `/compact`, `/undo`, `/redo`, `/fork`, `/skills`. The popup never takes focus.
 - **MCP servers panel** (`/mcps`, **OpenCode: MCP Servers**, or the chip in the footer): status of each server, turn it on or off for the running server, and sign in or out of OAuth servers.
 
