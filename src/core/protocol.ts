@@ -22,6 +22,8 @@ export type ViewSettings = {
   /** Resolved px size: the setting, else `max(chat.editor.fontSize, 14)`. */
   fontSize: number
   todoDefaultExpanded: boolean
+  /** `terminal.integrated.fontFamily`, for command output. Empty falls back to the editor font. */
+  terminalFontFamily: string
 }
 
 export const defaultViewSettings: ViewSettings = {
@@ -30,6 +32,7 @@ export const defaultViewSettings: ViewSettings = {
   showReasoning: "collapsed",
   fontSize: 14,
   todoDefaultExpanded: false,
+  terminalFontFamily: "",
 }
 
 /** What this server version can do. The UI hides what is missing instead of failing. */

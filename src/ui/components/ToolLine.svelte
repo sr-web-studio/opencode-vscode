@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { PermissionRequest } from "../../core/api"
+  import type { ViewSettings } from "../../core/protocol"
   import { headLines } from "../../core/format"
   import { toolIcon } from "../../core/transcript/icons"
   import { editStats, summarizeTool } from "../../core/transcript/tools"
@@ -12,9 +13,10 @@
   import PermissionPrompt from "./PermissionPrompt.svelte"
   import ShellBlock from "./ShellBlock.svelte"
 
-  let { tool, cwd, permission, defaultOpen }: { tool: ToolItem; cwd: string; permission?: PermissionRequest; defaultOpen: boolean } = $props()
+  let { tool, cwd, permission, defaultOpen, settings }: { tool: ToolItem; cwd: string; permission?: PermissionRequest; defaultOpen: boolean; settings: ViewSettings } = $props()
   const store = useStore()
   const view = useTranscript()
+  const fontFamily = $derived(settings.terminalFontFamily)
 
   let userOpen = $state<boolean | undefined>(undefined)
   let head: HTMLElement | undefined = $state()
@@ -26,10 +28,11 @@
   const isShell = $derived(tool.name === "shell")
   const exit = $derived(typeof tool.metadata.exit === "number" ? tool.metadata.exit : tool.status === "completed" ? 0 : undefined)
   const command = $derived(typeof tool.input.command === "string" ? tool.input.command : "")
+  const workdir = $derived(typeof tool.input.workdir === "string" ? tool.input.workdir : undefined)
 
   // A worker: the child session comes from the tool's metadata/result, else from the matched Background row.
   const isWorker = $derived(tool.name === "subagent")
-  const worker = $derived(isWorker ? view.workers().find((w) => w.toolID === tool.id) : undefined)
+  const worker = $derived(isWorker ? view.workers().find((w) => w.toolIDs.includes(tool.id)) : undefined)
   const childID = $derived(isWorker ? (toolChildID(tool) ?? worker?.sessionID) : undefined)
   const workerStatus = $derived(worker?.status ?? (active ? "running" : tool.status === "error" ? "failed" : "done"))
   const agentName = $derived(typeof tool.input.agent === "string" && tool.input.agent ? displayName(tool.input.agent) : "Agent")
@@ -93,7 +96,7 @@
   {#if open}
     <div class="details">
       {#if edits}
-        {#each edits.files as f (f.file)}
+        {#each edits.files as f, fi (fi)}
           <div class="file">
             <button class="link" onclick={() => store.bridge.openFile(f.file ?? "")}>{f.file}</button>
             <span class="muted"> +{f.additions ?? 0} −{f.deletions ?? 0}</span>
@@ -105,8 +108,7 @@
           </div>
         {/each}
       {:else if isShell}
-        {#if tool.output}<ShellBlock output={tool.output} />{:else if !active}<div class="muted small">No output</div>{/if}
-        {#if shellID}<button class="link" onclick={() => store.bridge.showTerminal(shellID, line.target)}>Show terminal</button>{/if}
+        <ShellBlock {command} output={tool.output ?? ""} {workdir} directory={cwd} {exit} {active} created={tool.created} completed={tool.completed} {shellID} title={line.target} fontFamily={fontFamily} />
       {:else if isWorker}
         {#if tool.output}<pre class="out mono">{headLines(tool.output, 14)}</pre>{/if}
       {:else if tool.name === "read"}
@@ -129,7 +131,7 @@
   .name { font-weight: 600; color: var(--oc-fg); }
   .target { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .path { text-align: left; }
-  .prompt-sign { color: var(--oc-ok); font-weight: 700; font-family: var(--vscode-editor-font-family, monospace); }
+  .prompt-sign { color: var(--oc-muted); font-weight: 700; font-family: var(--vscode-editor-font-family, monospace); }
   .cmd-chip { font-family: var(--vscode-editor-font-family, monospace); font-size: 0.92em; background: var(--oc-code-bg); padding: 0.05em 0.45em; border-radius: 4px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 36em; }
   .badge, .status, .result { font-size: 0.9em; white-space: nowrap; }
   .badge { border: 1px solid currentColor; border-radius: 999px; padding: 0 0.5em; line-height: 1.5; }

@@ -30,6 +30,7 @@ export function readViewSettings(): ViewSettings {
     showReasoning: reasoning === "expanded" || reasoning === "hidden" ? reasoning : "collapsed",
     fontSize: fontSize(),
     todoDefaultExpanded: c.get<boolean>("todo.defaultExpanded", false),
+    terminalFontFamily: vscode.workspace.getConfiguration("terminal.integrated").get<string>("fontFamily", "") || "",
   }
 }
 
@@ -58,4 +59,4 @@ export const affectsConnection = (e: vscode.ConfigurationChangeEvent) =>
   e.affectsConfiguration("opencode.serverUrl") || e.affectsConfiguration("opencode.cliPath")
 
 export const affectsView = (e: vscode.ConfigurationChangeEvent) =>
-  e.affectsConfiguration("opencode.transcript") || e.affectsConfiguration("opencode.todo") || e.affectsConfiguration("chat.editor.fontSize")
+  e.affectsConfiguration("opencode.transcript") || e.affectsConfiguration("opencode.todo") || e.affectsConfiguration("chat.editor.fontSize") || e.affectsConfiguration("terminal.integrated.fontFamily")

@@ -15,6 +15,8 @@ export type TranscriptContext = {
   features: () => Features
   readOnly: () => boolean
   running: () => boolean
+  /** The project folder with `~` for home, for the shell block header. */
+  displayPath: () => string
 }
 
 export const provideTranscript = (c: TranscriptContext) => setContext(VIEW, c)

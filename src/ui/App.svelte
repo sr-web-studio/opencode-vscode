@@ -53,6 +53,7 @@
     workers: () => app?.workers ?? [],
     features: () => app?.features ?? { revert: false, rename: false },
     readOnly: () => app?.readOnly ?? false,
+    displayPath: () => app?.displayPath ?? "",
     running: () => running || (!!app && app.target.kind === "session" && app.running.includes(app.target.id)),
   })
   const todos = $derived(app ? todoBar(app.view, running || (app.target.kind === "session" && app.running.includes(app.target.id))) : undefined)
