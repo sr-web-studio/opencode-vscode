@@ -185,9 +185,8 @@ Salim installed the M1 vsix locally on Windows (OpenCode 2.1.4 there, workspace 
 
 ### Round 2 follow-ups (0.2.8, Salim, 2026-11-06)
 
-- **Queue, not steer.** `session.prompt` defaults to `delivery: "steer"`: the server hands the prompt to the running turn at its next step, so it landed mid-conversation. The OpenCode TUI sends `queue` while a turn is active (checked in the 2.2.5 binary).
-  - The extension now sends `delivery: "queue"` when the session is running (`sendDelivery()`), and the server default otherwise.
-  - Queued items show under the transcript with "Queued · sent when the current work is done", plus **Send now** (`session.inbox.update` → `steer`) and **Remove** (`session.inbox.cancel`).
+- **Steer stays (Salim corrected himself, 2026-11-06).** `session.prompt` defaults to `delivery: "steer"`: a prompt sent while the agent works joins the running turn at its next step. Salim wants exactly that, so the extension sends no `delivery`. (The OpenCode TUI sends `queue` while a turn is active; we deliberately don't.)
+  - Prompts queued by other clients (TUI, browser) show under the transcript with "Queued · sent when the current work is done", plus **Send now** (`session.inbox.update` → `steer`) and **Remove** (`session.inbox.cancel`).
   - The view loads pending items with `session.inbox.list` when a session opens (queued prompts are not in `message.list` until delivered). The reducer handles `session.inbox.cancelled` and `session.inbox.delivery.changed`.
   - A prompt delivered while a turn is open starts its own turn, matching history after a reload.
   - Live-checked on 2.2.5 (`/tmp/opencode/occ-test`): queued prompts wait until the turn ends and run in order; steer delivers at the next step; cancel removes the item.

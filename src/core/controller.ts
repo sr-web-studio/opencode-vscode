@@ -46,11 +46,6 @@ const LAST_SESSION_KEY = "lastSession"
 
 const message = (e: unknown): string => (e instanceof Error ? e.message : typeof e === "string" ? e : "Request failed")
 
-/** `queue` while the session works, so a new prompt waits for the current work; otherwise the server default. */
-export function sendDelivery(running: boolean): "queue" | undefined {
-  return running ? "queue" : undefined
-}
-
 /**
  * State for one project. It talks to the server only through the root `@opencode/client` API and keeps no
  * reference to VS Code, Node or the DOM, so the same class can run in the extension host today and in a
@@ -762,10 +757,9 @@ export class Controller {
     this.feed.trim()
     this.sentTick++
     this.emitNow()
-    // The server's default delivery is `steer`: the prompt joins the running turn at its next step. While the agent
-    // works, a prompt waits in the inbox until the work is done instead, like the OpenCode apps (`queue`).
-    const delivery = sendDelivery(this.running.has(id) || isRunning(this.feed.view))
-    await client.session.prompt({ sessionID: id, text: body, ...filesInput(files), ...(delivery ? { delivery } : {}) })
+    // No `delivery`: the server default is `steer`, so a prompt sent while the agent works joins the running turn at
+    // its next step (Salim wants this). Prompts queued by other clients still show, with Send now / Remove.
+    await client.session.prompt({ sessionID: id, text: body, ...filesInput(files) })
   }
 
   /** Send a queued prompt now (it joins the running turn at the next step) or remove it from the queue. */

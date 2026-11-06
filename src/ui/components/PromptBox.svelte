@@ -218,7 +218,7 @@
         {/each}
       </div>
     {/if}
-    <textarea bind:this={area} bind:value={text} {onkeydown} {onpaste} oninput={resize} rows="2" placeholder={running ? "Send a message (queued while OpenCode works)" : "Ask OpenCode"} aria-label="Message"></textarea>
+    <textarea bind:this={area} bind:value={text} {onkeydown} {onpaste} oninput={resize} rows="2" placeholder={running ? "Steer: OpenCode reads it at its next step" : "Ask OpenCode"} aria-label="Message"></textarea>
     <div class="actions">
       <button class="clip muted" onclick={pick} title="Attach files" aria-label="Attach files"><Codicon name="attach" /></button>
       <span class="grow"></span>
