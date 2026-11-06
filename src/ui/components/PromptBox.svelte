@@ -12,6 +12,7 @@
   } from "../../core/attachments"
   import { shouldFocusPrompt } from "../../core/focus"
   import { cycleAgent, findModel } from "../../core/models"
+  import { promptHeight } from "../../core/prompt-height"
   import type { AppState } from "../../core/protocol"
   import { isRunning } from "../../core/transcript/reducer"
   import { focusGuarded, focusWhenAllowed, readFocusEnv } from "../focus"
@@ -38,15 +39,20 @@
   const canSend = $derived((text.trim().length > 0 || files.length > 0) && app.connection.status === "connected" && !app.sending)
   const imageOK = $derived(modelTakesImages(findModel(app.models, app.model)?.input))
 
+  /**
+   * Fit the box to its text. Runs synchronously (oninput, mount, restore, new chips, width change) so the old height is
+   * never shown for a frame next to the new line. Hidden overflow while measuring keeps a scrollbar from taking width
+   * and wrapping the text differently; the math itself is `promptHeight`.
+   */
   function resize() {
     if (!area) return
     const cs = getComputedStyle(area)
     const line = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.6
+    area.style.overflowY = "hidden"
     area.style.height = "auto"
-    const min = line * MIN_LINES
-    const max = line * MAX_LINES
-    area.style.height = `${Math.min(Math.max(area.scrollHeight, min), max)}px`
-    area.style.overflowY = area.scrollHeight > max ? "auto" : "hidden"
+    const fit = promptHeight({ scrollHeight: area.scrollHeight, lineHeight: line, minLines: MIN_LINES, maxLines: MAX_LINES })
+    area.style.height = `${fit.height}px`
+    area.style.overflowY = fit.overflow
   }
   /** Explicit user action inside this view (suggestion click, after send, popover closed). Guarded: never steals focus. */
   export function focusPrompt() { focusGuarded(area) }
@@ -76,6 +82,7 @@
     if (files.some((f) => f.uri === a.uri)) return
     files = [...files, a]
     note = ""
+    void tick().then(resize)
   }
 
   async function pick() {
@@ -142,7 +149,22 @@
 
   /* --------------------------------------------------------------- focus */
 
+  // Typing is sized synchronously in `oninput`; this covers text set by code (send clears it, a revert restores it).
   $effect(() => { void text; void tick().then(resize) })
+  // A narrower or wider panel re-wraps the text. Only a width change matters: our own height changes also fire the
+  // observer and must not loop.
+  $effect(() => {
+    if (!area || typeof ResizeObserver === "undefined") return
+    let width = area.clientWidth
+    const observer = new ResizeObserver(() => {
+      const next = area?.clientWidth ?? width
+      if (next === width) return
+      width = next
+      resize()
+    })
+    observer.observe(area)
+    return () => observer.disconnect()
+  })
   // The host bumps this counter only for explicit requests (`+`, a revert). The state object itself is replaced on
   // every emit, so the effect must depend on this derived number and nothing broader.
   const focusRequest = $derived(app.focusTick)
@@ -180,7 +202,10 @@
   })
 
   // First time the box is shown (also after a question closes). Only if this view already has the keyboard.
-  onMount(() => focusWhenAllowed(() => area))
+  onMount(() => {
+    resize()
+    focusWhenAllowed(() => area)
+  })
 </script>
 
 <div class="box">
@@ -193,7 +218,7 @@
         {/each}
       </div>
     {/if}
-    <textarea bind:this={area} bind:value={text} {onkeydown} {onpaste} rows="2" placeholder={running ? "Send a message (queued while OpenCode works)" : "Ask OpenCode"} aria-label="Message"></textarea>
+    <textarea bind:this={area} bind:value={text} {onkeydown} {onpaste} oninput={resize} rows="2" placeholder={running ? "Send a message (queued while OpenCode works)" : "Ask OpenCode"} aria-label="Message"></textarea>
     <div class="actions">
       <button class="clip muted" onclick={pick} title="Attach files" aria-label="Attach files"><Codicon name="attach" /></button>
       <span class="grow"></span>
@@ -213,7 +238,8 @@
   .input:focus-within { border-color: var(--vscode-focusBorder); }
   .input.drag { border-color: var(--oc-accent); border-style: dashed; }
   .chips { display: flex; flex-wrap: wrap; gap: 0.4em; }
-  textarea { width: 100%; resize: none; border: none; outline: none; background: transparent; line-height: 1.6; padding: 0; min-width: 0; overflow-y: hidden; }
+  /* No padding or border, so `scrollHeight` is exactly the text height. Overflow is set by `resize` (auto only past 12 lines). */
+  textarea { box-sizing: border-box; width: 100%; resize: none; border: none; outline: none; background: transparent; line-height: 1.6; padding: 0; margin: 0; min-width: 0; overflow-x: hidden; overflow-y: hidden; scrollbar-gutter: auto; }
   textarea::placeholder { color: var(--vscode-input-placeholderForeground); }
   .actions { display: flex; align-items: center; gap: 0.4em; }
   .grow { flex: 1; }
