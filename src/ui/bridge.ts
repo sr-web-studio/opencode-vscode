@@ -1,4 +1,4 @@
-import type { ToHost, ToWebview } from "../core/protocol"
+import type { PickedFile, ToHost, ToWebview } from "../core/protocol"
 
 /** Small key/value store that survives webview reloads (VS Code: `getState`/`setState`). */
 export interface BridgeStorage {
@@ -16,8 +16,17 @@ export interface HostBridge {
   openFile(path: string, line?: number): void
   /** Show a unified diff for a file. */
   openDiff(file: string, patch: string): void
-  /** Show the captured output of a background shell. */
+  /** Focus the terminal that mirrors a shell command (the host creates it when needed). */
   showTerminal(shellID: string, title?: string): void
+  /**
+   * Open another session. `readOnly` opens it as a worker tab (no prompt box, live updates); otherwise it becomes the
+   * session of the chat view. On mobile this is a pushed screen.
+   */
+  openSession(id: string, options: { readOnly: boolean }): void
+  /** The host's own file dialog (the paperclip). Resolves with nothing when the user cancels. */
+  pickFiles(): Promise<PickedFile[]>
+  /** Ask for confirmation in the host's own UI (a VS Code modal), then revert. */
+  confirmRevert(messageID: string): void
   /** Open a web link outside the app. */
   openExternal(url: string): void
   /** Show a transient message in the host's own UI. */

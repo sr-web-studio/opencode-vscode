@@ -1,10 +1,12 @@
 import type { HostBridge } from "../ui/bridge"
-import type { HostRequest, ToHost, ToWebview } from "../core/protocol"
+import type { HostRequest, PickedFile, ToHost, ToWebview } from "../core/protocol"
 
 type VsCodeApi = { postMessage(message: unknown): void; getState(): unknown; setState(state: unknown): void }
 declare function acquireVsCodeApi(): VsCodeApi
 
 /** `HostBridge` for a VS Code webview: messages go over `postMessage`, storage is the webview state. */
+let pickSeq = 0
+
 export function createVsCodeBridge(): HostBridge {
   const api = acquireVsCodeApi()
   const post = (message: ToHost) => api.postMessage(message)
@@ -15,6 +17,24 @@ export function createVsCodeBridge(): HostBridge {
     openFile: (path, line) => host({ type: "openFile", path, line }),
     openDiff: (file, patch) => host({ type: "openDiff", file, patch }),
     showTerminal: (shellID, title) => host({ type: "showTerminal", shellID, title }),
+    openSession: (id, options) => host({ type: "openSession", id, readOnly: options.readOnly }),
+    confirmRevert: (messageID) => host({ type: "confirmRevert", messageID }),
+    pickFiles: () =>
+      new Promise<PickedFile[]>((resolve) => {
+        const requestID = `pick-${++pickSeq}`
+        const done = (files: PickedFile[]) => {
+          window.removeEventListener("message", listener)
+          clearTimeout(timer)
+          resolve(files)
+        }
+        const listener = (e: MessageEvent<ToWebview>) => {
+          if (e.data?.type === "picked" && e.data.requestID === requestID) done(e.data.files)
+        }
+        // A cancelled dialog sends nothing; stop listening after a while so listeners do not pile up.
+        const timer = setTimeout(() => done([]), 10 * 60_000)
+        window.addEventListener("message", listener)
+        host({ type: "pickFiles", requestID })
+      }),
     openExternal: (url) => host({ type: "openExternal", url }),
     notify: (level, message) => host({ type: "notify", level, message }),
     storage: {
