@@ -56,6 +56,15 @@ Salim installed the M1 vsix locally on Windows (OpenCode 2.1.4 there, workspace 
     - Opening a session pages `message.list` newest-first (`order: desc`) and stops at the first **completed compaction** message (`type: "compaction"`, `status: "completed"`), so only the context after it is shown. A hard cap (e.g. 300 messages) applies when there is no compaction.
     - At the top, the compaction shows as one muted line `› Context compacted · <time>`; expanding it shows its `summary` as markdown. Above it is a "Show earlier messages" link, which loads the previous page with the cursor while keeping the scroll position.
     - Live events keep appending as usual. The same rule applies to the worker tabs.
+    - **Fixes after 0.2.3 (checked live on `ses_e5120d76…`, an auto compaction at 12:43:47):**
+      - **Auto compaction happens inside a turn.** The order is: user prompt, then `compaction` (`reason: "auto"`), then the assistant's answer.
+        - Today the chunk stops at the compaction. The prompt is cut off, and the answer shows with no prompt above it.
+        - Fix: when the chunk stops at a compaction, also take the older messages back to and including the nearest `user` message, provided no `idle` message lies between them.
+        - That turn renders as: the prompt, then the muted "Context compacted" line as a step inside the turn, then the answer.
+      - **Live compaction trims the view.**
+        - When `session.compaction.ended` arrives while the user is following (at the bottom), drop the turns before the compaction turn. Keep the history state, so "Show earlier messages" loads them again.
+        - When the user has scrolled up, don't trim at once; trim at the next jump to the end, or on the next send.
+        - The same applies in worker tabs.
 14. **Turn spacing and user prompts:**
     - Leave about 28px of vertical space between turns. A turn is one user prompt plus everything the agent did in answer.
     - The user prompt is a distinct block:
