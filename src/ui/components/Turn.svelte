@@ -1,7 +1,9 @@
 <script lang="ts">
   import type { PermissionRequest } from "../../core/api"
   import type { ViewSettings } from "../../core/protocol"
-  import { foldLabel, settledTurn, splitTurn } from "../../core/transcript/turn"
+  import { changedFiles, changesLabel } from "../../core/diff"
+  import { relativeTo } from "../../core/paths"
+  import { allTools, foldLabel, settledTurn, splitTurn } from "../../core/transcript/turn"
   import type { TurnView } from "../../core/transcript/types"
   import { moment, turnStamp, type TimeEnv } from "../../core/turn-time"
   import { keepAnchored } from "../anchor"
@@ -26,6 +28,8 @@
   const folded = $derived(finished && settings.collapseCompletedSteps && label !== "")
   let userOpen = $state<boolean | undefined>(undefined)
   let foldButton: HTMLElement | undefined = $state()
+  // Files the turn changed (finished turns only), for the `Changes (N files)` link next to the fold line.
+  const changes = $derived(finished ? changedFiles(allTools(turn), (f) => relativeTo(f, cwd)) : [])
   const showWork = $derived(!folded || userOpen === true)
   // A pending permission must stay visible even inside a folded turn.
   const needsAttention = $derived(turn.steps.some((s) => s.items.some((i) => i.kind === "tool" && permissions.has(i.id))))
@@ -64,10 +68,19 @@
 
   {#if turn.compacted}<CompactionNote compaction={turn.compacted} />{/if}
 
-  {#if folded}
-    <button class="fold muted" bind:this={foldButton} onclick={() => keepAnchored(foldButton ?? null, () => (userOpen = !(userOpen ?? needsAttention)))} aria-expanded={expanded}>
-      <Codicon name={expanded ? "chevron-down" : "chevron-right"} /> {label}
-    </button>
+  {#if folded || changes.length > 0}
+    <div class="foldrow">
+      {#if folded}
+        <button class="fold muted" bind:this={foldButton} onclick={() => keepAnchored(foldButton ?? null, () => (userOpen = !(userOpen ?? needsAttention)))} aria-expanded={expanded}>
+          <Codicon name={expanded ? "chevron-down" : "chevron-right"} /> {label}
+        </button>
+      {/if}
+      {#if changes.length > 0}
+        <button class="link changes" onclick={() => store.bridge.openChanges(changes.map((c) => ({ file: c.file, patches: c.patches })), `OpenCode changes (${changes.length} ${changes.length === 1 ? "file" : "files"})`)} title="Open every file this turn changed in one diff view">
+          <Codicon name="diff-multiple" /> {changesLabel(changes.length)}
+        </button>
+      {/if}
+    </div>
   {/if}
   {#if expanded && split.work.length > 0}
     <StepList steps={split.work} {cwd} {settings} {permissions} />
@@ -96,6 +109,8 @@
   .revert { position: absolute; top: -10px; left: -10px; display: inline-flex; align-items: center; padding: 0.15em 0.3em; border-radius: 50%; color: var(--oc-muted); background: var(--oc-popover); border: 1px solid var(--oc-hairline); opacity: 0; }
   .user:hover .revert, .revert:focus-visible { opacity: 1; }
   .revert:hover:not(:disabled) { color: var(--oc-fg); background: var(--oc-hover); }
+  .foldrow { display: flex; flex-wrap: wrap; align-items: center; gap: 0.2em 1.2em; }
+  .changes { display: inline-flex; align-items: center; gap: 0.35em; }
   .fold { align-self: flex-start; display: inline-flex; align-items: center; gap: 0.35em; }
   .fold:hover { color: var(--oc-fg); }
   .answer { margin-top: 0.2em; }

@@ -10,6 +10,7 @@
   import { keepAnchored } from "../anchor"
   import { useStore, useTranscript } from "../context"
   import Codicon from "./Codicon.svelte"
+  import DiffView from "./DiffView.svelte"
   import PermissionPrompt from "./PermissionPrompt.svelte"
   import ShellBlock from "./ShellBlock.svelte"
 
@@ -47,7 +48,9 @@
     return limit === undefined ? `From line ${from}` : `Lines ${from}–${from + limit - 1}`
   })
 
-  const diffClass = (l: string) => (l.startsWith("+") && !l.startsWith("+++") ? "add" : l.startsWith("-") && !l.startsWith("---") ? "del" : "")
+  const patchOf = (f: object): string => ((f as { patch?: unknown }).patch && typeof (f as { patch?: unknown }).patch === "string" ? (f as { patch: string }).patch : "")
+  /** This edit alone: the file on disk against the text before this patch. */
+  const openDiff = (f: { file?: string }) => store.bridge.openDiff(f.file ?? "", [patchOf(f)])
 
   function toggle() {
     void keepAnchored(head ?? null, () => (userOpen = !open))
@@ -98,12 +101,11 @@
       {#if edits}
         {#each edits.files as f, fi (fi)}
           <div class="file">
-            <button class="link" onclick={() => store.bridge.openFile(f.file ?? "")}>{f.file}</button>
+            <button class="link" title={patchOf(f) ? "Open the file. Alt-click opens the diff." : "Open the file"} onclick={(e) => (e.altKey && patchOf(f) ? openDiff(f) : store.bridge.openFile(f.file ?? ""))}>{f.file}</button>
             <span class="muted"> +{f.additions ?? 0} −{f.deletions ?? 0}</span>
-            {#if (f as { patch?: string }).patch}
-              <button class="link right" onclick={() => store.bridge.openDiff(f.file ?? "", (f as { patch?: string }).patch ?? "")}>Open diff</button>
-              <pre class="diff mono">{#each headLines((f as { patch?: string }).patch ?? "", 40).split("\n") as l}<span class={diffClass(l)}>{l}
-</span>{/each}</pre>
+            {#if patchOf(f)}
+              <button class="link right" onclick={() => openDiff(f)}>Open diff</button>
+              <DiffView patch={patchOf(f)} />
             {/if}
           </div>
         {/each}
@@ -144,8 +146,6 @@
   .dot.run { background: var(--oc-accent); }
   .details { margin: 0.1em 0 0.5em 1.6em; font-size: 0.95em; }
   pre { margin: 0.25em 0; white-space: pre-wrap; word-break: break-word; }
-  .out, .diff { background: var(--oc-code-bg); padding: 0.4em 0.6em; border-radius: 4px; max-height: 16em; overflow: auto; }
-  .diff .add { color: var(--vscode-gitDecoration-addedResourceForeground); }
-  .diff .del { color: var(--vscode-gitDecoration-deletedResourceForeground); }
+  .out { background: var(--oc-code-bg); padding: 0.4em 0.6em; border-radius: 4px; max-height: 16em; overflow: auto; }
   .right { margin-left: 0.8em; }
 </style>
