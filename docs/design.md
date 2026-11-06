@@ -56,6 +56,36 @@ Salim installed the M1 vsix locally on Windows (OpenCode 2.1.4 there, workspace 
     - Opening a session pages `message.list` newest-first (`order: desc`) and stops at the first **completed compaction** message (`type: "compaction"`, `status: "completed"`), so only the context after it is shown. A hard cap (e.g. 300 messages) applies when there is no compaction.
     - At the top, the compaction shows as one muted line `› Context compacted · <time>`; expanding it shows its `summary` as markdown. Above it is a "Show earlier messages" link, which loads the previous page with the cursor while keeping the scroll position.
     - Live events keep appending as usual. The same rule applies to the worker tabs.
+14. **Turn spacing and user prompts:**
+    - Leave about 28px of vertical space between turns. A turn is one user prompt plus everything the agent did in answer.
+    - The user prompt is a distinct block:
+      - 12px left padding and a 2px left accent border (`--vscode-textBlockQuote-border`, falling back to `--vscode-focusBorder`)
+      - a subtle background (`--vscode-chat-requestBackground`, falling back to `--vscode-textBlockQuote-background`), 6px radius and 8px vertical padding
+    - Attachments sent with the prompt show as small chips under its text.
+15. **Revert to a prompt ("go back in time")**, using OpenCode snapshots (`/v2/docs/snapshots`), the same flow as the TUI's `/undo` and "Revert":
+    - **Button:** hovering a user prompt shows a `discard` codicon button titled "Revert to here". Keyboard users can reach it with Tab.
+    - **Disabled while running:** the button is disabled while the session is running (tooltip "Stop the session first"), because the server rejects rollback during a run.
+    - **Confirm:** clicking asks for confirmation in a VS Code modal: "Revert to before this prompt? Messages after it are hidden, and files changed by later steps are restored. Shell side effects (git, databases, other files) are not undone."
+    - **Stage:** after confirmation, call `session.revert.stage({ sessionID, messageID: <user message id>, files: true })`.
+      - The server then sends `session.revert.staged`, and `Session.Info.revert` holds the boundary and the restored `files`.
+      - The transcript hides that prompt and everything after it. In their place it shows one muted bar: "Reverted · N files restored · Redo".
+      - The reverted prompt text, and its attachments where possible, go back into the prompt box for editing. Unlike other state updates, this one may focus the prompt box, because it follows a click.
+    - **Redo:** clicking "Redo" calls `session.revert.clear`, restores the view and empties the prompt box only if its text is still unchanged.
+    - **Send:** sending a new prompt while a revert is staged makes the rollback permanent. Check live whether the server commits automatically on prompt or whether the client must call `session.revert.commit` first. If it is the client, commit then prompt.
+    - **On load:** opening a session that already has `revert` set shows the same bar.
+    - **No snapshots:** if the folder is not a git repo, or snapshots are off, `files` comes back empty. The bar then says "Conversation reverted · files not restored".
+    - **Older servers:** on servers without `revert.stage` (feature-detect, Salim's 2.1.4), hide the button.
+    - **Worker tabs:** read-only, so they have no revert button.
+16. **Date and time after each turn:**
+    - A completed turn ends with one muted line under its final answer: `2:41 PM · 42s`. It shows when the turn finished, and the duration from the user prompt to the last step.
+    - Compact format, using the user's locale (`Intl.DateTimeFormat`):
+      - today: time only
+      - yesterday: `Yesterday 2:41 PM`
+      - this year: `Nov 3, 2:41 PM`
+      - older: `Nov 3 2025, 2:41 PM`
+    - Hovering shows the full date and time.
+    - A running turn shows no timestamp yet.
+    - The `N steps completed` line keeps its own duration. Put the formatter in a pure module with unit tests (fixed clock and time zone).
 10. **Edit session title**: a pencil icon on hover next to the header title (and F2 / double-click) turns it into an inline input. Enter saves via `session.update({ title })`, and Esc cancels. The session dropdown rows also get a rename action on hover.
 
 ## Voice input (proposed 2026-11-06, decision pending)
