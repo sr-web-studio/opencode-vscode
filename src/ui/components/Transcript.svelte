@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { tick } from "svelte"
+  import { tick, type Snippet } from "svelte"
   import type { PermissionRequest } from "../../core/api"
   import type { AppState } from "../../core/protocol"
   import { initialScroll, scrollTopAfterPrepend, showJump, stepScroll, type ScrollEvent, type ScrollState } from "../../core/scroll"
@@ -8,13 +8,16 @@
   import { contentSignature } from "../../core/transcript/signature"
   import { runningTool } from "../../core/transcript/turn"
   import { plural } from "../../core/format"
+  import { currentPrompt, promptLabel, promptPosition, type PromptPosition } from "../../core/sticky"
+  import { startsDay } from "../../core/turn-time"
   import { useStore } from "../context"
   import Chip from "./Chip.svelte"
   import Codicon from "./Codicon.svelte"
   import PermissionPrompt from "./PermissionPrompt.svelte"
   import Turn from "./Turn.svelte"
 
-  let { app }: { app: AppState } = $props()
+  /** `children` is the floating area over the bottom of the transcript (the todo bar). */
+  let { app, children }: { app: AppState; children?: Snippet } = $props()
   const store = useStore()
 
   let box: HTMLDivElement | undefined = $state()
@@ -31,6 +34,64 @@
   const busy = $derived(isRunning(app.view))
   const idleSpinner = $derived(busy && !runningTool(app.view.turns) && !app.view.turns.at(-1)?.steps.at(-1)?.items.some((i) => i.kind !== "tool" && i.streaming))
   const revert = $derived(app.view.revert)
+
+  // The prompt time above a bubble is always visible for the first prompt of a day.
+  const firstOfDay = $derived.by(() => {
+    let prev: number | undefined
+    return turns.map((t) => {
+      const at = t.user ? (t.user.created ?? t.started) : undefined
+      const first = startsDay(prev, at, undefined)
+      if (at !== undefined) prev = at
+      return first
+    })
+  })
+
+  // Floating area: the transcript pads its bottom by the measured height, so the last line scrolls above it.
+  let floatEl: HTMLDivElement | undefined = $state()
+  let floatH = $state(0)
+  $effect(() => {
+    if (!floatEl) return
+    const el = floatEl
+    const ro = new ResizeObserver(() => (floatH = el.offsetHeight))
+    ro.observe(el)
+    floatH = el.offsetHeight
+    return () => ro.disconnect()
+  })
+
+  // Sticky prompt: an IntersectionObserver reports where each bubble is; the pure helper picks the current one.
+  let positions = $state.raw<ReadonlyMap<string, PromptPosition>>(new Map())
+  const promptOrder = $derived(turns.flatMap((t) => (t.user ? [t.user.id] : [])))
+  const stickyID = $derived(currentPrompt(promptOrder, positions))
+  const stickyUser = $derived(stickyID ? turns.find((t) => t.user?.id === stickyID)?.user : undefined)
+  $effect(() => {
+    void promptOrder.join()
+    void app.loadingView
+    const root = box
+    if (!root || typeof IntersectionObserver === "undefined") return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const next = new Map(positions)
+        for (const e of entries) {
+          const id = (e.target as HTMLElement).dataset.prompt
+          if (!id) continue
+          const bounds = e.rootBounds ?? root.getBoundingClientRect()
+          next.set(id, promptPosition(e.boundingClientRect, bounds, e.isIntersecting))
+        }
+        positions = next
+      },
+      { root, threshold: [0, 1] },
+    )
+    void tick().then(() => root.querySelectorAll<HTMLElement>("[data-prompt]").forEach((el) => observer.observe(el)))
+    return () => observer.disconnect()
+  })
+
+  function toPrompt() {
+    if (!box || !stickyID) return
+    const el = [...box.querySelectorAll<HTMLElement>("[data-prompt]")].find((n) => n.dataset.prompt === stickyID)
+    if (!el) return
+    scroll = { ...scroll, follow: false }
+    el.scrollIntoView({ block: "center", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" })
+  }
 
   const metrics = () => ({ scrollTop: box!.scrollTop, clientHeight: box!.clientHeight, scrollHeight: box!.scrollHeight })
 
@@ -108,7 +169,13 @@
 </script>
 
 <div class="wrap">
-  <div class="transcript scroll" data-scroll-box bind:this={box} {onscroll}>
+  {#if stickyUser && !app.loadingView}
+    <button class="sticky" onclick={toPrompt} title={stickyUser.text ? `${stickyUser.text.slice(0, 400)}` : promptLabel(stickyUser)} aria-label="Scroll to this prompt: {promptLabel(stickyUser)}">
+      <Codicon name="arrow-up" />
+      <span class="slabel">{promptLabel(stickyUser)}</span>
+    </button>
+  {/if}
+  <div class="transcript scroll" data-scroll-box bind:this={box} {onscroll} style:padding-bottom="calc(0.6em + {floatH}px)">
     {#if app.loadingView}
       <div class="muted pad">Loading…</div>
     {:else}
@@ -118,7 +185,7 @@
         </div>
       {/if}
       {#each turns as turn, i (turn.id)}
-        <Turn {turn} last={i === turns.length - 1 && !revert} cwd={app.directory} settings={app.settings} permissions={byTool} />
+        <Turn {turn} last={i === turns.length - 1 && !revert} firstOfDay={firstOfDay[i] ?? false} cwd={app.directory} settings={app.settings} permissions={byTool} />
       {/each}
       {#if revert}
         <div class="rbar" role="status">
@@ -130,11 +197,10 @@
         {#each app.view.queued as q (q.id)}
           <div class="queued">
             <div class="user">
-              <div class="uhead"><Codicon name="account" /> You</div>
               {#if q.text}<div>{q.text}</div>{/if}
               {#if q.files?.length}<div class="chips">{#each q.files as f, i (i)}<Chip name={f.name} mime={f.mime} />{/each}</div>{/if}
             </div>
-            <div class="muted small">Queued</div>
+            <div class="muted small qlabel">Queued</div>
           </div>
         {/each}
         {#each orphans as p (p.id)}
@@ -152,8 +218,10 @@
     {/if}
   </div>
 
+  <div class="float" bind:this={floatEl}>{@render children?.()}</div>
+
   {#if showJump(scroll) && !app.loadingView}
-    <button class="jump" onclick={jump} title={scroll.unseen ? "New content below. Jump to the end" : "Jump to the end"} aria-label={scroll.unseen ? "Jump to the end (new content)" : "Jump to the end"}>
+    <button class="jump" style:bottom="{12 + floatH}px" onclick={jump} title={scroll.unseen ? "New content below. Jump to the end" : "Jump to the end"} aria-label={scroll.unseen ? "Jump to the end (new content)" : "Jump to the end"}>
       <Codicon name="arrow-down" />
       {#if scroll.unseen}<span class="new" aria-hidden="true"></span>{/if}
     </button>
@@ -163,11 +231,16 @@
 <style>
   .wrap { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
   .transcript { flex: 1; min-height: 0; overflow-y: auto; padding: 0.8em var(--oc-side) 0.6em; overflow-anchor: none; }
+  /* Over the bottom of the transcript, just above the prompt box; the transcript scrolls underneath. */
+  .float { position: absolute; left: 0; right: 0; bottom: 0; z-index: 3; }
+  .sticky { position: absolute; z-index: 4; top: 6px; left: var(--oc-side); right: var(--oc-side); margin-left: max(32px, 15%); display: flex; align-items: center; gap: 0.5em; padding: 3px 12px; text-align: left; min-width: 0; background: var(--oc-user-bg); border: 1px solid var(--oc-user-line); border-radius: 8px; box-shadow: 0 2px 8px var(--vscode-widget-shadow); }
+  .sticky:hover { border-color: var(--oc-accent); }
+  .slabel { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .pad { padding: 0.5em 0; }
   .earlier { display: flex; justify-content: center; margin-bottom: 1em; }
-  .queued { opacity: 0.75; margin-bottom: var(--oc-turn-gap); }
-  .user { padding: 10px 14px; border: 1px solid var(--oc-user-line); border-left: 3px solid var(--oc-user-accent); background: var(--oc-user-bg); border-radius: 6px; white-space: pre-wrap; word-break: break-word; }
-  .uhead { display: flex; align-items: center; gap: 0.45em; margin-bottom: 0.35em; font-weight: 600; white-space: normal; }
+  .queued { opacity: 0.75; margin: 0 0 var(--oc-turn-gap) max(32px, 15%); }
+  .qlabel { text-align: right; margin: 2px 2px 0; }
+  .user { padding: 10px 14px; border: 1px solid var(--oc-user-line); background: var(--oc-user-bg); border-radius: 8px; white-space: pre-wrap; word-break: break-word; }
   .chips { display: flex; flex-wrap: wrap; gap: 0.4em; margin-top: 0.5em; }
   .orphan { display: flex; gap: 0.6em; align-items: baseline; flex-wrap: wrap; border-left: 2px solid var(--oc-amber); padding-left: 0.5em; margin: 0.4em 0; }
   .label { font-weight: 600; }
@@ -176,7 +249,7 @@
   .rbar { display: flex; align-items: center; gap: 0.5em; padding: 6px 12px; margin: 0 0 var(--oc-turn-gap); border: 1px solid var(--oc-hairline); border-radius: 6px; background: var(--oc-popover); }
   .rtext { flex: 1; min-width: 0; }
   .redo { font-weight: 600; }
-  .jump { position: absolute; right: calc(var(--oc-side) + 4px); bottom: 12px; width: 32px; height: 32px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--oc-popover); border: 1px solid var(--oc-hairline); box-shadow: 0 2px 8px var(--vscode-widget-shadow); color: var(--oc-fg); }
+  .jump { position: absolute; z-index: 5; right: calc(var(--oc-side) + 4px); bottom: 12px; width: 32px; height: 32px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--oc-popover); border: 1px solid var(--oc-hairline); box-shadow: 0 2px 8px var(--vscode-widget-shadow); color: var(--oc-fg); }
   .jump:hover { background: var(--oc-hover); }
   .new { position: absolute; top: 3px; right: 3px; width: 8px; height: 8px; border-radius: 50%; background: var(--oc-accent); border: 1px solid var(--oc-popover); }
 </style>

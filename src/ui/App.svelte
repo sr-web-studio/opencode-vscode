@@ -84,16 +84,17 @@
     {#if empty}
       <EmptyState folderName={app.folderName} displayPath={app.displayPath} onsuggest={suggest} />
     {:else}
-      <Transcript {app} />
+      <Transcript {app}>
+        {#if todos && !app.form && !app.readOnly}
+          <TodoBar summary={todos} defaultExpanded={app.settings.todoDefaultExpanded} />
+        {/if}
+      </Transcript>
     {/if}
     {#if app.error}
       <div class="error err" role="alert">
         <span>{app.error}</span>
         <button class="muted" onclick={() => store.dispatch({ type: "dismissError" })} aria-label="Dismiss"><Codicon name="close" /></button>
       </div>
-    {/if}
-    {#if todos && !app.form && !app.readOnly}
-      <TodoBar summary={todos} defaultExpanded={app.settings.todoDefaultExpanded} />
     {/if}
     {#if app.readOnly}
       <!-- Worker tab: nothing to type into. -->

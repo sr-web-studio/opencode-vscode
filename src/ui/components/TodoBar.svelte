@@ -37,7 +37,8 @@
 </div>
 
 <style>
-  .todo { padding: 0 var(--oc-side) 0.3em; }
+  /* Floats over the bottom of the transcript: its own background and a shadow, so the text scrolls underneath. */
+  .todo { padding: 0.4em var(--oc-side) 0.35em; background: var(--vscode-sideBar-background, var(--vscode-editor-background)); box-shadow: 0 -4px 10px -4px var(--vscode-widget-shadow); border-top: 1px solid var(--oc-hairline); }
   .line { display: flex; align-items: center; gap: 0.5em; width: 100%; text-align: left; min-width: 0; }
   .cur-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .panel { border: 1px solid var(--oc-hairline); border-radius: 6px; padding: 0.5em 0.7em; margin-bottom: 0.35em; background: var(--oc-popover); }

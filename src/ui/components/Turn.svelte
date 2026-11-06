@@ -11,7 +11,7 @@
   import Markdown from "./Markdown.svelte"
   import StepList from "./StepList.svelte"
 
-  let { turn: raw, last, cwd, settings, permissions }: { turn: TurnView; last: boolean; cwd: string; settings: ViewSettings; permissions: Map<string, PermissionRequest> } = $props()
+  let { turn: raw, last, firstOfDay, cwd, settings, permissions }: { turn: TurnView; last: boolean; firstOfDay: boolean; cwd: string; settings: ViewSettings; permissions: Map<string, PermissionRequest> } = $props()
   const store = useStore()
   const view = useTranscript()
 
@@ -35,7 +35,7 @@
   // `2:41 PM · 42s` after a finished turn. A running turn shows nothing.
   const stamp = $derived(turn.compaction ? undefined : turnStamp(turn, env()))
   const compactedAt = $derived(turn.compaction?.created ? moment(turn.compaction.created, env()) : undefined)
-  // The prompt's own time, in the card header.
+  // The prompt's own time: above the bubble, on hover (always for the first prompt of a day).
   const promptTime = $derived(moment(turn.user?.created ?? turn.started, env()))
 
   const canRevert = $derived(view.features().revert && !view.readOnly() && !!turn.user)
@@ -55,12 +55,9 @@
   {/if}
 
   {#if turn.user}
-    <div class="user">
-      <div class="uhead">
-        <Codicon name="account" />
-        <span class="you">You</span>
-        <span class="grow"></span>
-        {#if promptTime}<span class="utime muted" title={promptTime.title}>{promptTime.text}</span>{/if}
+    <div class="uwrap">
+      {#if promptTime}<div class="utime muted" class:always={firstOfDay} title={promptTime.title}>{promptTime.text}</div>{/if}
+      <div class="user" data-prompt={turn.user.id}>
         {#if canRevert}
           <button
             class="revert"
@@ -70,11 +67,11 @@
             onclick={() => store.bridge.confirmRevert(turn.user!.id)}
           ><Codicon name="discard" /></button>
         {/if}
+        {#if turn.user.text}<div class="text">{turn.user.text}</div>{/if}
+        {#if turn.user.files?.length}
+          <div class="chips">{#each turn.user.files as f, i (i)}<Chip name={f.name} mime={f.mime} />{/each}</div>
+        {/if}
       </div>
-      {#if turn.user.text}<div class="text">{turn.user.text}</div>{/if}
-      {#if turn.user.files?.length}
-        <div class="chips">{#each turn.user.files as f, i (i)}<Chip name={f.name} mime={f.mime} />{/each}</div>
-      {/if}
     </div>
   {/if}
 
@@ -100,15 +97,15 @@
   .turn { position: relative; display: flex; flex-direction: column; gap: 0.5em; padding-bottom: calc(var(--oc-turn-gap) / 2); margin-bottom: calc(var(--oc-turn-gap) / 2); border-bottom: 1px solid var(--oc-hairline); }
   .turn:last-child { border-bottom-color: transparent; }
   .turn.compaction { gap: 0.2em; }
-  /* The prompt is a card: a clear speaker change, visible in dark themes too. */
-  .user { position: relative; align-self: stretch; padding: 10px 14px; border: 1px solid var(--oc-user-line); border-left: 3px solid var(--oc-user-accent); background: var(--oc-user-bg); border-radius: 6px; margin-bottom: 4px; }
-  .uhead { display: flex; align-items: center; gap: 0.45em; margin-bottom: 0.35em; }
-  .you { font-weight: 600; }
-  .grow { flex: 1; }
-  .utime { font-size: 0.9em; white-space: nowrap; }
+  /* The prompt is a bubble that leans right: indented by 15% (at least 32px) while the agent uses the full width. */
+  .uwrap { margin-left: max(32px, 15%); margin-bottom: 4px; }
+  .utime { text-align: right; font-size: 0.85em; line-height: 1.4; margin: 0 2px 2px; opacity: 0; transition: opacity 0.12s; }
+  .uwrap:hover .utime, .uwrap:focus-within .utime, .utime.always { opacity: 1; }
+  .user { position: relative; padding: 10px 14px; border: 1px solid var(--oc-user-line); background: var(--oc-user-bg); border-radius: 8px; }
   .text { white-space: pre-wrap; word-break: break-word; }
   .chips { display: flex; flex-wrap: wrap; gap: 0.4em; margin-top: 0.5em; }
-  .revert { flex: none; display: inline-flex; align-items: center; padding: 0.1em 0.3em; border-radius: 4px; color: var(--oc-muted); opacity: 0; }
+  /* On the bubble's top-left corner, only on hover. */
+  .revert { position: absolute; top: -10px; left: -10px; display: inline-flex; align-items: center; padding: 0.15em 0.3em; border-radius: 50%; color: var(--oc-muted); background: var(--oc-popover); border: 1px solid var(--oc-hairline); opacity: 0; }
   .user:hover .revert, .revert:focus-visible { opacity: 1; }
   .revert:hover:not(:disabled) { color: var(--oc-fg); background: var(--oc-hover); }
   .fold, .compact { align-self: flex-start; display: inline-flex; align-items: center; gap: 0.35em; }
@@ -116,6 +113,6 @@
   .summary { margin-left: 1.4em; padding: 0.2em 0.8em; border-left: 2px solid var(--oc-hairline); }
   .answer { margin-top: 0.2em; }
   .stamp { margin-top: -0.1em; }
-  /* About 12px between the card and the agent's part (the 4px margin plus the 0.5em gap). */
-  .user + :global(*) { margin-top: 0.4em; }
+  /* About 12px between the bubble and the agent's part (the 4px margin plus the 0.5em gap). */
+  .uwrap + :global(*) { margin-top: 0.4em; }
 </style>
