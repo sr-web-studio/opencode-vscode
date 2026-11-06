@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { compactTime, fullDateTime, turnStamp, type TimeEnv } from "../../src/core/turn-time"
+import { compactTime, fullDateTime, startsDay, turnStamp, type TimeEnv } from "../../src/core/turn-time"
 
 // Fixed clock and zone: Friday 6 Nov 2026, 15:30 in Dhaka (UTC+6, no DST). Dhaka midnight is 18:00 UTC.
 const dhaka = (y: number, m: number, d: number, h: number, min = 0) => Date.UTC(y, m - 1, d, h - 6, min)
@@ -73,5 +73,27 @@ describe("turnStamp", () => {
     expect(s.title).toBe(fullDateTime(ended, env))
     expect(s.title).toContain("Friday, November 6, 2026")
     expect(s.title).toContain("2:41:00 PM")
+  })
+})
+
+describe("startsDay", () => {
+  const z = "Asia/Dhaka"
+  const at = (d: number, h: number, m = 0) => Date.UTC(2026, 10, d, h - 6, m)
+  test("the first prompt shown starts its day", () => {
+    expect(startsDay(undefined, at(6, 9), z)).toBe(true)
+  })
+  test("same calendar day in the user's zone is not a new day", () => {
+    expect(startsDay(at(6, 9), at(6, 23, 59), z)).toBe(false)
+  })
+  test("after midnight in the zone is a new day, even when UTC is the same date", () => {
+    expect(startsDay(at(6, 23, 50), at(7, 0, 10), z)).toBe(true)
+  })
+  test("another month or year", () => {
+    expect(startsDay(Date.UTC(2026, 9, 6, 6), at(6, 9), z)).toBe(true)
+    expect(startsDay(Date.UTC(2025, 10, 6, 6), at(6, 9), z)).toBe(true)
+  })
+  test("a prompt without a time never claims a day", () => {
+    expect(startsDay(at(6, 9), undefined, z)).toBe(false)
+    expect(startsDay(at(6, 9), NaN, z)).toBe(false)
   })
 })

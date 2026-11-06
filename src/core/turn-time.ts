@@ -64,3 +64,15 @@ export function turnStamp(turn: { started?: number; ended?: number; outcome?: st
   const text = hasDuration ? `${when} · ${formatDuration(turn.ended - turn.started!)}` : when
   return { text, title: fullDateTime(turn.ended, env) }
 }
+
+/**
+ * Is this the first prompt of its calendar day? `previous` is the time of the prompt before it (undefined for the
+ * first prompt shown). The time above a bubble is always visible for these, and on hover for the others.
+ */
+export function startsDay(previous: number | undefined, at: number | undefined, timeZone?: string): boolean {
+  if (at === undefined || !Number.isFinite(at)) return false
+  if (previous === undefined || !Number.isFinite(previous)) return true
+  const a = partsOf(previous, timeZone)
+  const b = partsOf(at, timeZone)
+  return a.year !== b.year || a.month !== b.month || a.day !== b.day
+}
