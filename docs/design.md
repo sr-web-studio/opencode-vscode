@@ -192,7 +192,12 @@ The same UI as a phone app, without VS Code-specific actions. It is a client of 
 
 - **All projects:** `project.list` (`GET /api/project`) → project list → `session.list` filtered by `project`/`directory` → the same transcript and controls as the extension. There is no fixed workspace folder.
 - **Removed or replaced:** open file in editor → read-only file/diff viewer from `session.diff` and tool metadata. VS Code terminal → read-only shell output view (`/api/shell/{id}/output`) with Stop. Status bar → connection indicator in the header.
-- **Kept:** transcript, agent/model footer, permission line, question chooser, session switcher, todo bar, drafts, workers list.
+- **Kept:** transcript, agent/model footer, permission line, question chooser, session switcher, todo bar, drafts, workers list, attachments (camera/gallery instead of the file picker), revert, turn timestamps.
+- **Voice input (required in the first mobile release, added 2026-11-06):**
+  - Mic capture is native (Capacitor), streaming to Soniox with the same `SpeechEngine` and `language_hints` as the extension (default `["bn","en"]`).
+  - Free BYOK: the user's Soniox key goes into the app's secure storage, set on a Settings screen. Without a key, the mic shows a hint.
+  - Android needs the `RECORD_AUDIO` permission prompt.
+  - The UX is the same as in VS Code: live grey partial text, and nothing is auto-sent.
 
 ### Connection and QR pairing
 
