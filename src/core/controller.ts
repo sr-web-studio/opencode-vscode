@@ -533,7 +533,13 @@ export class Controller {
     if (plan.action === "focus") {
       this.focusTick++
       this.emitNow()
-    } else this.openDraft()
+    } else {
+      this.openDraft()
+      // `+` is a user action: the new draft's prompt box may take focus. Other paths into a draft (a session deleted
+      // elsewhere) go through openDraft() alone and never ask for focus.
+      this.focusTick++
+      this.emitNow()
+    }
   }
 
   private async send(text: string): Promise<void> {

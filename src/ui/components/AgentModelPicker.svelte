@@ -3,6 +3,7 @@
   import { cycleVariant, flattenModels, footerLabel, groupModels, sameModel } from "../../core/models"
   import type { AppState } from "../../core/protocol"
   import { useStore } from "../context"
+  import { focusGuarded } from "../focus"
 
   let { app }: { app: AppState } = $props()
   const store = useStore()
@@ -23,8 +24,8 @@
     query = ""
     index = which === "agent" ? Math.max(0, app.agents.findIndex((a) => a.id === app.agent)) : Math.max(0, flat.findIndex((m) => sameModel(app.model, m)))
     await tick()
-    if (which === "model") search?.focus()
-    else list?.focus()
+    if (which === "model") focusGuarded(search)
+    else focusGuarded(list)
   }
   function close() { popover = undefined }
 

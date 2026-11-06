@@ -19,6 +19,7 @@
     type OtherText,
   } from "../../core/forms"
   import { useStore } from "../context"
+  import { focusGuarded } from "../focus"
 
   let { form }: { form: FormInfo } = $props()
   const store = useStore()
@@ -42,7 +43,7 @@
     hi = 0
     touched = {}
     busy = false
-    void tick().then(() => root?.focus())
+    void tick().then(() => focusGuarded(root))
   })
 
   const fields = $derived(visibleFields(form.fields as FormField[], answers))
@@ -64,7 +65,7 @@
     if (delta > 0 && validateField(field, answers[field.key], other[field.key])) return
     step = clampStep(at + delta, fields.length)
     hi = 0
-    void tick().then(() => root?.focus())
+    void tick().then(() => focusGuarded(root))
   }
 
   async function submit() {
@@ -96,7 +97,7 @@
       advance()
     } else {
       set(f.key, OTHER)
-      void tick().then(() => root?.querySelector<HTMLInputElement>(".other-input")?.focus())
+      void tick().then(() => focusGuarded(root?.querySelector<HTMLInputElement>(".other-input")))
     }
   }
 
@@ -108,7 +109,7 @@
     const next = current.includes(value) ? current.filter((v) => v !== value) : [...current, value]
     if (!current.includes(value) && f.maxItems !== undefined && next.length > f.maxItems) return
     set(f.key, next)
-    if (value === OTHER && next.includes(OTHER)) void tick().then(() => root?.querySelector<HTMLInputElement>(".other-input")?.focus())
+    if (value === OTHER && next.includes(OTHER)) void tick().then(() => focusGuarded(root?.querySelector<HTMLInputElement>(".other-input")))
   }
 
   function advance() {
@@ -128,7 +129,7 @@
     if (e.key === "Tab" && e.shiftKey && fields.length > 1) { e.preventDefault(); go(-1); return }
     const rows = isChoice(field) || field.type === "multiselect" ? rowCount(field) : 0
     if (typing && target.classList.contains("other-input")) {
-      if (e.key === "ArrowUp" || e.key === "ArrowDown") { e.preventDefault(); hi = Math.max(0, Math.min(rows - 1, hi + (e.key === "ArrowDown" ? 1 : -1))); root?.focus() }
+      if (e.key === "ArrowUp" || e.key === "ArrowDown") { e.preventDefault(); hi = Math.max(0, Math.min(rows - 1, hi + (e.key === "ArrowDown" ? 1 : -1))); focusGuarded(root) }
       else if (e.key === "Enter") { e.preventDefault(); if (field.type === "multiselect") (last ? submit() : go(1)); else advance() }
       return
     }

@@ -51,7 +51,7 @@
 
   function suggest(text: string) {
     draft = text
-    prompt?.focus()
+    prompt?.focusPrompt()
   }
 </script>
 

@@ -1,8 +1,10 @@
 <script lang="ts">
-  import { tick } from "svelte"
+  import { onMount, tick } from "svelte"
+  import { shouldFocusPrompt } from "../../core/focus"
   import { cycleAgent } from "../../core/models"
   import type { AppState } from "../../core/protocol"
   import { isRunning } from "../../core/transcript/reducer"
+  import { focusGuarded, focusWhenAllowed, readFocusEnv } from "../focus"
   import { useStore } from "../context"
   import AgentModelPicker from "./AgentModelPicker.svelte"
 
@@ -18,7 +20,8 @@
     area.style.height = "auto"
     area.style.height = `${Math.min(area.scrollHeight, 200)}px`
   }
-  export function focus() { area?.focus() }
+  /** Explicit user action inside this view (suggestion click, after send, popover closed). Guarded: never steals focus. */
+  export function focusPrompt() { focusGuarded(area) }
 
   function send() {
     if (!canSend) return
@@ -37,8 +40,18 @@
   }
 
   $effect(() => { void text; void tick().then(resize) })
-  // `+` inside an empty draft only focuses the input; a fresh draft focuses it as well.
-  $effect(() => { void app.focusTick; void app.draftEpoch; void tick().then(() => area?.focus()) })
+  // The host bumps these counters only for explicit requests (`+`, a revert). The state object itself is
+  // replaced on every emit, so the effect must depend on this derived number and nothing broader.
+  const focusRequest = $derived(app.focusTick)
+  let seenRequest: number | undefined
+  $effect(() => {
+    const next = focusRequest
+    const prev = seenRequest
+    seenRequest = next
+    if (shouldFocusPrompt(prev, next, readFocusEnv(area))) void tick().then(() => focusWhenAllowed(() => area))
+  })
+  // First time the box is shown (also after a question closes). Only if this view already has the keyboard.
+  onMount(() => focusWhenAllowed(() => area))
 </script>
 
 <div class="box">

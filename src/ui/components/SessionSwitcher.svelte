@@ -4,6 +4,7 @@
   import type { AppState } from "../../core/protocol"
   import { DRAFT_TITLE, flattenGroups, groupSessions, toRows, UNTITLED } from "../../core/sessions"
   import { useStore } from "../context"
+  import { focusGuarded } from "../focus"
 
   let { app, hasDraftText }: { app: AppState; hasDraftText: boolean } = $props()
   const store = useStore()
@@ -27,7 +28,7 @@
       query = ""
       index = Math.max(0, flat.indexOf(currentID ?? ""))
       await tick()
-      input?.focus()
+      focusGuarded(input)
     }
   }
   function pick(id: string) {
