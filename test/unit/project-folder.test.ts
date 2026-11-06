@@ -5,8 +5,8 @@ import type { AppState } from "../../src/core/protocol"
 
 describe("sameDirectory", () => {
   test("Windows: drive letter and folder case, separators and trailing slashes", () => {
-    expect(sameDirectory("d:\\Work\\uniloop\\uniloop-platform", "D:\\Work\\uniloop\\uniloop-platform")).toBe(true)
-    expect(sameDirectory("d:\\work\\Uniloop\\uniloop-platform\\", "D:/Work/uniloop/uniloop-platform")).toBe(true)
+    expect(sameDirectory("d:\\Work\\acme\\app", "D:\\Work\\acme\\app")).toBe(true)
+    expect(sameDirectory("d:\\work\\Acme\\app\\", "D:/Work/acme/app")).toBe(true)
     expect(sameDirectory("\\\\server\\share\\proj", "\\\\SERVER\\share\\proj")).toBe(true)
   })
   test("different folders never match", () => {
@@ -27,7 +27,7 @@ describe("sameDirectory", () => {
 
 /** A server on Windows that stores `D:\…` while VS Code reports `d:\…`, and filters `session.list` on the exact path. */
 function windowsServer(opts: { locationGet: boolean }) {
-  const STORED = "D:\\Work\\uniloop\\uniloop-platform"
+  const STORED = "D:\\Work\\acme\\app"
   const session = (id: string, directory: string, updated: number) => ({
     id, title: id, projectID: "prj", time: { created: updated, updated }, location: { directory },
   })
@@ -72,7 +72,7 @@ function windowsServer(opts: { locationGet: boolean }) {
 const sessionsOf = async (locationGet: boolean) => {
   const server = windowsServer({ locationGet })
   const lines: string[] = []
-  const ctl = new Controller({ directory: "d:\\Work\\uniloop\\uniloop-platform", folderName: "uniloop-platform", displayPath: "d:\\Work\\uniloop\\uniloop-platform", log: (l) => lines.push(l) })
+  const ctl = new Controller({ directory: "d:\\Work\\acme\\app", folderName: "app", displayPath: "d:\\Work\\acme\\app", log: (l) => lines.push(l) })
   ;(ctl as unknown as { client: unknown }).client = server.client
   await ctl.sync()
   const state: AppState = ctl.snapshot()
@@ -85,7 +85,7 @@ describe("sessions of a Windows folder whose drive letter case differs from the 
     expect(ids).toEqual(["ses_a", "ses_b"])
     // The project id from location.get scopes the list (all spellings of the folder).
     expect(server.calls[0]).toMatchObject({ project: "prj", parentID: null })
-    expect(lines.some((l) => l.includes("server location D:\\Work\\uniloop\\uniloop-platform"))).toBe(true)
+    expect(lines.some((l) => l.includes("server location D:\\Work\\acme\\app"))).toBe(true)
   })
   test("new sessions are created under the server's spelling", async () => {
     const { ctl, server } = await sessionsOf(true)
@@ -106,14 +106,14 @@ describe("sessions of a Windows folder whose drive letter case differs from the 
 describe("sessions are listed by project (2026-11-06: a Windows colleague saw 1 of several)", () => {
   /** location.get echoes VS Code's `d:\…` but the project (and the older sessions) are stored as `D:\…`. */
   function server() {
-    const STORED = "D:\\Work\\uniloop\\uniloop-platform"
+    const STORED = "D:\\Work\\acme\\app"
     const s = (id: string, directory: string, updated: number) => ({ id, title: id, projectID: "prj", time: { created: updated, updated }, location: { directory } })
-    const all = [s("ses_new", "d:\\Work\\uniloop\\uniloop-platform", 9), s("ses_old1", STORED, 5), s("ses_old2", STORED, 4), s("ses_sub", `${STORED}\\apps\\web`, 3), s("ses_x", "D:\\Work\\uniloop-other", 2)]
+    const all = [s("ses_new", "d:\\Work\\acme\\app", 9), s("ses_old1", STORED, 5), s("ses_old2", STORED, 4), s("ses_sub", `${STORED}\\apps\\web`, 3), s("ses_x", "D:\\Work\\acme-other", 2)]
     const calls: Record<string, unknown>[] = []
     const base = windowsServer({ locationGet: true }).client
     const client = {
       ...base,
-      location: { get: async () => ({ directory: "d:\\Work\\uniloop\\uniloop-platform", project: { id: "prj", directory: STORED, canonical: STORED } }) },
+      location: { get: async () => ({ directory: "d:\\Work\\acme\\app", project: { id: "prj", directory: STORED, canonical: STORED } }) },
       session: {
         ...base.session,
         list: async (input: Record<string, unknown>) => {
@@ -129,7 +129,7 @@ describe("sessions are listed by project (2026-11-06: a Windows colleague saw 1 
 
   test("every spelling of the folder and its subfolders is listed; other folders are not", async () => {
     const srv = server()
-    const ctl = new Controller({ directory: "d:\\Work\\uniloop\\uniloop-platform", folderName: "uniloop-platform", displayPath: "", log: () => {} })
+    const ctl = new Controller({ directory: "d:\\Work\\acme\\app", folderName: "app", displayPath: "", log: () => {} })
     ;(ctl as unknown as { client: unknown }).client = srv.client
     await ctl.sync()
     expect(ctl.snapshot().sessions.map((x) => x.id)).toEqual(["ses_new", "ses_old1", "ses_old2", "ses_sub"])

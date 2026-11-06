@@ -1,65 +1,76 @@
-# OpenCode for VS Code
+# OpenCode (unofficial) for VS Code
 
-A client for [OpenCode](https://opencode.ai) V2 that lives in the VS Code secondary sidebar. The OpenCode server owns your sessions, so closing VS Code never stops or changes a running session.
+> **Unofficial.** This extension is made by SR Web Studio and is not affiliated with, endorsed by or supported by the OpenCode team. "OpenCode" is the name of their project, used here only to say what this extension works with. Official extensions: [OpenCode](https://marketplace.visualstudio.com/items?itemName=sst-dev.opencode).
 
-> Status: milestone M1 (branch `phase-1`). See `docs/design.md` for the design and `docs/mockups/` for the approved screens.
+A chat panel for [OpenCode](https://opencode.ai) V2 in the VS Code sidebar. Your sessions live on the OpenCode server, so they keep running when you close VS Code, and you find them again when you come back.
 
-## What it does
+## Why I built this
 
-- Chat with sessions of the current workspace folder: transcript, prompt box, stop button.
-- One-line tool calls with expandable details, folded finished turns, collapsed reasoning, clickable file paths.
-- Inline permission prompts (`Allow · Always · Deny`) and a question/form chooser that replaces the prompt box.
-- Agent and model picker, session switcher, task list (when the agent uses `todowrite`), empty-project view.
-- VS Code notifications when OpenCode needs you or finishes work (`opencode.notifications.*`).
+I'm a big OpenCode fan. I run OpenCode as a service on a machine that is on 24/7, so I can open my sessions from anywhere, my laptop or my phone, and pick each one up exactly where it is, even hours later.
+
+What I badly missed was the VS Code editor around it: opening files, native diffs, the terminal, all next to the chat. So I built this extension for myself, and it now helps me every day. Maybe it helps you too.
+
+I'm also working on an Android app with the same UI, for the same always-on setup.
+
+**Preview:** this is an early release. Please report problems in [Issues](https://github.com/sr-web-studio/opencode-vscode/issues).
+
+## Features
+
+- **Chat** with the sessions of the open workspace folder. Compact one-line tool calls with details on click, finished turns folded into "N steps completed", collapsible reasoning.
+- **Steer while it works:** a message sent while the agent is busy joins the running turn.
+- **Editor integration:** file paths open in the editor (images too), and edits open as native VS Code diffs.
+- **Terminal:** shell commands the agent runs show up in a read-only VS Code terminal, without stealing focus. Ctrl+C stops the running command, after asking.
+- **Permissions and questions** inline: `Allow · Always · Deny`, and question forms that stay fully readable.
+- **Agent and model picker**, session switcher, pinned sessions, a floating task list, and background workers in a header chip. Click a worker to open it read-only.
+- **Notifications** when OpenCode needs you or finishes work.
+- **Voice input** (optional, free with your own key): speak Bangla, English or many other languages into the prompt box. See [Voice input](#voice-input).
+
+OpenCode stays in charge: models, providers, MCP servers, skills, agents and all configuration come from your OpenCode setup. The extension never changes OpenCode's configuration and never stops or restarts the OpenCode service.
 
 ## Requirements
 
 - VS Code 1.144 or newer.
-- The `opencode` command (setting `opencode.cliPath`, else `PATH`, else `~/.opencode/bin/opencode`). Without it the panel shows a setup state with install instructions.
-- The extension never writes OpenCode configuration and never stops or restarts the OpenCode service. If no local service runs it starts the shared background service (`opencode serve --service`, detached), or connects to `opencode.serverUrl`.
+- [OpenCode](https://opencode.ai) V2 installed, so the `opencode` command works. If it is missing, the panel shows how to install it. You can also set **OpenCode: Set CLI Path**.
+- An OpenCode server. If none is running, the extension starts OpenCode's shared background service (`opencode serve --service`), which keeps running on its own. To use a server elsewhere, set `opencode.serverUrl` and run **OpenCode: Set Remote Server Password**.
 
-## Develop
+The workspace folder you open is the OpenCode project.
 
-Needs [Bun](https://bun.sh).
+## Voice input
 
-```sh
-bun install
-bun run build        # extension host (esbuild → dist/extension.js) + webview (vite → dist/webview)
-bun run watch        # rebuild on change
-bun run typecheck    # tsc (host, core, tests) + svelte-check (webview)
-bun test             # unit tests (test/unit)
-bun run package      # opencode-vscode.vsix
-```
+Voice input uses [Soniox](https://soniox.com) speech-to-text with **your own API key**; there is no paid tier here. Soniox charges you directly for what you use.
 
-Press F5 (`Run Extension` in `.vscode/launch.json`) to start an Extension Development Host.
+1. Create a key in the [Soniox console](https://console.soniox.com).
+2. Run **OpenCode: Set Voice API Key (Soniox)**. The key is checked, then stored in VS Code's secret storage.
+3. Click the mic in the prompt box, speak, and click again to stop. The text is added to the prompt; nothing is sent until you press Enter.
 
-Host smoke test (real VS Code via `@vscode/test-electron`; needs a display, so on headless Linux run it under `xvfb-run -a`):
+The mic button stays dimmed until a key is set. Recording is done by the small companion extension **OpenCode Voice (unofficial)**, which is installed automatically on the computer in front of you, also when you work over Remote SSH. On first use it checks the microphone permission and tells you how to fix it if it is blocked. Use **OpenCode Voice: Choose Microphone** to pick a device.
 
-```sh
-bun run test:host
-```
-
-## Layout
-
-| Path | Purpose | May import |
-| --- | --- | --- |
-| `src/core/` | API/state layer, reducers, form/session/model/todo/notification logic, `Controller` | root `@opencode/client` types only. No `vscode`, no `node:*`. |
-| `src/ui/` | Svelte components, `HostBridge` interface | `core/`. No `vscode`, no `node:*`. |
-| `src/webview/` | Webview entry and the VS Code `HostBridge` | `ui/`, `core/` |
-| `src/extension/` | Extension host: connection, view provider, notifier, commands | everything, incl. `@opencode/client/service` |
-| `test/unit/` | Unit tests, including `boundaries.test.ts` which enforces the import rules | |
-| `test/fixtures/` | Sanitized real-API captures (events + messages) | |
-
-`core/` and `ui/` are written so they can move into packages for a mobile app without changes.
-
-## Fixtures
-
-`bun run sanitize-fixtures <capture-dir> <name>` turns a raw capture (`events.json`, `messages.json`) into `test/fixtures/<name>.json`: it drops instruction/usage noise and anything that looks like a secret. Capture only in a throwaway directory with a throwaway session, and delete the session afterwards.
+Set your languages in `opencode.voice.languages` (default: `bn`, `en`). They are hints; other languages are still recognized.
 
 ## Settings
 
-See the **OpenCode** section in VS Code settings: `opencode.serverUrl`, `opencode.cliPath`, `opencode.transcript.*`, `opencode.todo.defaultExpanded`, `opencode.notifications.*`. A remote server password is stored in VS Code SecretStorage (**OpenCode: Set Remote Server Password**).
+Open Settings and search for **OpenCode**:
+
+| Setting | What it does |
+| --- | --- |
+| `opencode.serverUrl` | URL of a remote OpenCode server. Empty: use the local shared service. |
+| `opencode.cliPath` | Path to `opencode`. Empty: `PATH`, then `~/.opencode/bin`. |
+| `opencode.transcript.*` | Fold finished steps, expand tool details, reasoning display, font size. |
+| `opencode.todo.defaultExpanded` | Show the task list expanded. |
+| `opencode.notifications.*` | Which events notify you, and whether to notify while the window is focused. |
+| `opencode.terminal.*` | When to reveal terminals, one per session or per command, how many to keep open. |
+| `opencode.voice.languages`, `opencode.voice.model` | Voice input languages and Soniox model. |
+
+## Privacy
+
+- The extension talks only to your OpenCode server and, for voice input, to Soniox.
+- Audio is recorded only while the mic button is on. Your Soniox key stays in VS Code's secret storage; the recorder receives a key that expires after two minutes, one per recording.
+- No telemetry.
+
+## Development
+
+See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## License
 
-MIT
+MIT. Not affiliated with the OpenCode team.

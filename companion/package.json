@@ -1,7 +1,24 @@
 {
   "name": "opencode-voice",
-  "displayName": "OpenCode Voice",
-  "description": "Voice input for the OpenCode extension: records your microphone on this computer and types what you say (Bangla, English and more) into the OpenCode prompt box. Bring your own Soniox key.",
+  "displayName": "OpenCode Voice (unofficial)",
+  "description": "Voice input for the OpenCode (unofficial) extension: records your microphone on this computer and types what you say (Bangla, English and more) into the prompt box. Bring your own Soniox key. Unofficial — not affiliated with the OpenCode team.",
+  "icon": "media/icon.png",
+  "galleryBanner": {
+    "color": "#1e1e2e",
+    "theme": "dark"
+  },
+  "preview": true,
+  "keywords": [
+    "opencode",
+    "voice",
+    "dictation",
+    "speech to text",
+    "bangla"
+  ],
+  "homepage": "https://github.com/sr-web-studio/opencode-vscode#readme",
+  "bugs": {
+    "url": "https://github.com/sr-web-studio/opencode-vscode/issues"
+  },
   "version": "0.3.5",
   "publisher": "sr-web-studio",
   "license": "MIT",

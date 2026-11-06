@@ -1,7 +1,26 @@
 {
   "name": "opencode-vscode",
-  "displayName": "OpenCode",
-  "description": "A VS Code client for OpenCode. Sessions live on the OpenCode server and keep running when you close the editor.",
+  "displayName": "OpenCode (unofficial)",
+  "description": "Chat with OpenCode in the VS Code sidebar. Sessions live on your OpenCode server and keep running when you close the editor. Native diffs, terminal, voice input. Unofficial — not affiliated with the OpenCode team.",
+  "icon": "media/icon.png",
+  "galleryBanner": {
+    "color": "#1e1e2e",
+    "theme": "dark"
+  },
+  "preview": true,
+  "keywords": [
+    "opencode",
+    "ai",
+    "agent",
+    "coding agent",
+    "chat",
+    "llm",
+    "voice"
+  ],
+  "homepage": "https://github.com/sr-web-studio/opencode-vscode#readme",
+  "bugs": {
+    "url": "https://github.com/sr-web-studio/opencode-vscode/issues"
+  },
   "version": "0.3.5",
   "publisher": "sr-web-studio",
   "license": "MIT",
