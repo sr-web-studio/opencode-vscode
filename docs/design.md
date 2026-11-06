@@ -16,8 +16,22 @@ Chosen UI direction: `docs/mockups/v2/` (compact, Claude Code style). The first 
   - `opencode.transcript.showReasoning` (`"collapsed" | "expanded" | "hidden"`, default `"collapsed"`)
   - `opencode.transcript.fontSize` (default: inherit VS Code `chat.editor.fontSize`, else 13)
 - Comfortable spacing, readable font, theme colors only from `--vscode-*` variables. Markdown answers have proper paragraph and list spacing.
-- Permission prompts are inline lines with "Allow once / Always / Reject".
 - A slim "Background · 2 workers, 1 shell" row sits above the transcript and expands into a list.
+
+## Controls (approved 2026-11-06, mockups in `docs/mockups/v3/`)
+
+- **Agent / model** (v3/01, v3/02): one quiet footer row of plain muted text under the prompt textarea: `build ⌄ · Sonnet 5.5 · high ⌄`. No pills, chips or borders. Clicking opens a small popover anchored to that text.
+  - Agent popover: one row per primary agent (`name — description`), check on the current one, keyboard ↑↓ / Enter / Esc.
+  - Model popover: a search field, models grouped under muted provider headers, and variants (`low medium high`) right-aligned on the model's row and clickable. Lists come only from `agent.list` / `model.list`.
+- **Permission** (v3/03): inline on the tool's own line. Tiny text buttons `Allow · Always · Deny` follow the tool target, with `Allow` in the accent color, and a 2px amber mark to the left of the line. No box or card. Maps to `once / always / reject`.
+- **Questions / forms** (v3/05, v3/06): while a form is pending for the session, the prompt box is temporarily replaced by a compact chooser of the same width. Esc cancels the form (`session.form.cancel`), and the normal prompt box comes back.
+  - Single-choice (string with `options`): numbered one-line rows `1  Label — muted description`, keys 1–9, ↑↓, Enter. If `custom` is set, the last row is `Other…` with an inline text field.
+  - Multiselect: one-line rows with small checkboxes. `Other…` appears if `custom` is set. `minItems/maxItems` are respected.
+  - Boolean: small `Yes | No` segmented control.
+  - String / number / integer without options: one single-line input with placeholder, validation shown in muted error text.
+  - External: one line with a link button that opens the URL in the browser.
+  - Several fields: small tabs at the top (`Database ✓  Auth  Deploy`) with `2 / 3`. Tab moves to the next field. `when` conditions and `hidden` are applied. Submit appears on the last step.
+- **Session switcher** (v3/07): the header shows the session title with `⌄` and a `+` at the right. Clicking the title opens a dropdown with a search field and groups (Today / Yesterday / Last week / Older). Each session is one line: title, then the relative time right-aligned. Status is shown by dots: a running session gets the accent dot, one waiting for input (permission/form) gets an amber dot. The current session has a check. The footer row has `Show archived`. Only root sessions (no `parentID`) of this project are listed.
 
 ## Decision: interactive input
 
