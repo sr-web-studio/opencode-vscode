@@ -1,0 +1,6 @@
+{
+  "_comment": "Patch structure of real edit-tool metadata.files[].patch (OpenCode 2.2.5); neutral text only.",
+  "file": "docs/service.md",
+  "patch": "Index: docs/service.md\n===================================================================\n--- docs/service.md\n+++ docs/service.md\n@@ -76,10 +76,10 @@\n alpha one\n alpha two\n alpha three\n alpha four\n-the old setting is red and enabled\n-the old note\n+the new setting is blue and enabled\n+the new note\n \n omega one\n \n omega two\n",
+  "second": "Index: docs/service.md\n===================================================================\n--- docs/service.md\n+++ docs/service.md\n@@ -41,9 +41,9 @@\n beta one\n \n beta two\n beta three\n-the old heading\n+the new heading\n beta four\n beta five\n beta six\n \n"
+}
