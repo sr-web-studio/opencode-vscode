@@ -1,4 +1,5 @@
 import type { EventEnvelope, SessionMessageInfo } from "../api"
+import { applyRevertEvent } from "./revert"
 import {
   emptyView,
   type Outcome,
@@ -105,9 +106,32 @@ export function viewFromMessages(messages: ReadonlyArray<SessionMessageInfo>): S
         current.error = errorText(m.error)
         current = undefined
       }
+    } else if (m.type === "compaction" && m.status === "completed") {
+      turns.push(compactionTurn(m.id, m.summary, m.reason, m.time?.created))
+      current = undefined
     }
   }
   return { turns, queued: [], loaded: true }
+}
+
+function compactionTurn(id: string, summary: unknown, reason: unknown, created: number | undefined): TurnView {
+  return {
+    id: `compaction:${id}`,
+    compaction: { summary: typeof summary === "string" ? summary : "", reason: typeof reason === "string" ? reason : undefined, created },
+    steps: [],
+    started: created,
+    ended: created,
+    outcome: "succeeded",
+  }
+}
+
+/**
+ * Put an older chunk in front of a view ("Show earlier messages"). A turn of the older chunk that was cut off by
+ * the chunk boundary has no idle marker; it is closed so it is not shown as still running.
+ */
+export function prependView(view: SessionView, older: SessionView): SessionView {
+  const closed = older.turns.map((t) => (t.outcome || t.compaction ? t : { ...t, outcome: "succeeded" as const }))
+  return { ...view, turns: [...closed, ...view.turns] }
 }
 
 /* -------------------------------------------------------------------- events */
@@ -260,12 +284,21 @@ export function applyEvent(view: SessionView, ev: EventEnvelope): SessionView {
           completed: t,
         })),
       )
+    case "session.compaction.ended": {
+      // The summary replaces what came before. Close any open turn first so the marker sits after it.
+      const closed = view.turns.length && !view.turns[view.turns.length - 1]!.outcome ? finishTurn(view, "succeeded", t) : view
+      return { ...closed, turns: [...closed.turns, compactionTurn(`live:${ev.id ?? closed.turns.length}`, d.text, d.reason, t)] }
+    }
     case "session.execution.succeeded":
       return finishTurn(view, "succeeded", t)
     case "session.execution.failed":
       return finishTurn(view, "failed", t, errorText(d.error))
     case "session.execution.interrupted":
       return finishTurn(view, "interrupted", t)
+    case "session.revert.staged":
+    case "session.revert.cleared":
+    case "session.revert.committed":
+      return applyRevertEvent(view, ev.type, d)
     default:
       return view
   }

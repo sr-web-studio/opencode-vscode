@@ -32,9 +32,14 @@ export type StepView = {
 
 export type Outcome = "succeeded" | "failed" | "interrupted"
 
+/** A completed compaction: the summary that replaced everything before it. Shown as one muted, collapsible line. */
+export type CompactionView = { summary: string; reason?: string; created?: number }
+
 export type TurnView = {
   /** Message id of the user message, or a synthetic id when the turn has none. */
   id: string
+  /** Set on a marker turn that holds only a compaction summary (no user text, no steps). */
+  compaction?: CompactionView
   user?: { id: string; text: string; created?: number }
   steps: StepView[]
   started?: number
@@ -46,10 +51,15 @@ export type TurnView = {
 
 export type QueuedMessage = { id: string; text: string }
 
+/** A staged rollback: the boundary prompt and how many files the server restored (0 = none, or no snapshot). */
+export type RevertState = { messageID: string; files: number }
+
 export type SessionView = {
   turns: TurnView[]
   queued: QueuedMessage[]
   loaded: boolean
+  /** Set while a rollback is staged. The turns from the boundary prompt on are hidden (see `visibleTurns`). */
+  revert?: RevertState
 }
 
 export const emptyView = (): SessionView => ({ turns: [], queued: [], loaded: false })
