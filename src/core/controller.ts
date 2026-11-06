@@ -58,7 +58,7 @@ export class Controller {
 
   private connection: ConnectionState = { status: "connecting" }
   private settings: ViewSettings = defaultViewSettings
-  private voice: AppState["voice"] = { keySet: false, capture: false }
+  private voice: AppState["voice"] = { keySet: false, capture: false, recording: "off" }
   private target: ViewTarget = { kind: "draft" }
   private sessions: SessionInfo[] = []
   private archived: SessionInfo[] = []

@@ -224,9 +224,36 @@ Proposal:
   - Only an accepted key is saved, in SecretStorage (`opencode.voice.sonioxKey`). Then the mic turns normal.
   - A rejected key, a timeout or a network error saves nothing. The mic keeps its state, and an error message offers "Try again". A network error is never reported as "invalid key".
   - Commands: `OpenCode: Set Voice API Key (Soniox)`, `Clear Voice API Key`, `Voice Input`.
-  - `AppState.voice = { keySet, capture }` (`capture` stays false until the companion ships), and `HostBridge.voice()`. The key never reaches the webview or the logs.
+  - `AppState.voice = { keySet, capture, recording }`, and `HostBridge.voice()`. The key never reaches the webview or the logs.
   - Pure check `core/voice.ts` (`checkSonioxKey`, `keyShapeProblem`) has unit tests. The same code serves mobile with its own `fetch`.
 - **UX:** a mic codicon in the prompt box (keyboard `Ctrl+Alt+V`). Click to start and click again or Esc to stop. A small level meter and the active language (`বাংলা + EN`) are shown while recording. Partial text is grey, and nothing is auto-sent.
+
+### Voice capture (0.3.0, built 2026-11-06)
+- **Two extensions.** Webviews have no microphone, and with Remote SSH the main extension runs on the server. Recording lives in the companion **OpenCode Voice** (`sr-web-studio.opencode-voice`, folder `companion/`, `extensionKind: ["ui"]`), which runs on the machine with the microphone.
+- **Flow:**
+  1. The mic is clicked, and `Voice.click()` runs in the main extension.
+  2. The main extension mints a 120 s Soniox temporary key (`mintSonioxTempKey`), so the long-lived key never leaves its SecretStorage.
+  3. It calls `opencode.companion.voice.start {id, key, model, languages}`.
+  4. The companion forks `dist/recorder.js` with `ELECTRON_RUN_AS_NODE=1`, so a native crash cannot take down the extension host.
+  5. `DictationSession` records with pvrecorder (16 kHz, 100 ms frames) and streams to Soniox `stt-rt-v6`, sending the key as WebSocket subprotocols.
+  6. Updates go back as `opencode.voice.feed {id, kind: listening|heard|done}`.
+  7. The main extension posts `{type:"dictation", id, text, done}` to the webview, and the prompt box applies it with `mergeDictation`.
+- **Prompt box:**
+  - The text is only inserted, never sent.
+  - Typing during dictation is kept: only the newly heard part is appended.
+  - Sending stops the recording and drops the words still on their way.
+- **States:** `AppState.voice.recording` is `off`, `starting`, `on` or `stopping`.
+  - The mic shows a spinner while `starting` and `stopping`, and a pulsing red record icon while `on`.
+  - A recording stops itself after 60 s without new words, and after 10 min at most.
+  - After stop, it waits up to 4 s for Soniox's last words.
+- **No companion:** clicking the mic offers "Install from VSIX…". `vscode.extensions.onDidChange` refreshes `capture`.
+- **Errors:** Soniox errors show readable messages: 401 means the key was rejected, 402 means the balance is exhausted, then 408 and 429.
+- **Settings:** `opencode.voice.languages` (default `["bn","en"]`) and `opencode.voice.model` (default `stt-rt-v6`).
+- **Packaging:** `bun run package` builds both `opencode-vscode.vsix` and `opencode-voice.vsix`.
+  - pvrecorder 1.2.9 (Apache-2.0, see `NOTICE`) is shipped as files under `dist/pvrecorder/{dist,lib}`, because it resolves `../lib/<platform>` itself.
+  - Builds included: win x64/arm64, mac arm64/x64, linux x64. No Raspberry Pi builds.
+- **Verified here:** the packaged `recorder.js` opens the microphone (Linux, dummy device) and connects to Soniox with a temporary key. Errors come back as `done` with a reason.
+- **Not verified here:** real transcription (Soniox answered 402, organization balance exhausted) and pvrecorder on Windows inside VS Code (the risk is Electron DLL-init issues #76 and #91; the separate process limits the damage).
 
 ## Controls (approved 2026-11-06, mockups in `docs/mockups/v3/`)
 

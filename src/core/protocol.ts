@@ -104,9 +104,9 @@ export type AppState = {
   restore?: PromptRestore
   /**
    * Voice input. `keySet`: the user saved a working Soniox key (the key itself never reaches the webview).
-   * `capture`: this host can record audio. False in VS Code until the companion extension (M4) ships.
+   * `capture`: the recording companion is reachable. `recording`: the state of the current dictation.
    */
-  voice: { keySet: boolean; capture: boolean }
+  voice: { keySet: boolean; capture: boolean; recording: "off" | "starting" | "on" | "stopping" }
 }
 
 export type Action =
@@ -139,6 +139,8 @@ export type ToWebview =
   | { type: "picked"; requestID: string; files: PickedFile[] }
   /** The answer to `imageData`: a `data:` URI, or nothing when the image is gone or unreadable. */
   | { type: "image"; requestID: string; dataUri?: string }
+  /** Dictated text of recording `id` so far (cumulative). The prompt box merges it; `done` is the last update. */
+  | { type: "dictation"; id: string; text: string; done: boolean }
 
 /** A file chosen in the host's file dialog. `uri` is `vscode.Uri.file(path).toString()`. */
 export type PickedFile = { uri: string; name: string; mime?: string }

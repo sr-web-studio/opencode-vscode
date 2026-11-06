@@ -13,7 +13,8 @@ import { ImagePreviews } from "./images"
 import { DiffViews } from "./diffs"
 import { ChatViewProvider, VIEW_ID } from "./view"
 import { WorkerPanels } from "./workers"
-import { VoiceKeys } from "./voice"
+import { Voice } from "./voice"
+import { VOICE_FEED_COMMAND, type VoiceFeed } from "../core/dictation"
 
 const PASSWORD_KEY = "opencode.serverPassword"
 const PINS_KEY = "opencode.pinnedModels"
@@ -41,7 +42,8 @@ export function activate(context: vscode.ExtensionContext): void {
     log: (line) => output.info(line),
   })
   context.globalState.setKeysForSync([PINS_KEY])
-  const voice = new VoiceKeys(context.secrets, (v) => controller.setVoice(v))
+  // `provider` is created below; dictation text is only posted after a recording starts, long after activation.
+  const voice = new Voice(context.secrets, (v) => controller.setVoice(v), (m) => provider.post(m), (line) => output.info(line))
   void voice.refresh()
   controller.setSettings(readViewSettings())
 
@@ -147,6 +149,9 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("opencode.voice.setKey", () => voice.setKey()),
     vscode.commands.registerCommand("opencode.voice.clearKey", () => voice.clearKey()),
     vscode.commands.registerCommand("opencode.voice.toggle", () => voice.click()),
+    // The companion (laptop side) sends the heard text here.
+    vscode.commands.registerCommand(VOICE_FEED_COMMAND, (u: VoiceFeed) => voice.feed(u)),
+    voice.watchCompanion(),
     vscode.commands.registerCommand("opencode.setPassword", async () => {
       const value = await vscode.window.showInputBox({ prompt: "Password for the remote OpenCode server", password: true, ignoreFocusOut: true })
       if (value === undefined) return

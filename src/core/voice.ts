@@ -45,3 +45,30 @@ export async function checkSonioxKey(fetch: FetchLike, raw: string, timeoutMs = 
     clearTimeout(timer)
   }
 }
+
+export type TempKey = { ok: true; key: string } | { ok: false; reason: string }
+
+/**
+ * A short-lived key for one recording. The companion (on the user's laptop) connects to Soniox with it, so the user's
+ * long-lived key never leaves the main extension's secret storage. The key only has to be valid when the stream opens.
+ */
+export async function mintSonioxTempKey(fetch: (url: string, init: { method: string; headers: Record<string, string>; body: string; signal?: AbortSignal }) => Promise<{ status: number; ok: boolean; json(): Promise<unknown> }>, key: string, timeoutMs = 10_000): Promise<TempKey> {
+  const abort = new AbortController()
+  const timer = setTimeout(() => abort.abort(), timeoutMs)
+  try {
+    const res = await fetch(SONIOX_TEMP_KEY_URL, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key.trim()}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ usage_type: "transcribe_websocket", expires_in_seconds: 120 }),
+      signal: abort.signal,
+    })
+    if (res.status === 401 || res.status === 403) return { ok: false, reason: "Soniox rejected the saved voice key. Set it again with “OpenCode: Set Voice API Key”." }
+    if (!res.ok) return { ok: false, reason: `Soniox answered with HTTP ${res.status}.` }
+    const body = (await res.json()) as { api_key?: unknown }
+    return typeof body?.api_key === "string" && body.api_key ? { ok: true, key: body.api_key } : { ok: false, reason: "Soniox sent no temporary key." }
+  } catch (e) {
+    return { ok: false, reason: abort.signal.aborted ? "Soniox did not answer in time." : `Could not reach Soniox (${e instanceof Error ? e.message : "network error"}).` }
+  } finally {
+    clearTimeout(timer)
+  }
+}

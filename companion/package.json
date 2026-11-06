@@ -1,0 +1,19 @@
+{
+  "name": "opencode-voice",
+  "displayName": "OpenCode Voice",
+  "description": "Voice input for the OpenCode extension: records your microphone on this computer and types what you say (Bangla, English and more) into the OpenCode prompt box. Bring your own Soniox key.",
+  "version": "0.3.0",
+  "publisher": "sr-web-studio",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "git+https://github.com/sr-web-studio/opencode-vscode.git" },
+  "engines": { "vscode": "^1.144.0" },
+  "categories": ["AI", "Other"],
+  "extensionKind": ["ui"],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onCommand:opencode.companion.ping",
+    "onCommand:opencode.companion.voice.start",
+    "onCommand:opencode.companion.voice.stop"
+  ],
+  "contributes": {}
+}

@@ -1,0 +1,8 @@
+**
+!dist/extension.js
+!dist/recorder.js
+!dist/pvrecorder/**
+!package.json
+!README.md
+!LICENSE
+!NOTICE

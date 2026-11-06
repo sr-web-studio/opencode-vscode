@@ -2,7 +2,7 @@
   "name": "opencode-vscode",
   "displayName": "OpenCode",
   "description": "A VS Code client for OpenCode. Sessions live on the OpenCode server and keep running when you close the editor.",
-  "version": "0.2.9",
+  "version": "0.3.0",
   "publisher": "sr-web-studio",
   "license": "MIT",
   "repository": {
@@ -228,6 +228,22 @@
           "minimum": 1,
           "maximum": 50,
           "markdownDescription": "Most OpenCode terminals kept open. When there are more, the least recently used idle one is closed. A terminal with a running command is never closed."
+        },
+        "opencode.voice.languages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "bn",
+            "en"
+          ],
+          "markdownDescription": "Languages you speak, as ISO codes (for example `bn`, `en`, `hi`). Soniox uses them as hints; it still hears other languages."
+        },
+        "opencode.voice.model": {
+          "type": "string",
+          "default": "stt-rt-v6",
+          "markdownDescription": "Soniox real-time model for voice input."
         }
       }
     }
@@ -243,12 +259,14 @@
     "typecheck": "tsc --noEmit -p tsconfig.json && svelte-check --tsconfig tsconfig.webview.json",
     "test": "bun test test/unit",
     "test:host": "bun run build && bun test/host/run.mjs",
-    "package": "bun run build && vsce package --no-dependencies --out opencode-vscode.vsix",
+    "package": "bun run build && vsce package --no-dependencies --out opencode-vscode.vsix && bun run package:companion",
     "sanitize-fixtures": "bun scripts/sanitize-fixtures.ts",
     "publish:marketplace": "bun tools/publish.ts marketplace",
-    "publish:openvsx": "bun tools/publish.ts openvsx"
+    "publish:openvsx": "bun tools/publish.ts openvsx",
+    "package:companion": "cd companion && vsce package --no-dependencies --out ../opencode-voice.vsix"
   },
   "devDependencies": {
+    "@picovoice/pvrecorder-node": "1.2.9",
     "@sveltejs/vite-plugin-svelte": "7.3.1",
     "@tailwindcss/vite": "4.3.4",
     "@types/bun": "1.4.4",
