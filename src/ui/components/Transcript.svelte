@@ -207,7 +207,19 @@
               {#if q.text}<div>{q.text}</div>{/if}
               {#if q.files?.length}<SentFiles files={q.files} />{/if}
             </div>
-            <div class="muted small qlabel">Queued</div>
+            <div class="muted small qlabel">
+              {#if q.delivery === "steer"}
+                <span>Sending at the next step…</span>
+              {:else}
+                <span>Queued · sent when the current work is done</span>
+                {#if !app.readOnly}
+                  <button class="link" title="Give it to the agent now, at its next step" onclick={() => store.dispatch({ type: "queued", inboxID: q.id, op: "steer" })}>Send now</button>
+                {/if}
+              {/if}
+              {#if !app.readOnly}
+                <button class="link" title="Remove from the queue" onclick={() => store.dispatch({ type: "queued", inboxID: q.id, op: "cancel" })}>Remove</button>
+              {/if}
+            </div>
           </div>
         {/each}
         {#each orphans as p (p.id)}
@@ -246,7 +258,7 @@
   .pad { padding: 0.5em 0; }
   .earlier { display: flex; justify-content: center; margin-bottom: 1em; }
   .queued { opacity: 0.75; margin: 0 0 var(--oc-turn-gap) max(32px, 15%); }
-  .qlabel { text-align: right; margin: 2px 2px 0; }
+  .qlabel { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 0 0.9em; margin: 2px 2px 0; }
   .user { padding: 10px 14px; border: 1px solid var(--oc-user-line); background: var(--oc-user-bg); border-radius: 8px; white-space: pre-wrap; word-break: break-word; }
   .orphan { display: flex; gap: 0.6em; align-items: baseline; flex-wrap: wrap; border-left: 2px solid var(--oc-amber); padding-left: 0.5em; margin: 0.4em 0; }
   .label { font-weight: 600; }

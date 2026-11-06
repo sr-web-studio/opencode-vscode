@@ -121,6 +121,8 @@ export type Action =
   | { type: "loadEarlier" }
   | { type: "trimCompacted" }
   | { type: "stop" }
+  /** A queued prompt: `steer` hands it to the agent at its next step ("Send now"); `cancel` removes it. */
+  | { type: "queued"; inboxID: string; op: "steer" | "cancel" }
   | { type: "pickAgent"; id: string }
   | { type: "pickModel"; model: ModelSelection }
   | { type: "permission"; sessionID: string; requestID: string; decision: "once" | "always" | "reject" }

@@ -3,7 +3,7 @@
   import type { ViewSettings } from "../../core/protocol"
   import { headLines } from "../../core/format"
   import { toolIcon } from "../../core/transcript/icons"
-  import { editStats, summarizeTool } from "../../core/transcript/tools"
+  import { askedQuestions, editStats, summarizeTool } from "../../core/transcript/tools"
   import type { ToolItem } from "../../core/transcript/types"
   import { displayName } from "../../core/names"
   import { toolChildID } from "../../core/workers"
@@ -113,6 +113,18 @@
         <ShellBlock {command} output={tool.output ?? ""} {workdir} directory={cwd} {exit} {active} created={tool.created} completed={tool.completed} {shellID} title={line.target} fontFamily={fontFamily} />
       {:else if isWorker}
         {#if tool.output}<pre class="out mono">{headLines(tool.output, 14)}</pre>{/if}
+      {:else if tool.name === "question"}
+        {#each askedQuestions(tool) as q, qi (qi)}
+          <div class="ask">
+            <div class="askq">{q.question}</div>
+            {#each q.options as o, oi (oi)}
+              <div class="askopt" class:chosen={q.answer === o.label}>
+                <span class="askl">{o.label}{#if q.answer === o.label} ✓{/if}</span>{#if o.description}<span class="muted"> — {o.description}</span>{/if}
+              </div>
+            {/each}
+            {#if q.answer}<div class="askans"><span class="muted">Answer:</span> {q.answer}</div>{/if}
+          </div>
+        {/each}
       {:else if tool.name === "read"}
         <div class="muted">{range}</div>
       {:else}
@@ -146,6 +158,12 @@
   .dot.run { background: var(--oc-accent); }
   .details { margin: 0.1em 0 0.5em 1.6em; font-size: 0.95em; }
   pre { margin: 0.25em 0; white-space: pre-wrap; word-break: break-word; }
+  .ask { margin: 0.2em 0 0.6em; line-height: 1.45; overflow-wrap: anywhere; white-space: pre-wrap; }
+  .askq { font-weight: 600; margin-bottom: 0.2em; }
+  .askopt { padding-left: 0.8em; }
+  .askopt.chosen .askl { color: var(--oc-accent); }
+  .askl { font-weight: 500; }
+  .askans { margin-top: 0.25em; }
   .out { background: var(--oc-code-bg); padding: 0.4em 0.6em; border-radius: 4px; max-height: 16em; overflow: auto; }
   .right { margin-left: 0.8em; }
 </style>

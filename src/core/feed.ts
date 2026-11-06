@@ -1,6 +1,6 @@
 import type { EventEnvelope, OpenCodeClient } from "./api"
 import { loadChunk, initialHistory, type FetchPage, type HistoryState, type RawMessage } from "./history"
-import { applyEvent, prependView, viewFromMessages } from "./transcript/reducer"
+import { applyEvent, prependView, queuedFromInbox, viewFromMessages } from "./transcript/reducer"
 import { emptyView, type SessionView, type TurnView } from "./transcript/types"
 
 const isDelta = (type: string) => type === "session.text.delta" || type === "session.reasoning.delta" || type === "session.tool.input.delta"
@@ -68,9 +68,15 @@ export class SessionFeed {
     this.loading = true
     this.changed(true)
     try {
-      const chunk = await loadChunk(this.fetcher(client, sessionID))
+      // Queued prompts live in the session inbox, not in the message list, until they are delivered.
+      const [chunk, inbox] = await Promise.all([
+        loadChunk(this.fetcher(client, sessionID)),
+        Promise.resolve()
+          .then(() => client.session.inbox.list({ sessionID }))
+          .catch(() => []),
+      ])
       if (token !== this.token) return
-      let view = viewFromMessages(chunk.messages as never)
+      let view: SessionView = { ...viewFromMessages(chunk.messages as never), queued: queuedFromInbox(inbox as unknown[]) }
       for (const ev of this.buffered) if (!isDelta(ev.type)) view = applyEvent(view, ev)
       this.view = view
       this.history = chunk.state

@@ -111,7 +111,7 @@
   .boot { padding: 1em; }
   .banner { font-size: 0.9em; padding: 0.25em var(--oc-side); border-bottom: 1px solid var(--oc-hairline); }
   .error { display: flex; justify-content: space-between; gap: 0.6em; padding: 0.3em var(--oc-side); font-size: 0.95em; }
-  .qwrap { padding: 0.3em var(--oc-side) 0.7em; }
+  .qwrap { padding: 0.3em var(--oc-side) 0.7em; max-height: 65vh; overflow-y: auto; }
   .wtitle { display: flex; align-items: center; gap: 0.5em; padding: 0.5em var(--oc-side); border-bottom: 1px solid var(--oc-hairline); font-weight: 600; }
   .wname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>

@@ -102,3 +102,15 @@ describe("variantName", () => {
     expect(variantName("xhigh")).toBe("X-High")
   })
 })
+
+describe("askedQuestions", () => {
+  test("question tool calls read as questions, options and the answer", async () => {
+    const { askedQuestions } = await import("../../src/core/transcript/tools")
+    const input = { questions: [{ question: "Which one?", header: "Pick", options: [{ label: "A", description: "a long description that must not be cut" }, { label: "B" }] }] }
+    expect(askedQuestions({ input, metadata: { answers: [["A"]] } })).toEqual([
+      { question: "Which one?", header: "Pick", options: [{ label: "A", description: "a long description that must not be cut" }, { label: "B", description: undefined }], answer: "A" },
+    ])
+    expect(askedQuestions({ input, metadata: {} })[0]!.answer).toBeUndefined()
+    expect(askedQuestions({ input: {}, metadata: {} })).toEqual([])
+  })
+})

@@ -176,8 +176,8 @@
 
   {#if field}
     <div class="head">
-      <span class="title">{fieldTitle(field)}</span>
-      {#if field.description}<span class="muted"> — {field.description}</span>{/if}
+      <div class="title">{fieldTitle(field)}</div>
+      {#if field.description}<div class="muted hdesc">{field.description}</div>{/if}
     </div>
 
     {#if choiceOf(field)}
@@ -187,8 +187,10 @@
           <!-- svelte-ignore a11y_click_events_have_key_events -->
           <div class="row" class:hi={i === hi} role="option" tabindex="-1" aria-selected={answers[field.key] === o.value} onclick={() => chooseRow(choice, i)} onmousemove={() => (hi = i)}>
             <span class="num muted">{i + 1}</span>
-            <span class="lbl">{o.label}{#if answers[field.key] === o.value} <span class="ok">✓</span>{/if}</span>
-            {#if o.description}<span class="muted desc">— {o.description}</span>{/if}
+            <span class="txt">
+              <span class="lbl">{o.label}{#if answers[field.key] === o.value} <span class="ok">✓</span>{/if}</span>
+              {#if o.description}<span class="muted desc">{o.description}</span>{/if}
+            </span>
           </div>
         {/each}
         {#if custom(field)}
@@ -210,8 +212,10 @@
           <!-- svelte-ignore a11y_click_events_have_key_events -->
           <div class="row" class:hi={i === hi} role="option" tabindex="-1" aria-selected={picked.includes(o.value)} onclick={() => toggleRow(field, i)} onmousemove={() => (hi = i)}>
             <span class="box" class:on={picked.includes(o.value)}>{picked.includes(o.value) ? "✓" : ""}</span>
-            <span class="lbl">{o.label}</span>
-            {#if o.description}<span class="muted desc">— {o.description}</span>{/if}
+            <span class="txt">
+              <span class="lbl">{o.label}</span>
+              {#if o.description}<span class="muted desc">{o.description}</span>{/if}
+            </span>
           </div>
         {/each}
         {#if custom(field)}
@@ -269,14 +273,18 @@
   .tab { color: var(--oc-muted); padding-bottom: 1px; border-bottom: 1px solid transparent; }
   .tab.on { color: var(--oc-fg); border-bottom-color: var(--oc-accent); }
   .count { margin-left: auto; font-size: 0.9em; }
-  .head { margin-bottom: 0.35em; }
-  .title { font-weight: 600; }
-  .rows { display: flex; flex-direction: column; max-height: 14em; overflow-y: auto; }
-  .row { display: flex; align-items: baseline; gap: 0.6em; padding: 0.15em 0.4em; border-radius: 3px; cursor: pointer; }
+  /* Questions and answers are read in full: everything wraps, nothing is cut with an ellipsis. */
+  .head { margin-bottom: 0.45em; }
+  .title { font-weight: 600; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.4; }
+  .hdesc { margin-top: 0.15em; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.4; }
+  .rows { display: flex; flex-direction: column; gap: 1px; max-height: 24em; overflow-y: auto; }
+  .row { display: flex; align-items: baseline; gap: 0.6em; padding: 0.25em 0.4em; border-radius: 3px; cursor: pointer; }
   .row.hi { background: var(--oc-hover); }
   .num { width: 1em; text-align: right; flex: none; }
-  .lbl { white-space: nowrap; }
-  .desc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .txt { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+  .lbl { overflow-wrap: anywhere; line-height: 1.4; }
+  .desc { font-size: 0.92em; overflow-wrap: anywhere; line-height: 1.4; }
+  .tab { white-space: normal; text-align: left; overflow-wrap: anywhere; }
   .ok { color: var(--oc-accent); }
   .box { width: 1em; height: 1em; flex: none; border: 1px solid var(--oc-muted); border-radius: 3px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.8em; align-self: center; }
   .box.on { border-color: var(--oc-accent); color: var(--oc-accent); }

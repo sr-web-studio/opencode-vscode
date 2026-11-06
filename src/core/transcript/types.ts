@@ -61,7 +61,11 @@ export type FileChip = {
   ref?: { messageID: string; index: number }
 }
 
-export type QueuedMessage = { id: string; text: string; files?: FileChip[] }
+/**
+ * A prompt waiting in the session inbox. `queue` waits until the agent finishes its work; `steer` is handed to the
+ * agent at its next step ("Send now").
+ */
+export type QueuedMessage = { id: string; text: string; files?: FileChip[]; delivery: "queue" | "steer" }
 
 /** A staged rollback: the boundary prompt and how many files the server restored (0 = none, or no snapshot). */
 export type RevertState = { messageID: string; files: number }

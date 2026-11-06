@@ -183,6 +183,16 @@ Salim installed the M1 vsix locally on Windows (OpenCode 2.1.4 there, workspace 
         - Big sessions must not post megabytes of state on every emit.
 10. **Edit session title**: a pencil icon on hover next to the header title (and F2 / double-click) turns it into an inline input. Enter saves via `session.update({ title })`, and Esc cancels. The session dropdown rows also get a rename action on hover.
 
+### Round 2 follow-ups (0.2.8, Salim, 2026-11-06)
+
+- **Queue, not steer.** `session.prompt` defaults to `delivery: "steer"`: the server hands the prompt to the running turn at its next step, so it landed mid-conversation. The OpenCode TUI sends `queue` while a turn is active (checked in the 2.2.5 binary).
+  - The extension now sends `delivery: "queue"` when the session is running (`sendDelivery()`), and the server default otherwise.
+  - Queued items show under the transcript with "Queued · sent when the current work is done", plus **Send now** (`session.inbox.update` → `steer`) and **Remove** (`session.inbox.cancel`).
+  - The view loads pending items with `session.inbox.list` when a session opens (queued prompts are not in `message.list` until delivered). The reducer handles `session.inbox.cancelled` and `session.inbox.delivery.changed`.
+  - A prompt delivered while a turn is open starts its own turn, matching history after a reload.
+  - Live-checked on 2.2.5 (`/tmp/opencode/occ-test`): queued prompts wait until the turn ends and run in order; steer delivers at the next step; cancel removes the item.
+- **Questions are read in full.** The question form (`QuestionPrompt`) no longer cuts option descriptions with an ellipsis: the title, description, labels and option descriptions wrap, and the form scrolls at 65% of the view height. The expanded `question` tool line shows the questions, options and the chosen answer as text instead of JSON (`askedQuestions()`).
+
 ## Voice input (proposed 2026-11-06, decision pending)
 
 Goal: dictate prompts, Bangla first, plus English and mixed Bangla-English. Speech becomes text in the prompt box and is never sent automatically.

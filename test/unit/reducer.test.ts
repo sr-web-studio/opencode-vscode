@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import fixtureA from "../fixtures/simple-edit-shell.json"
 import fixtureB from "../fixtures/grep-glob-subagent-question.json"
 import fixtureC from "../fixtures/shell-exit-and-error.json"
-import { applyEvent, isRunning, viewFromMessages } from "../../src/core/transcript/reducer"
+import { applyEvent, isRunning, queuedFromInbox, viewFromMessages } from "../../src/core/transcript/reducer"
 import { emptyView, type SessionView, type ToolItem } from "../../src/core/transcript/types"
 import { splitTurn, foldLabel, countSteps } from "../../src/core/transcript/turn"
 import { summarizeTool } from "../../src/core/transcript/tools"
@@ -88,7 +88,7 @@ describe("live streaming", () => {
     expect(t.output).toBe("a\n")
   })
 
-  test("a steered message delivered mid-turn does not start a new turn", () => {
+  test("a message delivered mid-turn (steer, or the next queued prompt) starts its own turn, as in history", () => {
     let v = emptyView()
     v = applyEvent(v, ev("session.inbox.enqueued", { inboxID: "m1", item: { type: "user", payload: { text: "first" } } }))
     expect(v.queued).toHaveLength(1)
@@ -98,7 +98,35 @@ describe("live streaming", () => {
     v = applyEvent(v, ev("session.step.started", { assistantMessageID: "a1", started: 1 }))
     v = applyEvent(v, ev("session.inbox.enqueued", { inboxID: "m2", item: { type: "user", payload: { text: "steer" } } }))
     v = applyEvent(v, ev("session.inbox.delivered", { inboxID: "m2" }))
-    expect(v.turns).toHaveLength(1)
+    expect(v.turns.map((t) => t.user?.text)).toEqual(["first", "steer"])
+    expect(v.turns[0]!.outcome).toBe("succeeded")
+    expect(v.turns[1]!.outcome).toBeUndefined()
+    v = applyEvent(v, ev("session.step.started", { assistantMessageID: "a2", started: 2 }))
+    expect(v.turns[1]!.steps.map((s) => s.id)).toEqual(["a2"])
+  })
+
+  test("queued prompts: delivery mode, Send now, cancel, and the inbox list", () => {
+    let v = emptyView()
+    v = applyEvent(v, ev("session.inbox.enqueued", { inboxID: "q1", item: { type: "user", delivery: "queue", payload: { text: "later" } } }))
+    v = applyEvent(v, ev("session.inbox.enqueued", { inboxID: "q2", item: { type: "user", delivery: "queue", payload: { text: "drop" } } }))
+    expect(v.queued.map((q) => q.delivery)).toEqual(["queue", "queue"])
+    v = applyEvent(v, ev("session.inbox.delivery.changed", { inboxID: "q1", delivery: "steer" }))
+    expect(v.queued[0]!.delivery).toBe("steer")
+    const same = applyEvent(v, ev("session.inbox.delivery.changed", { inboxID: "q1", delivery: "steer" }))
+    expect(same).toBe(v)
+    v = applyEvent(v, ev("session.inbox.cancelled", { inboxID: "q2" }))
+    expect(v.queued.map((q) => q.id)).toEqual(["q1"])
+    expect(applyEvent(v, ev("session.inbox.cancelled", { inboxID: "nope" }))).toBe(v)
+    expect(
+      queuedFromInbox([
+        { id: "a", type: "user", delivery: "queue", payload: { text: "x" } },
+        { id: "b", type: "compaction", delivery: "steer", payload: {} },
+        { id: "c", type: "user", delivery: "steer", payload: { text: "y" } },
+      ]),
+    ).toEqual([
+      { id: "a", text: "x", files: undefined, delivery: "queue" },
+      { id: "c", text: "y", files: undefined, delivery: "steer" },
+    ])
   })
 
   test("execution end closes the turn and stops streaming flags", () => {

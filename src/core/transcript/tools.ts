@@ -149,3 +149,22 @@ export function summarizeTool(tool: ToolItem, cwd: string): ToolLine {
 export function subagentSessionID(tool: ToolItem): string | undefined {
   return tool.name === "subagent" ? str(tool.metadata.sessionID) || undefined : undefined
 }
+
+export type AskedQuestion = { question: string; header?: string; options: Array<{ label: string; description?: string }>; answer?: string }
+
+/**
+ * The questions of a `question` tool call with the user's answers (`metadata.answers`, one list per question), for a
+ * readable expanded view instead of JSON.
+ */
+export function askedQuestions(tool: { input: Record<string, unknown>; metadata: Record<string, unknown> }): AskedQuestion[] {
+  const qs = Array.isArray(tool.input.questions) ? (tool.input.questions as Array<Record<string, unknown>>) : []
+  const answers = Array.isArray(tool.metadata.answers) ? (tool.metadata.answers as unknown[]) : []
+  return qs.map((q, i) => {
+    const a = answers[i]
+    const answer = Array.isArray(a) ? a.filter((x) => typeof x === "string").join(", ") : typeof a === "string" ? a : undefined
+    const options = Array.isArray(q.options)
+      ? (q.options as Array<Record<string, unknown>>).map((o) => ({ label: String(o.label ?? ""), description: typeof o.description === "string" ? o.description : undefined }))
+      : []
+    return { question: String(q.question ?? ""), header: typeof q.header === "string" ? q.header : undefined, options, answer: answer || undefined }
+  })
+}

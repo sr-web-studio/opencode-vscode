@@ -46,6 +46,11 @@ const LAST_SESSION_KEY = "lastSession"
 
 const message = (e: unknown): string => (e instanceof Error ? e.message : typeof e === "string" ? e : "Request failed")
 
+/** `queue` while the session works, so a new prompt waits for the current work; otherwise the server default. */
+export function sendDelivery(running: boolean): "queue" | undefined {
+  return running ? "queue" : undefined
+}
+
 /**
  * State for one project. It talks to the server only through the root `@opencode/client` API and keeps no
  * reference to VS Code, Node or the DOM, so the same class can run in the extension host today and in a
@@ -630,6 +635,8 @@ export class Controller {
           return await this.send(action.text, action.files)
         case "stop":
           return await this.stop()
+        case "queued":
+          return await this.queuedAction(action.inboxID, action.op)
         case "rename":
           return await this.rename(action.id, action.title)
         case "togglePin":
@@ -750,11 +757,24 @@ export class Controller {
       return
     }
     // The server commits a staged revert by itself when a prompt arrives (live-checked on 2.2.5): no commit call here.
+    const id = this.target.id
     this.restore = undefined
     this.feed.trim()
     this.sentTick++
     this.emitNow()
-    await client.session.prompt({ sessionID: this.target.id, text: body, ...filesInput(files) })
+    // The server's default delivery is `steer`: the prompt joins the running turn at its next step. While the agent
+    // works, a prompt waits in the inbox until the work is done instead, like the OpenCode apps (`queue`).
+    const delivery = sendDelivery(this.running.has(id) || isRunning(this.feed.view))
+    await client.session.prompt({ sessionID: id, text: body, ...filesInput(files), ...(delivery ? { delivery } : {}) })
+  }
+
+  /** Send a queued prompt now (it joins the running turn at the next step) or remove it from the queue. */
+  private async queuedAction(inboxID: string, op: "steer" | "cancel"): Promise<void> {
+    const id = this.currentSessionID
+    if (!id) return
+    const client = this.need()
+    if (op === "steer") await client.session.inbox.update({ sessionID: id, inboxID, delivery: "steer" })
+    else await client.session.inbox.cancel({ sessionID: id, inboxID })
   }
 
   /* ----------------------------------------------------------- title, pins */

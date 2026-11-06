@@ -8,6 +8,7 @@ import {
   type CompactionView,
   type FileChip,
   type Outcome,
+  type QueuedMessage,
   type SessionView,
   type StepItem,
   type StepView,
@@ -105,6 +106,18 @@ function stepFromHistory(m: any): StepView {
     error: errorText(m.error),
     items,
   }
+}
+
+function queuedItem(id: string, item: any): QueuedMessage {
+  return { id, text: item?.payload?.text ?? "", files: fileChips(item?.payload?.files, id), delivery: item?.delivery === "steer" ? "steer" : "queue" }
+}
+
+/** Pending user prompts from `session.inbox.list` (not in `message.list` until delivered), oldest first. */
+export function queuedFromInbox(items: ReadonlyArray<unknown>): QueuedMessage[] {
+  return items.flatMap((raw) => {
+    const item = raw as any
+    return item?.type === "user" && typeof item.id === "string" ? [queuedItem(item.id, item)] : []
+  })
 }
 
 /** Build a view from `message.list` output (any order is normalised to oldest first by the caller). */
@@ -257,16 +270,29 @@ export function applyEvent(view: SessionView, ev: EventEnvelope): SessionView {
     case "session.inbox.enqueued": {
       const item = d.item
       if (item?.type !== "user" || view.queued.some((q) => q.id === d.inboxID)) return view
-      return { ...view, queued: [...view.queued, { id: d.inboxID, text: item.payload?.text ?? "", files: fileChips(item.payload?.files, d.inboxID) }] }
+      return { ...view, queued: [...view.queued, queuedItem(d.inboxID, item)] }
+    }
+    case "session.inbox.cancelled": {
+      if (!view.queued.some((q) => q.id === d.inboxID)) return view
+      return { ...view, queued: view.queued.filter((q) => q.id !== d.inboxID) }
+    }
+    case "session.inbox.delivery.changed": {
+      const delivery = d.delivery === "steer" ? "steer" : "queue"
+      if (!view.queued.some((q) => q.id === d.inboxID && q.delivery !== delivery)) return view
+      return { ...view, queued: view.queued.map((q) => (q.id === d.inboxID ? { ...q, delivery } : q)) }
     }
     case "session.inbox.delivered": {
       const queued = view.queued.find((q) => q.id === d.inboxID)
       const rest = view.queued.filter((q) => q.id !== d.inboxID)
       if (!queued || view.turns.some((turn) => turn.user?.id === d.inboxID)) return { ...view, queued: rest }
       const last = view.turns[view.turns.length - 1]
-      // A message delivered mid-turn (steer) belongs to the running turn's context, not a new turn.
-      if (last && !last.outcome && last.steps.length > 0) return { ...view, queued: rest }
       const turn: TurnView = { id: d.inboxID, user: { id: d.inboxID, text: queued.text, created: t, files: queued.files }, steps: [], started: t }
+      // A message steered into a running turn starts a new turn, as history shows it after a reload: the prompt ends
+      // the previous turn there too.
+      if (last && !last.outcome && last.steps.length > 0) {
+        const done = settledTurn(last, { last: false, running: false })
+        return { ...view, queued: rest, turns: [...replaceAt(view.turns, view.turns.length - 1, done), turn] }
+      }
       const turns = last && !last.outcome && !last.user && last.steps.length === 0 ? replaceAt(view.turns, view.turns.length - 1, turn) : [...view.turns, turn]
       return { ...view, queued: rest, turns }
     }
