@@ -49,6 +49,13 @@ Salim installed the M1 vsix locally on Windows (OpenCode 2.1.4 there, workspace 
     - Only for the main session of this window and its workers. Workers' terminals are named `OpenCode (<agent>): <command>`.
     - The tool line's "Show terminal" link focuses that terminal. After a reload, running shells (`shell.list`) for this project's sessions are reattached from cursor 0.
     - `shell.output` and `shell.get` are scoped to the session's location.
+12. **Scrolling** (Claude Code / ChatGPT behaviour):
+    - Auto-scroll to the bottom on new content **only while the user is already at the bottom** (within ~40px). As soon as the user scrolls up, new content does not move the view. Expanding or collapsing a step must not jump the view either; keep the anchor element in place.
+    - When not at the bottom, a small round floating button (codicon `arrow-down`) appears bottom-center above the prompt box. If new content arrived meanwhile, it gets a dot or "New" badge. Clicking it smooth-scrolls to the end and re-enables follow mode. Sending a prompt always jumps to the end.
+13. **Load only since the last compaction:**
+    - Opening a session pages `message.list` newest-first (`order: desc`) and stops at the first **completed compaction** message (`type: "compaction"`, `status: "completed"`), so only the context after it is shown. A hard cap (e.g. 300 messages) applies when there is no compaction.
+    - At the top, the compaction shows as one muted line `› Context compacted · <time>`; expanding it shows its `summary` as markdown. Above it is a "Show earlier messages" link, which loads the previous page with the cursor while keeping the scroll position.
+    - Live events keep appending as usual. The same rule applies to the worker tabs.
 10. **Edit session title**: a pencil icon on hover next to the header title (and F2 / double-click) turns it into an inline input. Enter saves via `session.update({ title })`, and Esc cancels. The session dropdown rows also get a rename action on hover.
 
 ## Voice input (proposed 2026-11-06, decision pending)
@@ -73,6 +80,10 @@ Proposal:
   - b. Companion records with a native helper (`ffmpeg -f dshow` on Windows). This adds an extra dependency.
   - c. When #323602 ships, record directly in the webview.
 - **Mobile:** Capacitor has native mic access, so it uses the same engine directly. Gboard remains a free fallback.
+- **Decision 2026-11-06:** Soniox is chosen. Voice is a **paid feature** once the extension is public, because the STT cost must not land on the publisher. Proposed model, not built yet:
+  - **Bring your own key (free tier):** the user pastes their own Soniox key into SecretStorage. We pay nothing, and the user pays Soniox directly.
+  - **Hosted voice (paid):** a small Cloudflare Worker (`voice.<domain>`) checks a license key, mints a short-lived Soniox temporary key from our account, and meters minutes per license. Licenses are sold through a merchant of record (Lemon Squeezy / Polar / Paddle, to compare at build time). The extension stores the license key in SecretStorage and calls the Worker only to get a temp key; audio goes straight to Soniox.
+  - Everything else in the extension stays free. For Salim's own use during development, his own Soniox key is used (BYOK path).
 - **UX:** a mic codicon in the prompt box (keyboard `Ctrl+Alt+V`). Click to start and click again or Esc to stop. A small level meter and the active language (`বাংলা + EN`) are shown while recording. Partial text is grey, and nothing is auto-sent.
 
 ## Controls (approved 2026-11-06, mockups in `docs/mockups/v3/`)
