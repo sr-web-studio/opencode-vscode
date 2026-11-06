@@ -2,7 +2,7 @@
   "name": "opencode-vscode",
   "displayName": "OpenCode",
   "description": "A VS Code client for OpenCode. Sessions live on the OpenCode server and keep running when you close the editor.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publisher": "sr-web-studio",
   "license": "MIT",
   "repository": {
