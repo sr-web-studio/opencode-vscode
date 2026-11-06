@@ -20,7 +20,10 @@
   --oc-user-line: var(--vscode-input-border, var(--oc-hairline));
   --oc-user-accent: var(--vscode-textLink-foreground, var(--vscode-focusBorder));
   --oc-user-bg: var(--vscode-input-background, var(--vscode-editorWidget-background));
-  --oc-side: 16px;
+  /* Side padding. In a wide view (editor tab, wide panel) the content keeps a readable column of at most `--oc-max`,
+     centred; backgrounds and borders still span the full width. */
+  --oc-max: 860px;
+  --oc-side: max(16px, calc((100vw - var(--oc-max)) / 2));
   --oc-turn-gap: 40px;
   --oc-popover: var(--vscode-editorWidget-background);
   --oc-code-bg: var(--vscode-textCodeBlock-background);

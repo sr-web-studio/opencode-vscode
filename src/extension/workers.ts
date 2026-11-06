@@ -33,7 +33,7 @@ export class WorkerPanels implements vscode.Disposable {
       return
     }
     const tab = new WorkerTab(this.controller, sessionID)
-    const panel = vscode.window.createWebviewPanel("opencode.worker", "Worker", vscode.ViewColumn.Beside, {
+    const panel = vscode.window.createWebviewPanel("opencode.worker", "Worker", this.column(), {
       enableScripts: true,
       retainContextWhenHidden: true,
       localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, "dist", "webview")],
@@ -58,6 +58,15 @@ export class WorkerPanels implements vscode.Disposable {
     })
     this.open_.set(sessionID, { tab, panel })
     await tab.start()
+  }
+
+  /**
+   * Worker tabs share one editor group: the group of the most recently opened worker tab that is still open, so a new
+   * worker becomes another tab there instead of splitting the editor again. The first one opens beside the editor.
+   */
+  private column(): vscode.ViewColumn {
+    const open = [...this.open_.values()].reverse()
+    return open.find((o) => o.panel.viewColumn !== undefined)?.panel.viewColumn ?? vscode.ViewColumn.Beside
   }
 
   dispose(): void {
