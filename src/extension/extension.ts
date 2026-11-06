@@ -43,8 +43,16 @@ export function activate(context: vscode.ExtensionContext): void {
   })
   context.globalState.setKeysForSync([PINS_KEY])
   // `provider` is created below; dictation text is only posted after a recording starts, long after activation.
-  const voice = new Voice(context.secrets, (v) => controller.setVoice(v), (m) => provider.post(m), (line) => output.info(line))
+  const voice = new Voice(context.secrets, (v) => controller.setVoice(v), (m) => provider.post(m), (line) => output.info(line), {
+    vsix: vscode.Uri.joinPath(context.extensionUri, "dist", "opencode-voice.vsix"),
+    version: String(context.extension.packageJSON.version ?? ""),
+  })
   void voice.refresh()
+  // Installing OpenCode installs its voice companion on this computer too (also from a remote window). Quietly, a
+  // little after startup; a failure is only logged here and explained when the mic is clicked.
+  // Never in the host smoke test, which must not install anything.
+  const companionTimer = setTimeout(() => process.env.OPENCODE_SMOKE || void voice.ensureCompanion(false), 4000)
+  context.subscriptions.push({ dispose: () => clearTimeout(companionTimer) })
   controller.setSettings(readViewSettings())
 
   let terminals!: ShellTerminals

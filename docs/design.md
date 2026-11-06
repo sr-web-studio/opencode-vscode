@@ -228,6 +228,17 @@ Proposal:
   - Pure check `core/voice.ts` (`checkSonioxKey`, `keyShapeProblem`) has unit tests. The same code serves mobile with its own `fetch`.
 - **UX:** a mic codicon in the prompt box (keyboard `Ctrl+Alt+V`). Click to start and click again or Esc to stop. A small level meter and the active language (`বাংলা + EN`) are shown while recording. Partial text is grey, and nothing is auto-sent.
 
+### Follow-ups 0.3.3: one install, permission asked (Salim, 2026-11-06)
+- **One install.** The main vsix carries `dist/opencode-voice.vsix`, which `bun run package` (`tools/package.ts`) builds with the same version. About 4 s after activation, and before each recording, `Voice.ensureCompanion()` pings the companion. If it is missing or a different version, it runs `workbench.extensions.installExtension(<vsix uri>)`.
+  - VS Code source (main, 2026-11-06), `ExtensionManagementService.installVSIX`: `getServersToInstall` → `prefersExecuteOnUI(manifest)` → the local server only. In a remote window the URI becomes `vscode-remote:` and the native service downloads it first, so the companion lands on the laptop.
+  - A fresh install starts at once. An update of a running companion asks to reload the window.
+  - If the install fails, the mic click offers a manual "Install from VSIX…".
+  - `extensionDependencies` was not used: it only resolves from the Marketplace. Revisit at M5, when both are published.
+- **Microphone permission.**
+  - Windows: before each recording the companion reads the three privacy switches with `reg query`; no admin is needed. The switches are `…\ConsentStore\microphone` in HKLM and HKCU, plus `\NonPackaged` for desktop apps. If any is `Deny`, nothing is recorded, and the error names the switch, with an **Open Microphone Settings** button (`ms-settings:privacy-microphone`).
+  - macOS asks by itself on first use. A one-time note tells the user to click Allow, and a denial shows as silence, with the same button (it opens Privacy → Microphone).
+  - Silence or missing audio after start gives **Open Microphone Settings** / **Choose Microphone** buttons (`VoiceFeed.fix`).
+
 ### Follow-ups 0.3.2 (2026-11-06)
 - **Silent mic → explained, not empty.** Salim's first try showed a red mic and no text. Soniox itself works: synthetic speech through `DictationSession` gives the full sentence.
   - The likely cause on Windows is the "Let desktop apps access your microphone" setting, or a muted or wrong default device. In those cases the recorder delivers zeros.

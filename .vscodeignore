@@ -1,5 +1,6 @@
 **
 !dist/extension.js
+!dist/opencode-voice.vsix
 !dist/webview/main.js
 !dist/webview/main.css
 !dist/webview/main.ttf

@@ -103,12 +103,18 @@ export const COMPANION = {
   ping: "opencode.companion.ping",
   start: "opencode.companion.voice.start",
   stop: "opencode.companion.voice.stop",
+  /** Open the operating system's microphone privacy page (Windows, macOS). */
+  micSettings: "opencode.companion.voice.micSettings",
+  chooseMicrophone: "opencode.companion.voice.chooseMicrophone",
 } as const
+
+/** What the user can do about a failed recording; the main extension turns it into a button. */
+export type VoiceFix = "micSettings" | "chooseMicrophone"
 
 /** The main extension's command that receives dictation updates from the companion. */
 export const VOICE_FEED_COMMAND = "opencode.voice.feed"
 
-export type CompanionInfo = { version: string; capture: boolean; problem?: string }
+export type CompanionInfo = { version: string; capture: boolean; problem?: string; platform?: string }
 
 export type VoiceStartArgs = {
   /** Correlates feed updates with this recording. */
@@ -123,4 +129,4 @@ export type VoiceStartArgs = {
 export type VoiceFeed =
   | { id: string; kind: "listening"; device?: string }
   | { id: string; kind: "heard"; final: string; partial: string }
-  | { id: string; kind: "done"; final: string; error?: string; stats?: { frames: number; peak: number; answers: number; device?: string } }
+  | { id: string; kind: "done"; final: string; error?: string; fix?: VoiceFix; stats?: { frames: number; peak: number; answers: number; device?: string } }

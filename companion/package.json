@@ -2,7 +2,7 @@
   "name": "opencode-voice",
   "displayName": "OpenCode Voice",
   "description": "Voice input for the OpenCode extension: records your microphone on this computer and types what you say (Bangla, English and more) into the OpenCode prompt box. Bring your own Soniox key.",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "publisher": "sr-web-studio",
   "license": "MIT",
   "repository": {
@@ -24,13 +24,19 @@
     "onCommand:opencode.companion.ping",
     "onCommand:opencode.companion.voice.start",
     "onCommand:opencode.companion.voice.stop",
-    "onCommand:opencode.companion.voice.chooseMicrophone"
+    "onCommand:opencode.companion.voice.chooseMicrophone",
+    "onCommand:opencode.companion.voice.micSettings"
   ],
   "contributes": {
     "commands": [
       {
         "command": "opencode.companion.voice.chooseMicrophone",
         "title": "Choose Microphone",
+        "category": "OpenCode Voice"
+      },
+      {
+        "command": "opencode.companion.voice.micSettings",
+        "title": "Open Microphone Settings",
         "category": "OpenCode Voice"
       }
     ]

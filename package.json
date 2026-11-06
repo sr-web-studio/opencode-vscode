@@ -2,7 +2,7 @@
   "name": "opencode-vscode",
   "displayName": "OpenCode",
   "description": "A VS Code client for OpenCode. Sessions live on the OpenCode server and keep running when you close the editor.",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "publisher": "sr-web-studio",
   "license": "MIT",
   "repository": {
@@ -259,11 +259,10 @@
     "typecheck": "tsc --noEmit -p tsconfig.json && svelte-check --tsconfig tsconfig.webview.json",
     "test": "bun test test/unit",
     "test:host": "bun run build && bun test/host/run.mjs",
-    "package": "bun run build && vsce package --no-dependencies --out opencode-vscode.vsix && bun run package:companion",
+    "package": "bun tools/package.ts",
     "sanitize-fixtures": "bun scripts/sanitize-fixtures.ts",
     "publish:marketplace": "bun tools/publish.ts marketplace",
-    "publish:openvsx": "bun tools/publish.ts openvsx",
-    "package:companion": "cd companion && vsce package --no-dependencies --out ../opencode-voice.vsix"
+    "publish:openvsx": "bun tools/publish.ts openvsx"
   },
   "devDependencies": {
     "@picovoice/pvrecorder-node": "1.2.9",

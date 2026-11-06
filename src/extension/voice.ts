@@ -1,5 +1,5 @@
 import * as vscode from "vscode"
-import { COMPANION, DEFAULT_LANGUAGES, SONIOX_MODEL, spokenText, type CompanionInfo, type VoiceFeed } from "../core/dictation"
+import { COMPANION, DEFAULT_LANGUAGES, SONIOX_MODEL, spokenText, type CompanionInfo, type VoiceFeed, type VoiceFix } from "../core/dictation"
 import type { AppState, ToWebview } from "../core/protocol"
 import { checkSonioxKey, mintSonioxTempKey } from "../core/voice"
 
@@ -24,6 +24,7 @@ export class Voice implements vscode.Disposable {
   private recording: VoiceState["recording"] = "off"
   private current?: string
   private checking = false
+  private installing?: Promise<CompanionInfo | undefined>
   private readonly sub: vscode.Disposable
 
   constructor(
@@ -31,6 +32,8 @@ export class Voice implements vscode.Disposable {
     private readonly publish: (v: VoiceState) => void,
     private readonly post: (m: ToWebview) => void,
     private readonly log: (line: string) => void,
+    /** The companion vsix shipped inside this extension, and the version it must have (this extension's). */
+    private readonly bundled: { vsix: vscode.Uri; version: string },
   ) {
     // Another window saved or cleared the key: follow it.
     this.sub = secrets.onDidChange((e) => {
@@ -64,28 +67,78 @@ export class Voice implements vscode.Disposable {
     await this.start()
   }
 
-  private async start(): Promise<void> {
+  /**
+   * Make sure the companion runs on the user's computer, in this extension's version. It is shipped inside this
+   * extension and installed from there: VS Code puts a `ui` extension on the local machine also when this window is
+   * remote (the vsix is fetched over the remote connection). Runs at activation and before each recording; installs at
+   * most once per window.
+   */
+  async ensureCompanion(interactive: boolean): Promise<CompanionInfo | undefined> {
     const info = await this.companion()
-    this.capture = !!info
-    if (!info) {
-      this.emit()
-      const pick = await vscode.window.showInformationMessage(
-        "Voice recording needs the small “OpenCode Voice” companion on this computer (it uses your microphone). Install its .vsix, then click the mic again.",
-        "Install from VSIX…",
+    if (info && info.version === this.bundled.version) return info
+    this.installing ??= this.installCompanion(info)
+    const result = await this.installing
+    // A failed install may be retried by the next mic click.
+    if (!result) this.installing = undefined
+    return result ?? (interactive ? await this.offerManualInstall() : undefined)
+  }
+
+  private async installCompanion(old: CompanionInfo | undefined): Promise<CompanionInfo | undefined> {
+    this.log(`Voice: ${old ? `updating OpenCode Voice ${old.version} → ${this.bundled.version}` : `installing OpenCode Voice ${this.bundled.version}`} on this computer`)
+    try {
+      await vscode.window.withProgress({ location: vscode.ProgressLocation.Window, title: "Installing OpenCode Voice…" }, () =>
+        Promise.resolve(vscode.commands.executeCommand("workbench.extensions.installExtension", this.bundled.vsix)),
       )
-      if (pick) await vscode.commands.executeCommand("workbench.extensions.action.installVSIX")
-      return
+    } catch (e) {
+      this.log(`Voice: installing OpenCode Voice failed: ${e instanceof Error ? e.message : e}`)
+      return undefined
     }
-    if (!info.capture) {
-      void vscode.window.showWarningMessage(info.problem ?? "Voice recording is not available on this computer.")
-      return
+    // A new extension starts at once; an update of a running one needs the window to restart its extensions.
+    for (let i = 0; i < 20; i++) {
+      const info = await this.companion()
+      if (info?.version === this.bundled.version) {
+        await this.refresh()
+        return info
+      }
+      await new Promise((r) => setTimeout(r, 250))
     }
-    const key = await this.secrets.get(KEY)
-    if (!key) return this.setKey()
+    if (old) {
+      void vscode.window
+        .showInformationMessage("OpenCode Voice was updated. Reload the window to use the new version.", "Reload Window")
+        .then((pick) => pick && vscode.commands.executeCommand("workbench.action.reloadWindow"))
+      return old
+    }
+    await this.refresh()
+    return this.companion()
+  }
+
+  private async offerManualInstall(): Promise<undefined> {
+    this.emit()
+    const pick = await vscode.window.showErrorMessage(
+      "Voice input needs OpenCode Voice on this computer, and installing it automatically did not work. Install opencode-voice.vsix by hand, then click the mic again.",
+      "Install from VSIX…",
+      "Show Log",
+    )
+    if (pick === "Install from VSIX…") await vscode.commands.executeCommand("workbench.extensions.action.installVSIX")
+    if (pick === "Show Log") await vscode.commands.executeCommand("workbench.action.output.show")
+    return undefined
+  }
+
+  private async start(): Promise<void> {
     const id = `dict_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
     this.current = id
     this.recording = "starting"
     this.emit()
+    const info = await this.ensureCompanion(true)
+    if (this.current !== id) return
+    this.capture = !!info
+    if (!info) return this.finish(id)
+    if (!info.capture) return this.failed(id, info.problem ?? "Voice recording is not available on this computer.")
+    const key = await this.secrets.get(KEY)
+    if (!key) {
+      this.finish(id)
+      return this.setKey()
+    }
     const temp = await mintSonioxTempKey((url, init) => fetch(url, init), key)
     if (this.current !== id) return
     if (!temp.ok) return this.failed(id, temp.reason)
@@ -137,14 +190,18 @@ export class Voice implements vscode.Disposable {
     const st = u.stats
     if (st) this.log(`Voice: ended after ${(st.frames / 10).toFixed(1)} s on ${st.device ?? "the default microphone"}, peak level ${st.peak}/32767, ${st.answers} answers from Soniox, ${u.final.length} characters`)
     this.post({ type: "dictation", id: u.id, text: spokenText({ final: u.final, partial: "", finished: true }), done: true })
-    if (u.error) return this.failed(u.id, u.error)
+    if (u.error) return this.failed(u.id, u.error, u.fix)
     this.finish(u.id)
   }
 
-  private failed(id: string, reason: string): void {
+  private failed(id: string, reason: string, fix?: VoiceFix): void {
     this.log(`Voice: ${reason}`)
     this.finish(id)
-    void vscode.window.showErrorMessage(`Voice input: ${reason}`)
+    const actions = fix === "micSettings" ? ["Open Microphone Settings", "Choose Microphone"] : fix === "chooseMicrophone" ? ["Choose Microphone"] : []
+    void vscode.window.showErrorMessage(`Voice input: ${reason}`, ...actions).then((pick) => {
+      if (pick === "Open Microphone Settings") void vscode.commands.executeCommand(COMPANION.micSettings)
+      if (pick === "Choose Microphone") void vscode.commands.executeCommand(COMPANION.chooseMicrophone)
+    })
   }
 
   private finish(id: string): void {
