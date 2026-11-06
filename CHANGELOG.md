@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Tool rows: the whole row is the action.** File rows open the file (a Read at the line it read from, an Edit or Patch at the first changed line), link rows open in the browser, other rows show their details. The chevron at the end, or Alt-click, shows details.
+- **Code rows** (OpenCode's Code Mode, `execute`) show which MCP tools the script calls, e.g. `exa.web_search_exa, chrome.new_page`, and the script with its output in the details.
 - **Free on-device voice input (Bangla)**, now the default engine (`opencode.voice.engine`: `local`). Asks once to download about 190 MB (speech engine and models, checksum-verified), then works offline: live text while you speak, refined at each pause. Soniox with your own key stays available as the `soniox` engine.
 - **Code blocks** in answers wrap long lines instead of scrolling sideways, and have a **Copy** button (shown on hover or focus, always on touch screens) plus the language label.
 - **Slash commands** in the prompt box: type `/` for a popup of OpenCode commands and skills. Built in: `/mcps`, `/compact`, `/undo`, `/redo`, `/fork`, `/skills`. The popup never takes focus.

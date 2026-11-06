@@ -1,5 +1,7 @@
 import { clip, firstLine } from "../format"
 import { relativeTo } from "../paths"
+import { executeTarget } from "./execute"
+import { firstChangedLine, patchedFiles } from "./patch"
 import type { ToolItem } from "./types"
 
 export type ToolLine = {
@@ -12,16 +14,32 @@ export type ToolLine = {
   tone: "muted" | "ok" | "error"
   /** File path the target links to, if any (as given by the tool, possibly absolute). */
   path?: string
+  /** 1-based line to open `path` at: the read offset, or the first changed line of an edit. Undefined = top. */
+  at?: number
+  /** http(s) URL the target stands for, if any. */
+  url?: string
 }
 
 const LABELS: Record<string, string> = {
   read: "Read", write: "Write", edit: "Edit", patch: "Patch", shell: "Shell", grep: "Grep", glob: "Glob",
   subagent: "Agent", question: "Question", webfetch: "Fetch", websearch: "Search", skill: "Skill",
-  execute: "Execute", todowrite: "Todo", experimental_image_generate: "Image",
+  execute: "Code", todowrite: "Todo", experimental_image_generate: "Image",
 }
 
 const str = (v: unknown): string => (typeof v === "string" ? v : "")
 const num = (v: unknown): number | undefined => (typeof v === "number" ? v : undefined)
+const isHttp = (s: string) => /^https?:\/\/\S+$/i.test(s)
+
+/**
+ * Line to open a `read` at. OpenCode's `offset` is 1-based (`offset: 95, limit: 40` returns "lines 95-134"), so it is
+ * the line itself. Missing, zero, negative or non-numeric offsets mean the top of the file (undefined).
+ */
+export function readLine(input: Record<string, unknown>): number | undefined {
+  const raw = input.offset
+  const n = typeof raw === "number" ? raw : typeof raw === "string" && /^\s*\d+\s*$/.test(raw) ? Number(raw) : undefined
+  if (n === undefined || !Number.isFinite(n) || n < 1) return undefined
+  return Math.floor(n)
+}
 
 export function toolLabel(name: string): string {
   const known = LABELS[name]
@@ -55,11 +73,25 @@ export function summarizeTool(tool: ToolItem, cwd: string): ToolLine {
 
   switch (tool.name) {
     case "read":
+      pathOf(str(i.path) || str(i.filePath))
+      line.at = readLine(i)
+      break
     case "write":
     case "edit":
-    case "patch":
       pathOf(str(i.path) || str(i.filePath))
+      if (line.path) line.at = changedLineIn(tool, line.path)
       break
+    case "patch": {
+      // The patch tool has no `path`: its files come from the result, or the `*** Update File:` headers while it runs.
+      const files = patchedFiles(tool)
+      const first = files[0]
+      if (first) {
+        pathOf(first.file)
+        line.target += files.length > 1 ? ` +${files.length - 1}` : ""
+        line.at = first.patch ? firstChangedLine(first.patch) : undefined
+      }
+      break
+    }
     case "shell":
       line.target = clip(firstLine(str(i.command)), 120)
       break
@@ -72,6 +104,7 @@ export function summarizeTool(tool: ToolItem, cwd: string): ToolLine {
       break
     case "webfetch":
       line.target = clip(str(i.url), 100)
+      if (isHttp(str(i.url))) line.url = str(i.url)
       break
     case "websearch":
       line.target = clip(str(i.query), 80)
@@ -85,7 +118,8 @@ export function summarizeTool(tool: ToolItem, cwd: string): ToolLine {
       break
     }
     case "execute":
-      line.target = clip(firstLine(str(i.code)), 80)
+      // Code Mode: the MCP tools the script calls say more than its first line.
+      line.target = clip(executeTarget(str(i.code)) || firstLine(str(i.code)), 80)
       break
     case "todowrite": {
       const todos = Array.isArray(i.todos) ? i.todos.length : 0
@@ -96,6 +130,7 @@ export function summarizeTool(tool: ToolItem, cwd: string): ToolLine {
       // Unknown or MCP tool: show the first short string argument.
       const first = Object.values(i).find((v) => typeof v === "string" && v.length > 0)
       line.target = clip(firstLine(str(first)), 80)
+      if (isHttp(str(first))) line.url = str(first)
     }
   }
 
@@ -143,6 +178,46 @@ export function summarizeTool(tool: ToolItem, cwd: string): ToolLine {
       line.tone = "ok"
   }
   return line
+}
+
+/** First changed line of the edit's own file, from the patch the server returns in `metadata.files`. */
+function changedLineIn(tool: ToolItem, path: string): number | undefined {
+  const files = patchedFiles(tool)
+  const mine = files.find((f) => f.file === path) ?? files[0]
+  return mine?.patch ? firstChangedLine(mine.patch) : undefined
+}
+
+/** What a click on the row does. */
+export type RowAction =
+  | { kind: "file"; path: string; line?: number }
+  | { kind: "url"; url: string }
+  | { kind: "worker" }
+  | { kind: "toggle" }
+
+/**
+ * The primary action of a tool row: open the file (at the read offset / first changed line), open the URL, open the
+ * worker tab (the caller falls back to toggling while the child session is unknown), else toggle the details.
+ */
+export function rowAction(tool: ToolItem, cwd: string): RowAction {
+  if (tool.name === "subagent") return { kind: "worker" }
+  const line = summarizeTool(tool, cwd)
+  if (line.path) return line.at ? { kind: "file", path: line.path, line: line.at } : { kind: "file", path: line.path }
+  if (line.url) return { kind: "url", url: line.url }
+  return { kind: "toggle" }
+}
+
+/** Tooltip of the primary button: says what a click does. */
+export function rowTitle(action: RowAction, line: Pick<ToolLine, "target">): string | undefined {
+  switch (action.kind) {
+    case "file":
+      return action.line ? `Open ${line.target} at line ${action.line}. Alt-click shows details.` : `Open ${line.target}. Alt-click shows details.`
+    case "url":
+      return `Open ${action.url} in the browser. Alt-click shows details.`
+    case "worker":
+      return "Open this worker in a tab"
+    default:
+      return undefined
+  }
 }
 
 /** Child session id for a subagent tool, when the server has reported it. */
