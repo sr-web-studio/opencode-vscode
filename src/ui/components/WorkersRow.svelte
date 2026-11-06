@@ -24,12 +24,13 @@
   </button>
   {#if open}
     <ul>
-      {#each workers as w, i (w.sessionID ?? w.toolID ?? i)}
+      {#each workers as w (w.key)}
         <li>
           <button class="w" disabled={!w.sessionID} title={w.sessionID ? "Open this worker in a tab" : "Waiting for the worker session"} onclick={() => w.sessionID && store.bridge.openSession(w.sessionID, { readOnly: true })}>
             <Codicon name="robot" />
             <span class="a">{displayName(w.agent)}</span>
             <span class="d muted">{w.description}</span>
+            {#if w.calls > 1}<span class="n muted" title="{w.calls} calls to this worker">×{w.calls}</span>{/if}
             <span class="s" class:ok={w.status === "done"} class:bad={w.status === "failed"} class:muted={w.status === "running" || w.status === "stopped"}>{label(w.status)}</span>
           </button>
         </li>
@@ -49,6 +50,7 @@
   .w:hover:not(:disabled) { background: var(--oc-hover); }
   .a { font-weight: 600; }
   .d { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n { font-size: 0.9em; white-space: nowrap; }
   .s { font-size: 0.9em; white-space: nowrap; }
   .ok { color: var(--oc-ok); }
   .bad { color: var(--oc-error); }

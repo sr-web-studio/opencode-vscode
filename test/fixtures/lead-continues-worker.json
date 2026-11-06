@@ -1,0 +1,259 @@
+{
+ "note": "Sanitized shape of a lead that continues one worker session with many subagent calls.",
+ "lead": "ses_lead",
+ "worker": "ses_worker",
+ "calls": [
+  {
+   "id": "call_1",
+   "status": "completed",
+   "input": {
+    "agent": "developer",
+    "description": "Task 1",
+    "background": true
+   },
+   "metadata": {
+    "sessionID": "ses_worker",
+    "status": "running",
+    "truncated": false
+   },
+   "created": 1000000,
+   "completed": 1000023
+  },
+  {
+   "id": "call_2",
+   "status": "completed",
+   "input": {
+    "agent": "developer",
+    "description": "Task 2",
+    "sessionID": "ses_worker",
+    "background": true
+   },
+   "metadata": {
+    "sessionID": "ses_worker",
+    "status": "running",
+    "truncated": false
+   },
+   "created": 1100186,
+   "completed": 1100197
+  },
+  {
+   "id": "call_3",
+   "status": "completed",
+   "input": {
+    "agent": "developer",
+    "description": "Task 3",
+    "sessionID": "ses_worker",
+    "background": true
+   },
+   "metadata": {
+    "sessionID": "ses_worker",
+    "status": "running",
+    "truncated": false
+   },
+   "created": 1513992,
+   "completed": 1514006
+  },
+  {
+   "id": "call_4",
+   "status": "completed",
+   "input": {
+    "agent": "developer",
+    "description": "Task 4",
+    "sessionID": "ses_worker",
+    "background": true
+   },
+   "metadata": {
+    "sessionID": "ses_worker",
+    "status": "running",
+    "truncated": false
+   },
+   "created": 1537883,
+   "completed": 1537902
+  },
+  {
+   "id": "call_5",
+   "status": "completed",
+   "input": {
+    "agent": "developer",
+    "description": "Task 5",
+    "sessionID": "ses_worker",
+    "background": true
+   },
+   "metadata": {
+    "sessionID": "ses_worker",
+    "status": "running",
+    "truncated": false
+   },
+   "created": 1669212,
+   "completed": 1669232
+  },
+  {
+   "id": "call_6",
+   "status": "completed",
+   "input": {
+    "agent": "developer",
+    "description": "Task 6",
+    "sessionID": "ses_worker",
+    "background": true
+   },
+   "metadata": {
+    "sessionID": "ses_worker",
+    "status": "running",
+    "truncated": false
+   },
+   "created": 2716160,
+   "completed": 2716171
+  },
+  {
+   "id": "call_7",
+   "status": "completed",
+   "input": {
+    "agent": "developer",
+    "description": "Task 7",
+    "sessionID": "ses_worker",
+    "background": true
+   },
+   "metadata": {
+    "sessionID": "ses_worker",
+    "status": "running",
+    "truncated": false
+   },
+   "created": 2791520,
+   "completed": 2791529
+  },
+  {
+   "id": "call_8",
+   "status": "completed",
+   "input": {
+    "agent": "developer",
+    "description": "Task 8",
+    "background": true
+   },
+   "metadata": {
+    "sessionID": "ses_worker",
+    "status": "running",
+    "truncated": false
+   },
+   "created": 1000000,
+   "completed": 1000023
+  },
+  {
+   "id": "call_9",
+   "status": "completed",
+   "input": {
+    "agent": "developer",
+    "description": "Task 9",
+    "sessionID": "ses_worker",
+    "background": true
+   },
+   "metadata": {
+    "sessionID": "ses_worker",
+    "status": "running",
+    "truncated": false
+   },
+   "created": 1100186,
+   "completed": 1100197
+  },
+  {
+   "id": "call_10",
+   "status": "completed",
+   "input": {
+    "agent": "developer",
+    "description": "Task 10",
+    "sessionID": "ses_worker",
+    "background": true
+   },
+   "metadata": {
+    "sessionID": "ses_worker",
+    "status": "running",
+    "truncated": false
+   },
+   "created": 1513992,
+   "completed": 1514006
+  },
+  {
+   "id": "call_11",
+   "status": "completed",
+   "input": {
+    "agent": "developer",
+    "description": "Task 11",
+    "sessionID": "ses_worker",
+    "background": true
+   },
+   "metadata": {
+    "sessionID": "ses_worker",
+    "status": "running",
+    "truncated": false
+   },
+   "created": 1537883,
+   "completed": 1537902
+  },
+  {
+   "id": "call_12",
+   "status": "completed",
+   "input": {
+    "agent": "developer",
+    "description": "Task 12",
+    "sessionID": "ses_worker",
+    "background": true
+   },
+   "metadata": {
+    "sessionID": "ses_worker",
+    "status": "running",
+    "truncated": false
+   },
+   "created": 1669212,
+   "completed": 1669232
+  },
+  {
+   "id": "call_13",
+   "status": "completed",
+   "input": {
+    "agent": "developer",
+    "description": "Task 13",
+    "sessionID": "ses_worker",
+    "background": true
+   },
+   "metadata": {
+    "sessionID": "ses_worker",
+    "status": "running",
+    "truncated": false
+   },
+   "created": 2716160,
+   "completed": 2716171
+  },
+  {
+   "id": "call_14",
+   "status": "completed",
+   "input": {
+    "agent": "developer",
+    "description": "Task 14",
+    "sessionID": "ses_worker",
+    "background": true
+   },
+   "metadata": {
+    "sessionID": "ses_worker",
+    "status": "running",
+    "truncated": false
+   },
+   "created": 2791520,
+   "completed": 2791529
+  },
+  {
+   "id": "call_15",
+   "status": "completed",
+   "input": {
+    "agent": "developer",
+    "description": "Task 15",
+    "background": true
+   },
+   "metadata": {
+    "sessionID": "ses_worker",
+    "status": "running",
+    "truncated": false
+   },
+   "created": 1000000,
+   "completed": 1000023
+  }
+ ]
+}

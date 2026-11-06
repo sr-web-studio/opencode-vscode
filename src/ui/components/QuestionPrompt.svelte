@@ -167,7 +167,7 @@
 <div class="q" role="group" aria-label={form.title} tabindex="-1" bind:this={root} {onkeydown}>
   {#if fields.length > 1}
     <div class="tabs">
-      {#each tabs as t, i (t.key)}
+      {#each tabs as t, i (i)}
         <button class="tab" class:on={i === at} onclick={() => { step = i; hi = 0 }}>{t.label}{#if t.done} <span class="ok">✓</span>{/if}</button>
       {/each}
       <span class="count muted">{at + 1} / {fields.length}</span>
@@ -183,7 +183,7 @@
     {#if choiceOf(field)}
       {@const choice = choiceOf(field)!}
       <div class="rows" role="listbox">
-        {#each options(field) as o, i (o.value)}
+        {#each options(field) as o, i (i)}
           <!-- svelte-ignore a11y_click_events_have_key_events -->
           <div class="row" class:hi={i === hi} role="option" tabindex="-1" aria-selected={answers[field.key] === o.value} onclick={() => chooseRow(choice, i)} onmousemove={() => (hi = i)}>
             <span class="num muted">{i + 1}</span>
@@ -206,7 +206,7 @@
     {:else if field.type === "multiselect"}
       {@const picked = Array.isArray(answers[field.key]) ? (answers[field.key] as string[]) : []}
       <div class="rows" role="listbox" aria-multiselectable="true">
-        {#each options(field) as o, i (o.value)}
+        {#each options(field) as o, i (i)}
           <!-- svelte-ignore a11y_click_events_have_key_events -->
           <div class="row" class:hi={i === hi} role="option" tabindex="-1" aria-selected={picked.includes(o.value)} onclick={() => toggleRow(field, i)} onmousemove={() => (hi = i)}>
             <span class="box" class:on={picked.includes(o.value)}>{picked.includes(o.value) ? "✓" : ""}</span>

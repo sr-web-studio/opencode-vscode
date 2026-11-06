@@ -12,11 +12,18 @@ export type ChildSession = {
 export type WorkerStatus = "running" | "done" | "failed" | "stopped"
 
 export type Worker = {
+  /** Unique in the list by construction: the child session id, else `tool:<tool id>`. Safe as a keyed `{#each}` key. */
+  key: string
   /** The child session, once known. Without it the row cannot be opened yet. */
   sessionID?: string
-  /** The `subagent` tool call that started it, if the visible transcript has one. */
+  /** The latest `subagent` tool call of this worker that the visible transcript has. */
   toolID?: string
+  /** Every visible `subagent` call that belongs to this worker (a lead can continue one worker session many times). */
+  toolIDs: string[]
+  /** How many `subagent` calls went to this worker. */
+  calls: number
   agent: string
+  /** The latest call's description. */
   description: string
   status: WorkerStatus
   started?: number
@@ -80,7 +87,12 @@ function statusOf(tool: ToolItem | undefined, child: ChildSession | undefined, r
   return "done"
 }
 
-/** Workers of the current session: one per `subagent` tool line, plus children no visible line explains. Newest last. */
+/**
+ * Workers of the current session: **one row per child session**. A lead can continue the same worker session with
+ * many `subagent` calls (`input.sessionID`), so several tool lines can point at one child; they share one row that
+ * shows the latest call's description and the call count, with the status of the child. A call whose child is not
+ * known yet gets its own row (`tool:<id>`). Children that no visible line explains are listed too. Oldest first.
+ */
 export function deriveWorkers({ view, children, running }: WorkerInput): Worker[] {
   const tools: ToolItem[] = []
   for (const turn of view.turns) for (const step of turn.steps) for (const i of step.items) if (i.kind === "tool" && i.name === "subagent") tools.push(i)
@@ -92,30 +104,49 @@ export function deriveWorkers({ view, children, running }: WorkerInput): Worker[
     if (id) claimed.add(id)
   }
 
-  const workers: Worker[] = []
+  // Tools in transcript order, each resolved to a child session where possible.
+  const resolved: Array<{ tool: ToolItem; sessionID?: string }> = []
   for (const tool of tools) {
     let sessionID = toolChildID(tool)
-    let child = sessionID ? byID.get(sessionID) : undefined
     if (!sessionID) {
-      child = matchChild(tool, children, claimed)
-      if (child) {
-        sessionID = child.id
-        claimed.add(child.id)
+      const match = matchChild(tool, children, claimed)
+      if (match) {
+        sessionID = match.id
+        claimed.add(match.id)
       }
     }
-    workers.push({
+    resolved.push({ tool, sessionID })
+  }
+
+  const rows = new Map<string, Worker>()
+  const order: string[] = []
+  for (const { tool, sessionID } of resolved) {
+    const key = sessionID ?? `tool:${tool.id}`
+    const child = sessionID ? byID.get(sessionID) : undefined
+    const earlier = rows.get(key)
+    const startedHere = tool.created ?? child?.time.created
+    if (!earlier) order.push(key)
+    rows.set(key, {
+      key,
       sessionID,
       toolID: tool.id,
-      agent: str(tool.input.agent) || child?.agent || "agent",
-      description: str(tool.input.description) || child?.title || "",
+      toolIDs: [...(earlier?.toolIDs ?? []), tool.id],
+      calls: (earlier?.calls ?? 0) + 1,
+      agent: str(tool.input.agent) || earlier?.agent || child?.agent || "agent",
+      description: str(tool.input.description) || child?.title || earlier?.description || "",
+      // The latest call is the one that decides while the child is unknown; the child decides once it is known.
       status: statusOf(tool, child, running),
-      started: tool.created ?? child?.time.created,
+      started: minTime(earlier?.started, startedHere),
     })
   }
+  const workers = order.map((k) => rows.get(k)!)
   for (const child of children) {
     if (claimed.has(child.id)) continue
     workers.push({
+      key: child.id,
       sessionID: child.id,
+      toolIDs: [],
+      calls: 0,
       agent: child.agent ?? "agent",
       description: child.title ?? "",
       status: statusOf(undefined, child, running),
@@ -124,6 +155,8 @@ export function deriveWorkers({ view, children, running }: WorkerInput): Worker[
   }
   return workers.sort((a, b) => (a.started ?? 0) - (b.started ?? 0))
 }
+
+const minTime = (a: number | undefined, b: number | undefined): number | undefined => (a === undefined ? b : b === undefined ? a : Math.min(a, b))
 
 export type BackgroundSummary = { workers: number; running: number; shells: number }
 

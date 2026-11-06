@@ -3,6 +3,7 @@ import { backgroundSummary, deriveWorkers, matchChild, sessionIDFromOutput, tool
 import { applyEvent, viewFromMessages } from "../../src/core/transcript/reducer"
 import { emptyView, type SessionView, type ToolItem } from "../../src/core/transcript/types"
 import fixture from "../fixtures/grep-glob-subagent-question.json"
+import lead from "../fixtures/lead-continues-worker.json"
 
 const tool = (over: Partial<ToolItem> & { id: string }): ToolItem => ({
   kind: "tool", name: "subagent", status: "completed", input: {}, metadata: {}, output: "", ...over,
@@ -69,7 +70,7 @@ describe("deriveWorkers", () => {
   test("a running tool line with progress metadata is openable and running", () => {
     const v = viewOf(tool({ id: "a", status: "running", input: { agent: "explore", description: "Scan" }, metadata: { sessionID: "ses_1", status: "running" }, created: 10 }))
     const [w] = deriveWorkers({ view: v, children: [], running: none })
-    expect(w).toMatchObject({ sessionID: "ses_1", toolID: "a", agent: "explore", description: "Scan", status: "running" })
+    expect(w).toMatchObject({ key: "ses_1", calls: 1, sessionID: "ses_1", toolID: "a", agent: "explore", description: "Scan", status: "running" })
   })
   test("without an id the child list supplies it", () => {
     const v = viewOf(tool({ id: "a", status: "running", input: { agent: "explore", description: "Scan" }, created: 10 }))
@@ -109,5 +110,61 @@ describe("deriveWorkers", () => {
   test("summary counts workers, running ones and shells", () => {
     const ws = deriveWorkers({ view: viewOf(tool({ id: "a", status: "running", metadata: { sessionID: "ses_1" } })), children: [child("ses_9", { outcome: "succeeded" })], running: none })
     expect(backgroundSummary(ws, 1)).toEqual({ workers: 2, running: 1, shells: 1 })
+  })
+})
+
+describe("one worker session continued by many subagent calls", () => {
+  const leadTools = (): ToolItem[] =>
+    lead.calls.map((c) => tool({ id: c.id, status: c.status as ToolItem["status"], input: c.input as Record<string, unknown>, metadata: c.metadata as Record<string, unknown>, created: c.created, completed: c.completed }))
+  const kid = child(lead.worker, { agent: "developer", title: "Task 15", outcome: "succeeded", time: { created: 1_000_000, updated: 1_900_000 } })
+
+  test("15 calls to 1 session give 1 row, with the latest description and the call count", () => {
+    const ws = deriveWorkers({ view: viewOf(...leadTools()), children: [kid], running: none })
+    expect(ws).toHaveLength(1)
+    expect(ws[0]).toMatchObject({ key: lead.worker, sessionID: lead.worker, calls: 15, description: "Task 15", agent: "developer", status: "done", toolID: "call_15" })
+    expect(ws[0]!.toolIDs).toHaveLength(15)
+  })
+
+  test("the row follows the child: running while the child executes, even though every tool call returned", () => {
+    const ws = deriveWorkers({ view: viewOf(...leadTools()), children: [{ ...kid, outcome: undefined }], running: new Set([lead.worker]) })
+    expect(ws).toHaveLength(1)
+    expect(ws[0]!.status).toBe("running")
+  })
+
+  test("without the child list the row still exists and is openable", () => {
+    const ws = deriveWorkers({ view: viewOf(...leadTools()), children: [], running: none })
+    expect(ws).toHaveLength(1)
+    expect(ws[0]!.sessionID).toBe(lead.worker)
+  })
+
+  test("keys are unique by construction, also with calls that have no session yet", () => {
+    const pending = [tool({ id: "p1", status: "running", input: { agent: "x", description: "a" }, created: 5 }), tool({ id: "p2", status: "running", input: { agent: "x", description: "b" }, created: 6 })]
+    const ws = deriveWorkers({ view: viewOf(...leadTools(), ...pending), children: [kid, child("ses_other", { agent: "zzz", outcome: "succeeded" })], running: none })
+    const keys = ws.map((w) => w.key)
+    expect(new Set(keys).size).toBe(keys.length)
+    expect(keys).toEqual(expect.arrayContaining([lead.worker, "tool:p1", "tool:p2", "ses_other"]))
+    expect(ws.every((w) => w.sessionID || w.key.startsWith("tool:"))).toBe(true)
+  })
+
+  test("two workers, one continued twice: two rows, counts per row", () => {
+    const v = viewOf(
+      tool({ id: "a", input: { agent: "x", description: "one" }, metadata: { sessionID: "ses_a" }, created: 1 }),
+      tool({ id: "b", input: { agent: "x", description: "two" }, metadata: { sessionID: "ses_b" }, created: 2 }),
+      tool({ id: "c", input: { agent: "x", description: "one again", sessionID: "ses_a" }, metadata: { sessionID: "ses_a" }, created: 3 }),
+    )
+    const ws = deriveWorkers({ view: v, children: [], running: none })
+    expect(ws.map((w) => [w.sessionID, w.calls, w.description])).toEqual([["ses_a", 2, "one again"], ["ses_b", 1, "two"]])
+    expect(ws[0]!.toolIDs).toEqual(["a", "c"])
+    expect(ws[0]!.started).toBe(1)
+  })
+
+  test("a tool line finds its row through toolIDs (every call opens the same tab)", () => {
+    const ws = deriveWorkers({ view: viewOf(...leadTools()), children: [kid], running: none })
+    for (const c of lead.calls) expect(ws.find((w) => w.toolIDs.includes(c.id))?.sessionID).toBe(lead.worker)
+  })
+
+  test("the fixture holds no prompt text or real ids", () => {
+    const text = JSON.stringify(lead)
+    expect(text).not.toMatch(/ses_e5|toolu_|"prompt"/)
   })
 })

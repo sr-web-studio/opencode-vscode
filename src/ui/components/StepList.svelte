@@ -11,9 +11,9 @@
 
 <div class="steps">
   {#each steps as step (step.id)}
-    {#each step.items as item, i (item.kind === "tool" ? `t:${item.id}` : `${step.id}:${item.key}`)}
+    {#each step.items as item, i (item.kind === "tool" ? `${step.id}:t:${item.id}` : `${step.id}:${item.key}`)}
       {#if item.kind === "tool"}
-        <ToolLine tool={item} {cwd} permission={permissions.get(item.id)} defaultOpen={settings.expandToolDetails} />
+        <ToolLine tool={item} {cwd} {settings} permission={permissions.get(item.id)} defaultOpen={settings.expandToolDetails} />
       {:else if item.kind === "reasoning"}
         {#if settings.showReasoning !== "hidden" && (item.text.trim() || item.streaming)}
           <Reasoning text={item.text} mode={settings.showReasoning} streaming={item.streaming} />

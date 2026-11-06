@@ -98,7 +98,7 @@
       <div class="scroll body" role="listbox" bind:this={list}>
         {#each sections as g (g.id)}
           <div class="group muted">{#if g.pinned}<Codicon name="pinned" /> {/if}{g.title}</div>
-          {#each g.models as m (m.id)}
+          {#each g.models as m (`${m.providerID}/${m.id}`)}
             {@const i = indexOf(g.id, m)}
             {@const current = sameModel(app.model, m)}
             {@const isPinned = pinned.has(pinKey(m))}
