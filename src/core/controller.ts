@@ -58,6 +58,7 @@ export class Controller {
 
   private connection: ConnectionState = { status: "connecting" }
   private settings: ViewSettings = defaultViewSettings
+  private voice: AppState["voice"] = { keySet: false, capture: false }
   private target: ViewTarget = { kind: "draft" }
   private sessions: SessionInfo[] = []
   private archived: SessionInfo[] = []
@@ -151,6 +152,7 @@ export class Controller {
       trimPending: this.feed.trimPending,
       sentTick: this.sentTick,
       restore: this.restore,
+      voice: this.voice,
     }
   }
 
@@ -227,6 +229,12 @@ export class Controller {
 
   setConnection(c: ConnectionState) {
     this.connection = c
+    this.emitNow()
+  }
+
+  /** The host tells whether a voice key is saved and whether it can record. */
+  setVoice(v: AppState["voice"]) {
+    this.voice = v
     this.emitNow()
   }
 

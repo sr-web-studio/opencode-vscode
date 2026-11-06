@@ -2,7 +2,7 @@
   "name": "opencode-vscode",
   "displayName": "OpenCode",
   "description": "A VS Code client for OpenCode. Sessions live on the OpenCode server and keep running when you close the editor.",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "publisher": "sr-web-studio",
   "license": "MIT",
   "repository": {
@@ -73,6 +73,22 @@
         "command": "opencode.setCliPath",
         "title": "Set CLI Path",
         "category": "OpenCode"
+      },
+      {
+        "command": "opencode.voice.setKey",
+        "title": "Set Voice API Key (Soniox)",
+        "category": "OpenCode"
+      },
+      {
+        "command": "opencode.voice.clearKey",
+        "title": "Clear Voice API Key",
+        "category": "OpenCode"
+      },
+      {
+        "command": "opencode.voice.toggle",
+        "title": "Voice Input",
+        "category": "OpenCode",
+        "icon": "$(mic)"
       }
     ],
     "configuration": {

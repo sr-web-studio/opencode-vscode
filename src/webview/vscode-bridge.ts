@@ -55,6 +55,7 @@ export function createVsCodeBridge(): HostBridge {
       }),
     openExternal: (url) => host({ type: "openExternal", url }),
     notify: (level, message) => host({ type: "notify", level, message }),
+    voice: () => host({ type: "voice" }),
     storage: {
       get: <T>(key: string) => read()[key] as T | undefined,
       set: (key, value) => api.setState({ ...read(), [key]: value }),

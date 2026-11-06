@@ -102,6 +102,11 @@ export type AppState = {
   /** Bumped when the user sends a prompt: the transcript jumps to the end. */
   sentTick: number
   restore?: PromptRestore
+  /**
+   * Voice input. `keySet`: the user saved a working Soniox key (the key itself never reaches the webview).
+   * `capture`: this host can record audio. False in VS Code until the companion extension (M4) ships.
+   */
+  voice: { keySet: boolean; capture: boolean }
 }
 
 export type Action =
@@ -153,6 +158,7 @@ export type HostRequest =
   | { type: "confirmRevert"; messageID: string }
   | { type: "openExternal"; url: string }
   | { type: "setCliPath" }
+  | { type: "voice" }
   | { type: "reconnect" }
   | { type: "notify"; level: "info" | "warning" | "error"; message: string }
 

@@ -36,6 +36,11 @@ export interface HostBridge {
   confirmRevert(messageID: string): void
   /** Open a web link outside the app. */
   openExternal(url: string): void
+  /**
+   * The mic button. Without a saved key the host asks for one (VS Code: an input box) and checks it. With a key it
+   * starts or stops recording where the host can record. The key never comes back to the UI.
+   */
+  voice(): void
   /** Show a transient message in the host's own UI. */
   notify(level: "info" | "warning" | "error", message: string): void
   storage: BridgeStorage

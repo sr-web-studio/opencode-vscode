@@ -209,6 +209,14 @@ Proposal:
   - Voice is off until the user runs `OpenCode: Set Voice API Key` and pastes their own Soniox key. It is stored in `SecretStorage` (secure storage on mobile) and the user pays Soniox directly. With no key, the mic button shows a short hint that links to the command.
   - The extension host mints short-lived Soniox temporary keys from the user's key, so the long-lived key never reaches the webview.
   - During development, Salim's key is in the repo's `.env` as `SONIOX_API_KEY`. Only dev scripts and live tests read it. The `.env` file is git-ignored and excluded from the vsix, and the shipped extension reads its key only from SecretStorage.
+- **Shipped in 0.2.7 (Salim, 2026-11-06):** the mic button and the key flow. Recording waits for the companion extension (M4), which Salim chose over a browser capture page.
+  - With no key, the mic looks disabled (dimmed) but stays clickable (`aria-disabled`). A click opens a VS Code password input box.
+  - The host checks the key by requesting a 60-second Soniox temporary key (`POST /v1/auth/temporary-api-key`). Checked live: a valid key returns 201, a wrong key 401.
+  - Only an accepted key is saved, in SecretStorage (`opencode.voice.sonioxKey`). Then the mic turns normal.
+  - A rejected key, a timeout or a network error saves nothing. The mic keeps its state, and an error message offers "Try again". A network error is never reported as "invalid key".
+  - Commands: `OpenCode: Set Voice API Key (Soniox)`, `Clear Voice API Key`, `Voice Input`.
+  - `AppState.voice = { keySet, capture }` (`capture` stays false until the companion ships), and `HostBridge.voice()`. The key never reaches the webview or the logs.
+  - Pure check `core/voice.ts` (`checkSonioxKey`, `keyShapeProblem`) has unit tests. The same code serves mobile with its own `fetch`.
 - **UX:** a mic codicon in the prompt box (keyboard `Ctrl+Alt+V`). Click to start and click again or Esc to stop. A small level meter and the active language (`বাংলা + EN`) are shown while recording. Partial text is grey, and nothing is auto-sent.
 
 ## Controls (approved 2026-11-06, mockups in `docs/mockups/v3/`)

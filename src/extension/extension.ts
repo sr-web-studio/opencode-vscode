@@ -13,6 +13,7 @@ import { ImagePreviews } from "./images"
 import { DiffViews } from "./diffs"
 import { ChatViewProvider, VIEW_ID } from "./view"
 import { WorkerPanels } from "./workers"
+import { VoiceKeys } from "./voice"
 
 const PASSWORD_KEY = "opencode.serverPassword"
 const PINS_KEY = "opencode.pinnedModels"
@@ -40,6 +41,8 @@ export function activate(context: vscode.ExtensionContext): void {
     log: (line) => output.info(line),
   })
   context.globalState.setKeysForSync([PINS_KEY])
+  const voice = new VoiceKeys(context.secrets, (v) => controller.setVoice(v))
+  void voice.refresh()
   controller.setSettings(readViewSettings())
 
   let terminals!: ShellTerminals
@@ -140,6 +143,10 @@ export function activate(context: vscode.ExtensionContext): void {
       provider.newSession()
     }),
     vscode.commands.registerCommand("opencode.reconnect", () => start()),
+    voice,
+    vscode.commands.registerCommand("opencode.voice.setKey", () => voice.setKey()),
+    vscode.commands.registerCommand("opencode.voice.clearKey", () => voice.clearKey()),
+    vscode.commands.registerCommand("opencode.voice.toggle", () => voice.click()),
     vscode.commands.registerCommand("opencode.setPassword", async () => {
       const value = await vscode.window.showInputBox({ prompt: "Password for the remote OpenCode server", password: true, ignoreFocusOut: true })
       if (value === undefined) return

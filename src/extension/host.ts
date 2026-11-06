@@ -72,6 +72,8 @@ export class HostActions {
         if (/^https?:\/\//i.test(req.url)) await vscode.env.openExternal(vscode.Uri.parse(req.url))
         return
       }
+      case "voice":
+        return void (await vscode.commands.executeCommand("opencode.voice.toggle"))
       case "setCliPath":
         return void (await vscode.commands.executeCommand("opencode.setCliPath"))
       case "reconnect":

@@ -222,6 +222,15 @@
     <div class="actions">
       <button class="clip muted" onclick={pick} title="Attach files" aria-label="Attach files"><Codicon name="attach" /></button>
       <span class="grow"></span>
+      <!-- Without a key the mic only looks disabled: a click opens the key dialog, so it stays focusable and clickable. -->
+      <button
+        class="mic muted"
+        class:off={!app.voice.keySet}
+        aria-disabled={!app.voice.keySet}
+        onclick={() => store.bridge.voice()}
+        title={app.voice.keySet ? "Voice input" : "Voice input is off: click to add your Soniox API key"}
+        aria-label={app.voice.keySet ? "Voice input" : "Voice input (set API key)"}
+      ><Codicon name="mic" /></button>
       {#if running}
         <button class="stop" onclick={() => store.dispatch({ type: "stop" })} title="Stop (Esc)" aria-label="Stop"><span class="sq"></span></button>
       {/if}
@@ -245,6 +254,10 @@
   .grow { flex: 1; }
   .clip { display: inline-flex; align-items: center; padding: 0.2em 0.3em; border-radius: 4px; }
   .clip:hover { color: var(--oc-fg); background: var(--oc-hover); }
+  .mic { display: inline-flex; align-items: center; padding: 0.2em 0.3em; border-radius: 4px; }
+  .mic:hover { color: var(--oc-fg); background: var(--oc-hover); }
+  .mic.off { opacity: 0.45; }
+  .mic.off:hover { opacity: 0.8; }
   .send { width: 1.8em; height: 1.8em; border-radius: 50%; background: var(--vscode-button-background); color: var(--vscode-button-foreground); display: inline-flex; align-items: center; justify-content: center; flex: none; }
   .send:hover:not(:disabled) { background: var(--vscode-button-hoverBackground); }
   .stop { width: 1.8em; height: 1.8em; border-radius: 50%; border: 1px solid var(--oc-muted); display: inline-flex; align-items: center; justify-content: center; flex: none; }
