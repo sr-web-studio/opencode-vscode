@@ -1,0 +1,1179 @@
+{
+ "events": [
+  {
+   "id": "evt_1aeb073e200163T9sDZUEBDy43",
+   "type": "server.connected",
+   "data": {}
+  },
+  {
+   "id": "evt_1aeb073e5002nmp08gpHROEKMT",
+   "created": 1793932162021,
+   "type": "session.inbox.enqueued",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "inboxID": "msg_1aeb073e5001LFWp1k32xpiVMR",
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "item": {
+     "type": "user",
+     "payload": {
+      "text": "Reply with the word ok and nothing else."
+     },
+     "delivery": "steer"
+    }
+   }
+  },
+  {
+   "id": "evt_1aeb073e600101iY6Uuvy44vnt",
+   "created": 1793932162022,
+   "type": "session.execution.started",
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq"
+   }
+  },
+  {
+   "id": "evt_1aeb073f7001Sl7lnpzBo3AUq5",
+   "created": 1793932162039,
+   "type": "session.inbox.delivered",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "inboxID": "msg_1aeb073e5001LFWp1k32xpiVMR"
+   }
+  },
+  {
+   "id": "evt_1aeb07e2b001B0mhmbnQ8p5byD",
+   "created": 1793932164651,
+   "type": "session.step.started",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "agent": "build",
+    "model": {
+     "id": "deepseek-v4.1-flash",
+     "providerID": "cli-proxy-api",
+     "variant": "low"
+    },
+    "assistantMessageID": "msg_1aeb073fa0015ZZIugl30Uv0kz",
+    "started": 1793932162045
+   }
+  },
+  {
+   "id": "evt_1aeb07e2d0016Lh5jZoi2zjnaD",
+   "created": 1793932164653,
+   "type": "session.text.started",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "assistantMessageID": "msg_1aeb073fa0015ZZIugl30Uv0kz",
+    "ordinal": 0
+   }
+  },
+  {
+   "id": "evt_1aeb07e3a001e4P7LQeu3K9NLP",
+   "created": 1793932164666,
+   "type": "session.text.delta",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "assistantMessageID": "msg_1aeb073fa0015ZZIugl30Uv0kz",
+    "ordinal": 0,
+    "delta": "ok"
+   }
+  },
+  {
+   "id": "evt_1aeb07e3a0021v4stgr01vj0D6",
+   "created": 1793932164666,
+   "type": "session.text.ended",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "assistantMessageID": "msg_1aeb073fa0015ZZIugl30Uv0kz",
+    "ordinal": 0,
+    "text": "ok"
+   }
+  },
+  {
+   "id": "evt_1aeb07e3c001hdZLeMbTk7SuAE",
+   "created": 1793932164668,
+   "type": "session.step.streamed",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "assistantMessageID": "msg_1aeb073fa0015ZZIugl30Uv0kz"
+   }
+  },
+  {
+   "id": "evt_1aeb07e3c0026OYhMqq6JHkf4i",
+   "created": 1793932164668,
+   "type": "session.step.ended",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "assistantMessageID": "msg_1aeb073fa0015ZZIugl30Uv0kz",
+    "finish": "stop",
+    "rawFinish": "stop",
+    "tokens": {
+     "input": 7353,
+     "output": 3,
+     "reasoning": 0,
+     "cache": {
+      "read": 256,
+      "write": 0
+     }
+    },
+    "cost": 0
+   }
+  },
+  {
+   "id": "evt_1aeb07e3e001jKeCVHGMRFt520",
+   "created": 1793932164670,
+   "type": "session.execution.succeeded",
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq"
+   }
+  },
+  {
+   "id": "evt_1aeb0822b002Pzj1nXdwh6JfhH",
+   "created": 1793932165675,
+   "type": "session.inbox.enqueued",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "inboxID": "msg_1aeb0822b001Z1bJGa1XmNN1T2",
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "item": {
+     "type": "user",
+     "payload": {
+      "text": "Create a file named hello.txt containing the text hi, read it back, then change hi to hello with an edit, and run `echo done` in the shell. Be brief."
+     },
+     "delivery": "steer"
+    }
+   }
+  },
+  {
+   "id": "evt_1aeb0822d001wkjnAUXSepcpJc",
+   "created": 1793932165677,
+   "type": "session.execution.started",
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq"
+   }
+  },
+  {
+   "id": "evt_1aeb08231001VFmWwHZCGqj8MI",
+   "created": 1793932165681,
+   "type": "session.inbox.delivered",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "inboxID": "msg_1aeb0822b001Z1bJGa1XmNN1T2"
+   }
+  },
+  {
+   "id": "evt_1aeb08c68001anMFXvxWvL84Gg",
+   "created": 1793932168296,
+   "type": "session.step.started",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "agent": "build",
+    "model": {
+     "id": "deepseek-v4.1-flash",
+     "providerID": "cli-proxy-api",
+     "variant": "low"
+    },
+    "assistantMessageID": "msg_1aeb08234001ng13HHxlGcpBOr",
+    "started": 1793932165687
+   }
+  },
+  {
+   "id": "evt_1aeb08c6a001Kirb3LOTdKmZRz",
+   "created": 1793932168298,
+   "type": "session.tool.input.started",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "assistantMessageID": "msg_1aeb08234001ng13HHxlGcpBOr",
+    "id": "call_16db9199fbac4185bed577a8",
+    "name": "write"
+   }
+  },
+  {
+   "id": "evt_1aeb08dc5001RDf2BQ5F0iadCs",
+   "created": 1793932168645,
+   "type": "session.tool.input.ended",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "assistantMessageID": "msg_1aeb08234001ng13HHxlGcpBOr",
+    "id": "call_16db9199fbac4185bed577a8",
+    "text": "{\"path\":\"/tmp/opencode/occ-test/hello.txt\",\"content\":\"hi\\n\"}"
+   }
+  },
+  {
+   "id": "evt_1aeb08dd2001LCLkDOJYsNk1lw",
+   "created": 1793932168658,
+   "type": "session.tool.called",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "assistantMessageID": "msg_1aeb08234001ng13HHxlGcpBOr",
+    "id": "call_16db9199fbac4185bed577a8",
+    "input": {
+     "path": "/tmp/opencode/occ-test/hello.txt",
+     "content": "hi\n"
+    },
+    "executed": false
+   }
+  },
+  {
+   "id": "evt_1aeb08dd4001gu0QJARGZ5MVi5",
+   "created": 1793932168660,
+   "type": "session.step.streamed",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "assistantMessageID": "msg_1aeb08234001ng13HHxlGcpBOr"
+   }
+  },
+  {
+   "id": "evt_1aeb08dd8001dA5G62k2DS90Yq",
+   "created": 1793932168664,
+   "type": "session.tool.success",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "assistantMessageID": "msg_1aeb08234001ng13HHxlGcpBOr",
+    "id": "call_16db9199fbac4185bed577a8",
+    "content": [
+     {
+      "type": "text",
+      "text": "Created file successfully: hello.txt"
+     }
+    ],
+    "metadata": {
+     "truncated": false
+    },
+    "executed": false
+   }
+  },
+  {
+   "id": "evt_1aeb08dd9001LP4HQoNrKLohMK",
+   "created": 1793932168665,
+   "type": "session.step.ended",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "assistantMessageID": "msg_1aeb08234001ng13HHxlGcpBOr",
+    "finish": "tool-calls",
+    "rawFinish": "tool_calls",
+    "tokens": {
+     "input": 100,
+     "output": 65,
+     "reasoning": 0,
+     "cache": {
+      "read": 7552,
+      "write": 0
+     }
+    },
+    "cost": 0
+   }
+  },
+  {
+   "id": "evt_1aeb09635001CFaqrSGzbOzQY6",
+   "created": 1793932170805,
+   "type": "session.step.started",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "agent": "build",
+    "model": {
+     "id": "deepseek-v4.1-flash",
+     "providerID": "cli-proxy-api",
+     "variant": "low"
+    },
+    "assistantMessageID": "msg_1aeb08de0001VwsRIzpkug13S1",
+    "started": 1793932168675
+   }
+  },
+  {
+   "id": "evt_1aeb09637001h58TH2RfeINssl",
+   "created": 1793932170807,
+   "type": "session.tool.input.started",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "assistantMessageID": "msg_1aeb08de0001VwsRIzpkug13S1",
+    "id": "call_f9b897de9a0649648e516e4c",
+    "name": "read"
+   }
+  },
+  {
+   "id": "evt_1aeb096d10015PTXEW1Ov3fqoS",
+   "created": 1793932170961,
+   "type": "session.tool.input.ended",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "assistantMessageID": "msg_1aeb08de0001VwsRIzpkug13S1",
+    "id": "call_f9b897de9a0649648e516e4c",
+    "text": "{\"path\":\"/tmp/opencode/occ-test/hello.txt\"}"
+   }
+  },
+  {
+   "id": "evt_1aeb096d2001oBbC8OaRDXe0Hl",
+   "created": 1793932170962,
+   "type": "session.tool.called",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "assistantMessageID": "msg_1aeb08de0001VwsRIzpkug13S1",
+    "id": "call_f9b897de9a0649648e516e4c",
+    "input": {
+     "path": "/tmp/opencode/occ-test/hello.txt"
+    },
+    "executed": false
+   }
+  },
+  {
+   "id": "evt_1aeb096d3001eGanQ7I64UTTI1",
+   "created": 1793932170964,
+   "type": "session.step.streamed",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "assistantMessageID": "msg_1aeb08de0001VwsRIzpkug13S1"
+   }
+  },
+  {
+   "id": "evt_1aeb096d70014iaJ71pvRVXcWk",
+   "created": 1793932170967,
+   "type": "session.tool.success",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "assistantMessageID": "msg_1aeb08de0001VwsRIzpkug13S1",
+    "id": "call_f9b897de9a0649648e516e4c",
+    "content": [
+     {
+      "type": "text",
+      "text": "Read file /tmp/opencode/occ-test/hello.txt, lines 1-1\n1: hi"
+     }
+    ],
+    "metadata": {
+     "truncated": false
+    },
+    "executed": false
+   }
+  },
+  {
+   "id": "evt_1aeb096d8001eJWNuHN0Q8obOw",
+   "created": 1793932170968,
+   "type": "session.step.ended",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "assistantMessageID": "msg_1aeb08de0001VwsRIzpkug13S1",
+    "finish": "tool-calls",
+    "rawFinish": "tool_calls",
+    "tokens": {
+     "input": 182,
+     "output": 48,
+     "reasoning": 0,
+     "cache": {
+      "read": 7552,
+      "write": 0
+     }
+    },
+    "cost": 0
+   }
+  },
+  {
+   "id": "evt_1aeb09edc001ECKu4MSIWr5xBL",
+   "created": 1793932173020,
+   "type": "session.step.started",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "agent": "build",
+    "model": {
+     "id": "deepseek-v4.1-flash",
+     "providerID": "cli-proxy-api",
+     "variant": "low"
+    },
+    "assistantMessageID": "msg_1aeb096de0018vtoZyj7ei4dLy",
+    "started": 1793932170977
+   }
+  },
+  {
+   "id": "evt_1aeb09ede001PKSt4VBdRwojsP",
+   "created": 1793932173022,
+   "type": "session.tool.input.started",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "assistantMessageID": "msg_1aeb096de0018vtoZyj7ei4dLy",
+    "id": "call_03a85eeb214243d18a616bed",
+    "name": "edit"
+   }
+  },
+  {
+   "id": "evt_1aeb0a07c00187A530fo3WNasp",
+   "created": 1793932173436,
+   "type": "session.tool.input.ended",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "assistantMessageID": "msg_1aeb096de0018vtoZyj7ei4dLy",
+    "id": "call_03a85eeb214243d18a616bed",
+    "text": "{\"path\":\"/tmp/opencode/occ-test/hello.txt\",\"oldString\":\"hi\",\"newString\":\"hello\"}"
+   }
+  },
+  {
+   "id": "evt_1aeb0a07e001Zlnpmpqj797557",
+   "created": 1793932173438,
+   "type": "session.tool.called",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "assistantMessageID": "msg_1aeb096de0018vtoZyj7ei4dLy",
+    "id": "call_03a85eeb214243d18a616bed",
+    "input": {
+     "path": "/tmp/opencode/occ-test/hello.txt",
+     "oldString": "hi",
+     "newString": "hello"
+    },
+    "executed": false
+   }
+  },
+  {
+   "id": "evt_1aeb0a07f001FHofM5jzifnoIW",
+   "created": 1793932173439,
+   "type": "session.step.streamed",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "assistantMessageID": "msg_1aeb096de0018vtoZyj7ei4dLy"
+   }
+  },
+  {
+   "id": "evt_1aeb0a082001y0LVIcAA111Riu",
+   "created": 1793932173442,
+   "type": "session.tool.success",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "assistantMessageID": "msg_1aeb096de0018vtoZyj7ei4dLy",
+    "id": "call_03a85eeb214243d18a616bed",
+    "content": [
+     {
+      "type": "text",
+      "text": "Edited hello.txt (1 replacement)"
+     }
+    ],
+    "metadata": {
+     "files": [
+      {
+       "file": "hello.txt",
+       "patch": "Index: hello.txt\n===================================================================\n--- hello.txt\n+++ hello.txt\n@@ -1,1 +1,1 @@\n-hi\n+hello\n",
+       "status": "modified",
+       "additions": 1,
+       "deletions": 1
+      }
+     ],
+     "truncated": false
+    },
+    "executed": false
+   }
+  },
+  {
+   "id": "evt_1aeb0a083001U9VZoOv1lpKZXQ",
+   "created": 1793932173443,
+   "type": "session.step.ended",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "assistantMessageID": "msg_1aeb096de0018vtoZyj7ei4dLy",
+    "finish": "tool-calls",
+    "rawFinish": "tool_calls",
+    "tokens": {
+     "input": 136,
+     "output": 82,
+     "reasoning": 0,
+     "cache": {
+      "read": 7680,
+      "write": 0
+     }
+    },
+    "cost": 0
+   }
+  },
+  {
+   "id": "evt_1aeb0a99f0012qnozpvLKGvhxp",
+   "created": 1793932175775,
+   "type": "session.step.started",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "agent": "build",
+    "model": {
+     "id": "deepseek-v4.1-flash",
+     "providerID": "cli-proxy-api",
+     "variant": "low"
+    },
+    "assistantMessageID": "msg_1aeb0a089001rh3P6K64s9U8JT",
+    "started": 1793932173452
+   }
+  },
+  {
+   "id": "evt_1aeb0a9a1001WSOYNvVJLySs8o",
+   "created": 1793932175777,
+   "type": "session.tool.input.started",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "assistantMessageID": "msg_1aeb0a089001rh3P6K64s9U8JT",
+    "id": "call_57ee49d03b1d4a15992ced97",
+    "name": "shell"
+   }
+  },
+  {
+   "id": "evt_1aeb0aa1d001H7iSl6cLBsL7gF",
+   "created": 1793932175901,
+   "type": "session.tool.input.ended",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "assistantMessageID": "msg_1aeb0a089001rh3P6K64s9U8JT",
+    "id": "call_57ee49d03b1d4a15992ced97",
+    "text": "{\"command\":\"echo done\"}"
+   }
+  },
+  {
+   "id": "evt_1aeb0aa1e0010ak0oDzni2ZwY8",
+   "created": 1793932175902,
+   "type": "session.tool.called",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "assistantMessageID": "msg_1aeb0a089001rh3P6K64s9U8JT",
+    "id": "call_57ee49d03b1d4a15992ced97",
+    "input": {
+     "command": "echo done"
+    },
+    "executed": false
+   }
+  },
+  {
+   "id": "evt_1aeb0aa1f00145eFseJs0zx91B",
+   "created": 1793932175903,
+   "type": "session.step.streamed",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "assistantMessageID": "msg_1aeb0a089001rh3P6K64s9U8JT"
+   }
+  },
+  {
+   "id": "evt_1aeb0aa23002LDLRkdLygk3msr",
+   "created": 1793932175907,
+   "type": "session.tool.progress",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "assistantMessageID": "msg_1aeb0a089001rh3P6K64s9U8JT",
+    "id": "call_57ee49d03b1d4a15992ced97",
+    "metadata": {
+     "shellID": "sh_1aeb0aa220019Ua0LBupFL5KuA"
+    }
+   }
+  },
+  {
+   "id": "evt_1aeb0aa25002Mj7nkIzyWYP3ru",
+   "created": 1793932175909,
+   "type": "session.tool.success",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "assistantMessageID": "msg_1aeb0a089001rh3P6K64s9U8JT",
+    "id": "call_57ee49d03b1d4a15992ced97",
+    "content": [
+     {
+      "type": "text",
+      "text": "done\n"
+     }
+    ],
+    "metadata": {
+     "status": "completed",
+     "truncated": false,
+     "exit": 0
+    },
+    "executed": false
+   }
+  },
+  {
+   "id": "evt_1aeb0aa26001zczs4n0ZejEzOk",
+   "created": 1793932175910,
+   "type": "session.step.ended",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "assistantMessageID": "msg_1aeb0a089001rh3P6K64s9U8JT",
+    "finish": "tool-calls",
+    "rawFinish": "tool_calls",
+    "tokens": {
+     "input": 107,
+     "output": 39,
+     "reasoning": 0,
+     "cache": {
+      "read": 7808,
+      "write": 0
+     }
+    },
+    "cost": 0
+   }
+  },
+  {
+   "id": "evt_1aeb0b210001gABSxvy7L31WRI",
+   "created": 1793932177936,
+   "type": "session.step.started",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "agent": "build",
+    "model": {
+     "id": "deepseek-v4.1-flash",
+     "providerID": "cli-proxy-api",
+     "variant": "low"
+    },
+    "assistantMessageID": "msg_1aeb0aa2b0012I1eHy6NQfPHwp",
+    "started": 1793932175918
+   }
+  },
+  {
+   "id": "evt_1aeb0b21200141UrUB2j9KLijX",
+   "created": 1793932177938,
+   "type": "session.text.started",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "assistantMessageID": "msg_1aeb0aa2b0012I1eHy6NQfPHwp",
+    "ordinal": 0
+   }
+  },
+  {
+   "id": "evt_1aeb0b2770019Kbf4DdyxWq4ay",
+   "created": 1793932178039,
+   "type": "session.text.delta",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "assistantMessageID": "msg_1aeb0aa2b0012I1eHy6NQfPHwp",
+    "ordinal": 0,
+    "delta": "Done: created `hello.txt` with \""
+   }
+  },
+  {
+   "id": "evt_1aeb0b2e1001YB54BLEuGAlsqB",
+   "created": 1793932178145,
+   "type": "session.text.delta",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "assistantMessageID": "msg_1aeb0aa2b0012I1eHy6NQfPHwp",
+    "ordinal": 0,
+    "delta": "hi\", read it back, edited to \"hello\", and `echo done` output"
+   }
+  },
+  {
+   "id": "evt_1aeb0b2f1001b0sJ1Dg0BSRqL6",
+   "created": 1793932178161,
+   "type": "session.text.delta",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "assistantMessageID": "msg_1aeb0aa2b0012I1eHy6NQfPHwp",
+    "ordinal": 0,
+    "delta": " `done`."
+   }
+  },
+  {
+   "id": "evt_1aeb0b2f10023n4P2I36SU3mmH",
+   "created": 1793932178161,
+   "type": "session.text.ended",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "assistantMessageID": "msg_1aeb0aa2b0012I1eHy6NQfPHwp",
+    "ordinal": 0,
+    "text": "Done: created `hello.txt` with \"hi\", read it back, edited to \"hello\", and `echo done` output `done`."
+   }
+  },
+  {
+   "id": "evt_1aeb0b2f2001WTeRzXHCwBTuj2",
+   "created": 1793932178162,
+   "type": "session.step.streamed",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "assistantMessageID": "msg_1aeb0aa2b0012I1eHy6NQfPHwp"
+   }
+  },
+  {
+   "id": "evt_1aeb0b2f4001dwubqbAlv01b5g",
+   "created": 1793932178164,
+   "type": "session.step.ended",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq",
+    "assistantMessageID": "msg_1aeb0aa2b0012I1eHy6NQfPHwp",
+    "finish": "stop",
+    "rawFinish": "stop",
+    "tokens": {
+     "input": 159,
+     "output": 31,
+     "reasoning": 0,
+     "cache": {
+      "read": 7808,
+      "write": 0
+     }
+    },
+    "cost": 0
+   }
+  },
+  {
+   "id": "evt_1aeb0b2f60019ndhJ1Pyb0qP2h",
+   "created": 1793932178166,
+   "type": "session.execution.succeeded",
+   "data": {
+    "sessionID": "ses_e514f8c22ffeBkxh0BrquKxgLq"
+   }
+  }
+ ],
+ "messages": [
+  {
+   "id": "msg_1aeb073e5001LFWp1k32xpiVMR",
+   "time": {
+    "created": 1793932162039
+   },
+   "text": "Reply with the word ok and nothing else.",
+   "type": "user"
+  },
+  {
+   "id": "msg_1aeb073fa0015ZZIugl30Uv0kz",
+   "time": {
+    "created": 1793932162045,
+    "streamed": 1793932164668,
+    "completed": 1793932164668
+   },
+   "type": "assistant",
+   "agent": "build",
+   "model": {
+    "id": "deepseek-v4.1-flash",
+    "providerID": "cli-proxy-api",
+    "variant": "low"
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "ok"
+    }
+   ],
+   "finish": "stop",
+   "rawFinish": "stop",
+   "cost": 0,
+   "tokens": {
+    "input": 7353,
+    "output": 3,
+    "reasoning": 0,
+    "cache": {
+     "read": 256,
+     "write": 0
+    }
+   }
+  },
+  {
+   "id": "msg_1aeb07e3e001jKeCVHGMRFt520",
+   "time": {
+    "created": 1793932164670
+   },
+   "type": "idle",
+   "outcome": "succeeded"
+  },
+  {
+   "id": "msg_1aeb0822b001Z1bJGa1XmNN1T2",
+   "time": {
+    "created": 1793932165681
+   },
+   "text": "Create a file named hello.txt containing the text hi, read it back, then change hi to hello with an edit, and run `echo done` in the shell. Be brief.",
+   "type": "user"
+  },
+  {
+   "id": "msg_1aeb08234001ng13HHxlGcpBOr",
+   "time": {
+    "created": 1793932165687,
+    "streamed": 1793932168660,
+    "completed": 1793932168665
+   },
+   "type": "assistant",
+   "agent": "build",
+   "model": {
+    "id": "deepseek-v4.1-flash",
+    "providerID": "cli-proxy-api",
+    "variant": "low"
+   },
+   "content": [
+    {
+     "type": "tool",
+     "id": "call_16db9199fbac4185bed577a8",
+     "name": "write",
+     "executed": false,
+     "state": {
+      "status": "completed",
+      "input": {
+       "path": "/tmp/opencode/occ-test/hello.txt",
+       "content": "hi\n"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "Created file successfully: hello.txt"
+       }
+      ],
+      "metadata": {
+       "truncated": false
+      }
+     },
+     "time": {
+      "created": 1793932168298,
+      "ran": 1793932168658,
+      "completed": 1793932168664
+     }
+    }
+   ],
+   "finish": "tool-calls",
+   "rawFinish": "tool_calls",
+   "cost": 0,
+   "tokens": {
+    "input": 100,
+    "output": 65,
+    "reasoning": 0,
+    "cache": {
+     "read": 7552,
+     "write": 0
+    }
+   }
+  },
+  {
+   "id": "msg_1aeb08de0001VwsRIzpkug13S1",
+   "time": {
+    "created": 1793932168675,
+    "streamed": 1793932170964,
+    "completed": 1793932170968
+   },
+   "type": "assistant",
+   "agent": "build",
+   "model": {
+    "id": "deepseek-v4.1-flash",
+    "providerID": "cli-proxy-api",
+    "variant": "low"
+   },
+   "content": [
+    {
+     "type": "tool",
+     "id": "call_f9b897de9a0649648e516e4c",
+     "name": "read",
+     "executed": false,
+     "state": {
+      "status": "completed",
+      "input": {
+       "path": "/tmp/opencode/occ-test/hello.txt"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "Read file /tmp/opencode/occ-test/hello.txt, lines 1-1\n1: hi"
+       }
+      ],
+      "metadata": {
+       "truncated": false
+      }
+     },
+     "time": {
+      "created": 1793932170807,
+      "ran": 1793932170962,
+      "completed": 1793932170967
+     }
+    }
+   ],
+   "finish": "tool-calls",
+   "rawFinish": "tool_calls",
+   "cost": 0,
+   "tokens": {
+    "input": 182,
+    "output": 48,
+    "reasoning": 0,
+    "cache": {
+     "read": 7552,
+     "write": 0
+    }
+   }
+  },
+  {
+   "id": "msg_1aeb096de0018vtoZyj7ei4dLy",
+   "time": {
+    "created": 1793932170977,
+    "streamed": 1793932173439,
+    "completed": 1793932173443
+   },
+   "type": "assistant",
+   "agent": "build",
+   "model": {
+    "id": "deepseek-v4.1-flash",
+    "providerID": "cli-proxy-api",
+    "variant": "low"
+   },
+   "content": [
+    {
+     "type": "tool",
+     "id": "call_03a85eeb214243d18a616bed",
+     "name": "edit",
+     "executed": false,
+     "state": {
+      "status": "completed",
+      "input": {
+       "path": "/tmp/opencode/occ-test/hello.txt",
+       "oldString": "hi",
+       "newString": "hello"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "Edited hello.txt (1 replacement)"
+       }
+      ],
+      "metadata": {
+       "files": [
+        {
+         "file": "hello.txt",
+         "patch": "Index: hello.txt\n===================================================================\n--- hello.txt\n+++ hello.txt\n@@ -1,1 +1,1 @@\n-hi\n+hello\n",
+         "status": "modified",
+         "additions": 1,
+         "deletions": 1
+        }
+       ],
+       "truncated": false
+      }
+     },
+     "time": {
+      "created": 1793932173022,
+      "ran": 1793932173438,
+      "completed": 1793932173442
+     }
+    }
+   ],
+   "finish": "tool-calls",
+   "rawFinish": "tool_calls",
+   "cost": 0,
+   "tokens": {
+    "input": 136,
+    "output": 82,
+    "reasoning": 0,
+    "cache": {
+     "read": 7680,
+     "write": 0
+    }
+   }
+  },
+  {
+   "id": "msg_1aeb0a089001rh3P6K64s9U8JT",
+   "time": {
+    "created": 1793932173452,
+    "streamed": 1793932175903,
+    "completed": 1793932175910
+   },
+   "type": "assistant",
+   "agent": "build",
+   "model": {
+    "id": "deepseek-v4.1-flash",
+    "providerID": "cli-proxy-api",
+    "variant": "low"
+   },
+   "content": [
+    {
+     "type": "tool",
+     "id": "call_57ee49d03b1d4a15992ced97",
+     "name": "shell",
+     "executed": false,
+     "state": {
+      "status": "completed",
+      "input": {
+       "command": "echo done"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "done\n"
+       }
+      ],
+      "metadata": {
+       "status": "completed",
+       "truncated": false,
+       "exit": 0
+      }
+     },
+     "time": {
+      "created": 1793932175777,
+      "ran": 1793932175902,
+      "completed": 1793932175909
+     }
+    }
+   ],
+   "finish": "tool-calls",
+   "rawFinish": "tool_calls",
+   "cost": 0,
+   "tokens": {
+    "input": 107,
+    "output": 39,
+    "reasoning": 0,
+    "cache": {
+     "read": 7808,
+     "write": 0
+    }
+   }
+  },
+  {
+   "id": "msg_1aeb0aa2b0012I1eHy6NQfPHwp",
+   "time": {
+    "created": 1793932175918,
+    "streamed": 1793932178162,
+    "completed": 1793932178164
+   },
+   "type": "assistant",
+   "agent": "build",
+   "model": {
+    "id": "deepseek-v4.1-flash",
+    "providerID": "cli-proxy-api",
+    "variant": "low"
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "Done: created `hello.txt` with \"hi\", read it back, edited to \"hello\", and `echo done` output `done`."
+    }
+   ],
+   "finish": "stop",
+   "rawFinish": "stop",
+   "cost": 0,
+   "tokens": {
+    "input": 159,
+    "output": 31,
+    "reasoning": 0,
+    "cache": {
+     "read": 7808,
+     "write": 0
+    }
+   }
+  },
+  {
+   "id": "msg_1aeb0b2f60019ndhJ1Pyb0qP2h",
+   "time": {
+    "created": 1793932178166
+   },
+   "type": "idle",
+   "outcome": "succeeded"
+  }
+ ]
+}

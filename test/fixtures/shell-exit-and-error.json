@@ -1,0 +1,649 @@
+{
+ "events": [
+  {
+   "id": "evt_1aec198c7001RyToo1Frwprzah",
+   "type": "server.connected",
+   "data": {}
+  },
+  {
+   "id": "evt_1aec198ca001YMr6c2XrH3Y4H7",
+   "created": 1793933285578,
+   "type": "session.inbox.enqueued",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "inboxID": "msg_1aec198c90017PmhvEaFZrkMVG",
+    "sessionID": "ses_e513e673cffe6ZEYHLhqFkOL5y",
+    "item": {
+     "type": "user",
+     "payload": {
+      "text": "Run `sh -c \"echo oops >&2; exit 3\"` in the shell, then read the file /tmp/opencode/occ-test/nope.txt. Be brief."
+     },
+     "delivery": "steer"
+    }
+   }
+  },
+  {
+   "id": "evt_1aec198cb001nahDIh5Boy4mJC",
+   "created": 1793933285579,
+   "type": "session.execution.started",
+   "data": {
+    "sessionID": "ses_e513e673cffe6ZEYHLhqFkOL5y"
+   }
+  },
+  {
+   "id": "evt_1aec198d1001D8Yf3BliVpead6",
+   "created": 1793933285585,
+   "type": "session.inbox.delivered",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e513e673cffe6ZEYHLhqFkOL5y",
+    "inboxID": "msg_1aec198c90017PmhvEaFZrkMVG"
+   }
+  },
+  {
+   "id": "evt_1aec1bf41001gr9kXMAJe62lQz",
+   "created": 1793933295425,
+   "type": "session.step.started",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e513e673cffe6ZEYHLhqFkOL5y",
+    "agent": "build",
+    "model": {
+     "id": "deepseek-v4.1-flash",
+     "providerID": "cli-proxy-api",
+     "variant": "low"
+    },
+    "assistantMessageID": "msg_1aec198d5001o7ZdgL85P0PpBw",
+    "started": 1793933285592
+   }
+  },
+  {
+   "id": "evt_1aec1bf43001hEWkqyAZfvfbmh",
+   "created": 1793933295427,
+   "type": "session.reasoning.started",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e513e673cffe6ZEYHLhqFkOL5y",
+    "assistantMessageID": "msg_1aec198d5001o7ZdgL85P0PpBw",
+    "ordinal": 0,
+    "native": {
+     "reasoningField": "reasoning_content"
+    }
+   }
+  },
+  {
+   "id": "evt_1aec1bfa8001nnOQCfrgcrZLV1",
+   "created": 1793933295528,
+   "type": "session.reasoning.delta",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e513e673cffe6ZEYHLhqFkOL5y",
+    "assistantMessageID": "msg_1aec198d5001o7ZdgL85P0PpBw",
+    "ordinal": 0,
+    "delta": "The"
+   }
+  },
+  {
+   "id": "evt_1aec1c2d60016TA485CuNM3xBI",
+   "created": 1793933296348,
+   "type": "session.reasoning.delta",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e513e673cffe6ZEYHLhqFkOL5y",
+    "assistantMessageID": "msg_1aec198d5001o7ZdgL85P0PpBw",
+    "ordinal": 0,
+    "delta": " user wants me to run a command"
+   }
+  },
+  {
+   "id": "evt_1aec1c35b001URlrlUuzFzSV6s",
+   "created": 1793933296475,
+   "type": "session.reasoning.delta",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e513e673cffe6ZEYHLhqFkOL5y",
+    "assistantMessageID": "msg_1aec198d5001o7ZdgL85P0PpBw",
+    "ordinal": 0,
+    "delta": " and"
+   }
+  },
+  {
+   "id": "evt_1aec1c4550012hRja2eDJwXsEJ",
+   "created": 1793933296725,
+   "type": "session.reasoning.delta",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e513e673cffe6ZEYHLhqFkOL5y",
+    "assistantMessageID": "msg_1aec198d5001o7ZdgL85P0PpBw",
+    "ordinal": 0,
+    "delta": " then read a file. Let"
+   }
+  },
+  {
+   "id": "evt_1aec1c5530015VtolX4O1ff4Hf",
+   "created": 1793933296979,
+   "type": "session.reasoning.delta",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e513e673cffe6ZEYHLhqFkOL5y",
+    "assistantMessageID": "msg_1aec198d5001o7ZdgL85P0PpBw",
+    "ordinal": 0,
+    "delta": " me do both."
+   }
+  },
+  {
+   "id": "evt_1aec1c5bc001NKz7sJR4ZWaG2L",
+   "created": 1793933297084,
+   "type": "session.tool.input.started",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e513e673cffe6ZEYHLhqFkOL5y",
+    "assistantMessageID": "msg_1aec198d5001o7ZdgL85P0PpBw",
+    "id": "call_22084d2118ee4f2c9dd8dcd1",
+    "name": "shell"
+   }
+  },
+  {
+   "id": "evt_1aec1c8a1001p2Ig97EmkmS4kU",
+   "created": 1793933297825,
+   "type": "session.tool.input.started",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e513e673cffe6ZEYHLhqFkOL5y",
+    "assistantMessageID": "msg_1aec198d5001o7ZdgL85P0PpBw",
+    "id": "call_0ec96ae913dc4ca1a5104acd",
+    "name": "read"
+   }
+  },
+  {
+   "id": "evt_1aec1c9f6001XoJGJKYB8fv9Ei",
+   "created": 1793933298166,
+   "type": "session.reasoning.ended",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e513e673cffe6ZEYHLhqFkOL5y",
+    "assistantMessageID": "msg_1aec198d5001o7ZdgL85P0PpBw",
+    "ordinal": 0,
+    "text": "The user wants me to run a command and then read a file. Let me do both.",
+    "native": {
+     "reasoningField": "reasoning_content"
+    }
+   }
+  },
+  {
+   "id": "evt_1aec1c9f7001cF76D4LG4m5uqu",
+   "created": 1793933298167,
+   "type": "session.tool.input.ended",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e513e673cffe6ZEYHLhqFkOL5y",
+    "assistantMessageID": "msg_1aec198d5001o7ZdgL85P0PpBw",
+    "id": "call_22084d2118ee4f2c9dd8dcd1",
+    "text": "{\"command\":\"sh -c \\\"echo oops >&2; exit 3\\\"\"}"
+   }
+  },
+  {
+   "id": "evt_1aec1c9f90012kM5LFgDLomBRS",
+   "created": 1793933298169,
+   "type": "session.tool.called",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e513e673cffe6ZEYHLhqFkOL5y",
+    "assistantMessageID": "msg_1aec198d5001o7ZdgL85P0PpBw",
+    "id": "call_22084d2118ee4f2c9dd8dcd1",
+    "input": {
+     "command": "sh -c \"echo oops >&2; exit 3\""
+    },
+    "executed": false
+   }
+  },
+  {
+   "id": "evt_1aec1c9fa001J22kkX2IEam2pL",
+   "created": 1793933298170,
+   "type": "session.tool.input.ended",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e513e673cffe6ZEYHLhqFkOL5y",
+    "assistantMessageID": "msg_1aec198d5001o7ZdgL85P0PpBw",
+    "id": "call_0ec96ae913dc4ca1a5104acd",
+    "text": "{\"path\":\"/tmp/opencode/occ-test/nope.txt\"}"
+   }
+  },
+  {
+   "id": "evt_1aec1c9fb001TIGIEHyy6s48Mt",
+   "created": 1793933298171,
+   "type": "session.tool.called",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e513e673cffe6ZEYHLhqFkOL5y",
+    "assistantMessageID": "msg_1aec198d5001o7ZdgL85P0PpBw",
+    "id": "call_0ec96ae913dc4ca1a5104acd",
+    "input": {
+     "path": "/tmp/opencode/occ-test/nope.txt"
+    },
+    "executed": false
+   }
+  },
+  {
+   "id": "evt_1aec1c9fc00157NxFHI9y81KaR",
+   "created": 1793933298172,
+   "type": "session.step.streamed",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e513e673cffe6ZEYHLhqFkOL5y",
+    "assistantMessageID": "msg_1aec198d5001o7ZdgL85P0PpBw"
+   }
+  },
+  {
+   "id": "evt_1aec1ca03002roRdzJGOGsUQ32",
+   "created": 1793933298179,
+   "type": "session.tool.progress",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e513e673cffe6ZEYHLhqFkOL5y",
+    "assistantMessageID": "msg_1aec198d5001o7ZdgL85P0PpBw",
+    "id": "call_22084d2118ee4f2c9dd8dcd1",
+    "metadata": {
+     "shellID": "sh_1aec1ca01001rqh1vZLAERMHM0"
+    }
+   }
+  },
+  {
+   "id": "evt_1aec1ca040014WPHJjp6CfKOKk",
+   "created": 1793933298180,
+   "type": "session.tool.failed",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e513e673cffe6ZEYHLhqFkOL5y",
+    "assistantMessageID": "msg_1aec198d5001o7ZdgL85P0PpBw",
+    "id": "call_0ec96ae913dc4ca1a5104acd",
+    "error": {
+     "type": "tool.execution",
+     "message": "File not found: /tmp/opencode/occ-test/nope.txt"
+    },
+    "executed": false
+   }
+  },
+  {
+   "id": "evt_1aec1ca070018x6izBXFPTZ5sW",
+   "created": 1793933298183,
+   "type": "session.tool.success",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e513e673cffe6ZEYHLhqFkOL5y",
+    "assistantMessageID": "msg_1aec198d5001o7ZdgL85P0PpBw",
+    "id": "call_22084d2118ee4f2c9dd8dcd1",
+    "content": [
+     {
+      "type": "text",
+      "text": "oops\n"
+     },
+     {
+      "type": "text",
+      "text": "Exited with code 3"
+     }
+    ],
+    "metadata": {
+     "status": "completed",
+     "truncated": false,
+     "exit": 3
+    },
+    "executed": false
+   }
+  },
+  {
+   "id": "evt_1aec1ca080014dGX6F16eNXGtr",
+   "created": 1793933298184,
+   "type": "session.step.ended",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e513e673cffe6ZEYHLhqFkOL5y",
+    "assistantMessageID": "msg_1aec198d5001o7ZdgL85P0PpBw",
+    "finish": "tool-calls",
+    "rawFinish": "tool_calls",
+    "tokens": {
+     "input": 7641,
+     "output": 89,
+     "reasoning": 19,
+     "cache": {
+      "read": 0,
+      "write": 0
+     }
+    },
+    "cost": 0
+   }
+  },
+  {
+   "id": "evt_1aec1fcfb001fxu5IkHzA5blrC",
+   "created": 1793933311227,
+   "type": "session.step.started",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e513e673cffe6ZEYHLhqFkOL5y",
+    "agent": "build",
+    "model": {
+     "id": "deepseek-v4.1-flash",
+     "providerID": "cli-proxy-api",
+     "variant": "low"
+    },
+    "assistantMessageID": "msg_1aec1ca11001mSbdALKfw0G2ur",
+    "started": 1793933298197
+   }
+  },
+  {
+   "id": "evt_1aec1fcfe0013EQB9d3xICS56h",
+   "created": 1793933311230,
+   "type": "session.text.started",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e513e673cffe6ZEYHLhqFkOL5y",
+    "assistantMessageID": "msg_1aec1ca11001mSbdALKfw0G2ur",
+    "ordinal": 0
+   }
+  },
+  {
+   "id": "evt_1aec1fd63001hRg15QQn7T3mle",
+   "created": 1793933311331,
+   "type": "session.text.delta",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e513e673cffe6ZEYHLhqFkOL5y",
+    "assistantMessageID": "msg_1aec1ca11001mSbdALKfw0G2ur",
+    "ordinal": 0,
+    "delta": "- Command printed `oops`"
+   }
+  },
+  {
+   "id": "evt_1aec1fe010016BqIcpWgIppqMF",
+   "created": 1793933311489,
+   "type": "session.text.delta",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e513e673cffe6ZEYHLhqFkOL5y",
+    "assistantMessageID": "msg_1aec1ca11001mSbdALKfw0G2ur",
+    "ordinal": 0,
+    "delta": " to stderr and exited with code 3.\n- `/"
+   }
+  },
+  {
+   "id": "evt_1aec1fe81001ClwOfsYvYYvHXU",
+   "created": 1793933311617,
+   "type": "session.text.delta",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e513e673cffe6ZEYHLhqFkOL5y",
+    "assistantMessageID": "msg_1aec1ca11001mSbdALKfw0G2ur",
+    "ordinal": 0,
+    "delta": "tmp/opencode/occ-test/nope.txt` does"
+   }
+  },
+  {
+   "id": "evt_1aec1fece001b8nK18OHg4r8Ta",
+   "created": 1793933311694,
+   "type": "session.text.delta",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e513e673cffe6ZEYHLhqFkOL5y",
+    "assistantMessageID": "msg_1aec1ca11001mSbdALKfw0G2ur",
+    "ordinal": 0,
+    "delta": " not exist."
+   }
+  },
+  {
+   "id": "evt_1aec1fece002z0E5ZxU25gnHiY",
+   "created": 1793933311694,
+   "type": "session.text.ended",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e513e673cffe6ZEYHLhqFkOL5y",
+    "assistantMessageID": "msg_1aec1ca11001mSbdALKfw0G2ur",
+    "ordinal": 0,
+    "text": "- Command printed `oops` to stderr and exited with code 3.\n- `/tmp/opencode/occ-test/nope.txt` does not exist."
+   }
+  },
+  {
+   "id": "evt_1aec1fecf001YqsypzYFvqab1n",
+   "created": 1793933311695,
+   "type": "session.step.streamed",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e513e673cffe6ZEYHLhqFkOL5y",
+    "assistantMessageID": "msg_1aec1ca11001mSbdALKfw0G2ur"
+   }
+  },
+  {
+   "id": "evt_1aec1fed1001gYOn1x4w4olSou",
+   "created": 1793933311697,
+   "type": "session.step.ended",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e513e673cffe6ZEYHLhqFkOL5y",
+    "assistantMessageID": "msg_1aec1ca11001mSbdALKfw0G2ur",
+    "finish": "stop",
+    "rawFinish": "stop",
+    "tokens": {
+     "input": 7808,
+     "output": 36,
+     "reasoning": 0,
+     "cache": {
+      "read": 0,
+      "write": 0
+     }
+    },
+    "cost": 0
+   }
+  },
+  {
+   "id": "evt_1aec1fed3001Jv26pqiWxUF7Xk",
+   "created": 1793933311699,
+   "type": "session.execution.succeeded",
+   "data": {
+    "sessionID": "ses_e513e673cffe6ZEYHLhqFkOL5y"
+   }
+  }
+ ],
+ "messages": [
+  {
+   "id": "msg_1aec198c90017PmhvEaFZrkMVG",
+   "time": {
+    "created": 1793933285585
+   },
+   "text": "Run `sh -c \"echo oops >&2; exit 3\"` in the shell, then read the file /tmp/opencode/occ-test/nope.txt. Be brief.",
+   "type": "user"
+  },
+  {
+   "id": "msg_1aec198d5001o7ZdgL85P0PpBw",
+   "time": {
+    "created": 1793933285592,
+    "streamed": 1793933298172,
+    "completed": 1793933298184
+   },
+   "type": "assistant",
+   "agent": "build",
+   "model": {
+    "id": "deepseek-v4.1-flash",
+    "providerID": "cli-proxy-api",
+    "variant": "low"
+   },
+   "content": [
+    {
+     "type": "reasoning",
+     "text": "The user wants me to run a command and then read a file. Let me do both.",
+     "native": {
+      "reasoningField": "reasoning_content"
+     },
+     "time": {
+      "created": 1793933295427,
+      "completed": 1793933298166
+     }
+    },
+    {
+     "type": "tool",
+     "id": "call_22084d2118ee4f2c9dd8dcd1",
+     "name": "shell",
+     "executed": false,
+     "state": {
+      "status": "completed",
+      "input": {
+       "command": "sh -c \"echo oops >&2; exit 3\""
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "oops\n"
+       },
+       {
+        "type": "text",
+        "text": "Exited with code 3"
+       }
+      ],
+      "metadata": {
+       "status": "completed",
+       "truncated": false,
+       "exit": 3
+      }
+     },
+     "time": {
+      "created": 1793933297084,
+      "ran": 1793933298169,
+      "completed": 1793933298183
+     }
+    },
+    {
+     "type": "tool",
+     "id": "call_0ec96ae913dc4ca1a5104acd",
+     "name": "read",
+     "executed": false,
+     "state": {
+      "status": "error",
+      "input": {
+       "path": "/tmp/opencode/occ-test/nope.txt"
+      },
+      "error": {
+       "type": "tool.execution",
+       "message": "File not found: /tmp/opencode/occ-test/nope.txt"
+      }
+     },
+     "time": {
+      "created": 1793933297825,
+      "ran": 1793933298171,
+      "completed": 1793933298180
+     }
+    }
+   ],
+   "finish": "tool-calls",
+   "rawFinish": "tool_calls",
+   "cost": 0,
+   "tokens": {
+    "input": 7641,
+    "output": 89,
+    "reasoning": 19,
+    "cache": {
+     "read": 0,
+     "write": 0
+    }
+   }
+  },
+  {
+   "id": "msg_1aec1ca11001mSbdALKfw0G2ur",
+   "time": {
+    "created": 1793933298197,
+    "streamed": 1793933311695,
+    "completed": 1793933311697
+   },
+   "type": "assistant",
+   "agent": "build",
+   "model": {
+    "id": "deepseek-v4.1-flash",
+    "providerID": "cli-proxy-api",
+    "variant": "low"
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "- Command printed `oops` to stderr and exited with code 3.\n- `/tmp/opencode/occ-test/nope.txt` does not exist."
+    }
+   ],
+   "finish": "stop",
+   "rawFinish": "stop",
+   "cost": 0,
+   "tokens": {
+    "input": 7808,
+    "output": 36,
+    "reasoning": 0,
+    "cache": {
+     "read": 0,
+     "write": 0
+    }
+   }
+  },
+  {
+   "id": "msg_1aec1fed3001Jv26pqiWxUF7Xk",
+   "time": {
+    "created": 1793933311699
+   },
+   "type": "idle",
+   "outcome": "succeeded"
+  }
+ ]
+}

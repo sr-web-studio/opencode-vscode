@@ -1,0 +1,1398 @@
+{
+ "events": [
+  {
+   "id": "evt_1aeb34baa001Cnzy6JkSp01E3M",
+   "type": "server.connected",
+   "data": {}
+  },
+  {
+   "id": "evt_1aeb34bad001yQzAt6v3r1pi32",
+   "created": 1793932348333,
+   "type": "session.inbox.enqueued",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "inboxID": "msg_1aeb34bac001ynNMkYGcV9GH0d",
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "item": {
+     "type": "user",
+     "payload": {
+      "text": "Use the grep tool to search for hello and the glob tool to find *.txt in the current directory, and launch the explore subagent to list the files here. Be brief."
+     },
+     "delivery": "steer"
+    }
+   }
+  },
+  {
+   "id": "evt_1aeb34bae001jdR2kdMroBasKN",
+   "created": 1793932348334,
+   "type": "session.execution.started",
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g"
+   }
+  },
+  {
+   "id": "evt_1aeb34bb2001WNZgPTBvhgsusc",
+   "created": 1793932348338,
+   "type": "session.inbox.delivered",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "inboxID": "msg_1aeb34bac001ynNMkYGcV9GH0d"
+   }
+  },
+  {
+   "id": "evt_1aeb3558a001PLSOxcuqSgFo1C",
+   "created": 1793932350858,
+   "type": "session.step.started",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "agent": "build",
+    "model": {
+     "id": "deepseek-v4.1-flash",
+     "providerID": "cli-proxy-api",
+     "variant": "low"
+    },
+    "assistantMessageID": "msg_1aeb34bb50010SSyUHvfHPCUyk",
+    "started": 1793932348344
+   }
+  },
+  {
+   "id": "evt_1aeb3558b001EbmcxUatGCnq0x",
+   "created": 1793932350859,
+   "type": "session.reasoning.started",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb34bb50010SSyUHvfHPCUyk",
+    "ordinal": 0,
+    "native": {
+     "reasoningField": "reasoning_content"
+    }
+   }
+  },
+  {
+   "id": "evt_1aeb355f00010bUdp6D3U1sEiU",
+   "created": 1793932350960,
+   "type": "session.reasoning.delta",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb34bb50010SSyUHvfHPCUyk",
+    "ordinal": 0,
+    "delta": "The user wants me to use grep, glob, and explore subagent. Note: explore subagent is not in my available list — available:"
+   }
+  },
+  {
+   "id": "evt_1aeb3565800174fIHugbj9VVZm",
+   "created": 1793932351064,
+   "type": "session.reasoning.delta",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb34bb50010SSyUHvfHPCUyk",
+    "ordinal": 0,
+    "delta": " developer, explore, explorer, general, researcher. Yes explore is available."
+   }
+  },
+  {
+   "id": "evt_1aeb356bf001F67Pl6yXYkIVOh",
+   "created": 1793932351167,
+   "type": "session.reasoning.delta",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb34bb50010SSyUHvfHPCUyk",
+    "ordinal": 0,
+    "delta": "\n\nLet me do grep and glob in parallel, and launch explore. Let's"
+   }
+  },
+  {
+   "id": "evt_1aeb35727001UeH6CDrZYL5kQI",
+   "created": 1793932351271,
+   "type": "session.reasoning.delta",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb34bb50010SSyUHvfHPCUyk",
+    "ordinal": 0,
+    "delta": " first see the directory content maybe"
+   }
+  },
+  {
+   "id": "evt_1aeb35793001mRrcGQ5AfvWOyo",
+   "created": 1793932351379,
+   "type": "session.reasoning.delta",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb34bb50010SSyUHvfHPCUyk",
+    "ordinal": 0,
+    "delta": ". Just do it.\n\nGrep and glob calls are direct tools. Subagent explore"
+   }
+  },
+  {
+   "id": "evt_1aeb35803001uoGEc1Mj07oeQ6",
+   "created": 1793932351491,
+   "type": "session.reasoning.delta",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb34bb50010SSyUHvfHPCUyk",
+    "ordinal": 0,
+    "delta": " also direct. Launch all three in parallel? Independent"
+   }
+  },
+  {
+   "id": "evt_1aeb35854001RT7QFPbRBhXamb",
+   "created": 1793932351572,
+   "type": "session.reasoning.delta",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb34bb50010SSyUHvfHPCUyk",
+    "ordinal": 0,
+    "delta": " — yes."
+   }
+  },
+  {
+   "id": "evt_1aeb35854002f6WV82MhcRKQcQ",
+   "created": 1793932351572,
+   "type": "session.tool.input.started",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb34bb50010SSyUHvfHPCUyk",
+    "id": "chatcmpl-tool-8cd58904d3a0036f",
+    "name": "grep"
+   }
+  },
+  {
+   "id": "evt_1aeb358b3001UXbedY6XJV3pu9",
+   "created": 1793932351667,
+   "type": "session.tool.input.started",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb34bb50010SSyUHvfHPCUyk",
+    "id": "chatcmpl-tool-aed8d3adaa3bfce0",
+    "name": "glob"
+   }
+  },
+  {
+   "id": "evt_1aeb3592f001Qf6ipylVbMe1Zk",
+   "created": 1793932351791,
+   "type": "session.tool.input.started",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb34bb50010SSyUHvfHPCUyk",
+    "id": "chatcmpl-tool-b41aacf8e0031afc",
+    "name": "subagent"
+   }
+  },
+  {
+   "id": "evt_1aeb35d74001BZRaTwwOEOIKgU",
+   "created": 1793932352884,
+   "type": "session.reasoning.ended",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb34bb50010SSyUHvfHPCUyk",
+    "ordinal": 0,
+    "text": "The user wants me to use grep, glob, and explore subagent. Note: explore subagent is not in my available list — available: developer, explore, explorer, general, researcher. Yes explore is available.\n\nLet me do grep and glob in parallel, and launch explore. Let's first see the directory content maybe. Just do it.\n\nGrep and glob calls are direct tools. Subagent explore also direct. Launch all three in parallel? Independent — yes.",
+    "native": {
+     "reasoningField": "reasoning_content"
+    }
+   }
+  },
+  {
+   "id": "evt_1aeb35d76001uJPxjsDnUQoi44",
+   "created": 1793932352886,
+   "type": "session.tool.input.ended",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb34bb50010SSyUHvfHPCUyk",
+    "id": "chatcmpl-tool-8cd58904d3a0036f",
+    "text": "{\"pattern\": \"hello\"}"
+   }
+  },
+  {
+   "id": "evt_1aeb35d77001NVc3GcSEFlXESU",
+   "created": 1793932352887,
+   "type": "session.tool.called",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb34bb50010SSyUHvfHPCUyk",
+    "id": "chatcmpl-tool-8cd58904d3a0036f",
+    "input": {
+     "pattern": "hello"
+    },
+    "executed": false
+   }
+  },
+  {
+   "id": "evt_1aeb35d78001FfTv0LxwH5ygvN",
+   "created": 1793932352888,
+   "type": "session.tool.input.ended",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb34bb50010SSyUHvfHPCUyk",
+    "id": "chatcmpl-tool-aed8d3adaa3bfce0",
+    "text": "{\"pattern\": \"*.txt\"}"
+   }
+  },
+  {
+   "id": "evt_1aeb35d79001DnwynXyXynu9kI",
+   "created": 1793932352889,
+   "type": "session.tool.called",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb34bb50010SSyUHvfHPCUyk",
+    "id": "chatcmpl-tool-aed8d3adaa3bfce0",
+    "input": {
+     "pattern": "*.txt"
+    },
+    "executed": false
+   }
+  },
+  {
+   "id": "evt_1aeb35d7a001I1hzYB9Qxbx6yn",
+   "created": 1793932352890,
+   "type": "session.tool.input.ended",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb34bb50010SSyUHvfHPCUyk",
+    "id": "chatcmpl-tool-b41aacf8e0031afc",
+    "text": "{\"agent\": \"explore\", \"description\": \"List files in directory\", \"prompt\": \"Quick task: list the files in the current working directory /tmp/opencode/occ-test. Report just the file names (and note which are directories), thoroughness: quick. Do not modify anything.\"}"
+   }
+  },
+  {
+   "id": "evt_1aeb35d7e001Kys6dkfeduKHLi",
+   "created": 1793932352894,
+   "type": "session.tool.called",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb34bb50010SSyUHvfHPCUyk",
+    "id": "chatcmpl-tool-b41aacf8e0031afc",
+    "input": {
+     "agent": "explore",
+     "description": "List files in directory",
+     "prompt": "Quick task: list the files in the current working directory /tmp/opencode/occ-test. Report just the file names (and note which are directories), thoroughness: quick. Do not modify anything."
+    },
+    "executed": false
+   }
+  },
+  {
+   "id": "evt_1aeb35d7f001NEtu4WG0bcybN3",
+   "created": 1793932352895,
+   "type": "session.step.streamed",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb34bb50010SSyUHvfHPCUyk"
+   }
+  },
+  {
+   "id": "evt_1aeb35d88001ZoU7S0k5uSbaG3",
+   "created": 1793932352904,
+   "type": "session.tool.progress",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb34bb50010SSyUHvfHPCUyk",
+    "id": "chatcmpl-tool-b41aacf8e0031afc",
+    "metadata": {
+     "sessionID": "ses_e514ca27dffe4xfZPSTu9QR5hC",
+     "status": "running"
+    }
+   }
+  },
+  {
+   "id": "evt_1aeb35d9b001smp2MXQntbZ16N",
+   "created": 1793932352923,
+   "type": "session.tool.success",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb34bb50010SSyUHvfHPCUyk",
+    "id": "chatcmpl-tool-8cd58904d3a0036f",
+    "content": [
+     {
+      "type": "text",
+      "text": "Found 1 matches\n/tmp/opencode/occ-test/hello.txt:\n  Line 1: hello\n"
+     }
+    ],
+    "metadata": {
+     "matches": 1,
+     "truncated": false
+    },
+    "executed": false
+   }
+  },
+  {
+   "id": "evt_1aeb35d9d0016aWog2p3WOlpR0",
+   "created": 1793932352925,
+   "type": "session.tool.success",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb34bb50010SSyUHvfHPCUyk",
+    "id": "chatcmpl-tool-aed8d3adaa3bfce0",
+    "content": [
+     {
+      "type": "text",
+      "text": "/tmp/opencode/occ-test/hello.txt"
+     }
+    ],
+    "metadata": {
+     "count": 1,
+     "truncated": false
+    },
+    "executed": false
+   }
+  },
+  {
+   "id": "evt_1aeb378b2001SSRCUdtxByONQV",
+   "created": 1793932359858,
+   "type": "session.tool.success",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb34bb50010SSyUHvfHPCUyk",
+    "id": "chatcmpl-tool-b41aacf8e0031afc",
+    "content": [
+     {
+      "type": "text",
+      "text": "<subagent sessionID=\"ses_e514ca27dffe4xfZPSTu9QR5hC\" state=\"completed\">\nThe current working directory `/tmp/opencode/occ-test` contains a single entry:\n\n- `hello.txt` — file (not a directory)\n</subagent>"
+     }
+    ],
+    "metadata": {
+     "sessionID": "ses_e514ca27dffe4xfZPSTu9QR5hC",
+     "status": "completed",
+     "truncated": false
+    },
+    "executed": false
+   }
+  },
+  {
+   "id": "evt_1aeb378b30010mptZkvvZkUzRC",
+   "created": 1793932359859,
+   "type": "session.step.ended",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb34bb50010SSyUHvfHPCUyk",
+    "finish": "tool-calls",
+    "rawFinish": "tool_calls",
+    "tokens": {
+     "input": 7636,
+     "output": 172,
+     "reasoning": 95,
+     "cache": {
+      "read": 0,
+      "write": 0
+     }
+    },
+    "cost": 0
+   }
+  },
+  {
+   "id": "evt_1aeb3825a001S4Zm6mf1gtx3Ml",
+   "created": 1793932362330,
+   "type": "session.step.started",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "agent": "build",
+    "model": {
+     "id": "deepseek-v4.1-flash",
+     "providerID": "cli-proxy-api",
+     "variant": "low"
+    },
+    "assistantMessageID": "msg_1aeb378b90015E3Zho708XLKiJ",
+    "started": 1793932359868
+   }
+  },
+  {
+   "id": "evt_1aeb3825c001ZFiNeH3psoKGt1",
+   "created": 1793932362332,
+   "type": "session.text.started",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb378b90015E3Zho708XLKiJ",
+    "ordinal": 0
+   }
+  },
+  {
+   "id": "evt_1aeb3827e001uuG8wu5BEr0JUk",
+   "created": 1793932362366,
+   "type": "session.text.delta",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb378b90015E3Zho708XLKiJ",
+    "ordinal": 0,
+    "delta": "- **grep \"hello\"**: 1 match in `/tmp/opencode/occ-test/hello.txt` (line 1: `hello`)\n- **glob `*.txt`**: `/tmp/opencode/occ-test/hello.txt`\n- **explore agent**: directory contains one file, `hello.txt` (no subdirectories)"
+   }
+  },
+  {
+   "id": "evt_1aeb3827e002bFZ0JbIlo46VHf",
+   "created": 1793932362366,
+   "type": "session.text.ended",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb378b90015E3Zho708XLKiJ",
+    "ordinal": 0,
+    "text": "- **grep \"hello\"**: 1 match in `/tmp/opencode/occ-test/hello.txt` (line 1: `hello`)\n- **glob `*.txt`**: `/tmp/opencode/occ-test/hello.txt`\n- **explore agent**: directory contains one file, `hello.txt` (no subdirectories)"
+   }
+  },
+  {
+   "id": "evt_1aeb382800017rd9I3rG92Jz74",
+   "created": 1793932362368,
+   "type": "session.step.streamed",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb378b90015E3Zho708XLKiJ"
+   }
+  },
+  {
+   "id": "evt_1aeb38280002x4G8pl1mEe9Eo3",
+   "created": 1793932362368,
+   "type": "session.step.ended",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb378b90015E3Zho708XLKiJ",
+    "finish": "stop",
+    "rawFinish": "stop",
+    "tokens": {
+     "input": 217,
+     "output": 75,
+     "reasoning": 0,
+     "cache": {
+      "read": 7808,
+      "write": 0
+     }
+    },
+    "cost": 0
+   }
+  },
+  {
+   "id": "evt_1aeb38283001LUOM41tRvvUnZe",
+   "created": 1793932362371,
+   "type": "session.execution.succeeded",
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g"
+   }
+  },
+  {
+   "id": "evt_1aeb3866f001ZO7pgntYRvxxmb",
+   "created": 1793932363375,
+   "type": "session.inbox.enqueued",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "inboxID": "msg_1aeb3866e001EjCgxN9eAXj75F",
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "item": {
+     "type": "user",
+     "payload": {
+      "text": "Write the word x to the file /tmp/opencode/occ-outside/x.txt"
+     },
+     "delivery": "steer"
+    }
+   }
+  },
+  {
+   "id": "evt_1aeb38670001Xe3EnR76US17I3",
+   "created": 1793932363376,
+   "type": "session.execution.started",
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g"
+   }
+  },
+  {
+   "id": "evt_1aeb38674001p6Q6N0OC1DtlDw",
+   "created": 1793932363380,
+   "type": "session.inbox.delivered",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "inboxID": "msg_1aeb3866e001EjCgxN9eAXj75F"
+   }
+  },
+  {
+   "id": "evt_1aeb3909c001id99eavVTX8hOc",
+   "created": 1793932365980,
+   "type": "session.step.started",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "agent": "build",
+    "model": {
+     "id": "deepseek-v4.1-flash",
+     "providerID": "cli-proxy-api",
+     "variant": "low"
+    },
+    "assistantMessageID": "msg_1aeb38677001Xsq8R4XJQKMBuz",
+    "started": 1793932363386
+   }
+  },
+  {
+   "id": "evt_1aeb3909d001NtNiZFP9EMZF3o",
+   "created": 1793932365981,
+   "type": "session.reasoning.started",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb38677001Xsq8R4XJQKMBuz",
+    "ordinal": 0,
+    "native": {
+     "reasoningField": "reasoning_content"
+    }
+   }
+  },
+  {
+   "id": "evt_1aeb39107001zsFQ3joSp3l9Cy",
+   "created": 1793932366087,
+   "type": "session.reasoning.delta",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb38677001Xsq8R4XJQKMBuz",
+    "ordinal": 0,
+    "delta": "The user wants to write to /tmp/opencode/occ-outside/x.txt. Working dir is /tmp/opencode/occ-test. Outside path"
+   }
+  },
+  {
+   "id": "evt_1aeb3928e001Fmn15TFEUP49wZ",
+   "created": 1793932366478,
+   "type": "session.reasoning.delta",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb38677001Xsq8R4XJQKMBuz",
+    "ordinal": 0,
+    "delta": " — allowed? Env says prefer /tmp/opencode over generic system temp; approved for external access. But there may be a permission boundary: writing outside workspace. Let's just try the write tool. Parent"
+   }
+  },
+  {
+   "id": "evt_1aeb392fd001vCNB36ixpIfP6O",
+   "created": 1793932366589,
+   "type": "session.reasoning.delta",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb38677001Xsq8R4XJQKMBuz",
+    "ordinal": 0,
+    "delta": " dirs created automatically.\n\nPotential trick: the harness may deny"
+   }
+  },
+  {
+   "id": "evt_1aeb3938d0013l3nctTKGPqAbz",
+   "created": 1793932366733,
+   "type": "session.reasoning.delta",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb38677001Xsq8R4XJQKMBuz",
+    "ordinal": 0,
+    "delta": " writes outside working directory, and I should ask/confirm. Let's attempt."
+   }
+  },
+  {
+   "id": "evt_1aeb393aa001UMuv3GKDM5Y5BS",
+   "created": 1793932366762,
+   "type": "session.tool.input.started",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb38677001Xsq8R4XJQKMBuz",
+    "id": "chatcmpl-tool-b3f80c81bbe76ebe",
+    "name": "write"
+   }
+  },
+  {
+   "id": "evt_1aeb3949a001cfvjTYk7o7JOxy",
+   "created": 1793932367002,
+   "type": "session.reasoning.ended",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb38677001Xsq8R4XJQKMBuz",
+    "ordinal": 0,
+    "text": "The user wants to write to /tmp/opencode/occ-outside/x.txt. Working dir is /tmp/opencode/occ-test. Outside path — allowed? Env says prefer /tmp/opencode over generic system temp; approved for external access. But there may be a permission boundary: writing outside workspace. Let's just try the write tool. Parent dirs created automatically.\n\nPotential trick: the harness may deny writes outside working directory, and I should ask/confirm. Let's attempt.",
+    "native": {
+     "reasoningField": "reasoning_content"
+    }
+   }
+  },
+  {
+   "id": "evt_1aeb3949b001BC1nH7b8Znfqz7",
+   "created": 1793932367003,
+   "type": "session.tool.input.ended",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb38677001Xsq8R4XJQKMBuz",
+    "id": "chatcmpl-tool-b3f80c81bbe76ebe",
+    "text": "{\"path\": \"/tmp/opencode/occ-outside/x.txt\", \"content\": \"x\\n\"}"
+   }
+  },
+  {
+   "id": "evt_1aeb3949c001ZJLx1NfUEq75ax",
+   "created": 1793932367004,
+   "type": "session.tool.called",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb38677001Xsq8R4XJQKMBuz",
+    "id": "chatcmpl-tool-b3f80c81bbe76ebe",
+    "input": {
+     "path": "/tmp/opencode/occ-outside/x.txt",
+     "content": "x\n"
+    },
+    "executed": false
+   }
+  },
+  {
+   "id": "evt_1aeb3949d001A2xL6OcuNCNy4i",
+   "created": 1793932367005,
+   "type": "session.step.streamed",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb38677001Xsq8R4XJQKMBuz"
+   }
+  },
+  {
+   "id": "evt_1aeb394a1001rAPkbA6dSYObTA",
+   "created": 1793932367009,
+   "type": "session.tool.success",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb38677001Xsq8R4XJQKMBuz",
+    "id": "chatcmpl-tool-b3f80c81bbe76ebe",
+    "content": [
+     {
+      "type": "text",
+      "text": "Created file successfully: /tmp/opencode/occ-outside/x.txt"
+     }
+    ],
+    "metadata": {
+     "truncated": false
+    },
+    "executed": false
+   }
+  },
+  {
+   "id": "evt_1aeb394a20017hIucu0yZiQ8hJ",
+   "created": 1793932367010,
+   "type": "session.step.ended",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb38677001Xsq8R4XJQKMBuz",
+    "finish": "tool-calls",
+    "rawFinish": "tool_calls",
+    "tokens": {
+     "input": 57,
+     "output": 65,
+     "reasoning": 103,
+     "cache": {
+      "read": 8064,
+      "write": 0
+     }
+    },
+    "cost": 0
+   }
+  },
+  {
+   "id": "evt_1aeb3a06e00148doiScz193mnS",
+   "created": 1793932370030,
+   "type": "session.step.started",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "agent": "build",
+    "model": {
+     "id": "deepseek-v4.1-flash",
+     "providerID": "cli-proxy-api",
+     "variant": "low"
+    },
+    "assistantMessageID": "msg_1aeb394a8001dmxNhAITlqVxAU",
+    "started": 1793932367019
+   }
+  },
+  {
+   "id": "evt_1aeb3a070001r6H1lKEAUf6ZGN",
+   "created": 1793932370032,
+   "type": "session.text.started",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb394a8001dmxNhAITlqVxAU",
+    "ordinal": 0
+   }
+  },
+  {
+   "id": "evt_1aeb3a0c7001WgfiCYIQjdP5AH",
+   "created": 1793932370119,
+   "type": "session.text.delta",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb394a8001dmxNhAITlqVxAU",
+    "ordinal": 0,
+    "delta": "Created `/tmp/opencode/occ-outside/x.txt` containing `x`."
+   }
+  },
+  {
+   "id": "evt_1aeb3a0c7002eiTrwlB0A1fAnQ",
+   "created": 1793932370119,
+   "type": "session.text.ended",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb394a8001dmxNhAITlqVxAU",
+    "ordinal": 0,
+    "text": "Created `/tmp/opencode/occ-outside/x.txt` containing `x`."
+   }
+  },
+  {
+   "id": "evt_1aeb3a0c80013HgKXBmSoFWFiR",
+   "created": 1793932370120,
+   "type": "session.step.streamed",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb394a8001dmxNhAITlqVxAU"
+   }
+  },
+  {
+   "id": "evt_1aeb3a0c9001ZXTEvjLGF9OzO3",
+   "created": 1793932370121,
+   "type": "session.step.ended",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb394a8001dmxNhAITlqVxAU",
+    "finish": "stop",
+    "rawFinish": "stop",
+    "tokens": {
+     "input": 123,
+     "output": 19,
+     "reasoning": 0,
+     "cache": {
+      "read": 8192,
+      "write": 0
+     }
+    },
+    "cost": 0
+   }
+  },
+  {
+   "id": "evt_1aeb3a0cc001Fdx0GN0uf6085R",
+   "created": 1793932370124,
+   "type": "session.execution.succeeded",
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g"
+   }
+  },
+  {
+   "id": "evt_1aeb3a4b8001UcrRML9fwuUJt2",
+   "created": 1793932371128,
+   "type": "session.inbox.enqueued",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "inboxID": "msg_1aeb3a4b7001zrTNjlB1K3pdmG",
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "item": {
+     "type": "user",
+     "payload": {
+      "text": "Use the question tool to ask me whether I prefer red or blue. Then reply with my answer in one word."
+     },
+     "delivery": "steer"
+    }
+   }
+  },
+  {
+   "id": "evt_1aeb3a4ba001BajsyWFdG4X5Ig",
+   "created": 1793932371130,
+   "type": "session.execution.started",
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g"
+   }
+  },
+  {
+   "id": "evt_1aeb3a4be0015ZYcGWQDyM3cZG",
+   "created": 1793932371134,
+   "type": "session.inbox.delivered",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "inboxID": "msg_1aeb3a4b7001zrTNjlB1K3pdmG"
+   }
+  },
+  {
+   "id": "evt_1aeb3b1f7001da53wnPsShiluP",
+   "created": 1793932374519,
+   "type": "session.step.started",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "agent": "build",
+    "model": {
+     "id": "deepseek-v4.1-flash",
+     "providerID": "cli-proxy-api",
+     "variant": "low"
+    },
+    "assistantMessageID": "msg_1aeb3a4c1001nHTZLHskcWd2sQ",
+    "started": 1793932371140
+   }
+  },
+  {
+   "id": "evt_1aeb3b1f90017M6w9dbBbfnJ13",
+   "created": 1793932374521,
+   "type": "session.tool.input.started",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb3a4c1001nHTZLHskcWd2sQ",
+    "id": "chatcmpl-tool-bf6b0639561ec54f",
+    "name": "question"
+   }
+  },
+  {
+   "id": "evt_1aeb3b2aa001woSJoA5pu6Iuqo",
+   "created": 1793932374698,
+   "type": "session.tool.input.ended",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb3a4c1001nHTZLHskcWd2sQ",
+    "id": "chatcmpl-tool-bf6b0639561ec54f",
+    "text": "{\"questions\": [{\"header\": \"Color preference\", \"question\": \"Which color do you prefer, red or blue?\", \"options\": [{\"label\": \"Red\", \"description\": \"I prefer red.\"}, {\"label\": \"Blue\", \"description\": \"I prefer blue.\"}]}]}"
+   }
+  },
+  {
+   "id": "evt_1aeb3b2ab00183YemQPGAhe670",
+   "created": 1793932374699,
+   "type": "session.tool.called",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb3a4c1001nHTZLHskcWd2sQ",
+    "id": "chatcmpl-tool-bf6b0639561ec54f",
+    "input": {
+     "questions": [
+      {
+       "header": "Color preference",
+       "question": "Which color do you prefer, red or blue?",
+       "options": [
+        {
+         "label": "Red",
+         "description": "I prefer red."
+        },
+        {
+         "label": "Blue",
+         "description": "I prefer blue."
+        }
+       ]
+      }
+     ]
+    },
+    "executed": false
+   }
+  },
+  {
+   "id": "evt_1aeb3b2ac0018aUMUkkNDTpzNA",
+   "created": 1793932374700,
+   "type": "session.step.streamed",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+    "assistantMessageID": "msg_1aeb3a4c1001nHTZLHskcWd2sQ"
+   }
+  }
+ ],
+ "messages": [
+  {
+   "id": "msg_1aeb34bac001ynNMkYGcV9GH0d",
+   "time": {
+    "created": 1793932348338
+   },
+   "text": "Use the grep tool to search for hello and the glob tool to find *.txt in the current directory, and launch the explore subagent to list the files here. Be brief.",
+   "type": "user"
+  },
+  {
+   "id": "msg_1aeb34bb50010SSyUHvfHPCUyk",
+   "time": {
+    "created": 1793932348344,
+    "streamed": 1793932352895,
+    "completed": 1793932359859
+   },
+   "type": "assistant",
+   "agent": "build",
+   "model": {
+    "id": "deepseek-v4.1-flash",
+    "providerID": "cli-proxy-api",
+    "variant": "low"
+   },
+   "content": [
+    {
+     "type": "reasoning",
+     "text": "The user wants me to use grep, glob, and explore subagent. Note: explore subagent is not in my available list — available: developer, explore, explorer, general, researcher. Yes explore is available.\n\nLet me do grep and glob in parallel, and launch explore. Let's first see the directory content maybe. Just do it.\n\nGrep and glob calls are direct tools. Subagent explore also direct. Launch all three in parallel? Independent — yes.",
+     "native": {
+      "reasoningField": "reasoning_content"
+     },
+     "time": {
+      "created": 1793932350859,
+      "completed": 1793932352884
+     }
+    },
+    {
+     "type": "tool",
+     "id": "chatcmpl-tool-8cd58904d3a0036f",
+     "name": "grep",
+     "executed": false,
+     "state": {
+      "status": "completed",
+      "input": {
+       "pattern": "hello"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "Found 1 matches\n/tmp/opencode/occ-test/hello.txt:\n  Line 1: hello\n"
+       }
+      ],
+      "metadata": {
+       "matches": 1,
+       "truncated": false
+      }
+     },
+     "time": {
+      "created": 1793932351572,
+      "ran": 1793932352887,
+      "completed": 1793932352923
+     }
+    },
+    {
+     "type": "tool",
+     "id": "chatcmpl-tool-aed8d3adaa3bfce0",
+     "name": "glob",
+     "executed": false,
+     "state": {
+      "status": "completed",
+      "input": {
+       "pattern": "*.txt"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "/tmp/opencode/occ-test/hello.txt"
+       }
+      ],
+      "metadata": {
+       "count": 1,
+       "truncated": false
+      }
+     },
+     "time": {
+      "created": 1793932351667,
+      "ran": 1793932352889,
+      "completed": 1793932352925
+     }
+    },
+    {
+     "type": "tool",
+     "id": "chatcmpl-tool-b41aacf8e0031afc",
+     "name": "subagent",
+     "executed": false,
+     "state": {
+      "status": "completed",
+      "input": {
+       "agent": "explore",
+       "description": "List files in directory",
+       "prompt": "Quick task: list the files in the current working directory /tmp/opencode/occ-test. Report just the file names (and note which are directories), thoroughness: quick. Do not modify anything."
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "<subagent sessionID=\"ses_e514ca27dffe4xfZPSTu9QR5hC\" state=\"completed\">\nThe current working directory `/tmp/opencode/occ-test` contains a single entry:\n\n- `hello.txt` — file (not a directory)\n</subagent>"
+       }
+      ],
+      "metadata": {
+       "sessionID": "ses_e514ca27dffe4xfZPSTu9QR5hC",
+       "status": "completed",
+       "truncated": false
+      }
+     },
+     "time": {
+      "created": 1793932351791,
+      "ran": 1793932352894,
+      "completed": 1793932359858
+     }
+    }
+   ],
+   "finish": "tool-calls",
+   "rawFinish": "tool_calls",
+   "cost": 0,
+   "tokens": {
+    "input": 7636,
+    "output": 172,
+    "reasoning": 95,
+    "cache": {
+     "read": 0,
+     "write": 0
+    }
+   }
+  },
+  {
+   "id": "msg_1aeb378b90015E3Zho708XLKiJ",
+   "time": {
+    "created": 1793932359868,
+    "streamed": 1793932362368,
+    "completed": 1793932362368
+   },
+   "type": "assistant",
+   "agent": "build",
+   "model": {
+    "id": "deepseek-v4.1-flash",
+    "providerID": "cli-proxy-api",
+    "variant": "low"
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "- **grep \"hello\"**: 1 match in `/tmp/opencode/occ-test/hello.txt` (line 1: `hello`)\n- **glob `*.txt`**: `/tmp/opencode/occ-test/hello.txt`\n- **explore agent**: directory contains one file, `hello.txt` (no subdirectories)"
+    }
+   ],
+   "finish": "stop",
+   "rawFinish": "stop",
+   "cost": 0,
+   "tokens": {
+    "input": 217,
+    "output": 75,
+    "reasoning": 0,
+    "cache": {
+     "read": 7808,
+     "write": 0
+    }
+   }
+  },
+  {
+   "id": "msg_1aeb38283001LUOM41tRvvUnZe",
+   "time": {
+    "created": 1793932362371
+   },
+   "type": "idle",
+   "outcome": "succeeded"
+  },
+  {
+   "id": "msg_1aeb3866e001EjCgxN9eAXj75F",
+   "time": {
+    "created": 1793932363380
+   },
+   "text": "Write the word x to the file /tmp/opencode/occ-outside/x.txt",
+   "type": "user"
+  },
+  {
+   "id": "msg_1aeb38677001Xsq8R4XJQKMBuz",
+   "time": {
+    "created": 1793932363386,
+    "streamed": 1793932367005,
+    "completed": 1793932367010
+   },
+   "type": "assistant",
+   "agent": "build",
+   "model": {
+    "id": "deepseek-v4.1-flash",
+    "providerID": "cli-proxy-api",
+    "variant": "low"
+   },
+   "content": [
+    {
+     "type": "reasoning",
+     "text": "The user wants to write to /tmp/opencode/occ-outside/x.txt. Working dir is /tmp/opencode/occ-test. Outside path — allowed? Env says prefer /tmp/opencode over generic system temp; approved for external access. But there may be a permission boundary: writing outside workspace. Let's just try the write tool. Parent dirs created automatically.\n\nPotential trick: the harness may deny writes outside working directory, and I should ask/confirm. Let's attempt.",
+     "native": {
+      "reasoningField": "reasoning_content"
+     },
+     "time": {
+      "created": 1793932365981,
+      "completed": 1793932367002
+     }
+    },
+    {
+     "type": "tool",
+     "id": "chatcmpl-tool-b3f80c81bbe76ebe",
+     "name": "write",
+     "executed": false,
+     "state": {
+      "status": "completed",
+      "input": {
+       "path": "/tmp/opencode/occ-outside/x.txt",
+       "content": "x\n"
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "Created file successfully: /tmp/opencode/occ-outside/x.txt"
+       }
+      ],
+      "metadata": {
+       "truncated": false
+      }
+     },
+     "time": {
+      "created": 1793932366762,
+      "ran": 1793932367004,
+      "completed": 1793932367009
+     }
+    }
+   ],
+   "finish": "tool-calls",
+   "rawFinish": "tool_calls",
+   "cost": 0,
+   "tokens": {
+    "input": 57,
+    "output": 65,
+    "reasoning": 103,
+    "cache": {
+     "read": 8064,
+     "write": 0
+    }
+   }
+  },
+  {
+   "id": "msg_1aeb394a8001dmxNhAITlqVxAU",
+   "time": {
+    "created": 1793932367019,
+    "streamed": 1793932370120,
+    "completed": 1793932370121
+   },
+   "type": "assistant",
+   "agent": "build",
+   "model": {
+    "id": "deepseek-v4.1-flash",
+    "providerID": "cli-proxy-api",
+    "variant": "low"
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "Created `/tmp/opencode/occ-outside/x.txt` containing `x`."
+    }
+   ],
+   "finish": "stop",
+   "rawFinish": "stop",
+   "cost": 0,
+   "tokens": {
+    "input": 123,
+    "output": 19,
+    "reasoning": 0,
+    "cache": {
+     "read": 8192,
+     "write": 0
+    }
+   }
+  },
+  {
+   "id": "msg_1aeb3a0cc001Fdx0GN0uf6085R",
+   "time": {
+    "created": 1793932370124
+   },
+   "type": "idle",
+   "outcome": "succeeded"
+  },
+  {
+   "id": "msg_1aeb3a4b7001zrTNjlB1K3pdmG",
+   "time": {
+    "created": 1793932371134
+   },
+   "text": "Use the question tool to ask me whether I prefer red or blue. Then reply with my answer in one word.",
+   "type": "user"
+  },
+  {
+   "id": "msg_1aeb3a4c1001nHTZLHskcWd2sQ",
+   "time": {
+    "created": 1793932371140,
+    "streamed": 1793932374700
+   },
+   "type": "assistant",
+   "agent": "build",
+   "model": {
+    "id": "deepseek-v4.1-flash",
+    "providerID": "cli-proxy-api",
+    "variant": "low"
+   },
+   "content": [
+    {
+     "type": "tool",
+     "id": "chatcmpl-tool-bf6b0639561ec54f",
+     "name": "question",
+     "executed": false,
+     "state": {
+      "status": "running",
+      "input": {
+       "questions": [
+        {
+         "header": "Color preference",
+         "question": "Which color do you prefer, red or blue?",
+         "options": [
+          {
+           "label": "Red",
+           "description": "I prefer red."
+          },
+          {
+           "label": "Blue",
+           "description": "I prefer blue."
+          }
+         ]
+        }
+       ]
+      },
+      "metadata": {}
+     },
+     "time": {
+      "created": 1793932374521,
+      "ran": 1793932374699
+     }
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,51 @@
+{
+ "note": "pending form from form.list on a real server (question tool); form.replied is the real event captured after replying",
+ "form": {
+  "id": "frm_1aeb3b2ae001WRI6ceAATZ0NvQ",
+  "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+  "title": "Questions",
+  "metadata": {
+   "kind": "question",
+   "tool": {
+    "messageID": "msg_1aeb3a4c1001nHTZLHskcWd2sQ",
+    "id": "chatcmpl-tool-bf6b0639561ec54f"
+   }
+  },
+  "fields": [
+   {
+    "key": "q0",
+    "title": "Color preference",
+    "description": "Which color do you prefer, red or blue?",
+    "type": "string",
+    "options": [
+     {
+      "value": "Red",
+      "label": "Red",
+      "description": "I prefer red."
+     },
+     {
+      "value": "Blue",
+      "label": "Blue",
+      "description": "I prefer blue."
+     }
+    ],
+    "custom": true
+   }
+  ]
+ },
+ "replied": {
+  "id": "evt_1aeb62203001Zuv98TdPLKwR7s",
+  "created": 1793932534275,
+  "type": "form.replied",
+  "location": {
+   "directory": "/tmp/opencode/occ-test"
+  },
+  "data": {
+   "id": "frm_1aeb3b2ae001WRI6ceAATZ0NvQ",
+   "sessionID": "ses_e514cb45affe9ksc1pWQsCmR8g",
+   "answer": {
+    "q0": "Blue"
+   }
+  }
+ }
+}
