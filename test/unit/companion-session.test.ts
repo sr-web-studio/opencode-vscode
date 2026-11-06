@@ -78,7 +78,7 @@ describe("DictationSession", () => {
     expect(sock.sent.at(-1)).toBe("")
     sock.answer({ tokens: [{ text: " world", is_final: true }] })
     sock.answer({ tokens: [], finished: true })
-    expect(updates.at(-1)).toEqual({ kind: "done", final: "hello world", error: undefined })
+    expect(updates.at(-1)).toMatchObject({ kind: "done", final: "hello world", error: undefined })
     expect(sock.closed).toBe(true)
     expect(updates.filter((u) => u.kind === "done")).toHaveLength(1)
     await wait(60)
@@ -91,7 +91,7 @@ describe("DictationSession", () => {
     sock.answer({ tokens: [{ text: "hi", is_final: false }] })
     s.stop()
     await wait(60)
-    expect(updates.at(-1)).toEqual({ kind: "done", final: "hi", error: undefined })
+    expect(updates.at(-1)).toMatchObject({ kind: "done", final: "hi", error: undefined })
   })
 
   test("stopping before the socket opens still ends the stream once it opens", () => {
@@ -123,7 +123,8 @@ describe("DictationSession", () => {
       socket: () => { throw new Error("unused") },
       emit: (u) => updates.push(u),
     }).start()
-    expect(updates).toEqual([{ kind: "done", final: "", error: "Could not open the microphone: no device" }])
+    expect(updates).toHaveLength(1)
+    expect(updates[0]).toMatchObject({ kind: "done", final: "", error: "Could not open the microphone: no device" })
   })
 
   test("stops by itself when nothing is heard for idleMs", async () => {
@@ -137,5 +138,29 @@ describe("DictationSession", () => {
     expect(sock.sent.at(-1)).toBe("")
     sock.answer({ tokens: [], finished: true })
     expect(updates.at(-1)).toMatchObject({ kind: "done" })
+  })
+
+  test("a microphone that sends only zeros is reported within 2 s, with the Windows privacy hint", async () => {
+    const { rec, sock, updates } = setup()
+    sock.open()
+    for (let i = 0; i < 20; i++) { rec.frame([0, 0, 1]); await wait(1) }
+    const done = updates.at(-1)
+    expect(done).toMatchObject({ kind: "done", final: "" })
+    expect(done && "error" in done && done.error).toContain("Let desktop apps access your microphone")
+    expect(sock.closed).toBe(true)
+  })
+
+  test("real audio but no words: a clear reason instead of an empty, silent end", async () => {
+    let t = 0
+    const { s, rec, sock, updates } = setup({ now: () => t })
+    sock.open()
+    for (let i = 0; i < 25; i++) { rec.frame([900, -700]); await wait(1) }
+    sock.answer({ tokens: [] })
+    t = 3000
+    s.stop()
+    sock.answer({ tokens: [], finished: true })
+    const done = updates.at(-1)
+    expect(done).toMatchObject({ kind: "done", final: "", stats: { frames: 25, peak: 900, answers: 2 } })
+    expect(done && "error" in done && done.error).toContain("No words were heard")
   })
 })

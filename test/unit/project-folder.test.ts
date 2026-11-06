@@ -83,7 +83,8 @@ describe("sessions of a Windows folder whose drive letter case differs from the 
   test("location.get gives the server's spelling; sessions are listed under it", async () => {
     const { ids, server, lines } = await sessionsOf(true)
     expect(ids).toEqual(["ses_a", "ses_b"])
-    expect(server.calls[0]).toMatchObject({ directory: server.STORED, parentID: null })
+    // The project id from location.get scopes the list (all spellings of the folder).
+    expect(server.calls[0]).toMatchObject({ project: "prj", parentID: null })
     expect(lines.some((l) => l.includes("server location D:\\Work\\uniloop\\uniloop-platform"))).toBe(true)
   })
   test("new sessions are created under the server's spelling", async () => {
@@ -99,5 +100,52 @@ describe("sessions of a Windows folder whose drive letter case differs from the 
   test("workers are listed by parent id only", async () => {
     const { server } = await sessionsOf(true)
     expect(server.calls.find((c) => c.parentID === "ses_a")).toEqual({ parentID: "ses_a", limit: 200 })
+  })
+})
+
+describe("sessions are listed by project (2026-11-06: a Windows colleague saw 1 of several)", () => {
+  /** location.get echoes VS Code's `d:\…` but the project (and the older sessions) are stored as `D:\…`. */
+  function server() {
+    const STORED = "D:\\Work\\uniloop\\uniloop-platform"
+    const s = (id: string, directory: string, updated: number) => ({ id, title: id, projectID: "prj", time: { created: updated, updated }, location: { directory } })
+    const all = [s("ses_new", "d:\\Work\\uniloop\\uniloop-platform", 9), s("ses_old1", STORED, 5), s("ses_old2", STORED, 4), s("ses_sub", `${STORED}\\apps\\web`, 3), s("ses_x", "D:\\Work\\uniloop-other", 2)]
+    const calls: Record<string, unknown>[] = []
+    const base = windowsServer({ locationGet: true }).client
+    const client = {
+      ...base,
+      location: { get: async () => ({ directory: "d:\\Work\\uniloop\\uniloop-platform", project: { id: "prj", directory: STORED, canonical: STORED } }) },
+      session: {
+        ...base.session,
+        list: async (input: Record<string, unknown>) => {
+          calls.push(input)
+          if (input.archived) return { data: [] }
+          if (input.project) return { data: all.filter((x) => x.projectID === input.project && x.id !== "ses_x").concat(all.filter((x) => x.id === "ses_x")) }
+          return { data: all.filter((x) => x.location.directory === input.directory) }
+        },
+      },
+    }
+    return { client, calls, STORED }
+  }
+
+  test("every spelling of the folder and its subfolders is listed; other folders are not", async () => {
+    const srv = server()
+    const ctl = new Controller({ directory: "d:\\Work\\uniloop\\uniloop-platform", folderName: "uniloop-platform", displayPath: "", log: () => {} })
+    ;(ctl as unknown as { client: unknown }).client = srv.client
+    await ctl.sync()
+    expect(ctl.snapshot().sessions.map((x) => x.id)).toEqual(["ses_new", "ses_old1", "ses_old2", "ses_sub"])
+    expect(srv.calls[0]).toMatchObject({ project: "prj", parentID: null })
+    // New sessions use the project's spelling, so they join the old ones.
+    expect(ctl.directory).toBe(srv.STORED)
+  })
+})
+
+describe("withinDirectory", () => {
+  test("the folder itself and folders inside it, never a sibling with a longer name", async () => {
+    const { withinDirectory } = await import("../../src/core/paths")
+    expect(withinDirectory("D:\\Work\\a\\apps\\web", "d:\\Work\\a")).toBe(true)
+    expect(withinDirectory("d:/work/A", "D:\\Work\\a\\")).toBe(true)
+    expect(withinDirectory("D:\\Work\\ab", "D:\\Work\\a")).toBe(false)
+    expect(withinDirectory("/home/me/p/sub", "/home/me/p")).toBe(true)
+    expect(withinDirectory("/home/me/P/sub", "/home/me/p")).toBe(false)
   })
 })

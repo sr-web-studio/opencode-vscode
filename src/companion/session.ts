@@ -31,10 +31,23 @@ export interface Socket {
   onclose: ((ev: { code?: number }) => void) | null
 }
 
+/** What one recording received: for the log, and to tell "silent microphone" from "nothing said". */
+export type SessionStats = { frames: number; peak: number; answers: number; device?: string }
+
 export type SessionUpdate =
   | { kind: "listening"; device?: string }
   | { kind: "heard"; final: string; partial: string }
-  | { kind: "done"; final: string; error?: string }
+  | { kind: "done"; final: string; error?: string; stats?: SessionStats }
+
+/**
+ * A blocked or muted microphone delivers (near) digital zeros; any real microphone has a noise floor above this.
+ * Checked after `SILENCE_FRAMES` frames (100 ms each), so the user is told within 2 s instead of talking to nothing.
+ */
+export const SILENT_PEAK = 8
+export const SILENCE_FRAMES = 20
+
+export const silenceMessage = (device?: string): string =>
+  `The microphone${device ? ` “${device}”` : ""} sends only silence. On Windows, turn on Settings → Privacy & security → Microphone → “Let desktop apps access your microphone”, and check that it is not muted. Or pick another one with “OpenCode Voice: Choose Microphone”.`
 
 export type SessionOptions = {
   key: string
@@ -70,6 +83,10 @@ export class DictationSession {
   private lastHeard = 0
   private started = 0
   private drainTimer?: ReturnType<typeof setTimeout>
+  private frames = 0
+  private peak = 0
+  private answers = 0
+  private device?: string
   private readonly now: () => number
 
   constructor(private readonly o: SessionOptions) {
@@ -106,7 +123,8 @@ export class DictationSession {
     } catch (e) {
       return this.finish(`Could not connect to Soniox: ${errorText(e)}`)
     }
-    this.o.emit({ kind: "listening", device: safe(() => this.recorder?.getSelectedDevice?.()) })
+    this.device = safe(() => this.recorder?.getSelectedDevice?.())
+    this.o.emit({ kind: "listening", device: this.device })
     void this.pump()
   }
 
@@ -141,6 +159,12 @@ export class DictationSession {
         return
       }
       if (!this.recording || this.ended) return
+      this.frames++
+      for (let i = 0; i < frame.length; i++) {
+        const v = Math.abs(frame[i]!)
+        if (v > this.peak) this.peak = v
+      }
+      if (this.frames === SILENCE_FRAMES && this.peak < SILENT_PEAK) return this.finish(silenceMessage(this.device))
       const bytes = pcmBytes(frame)
       const ws = this.socket
       if (ws && ws.readyState === OPEN) ws.send(bytes)
@@ -160,6 +184,7 @@ export class DictationSession {
     } catch {
       return
     }
+    this.answers++
     const before = this.heard
     this.heard = applySonioxMessage(this.heard, parsed)
     if (this.heard.final !== before.final || (this.heard.partial && this.heard.partial !== before.partial)) this.lastHeard = this.now()
@@ -192,7 +217,14 @@ export class DictationSession {
     }
     // The last guess counts when the user stopped before Soniox made it final.
     const final = (this.heard.final + (error ? "" : this.heard.partial)).trim() ? this.heard.final + (error ? "" : this.heard.partial) : ""
-    this.o.emit({ kind: "done", final, error })
+    // Never end quietly with nothing: say why, so the user is not left guessing.
+    if (!error && !final && this.now() - this.started > 1500) {
+      if (this.frames === 0) error = `The microphone${this.device ? ` “${this.device}”` : ""} delivered no audio. Pick another one with “OpenCode Voice: Choose Microphone”.`
+      else if (this.peak < SILENT_PEAK) error = silenceMessage(this.device)
+      else if (this.answers === 0) error = "Soniox did not answer. Check the internet connection and try again."
+      else error = "No words were heard. Speak a little louder or closer to the microphone, or pick another one with “OpenCode Voice: Choose Microphone”."
+    }
+    this.o.emit({ kind: "done", final, error, stats: { frames: this.frames, peak: this.peak, answers: this.answers, device: this.device } })
   }
 }
 

@@ -134,6 +134,8 @@ export class Voice implements vscode.Disposable {
       this.post({ type: "dictation", id: u.id, text: spokenText({ final: u.final, partial: u.partial, finished: false }), done: false })
       return this.emit()
     }
+    const st = u.stats
+    if (st) this.log(`Voice: ended after ${(st.frames / 10).toFixed(1)} s on ${st.device ?? "the default microphone"}, peak level ${st.peak}/32767, ${st.answers} answers from Soniox, ${u.final.length} characters`)
     this.post({ type: "dictation", id: u.id, text: spokenText({ final: u.final, partial: "", finished: true }), done: true })
     if (u.error) return this.failed(u.id, u.error)
     this.finish(u.id)

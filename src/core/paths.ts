@@ -68,3 +68,13 @@ export function looksLikePath(text: string): boolean {
   if (!KNOWN_EXT.has(ext)) return false
   return path.includes("/") || path.includes("\\") || name.length > ext.length + 1
 }
+
+/** `child` is `parent` or a folder inside it (same spelling rules as `sameDirectory`). */
+export function withinDirectory(child: string | undefined, parent: string | undefined): boolean {
+  if (!child || !parent) return false
+  if (sameDirectory(child, parent)) return true
+  const win = isWindowsPath(child) || isWindowsPath(parent)
+  const fold = (p: string) => (win ? normalize(p).toLowerCase() : normalize(p))
+  const base = fold(parent).replace(/\/+$/, "")
+  return fold(child).startsWith(`${base}/`)
+}

@@ -123,4 +123,4 @@ export type VoiceStartArgs = {
 export type VoiceFeed =
   | { id: string; kind: "listening"; device?: string }
   | { id: string; kind: "heard"; final: string; partial: string }
-  | { id: string; kind: "done"; final: string; error?: string }
+  | { id: string; kind: "done"; final: string; error?: string; stats?: { frames: number; peak: number; answers: number; device?: string } }

@@ -14,7 +14,7 @@ import {
   type ViewSettings,
 } from "./protocol"
 import { isRoot, upsertSession } from "./sessions"
-import { isWindowsPath, sameDirectory } from "./paths"
+import { isWindowsPath, sameDirectory, withinDirectory } from "./paths"
 import { isRunning } from "./transcript/reducer"
 import { applyRevertEvent, revertFromServer, revertedPrompt } from "./transcript/revert"
 import { toPromptFiles, type PromptFile } from "./attachments"
@@ -95,6 +95,8 @@ export class Controller {
 
   /** The server's spelling of the project folder (`location.get`), which can differ from VS Code's (e.g. `d:` vs `D:`). */
   private serverDirectory?: string
+  /** The server's project of this folder. Session lists use it: it matches every spelling of the folder. */
+  private projectID?: string
 
   constructor(private readonly opts: ControllerOptions) {}
 
@@ -346,7 +348,7 @@ export class Controller {
       return
     }
     const dir = ev.location?.directory
-    if (dir && !this.isOurs(dir)) return
+    if (dir && !this.isListed(dir)) return
     await this.apply(ev)
     this.opts.onEvent?.(ev)
     for (const o of this.observers) o.event?.(ev)
@@ -359,7 +361,7 @@ export class Controller {
       case "session.created": {
         if (!this.client) return
         const s = await this.client.session.get({ sessionID: d.sessionID }).catch(() => undefined)
-        if (!s || !this.isOurs(s.location?.directory)) return
+        if (!s || !this.isListed(s.location?.directory)) return
         if (isRoot(s)) this.sessions = this.sort(upsertSession(this.sessions, s))
         else this.children.set(s.id, s)
         break
@@ -476,9 +478,15 @@ export class Controller {
     if (!this.opts.directory || this.serverDirectory) return
     try {
       const info = await client.location.get({ location: { directory: this.opts.directory } })
-      if (typeof info?.directory === "string" && sameDirectory(info.directory, this.opts.directory)) {
+      // Prefer the project's spelling: a server can echo VS Code's `d:\…` while the project and its older sessions are
+      // stored under `D:\…` (seen on Windows, 2026-11-06). New sessions then join the old ones.
+      const project = info?.project
+      if (typeof project?.directory === "string" && sameDirectory(project.directory, this.opts.directory)) {
+        this.serverDirectory = project.directory
+      } else if (typeof info?.directory === "string" && sameDirectory(info.directory, this.opts.directory)) {
         this.serverDirectory = info.directory
       }
+      if (typeof project?.id === "string" && project.id) this.projectID = project.id
       this.opts.log?.(`Folder ${this.opts.directory} → server location ${info?.directory ?? "?"} (project ${info?.project?.id ?? "?"} at ${info?.project?.directory ?? "?"})`)
     } catch (e) {
       this.opts.log?.(`location.get failed for ${this.opts.directory}: ${message(e)}. Using the folder path as is.`)
@@ -525,20 +533,24 @@ export class Controller {
     return sameDirectory(directory, this.dir) || sameDirectory(directory, this.opts.directory)
   }
 
+  /** A session belongs in this window's list: started in this folder or a folder inside it (any spelling). */
+  private isListed(directory: string | undefined): boolean {
+    return withinDirectory(directory, this.dir) || withinDirectory(directory, this.opts.directory)
+  }
+
   private async loadSessions(): Promise<void> {
     const client = this.client
     if (!client) return
-    const [scoped, active] = await Promise.all([
-      client.session.list({ directory: this.dir, parentID: null, limit: 200 }),
-      client.session.active(),
-    ])
+    // By project when known (all spellings of the folder, like the OpenCode web app), filtered to this folder below.
+    const scope = this.projectID ? { project: this.projectID } : { directory: this.dir }
+    const [scoped, active] = await Promise.all([client.session.list({ ...scope, parentID: null, limit: 200 }), client.session.active()])
     let roots = scoped
     // The server filters on the exact stored path. On Windows its spelling can still differ (drive letter case, an
     // older server without `location.get`), so look through the newest sessions of every folder instead.
     if (roots.data.length === 0 && isWindowsPath(this.dir)) roots = await client.session.list({ parentID: null, limit: 200 })
-    this.sessions = this.sort(roots.data.filter((s) => isRoot(s) && this.isOurs(s.location.directory)))
-    const others = [...new Set(roots.data.filter((s) => !this.isOurs(s.location?.directory)).map((s) => s.location?.directory))]
-    this.opts.log?.(`Sessions: ${this.sessions.length} for this folder of ${roots.data.length} listed for ${this.dir}${others.length ? `; other folders: ${others.slice(0, 5).join(", ")}` : ""}`)
+    this.sessions = this.sort(roots.data.filter((s) => isRoot(s) && this.isListed(s.location.directory)))
+    const others = [...new Set(roots.data.filter((s) => !this.isListed(s.location?.directory)).map((s) => s.location?.directory))]
+    this.opts.log?.(`Sessions: ${this.sessions.length} for this folder of ${roots.data.length} listed for ${this.projectID ? `project ${this.projectID}` : this.dir}${others.length ? `; other folders: ${others.slice(0, 5).join(", ")}` : ""}`)
     this.running = new Set(Object.keys(active).filter((id) => this.sessions.some((s) => s.id === id) || this.children.has(id) || this.running.has(id) || id === this.currentSessionID))
     this.sessionsLoaded = true
     if (this.showArchived) await this.loadArchived()
@@ -548,8 +560,9 @@ export class Controller {
   private async loadArchived(): Promise<void> {
     const client = this.client
     if (!client) return
-    const res = await client.session.list({ directory: this.dir, parentID: null, archived: true, limit: 200 })
-    this.archived = this.sort(res.data.filter((s) => isRoot(s) && this.isOurs(s.location.directory)))
+    const scope = this.projectID ? { project: this.projectID } : { directory: this.dir }
+    const res = await client.session.list({ ...scope, parentID: null, archived: true, limit: 200 })
+    this.archived = this.sort(res.data.filter((s) => isRoot(s) && this.isListed(s.location.directory)))
   }
 
   private async loadPending(client: OpenCodeClient): Promise<void> {

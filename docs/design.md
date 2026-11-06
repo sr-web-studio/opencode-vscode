@@ -228,6 +228,18 @@ Proposal:
   - Pure check `core/voice.ts` (`checkSonioxKey`, `keyShapeProblem`) has unit tests. The same code serves mobile with its own `fetch`.
 - **UX:** a mic codicon in the prompt box (keyboard `Ctrl+Alt+V`). Click to start and click again or Esc to stop. A small level meter and the active language (`বাংলা + EN`) are shown while recording. Partial text is grey, and nothing is auto-sent.
 
+### Follow-ups 0.3.2 (2026-11-06)
+- **Silent mic → explained, not empty.** Salim's first try showed a red mic and no text. Soniox itself works: synthetic speech through `DictationSession` gives the full sentence.
+  - The likely cause on Windows is the "Let desktop apps access your microphone" setting, or a muted or wrong default device. In those cases the recorder delivers zeros.
+  - Now, if the peak level stays below 8 after 2 s, the recording ends with that hint.
+  - A recording that ends without text always gives a reason: no audio, silence, no answer from Soniox, or "no words heard".
+  - Each recording logs frames, peak level, Soniox answers and character count in both output channels.
+- **Choose microphone:** the companion command `OpenCode Voice: Choose Microphone` lists devices in a short-lived recorder process. The choice is saved by name, not index, because indexes change when devices are plugged in.
+- **Session list by project (Windows colleague):** the log showed 1 session while the web app showed several.
+  - `location.get` echoed VS Code's `d:\…` while the project lives at `D:\…`.
+  - Lists now use `session.list({ project })`, with the project id from `location.get`, and keep sessions started in this folder or any subfolder (`withinDirectory`).
+  - New sessions use the project's spelling of the folder.
+
 ### Background workers as a floating panel (0.3.1, Salim, 2026-11-06)
 - The "Background · N workers" row under the header took more space as workers grew. It is now a small chip in the header next to **+**, showing `running/total` with a spinner while any worker runs, or the count with a robot icon.
 - Clicking the chip opens the same list as a floating panel under the header, over the transcript, up to 50vh tall with scrolling. Escape, a click outside, or opening a worker closes it.

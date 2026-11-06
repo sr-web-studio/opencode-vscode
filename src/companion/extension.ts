@@ -12,6 +12,9 @@ import type { SessionUpdate } from "./session"
  * It never sees the user's Soniox key: each recording gets a short-lived key from the OpenCode extension.
  */
 
+const DEVICE_KEY = "opencode.voice.device"
+const CHOOSE_COMMAND = "opencode.companion.voice.chooseMicrophone"
+
 const SUPPORTED = new Set(["win32/x64", "win32/arm64", "darwin/x64", "darwin/arm64", "linux/x64"])
 
 let current: { id: string; child: ChildProcess; done: boolean } | undefined
@@ -28,6 +31,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand(COMPANION.ping, (): CompanionInfo => ({ version, capture, problem: capture ? undefined : `Voice recording is not available on ${platform}.` })),
     vscode.commands.registerCommand(COMPANION.start, (args: VoiceStartArgs) => start(context, args)),
     vscode.commands.registerCommand(COMPANION.stop, (id?: string) => stop(id)),
+    vscode.commands.registerCommand(CHOOSE_COMMAND, () => chooseMicrophone(context)),
     { dispose: () => kill() },
   )
 }
@@ -40,9 +44,62 @@ function feed(update: VoiceFeed): void {
   void vscode.commands.executeCommand(VOICE_FEED_COMMAND, update).then(undefined, (e) => log.warn(`feed failed: ${e instanceof Error ? e.message : e}`))
 }
 
-function start(context: vscode.ExtensionContext, args: VoiceStartArgs): boolean {
+/** List the microphones in a short-lived recorder process (the native library never loads in the extension host). */
+function listDevices(context: vscode.ExtensionContext): Promise<{ devices: string[]; error?: string }> {
+  return new Promise((resolve) => {
+    let child: ChildProcess
+    try {
+      child = fork(join(context.extensionPath, "dist", "recorder.js"), [], { env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" }, stdio: ["ignore", "ignore", "pipe", "ipc"] })
+    } catch (e) {
+      return resolve({ devices: [], error: e instanceof Error ? e.message : String(e) })
+    }
+    let stderr = ""
+    child.stderr?.on("data", (b: Buffer) => (stderr = (stderr + b.toString()).slice(-1000)))
+    const timer = setTimeout(() => child.kill(), 10_000)
+    child.on("message", (m: { kind?: string; devices?: string[]; error?: string }) => {
+      if (m?.kind === "devices") resolve({ devices: m.devices ?? [], error: m.error })
+    })
+    child.on("exit", () => {
+      clearTimeout(timer)
+      resolve({ devices: [], error: stderr.trim().split("\n").pop() || "the recorder process ended" })
+    })
+    child.send({ type: "devices" })
+  })
+}
+
+type SavedDevice = { name: string } | undefined
+
+async function chooseMicrophone(context: vscode.ExtensionContext): Promise<void> {
+  const { devices, error } = await listDevices(context)
+  if (error || devices.length === 0) {
+    void vscode.window.showErrorMessage(`OpenCode Voice: no microphone found${error ? ` (${error})` : ""}.`)
+    return
+  }
+  const saved = context.globalState.get<SavedDevice>(DEVICE_KEY)
+  const items: Array<vscode.QuickPickItem & { name?: string }> = [
+    { label: "System default", description: !saved ? "current" : undefined },
+    ...devices.map((name) => ({ label: name, name, description: saved?.name === name ? "current" : undefined })),
+  ]
+  const pick = await vscode.window.showQuickPick(items, { title: "OpenCode Voice: microphone", placeHolder: "Which microphone should voice input use?" })
+  if (!pick) return
+  await context.globalState.update(DEVICE_KEY, pick.name ? { name: pick.name } : undefined)
+  log.info(`Microphone: ${pick.name ?? "system default"}`)
+}
+
+/** The chosen microphone's index now (indexes change when devices are plugged in); -1 = system default. */
+async function deviceIndex(context: vscode.ExtensionContext): Promise<number> {
+  const saved = context.globalState.get<SavedDevice>(DEVICE_KEY)
+  if (!saved) return -1
+  const { devices } = await listDevices(context)
+  const i = devices.indexOf(saved.name)
+  if (i < 0) log.warn(`Microphone “${saved.name}” is not connected; using the system default.`)
+  return i
+}
+
+async function start(context: vscode.ExtensionContext, args: VoiceStartArgs): Promise<boolean> {
   if (!args?.id || !args.key) return false
   if (current && !current.done) stop(current.id)
+  const device = await deviceIndex(context)
   const script = join(context.extensionPath, "dist", "recorder.js")
   let child: ChildProcess
   try {
@@ -61,7 +118,11 @@ function start(context: vscode.ExtensionContext, args: VoiceStartArgs): boolean 
   child.on("message", (u: SessionUpdate) => {
     if (u.kind === "done") run.done = true
     if (u.kind === "listening") log.info(`Listening${u.device ? ` on ${u.device}` : ""}`)
-    if (u.kind === "done" && u.error) log.warn(u.error)
+    if (u.kind === "done") {
+      const st = u.stats
+      if (st) log.info(`Recording ended: ${st.frames} frames (${(st.frames / 10).toFixed(1)} s), peak level ${st.peak}/32767, ${st.answers} answers from Soniox, ${u.final.length} characters heard`)
+      if (u.error) log.warn(u.error)
+    }
     feed({ id: run.id, ...u } as VoiceFeed)
   })
   child.on("exit", (code, signal) => {
@@ -72,7 +133,7 @@ function start(context: vscode.ExtensionContext, args: VoiceStartArgs): boolean 
     const why = stderr.trim().split("\n").filter(Boolean).pop() ?? `exit ${code ?? signal}`
     feed({ id: run.id, kind: "done", final: "", error: `The recorder stopped unexpectedly (${why.slice(0, 200)}).` })
   })
-  child.send({ type: "start", key: args.key, model: args.model, languages: args.languages })
+  child.send({ type: "start", key: args.key, model: args.model, languages: args.languages, deviceIndex: device })
   return true
 }
 
