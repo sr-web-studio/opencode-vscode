@@ -6,7 +6,7 @@
   import { moment, turnStamp, type TimeEnv } from "../../core/turn-time"
   import { keepAnchored } from "../anchor"
   import { useStore, useTranscript } from "../context"
-  import Chip from "./Chip.svelte"
+  import SentFiles from "./SentFiles.svelte"
   import Codicon from "./Codicon.svelte"
   import Markdown from "./Markdown.svelte"
   import StepList from "./StepList.svelte"
@@ -68,9 +68,7 @@
           ><Codicon name="discard" /></button>
         {/if}
         {#if turn.user.text}<div class="text">{turn.user.text}</div>{/if}
-        {#if turn.user.files?.length}
-          <div class="chips">{#each turn.user.files as f, i (i)}<Chip name={f.name} mime={f.mime} />{/each}</div>
-        {/if}
+        {#if turn.user.files?.length}<SentFiles files={turn.user.files} />{/if}
       </div>
     </div>
   {/if}
@@ -103,7 +101,6 @@
   .uwrap:hover .utime, .uwrap:focus-within .utime, .utime.always { opacity: 1; }
   .user { position: relative; padding: 10px 14px; border: 1px solid var(--oc-user-line); background: var(--oc-user-bg); border-radius: 8px; }
   .text { white-space: pre-wrap; word-break: break-word; }
-  .chips { display: flex; flex-wrap: wrap; gap: 0.4em; margin-top: 0.5em; }
   /* On the bubble's top-left corner, only on hover. */
   .revert { position: absolute; top: -10px; left: -10px; display: inline-flex; align-items: center; padding: 0.15em 0.3em; border-radius: 50%; color: var(--oc-muted); background: var(--oc-popover); border: 1px solid var(--oc-hairline); opacity: 0; }
   .user:hover .revert, .revert:focus-visible { opacity: 1; }

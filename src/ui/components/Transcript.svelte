@@ -11,7 +11,7 @@
   import { currentPrompt, promptLabel, promptPosition, type PromptPosition } from "../../core/sticky"
   import { startsDay } from "../../core/turn-time"
   import { useStore } from "../context"
-  import Chip from "./Chip.svelte"
+  import SentFiles from "./SentFiles.svelte"
   import Codicon from "./Codicon.svelte"
   import PermissionPrompt from "./PermissionPrompt.svelte"
   import Turn from "./Turn.svelte"
@@ -198,7 +198,7 @@
           <div class="queued">
             <div class="user">
               {#if q.text}<div>{q.text}</div>{/if}
-              {#if q.files?.length}<div class="chips">{#each q.files as f, i (i)}<Chip name={f.name} mime={f.mime} />{/each}</div>{/if}
+              {#if q.files?.length}<SentFiles files={q.files} />{/if}
             </div>
             <div class="muted small qlabel">Queued</div>
           </div>
@@ -241,7 +241,6 @@
   .queued { opacity: 0.75; margin: 0 0 var(--oc-turn-gap) max(32px, 15%); }
   .qlabel { text-align: right; margin: 2px 2px 0; }
   .user { padding: 10px 14px; border: 1px solid var(--oc-user-line); background: var(--oc-user-bg); border-radius: 8px; white-space: pre-wrap; word-break: break-word; }
-  .chips { display: flex; flex-wrap: wrap; gap: 0.4em; margin-top: 0.5em; }
   .orphan { display: flex; gap: 0.6em; align-items: baseline; flex-wrap: wrap; border-left: 2px solid var(--oc-amber); padding-left: 0.5em; margin: 0.4em 0; }
   .label { font-weight: 600; }
   .target { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
