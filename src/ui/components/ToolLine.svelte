@@ -8,7 +8,7 @@
   import { askedQuestions, editStats, rowAction, rowTitle, summarizeTool } from "../../core/transcript/tools"
   import type { ToolItem } from "../../core/transcript/types"
   import { displayName } from "../../core/names"
-  import { toolChildID } from "../../core/workers"
+  import { modelLabel, modelTitle, toolChildID } from "../../core/workers"
   import { keepAnchored } from "../anchor"
   import { useStore, useTranscript } from "../context"
   import Codicon from "./Codicon.svelte"
@@ -38,6 +38,7 @@
   const worker = $derived(isWorker ? view.workers().find((w) => w.toolIDs.includes(tool.id)) : undefined)
   const childID = $derived(isWorker ? (toolChildID(tool) ?? worker?.sessionID) : undefined)
   const workerStatus = $derived(worker?.status ?? (active ? "running" : tool.status === "error" ? "failed" : "done"))
+  const workerModel = $derived(modelLabel(worker?.model, view.models(), { short: true }))
   const agentName = $derived(typeof tool.input.agent === "string" && tool.input.agent ? displayName(tool.input.agent) : "Agent")
 
   const str = (v: unknown) => (typeof v === "string" ? v : "")
@@ -96,6 +97,7 @@
       {/if}
       <span class="tail">
         {#if isWorker}
+          {#if workerModel}<span class="wmodel muted" title={modelTitle(worker?.model)}>{workerModel}</span>{/if}
           <span class="status" class:ok={workerStatus === "done"} class:bad={workerStatus === "failed"} class:muted={workerStatus === "running" || workerStatus === "stopped"}>
             {workerStatus === "running" ? "Running" : workerStatus === "done" ? "Done" : workerStatus === "failed" ? "Failed" : "Stopped"}
           </span>
@@ -172,6 +174,7 @@
   .row.acts:hover .goes, .row.acts:has(.main:focus-visible) .goes { color: var(--oc-accent); text-decoration: underline; }
   .prompt-sign { color: var(--oc-muted); font-weight: 700; font-family: var(--vscode-editor-font-family, monospace); }
   .cmd-chip { font-family: var(--vscode-editor-font-family, monospace); font-size: 0.92em; background: var(--oc-code-bg); padding: 0.05em 0.45em; border-radius: 4px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 36em; }
+  .wmodel { font-size: 0.9em; max-width: 9em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .badge, .status, .result { font-size: 0.9em; white-space: nowrap; }
   .badge { border: 1px solid currentColor; border-radius: 999px; padding: 0 0.5em; line-height: 1.5; }
   .ok { color: var(--oc-ok); }

@@ -23,6 +23,7 @@ import { CommandCatalog } from "./commands"
 import { McpManager, type McpHost } from "./mcp"
 import { commandBlock, isClientCommand, isEmptySession, parseSlash } from "./slash"
 import { deriveWorkers, type ChildSession } from "./workers"
+import { addHidden, clearable, forgetSession, normalizeHidden, pruneHidden, removeHidden, type HiddenWorkers } from "./worker-hidden"
 
 export type ControllerOptions = {
   directory: string
@@ -49,6 +50,8 @@ export type Observer = {
 
 const EMIT_MS = 30
 const LAST_SESSION_KEY = "lastSession"
+const HIDDEN_WORKERS_KEY = "hiddenWorkers"
+const CHILD_PAGE = 200
 
 
 /**
@@ -115,7 +118,18 @@ export class Controller {
   /** The server's project of this folder. Session lists use it: it matches every spelling of the folder. */
   private projectID?: string
 
-  constructor(private readonly opts: ControllerOptions) {}
+  /** Workers the user removed from the panel, per parent session. Only this list changes; server sessions are untouched. */
+  private hidden: HiddenWorkers
+
+  constructor(private readonly opts: ControllerOptions) {
+    this.hidden = normalizeHidden(opts.storage?.get(HIDDEN_WORKERS_KEY))
+  }
+
+  private setHidden(next: HiddenWorkers): void {
+    if (next === this.hidden) return
+    this.hidden = next
+    this.opts.storage?.set(HIDDEN_WORKERS_KEY, next)
+  }
 
   /** The project folder as the server spells it, once known; the workspace folder until then. */
   private get dir(): string {
@@ -162,6 +176,7 @@ export class Controller {
       draftEpoch: this.draftEpoch,
       readOnly: false,
       workers: this.workers(),
+      hiddenWorkers: id ? (this.hidden[id] ?? []) : [],
       runningShells: this.runningShells(),
       pins: this.pins(),
       features: detectFeatures(this.client, this.connection.version, this.broken),
@@ -189,6 +204,26 @@ export class Controller {
 
   private workers() {
     return deriveWorkers({ view: this.feed.view, children: this.childList(), running: this.running })
+  }
+
+  /** "x" and "Clear done": hide finished workers of the current session. Running ones are skipped. */
+  private hideWorkers(keys: readonly string[]): void {
+    const id = this.currentSessionID
+    if (!id) return
+    const allowed = new Set(clearable(this.workers()).map((w) => w.key))
+    const picked = keys.filter((k) => allowed.has(k))
+    if (picked.length === 0) return
+    this.setHidden(addHidden(this.hidden, id, picked))
+    this.emitNow()
+  }
+
+  /** A worker that runs again shows again, and stays visible once it finishes. */
+  private unhideRunning(): void {
+    const id = this.currentSessionID
+    const stored = id ? this.hidden[id] : undefined
+    if (!id || !stored) return
+    const running = this.workers().filter((w) => w.status === "running" && stored.includes(w.key)).map((w) => w.key)
+    if (running.length) this.setHidden(removeHidden(this.hidden, id, running))
   }
 
   private runningShells(): number {
@@ -422,6 +457,8 @@ export class Controller {
         this.running.delete(d.sessionID)
         this.permissions.delete(d.sessionID)
         this.forms.delete(d.sessionID)
+        this.children.delete(d.sessionID)
+        this.setHidden(forgetSession(this.hidden, d.sessionID))
         if (this.currentSessionID === d.sessionID) await this.showDefaultTarget()
         break
       case "session.archived":
@@ -433,10 +470,13 @@ export class Controller {
         break
       case "session.model.selected":
         this.sessions = this.sessions.map((s) => (s.id === d.sessionID ? { ...s, model: d.model } : s))
+        // A worker's own model change shows in the panel too.
+        if (this.children.has(d.sessionID)) this.children.set(d.sessionID, { ...this.children.get(d.sessionID)!, model: d.model })
         break
       case "session.execution.started":
         this.running.add(d.sessionID)
         this.touch(d.sessionID, ev.created)
+        if (this.children.has(d.sessionID)) this.unhideRunning()
         break
       case "session.execution.succeeded":
       case "session.execution.failed":
@@ -542,9 +582,11 @@ export class Controller {
   private async loadChildren(client: OpenCodeClient, parentID: string): Promise<void> {
     try {
       // The parent id alone picks the children; no folder filter, so a differently spelled path cannot hide them.
-      const res = await client.session.list({ parentID, limit: 200 })
+      const res = await client.session.list({ parentID, limit: CHILD_PAGE })
       for (const [id, c] of this.children) if (c.parentID === parentID) this.children.delete(id)
       for (const c of res.data) if (c.parentID === parentID) this.children.set(c.id, c)
+      // Hidden keys of children the server no longer has are dropped (only when the list is complete).
+      this.setHidden(pruneHidden(this.hidden, parentID, res.data.map((c) => c.id), res.data.length < CHILD_PAGE))
     } catch {
       // Older server or a transient error: the Background row then relies on the tool lines alone.
     }
@@ -641,6 +683,7 @@ export class Controller {
     if (this.currentSessionID !== id) return
     await Promise.all([this.loadChildren(client, id), this.loadRevert(client, id)])
     await this.refreshChildRunning(client)
+    this.unhideRunning()
     this.emitNow()
   }
 
@@ -685,6 +728,8 @@ export class Controller {
           return await this.rename(action.id, action.title)
         case "togglePin":
           return this.togglePin(action.key)
+        case "hideWorkers":
+          return this.hideWorkers(action.keys)
         case "revert":
           return await this.revert(action.messageID)
         case "redo":

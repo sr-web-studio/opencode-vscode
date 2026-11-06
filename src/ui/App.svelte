@@ -4,6 +4,8 @@
   import { todoBar } from "../core/todo"
   import { isRunning } from "../core/transcript/reducer"
   import { showEmptyState } from "../core/draft"
+  import { modelLabel, modelTitle } from "../core/workers"
+  import { visibleWorkers } from "../core/worker-hidden"
   import type { HostBridge } from "./bridge"
   import { provideStore, provideTranscript } from "./context"
   import { Store } from "./store.svelte"
@@ -51,11 +53,14 @@
   const running = $derived(!!app && isRunning(app.view))
   provideTranscript({
     workers: () => app?.workers ?? [],
+    models: () => app?.models ?? [],
     features: () => app?.features ?? { revert: false, rename: false },
     readOnly: () => app?.readOnly ?? false,
     displayPath: () => app?.displayPath ?? "",
     running: () => running || (!!app && app.target.kind === "session" && app.running.includes(app.target.id)),
   })
+  const shownWorkers = $derived(app ? visibleWorkers(app.workers, app.hiddenWorkers).length : 0)
+  const workerModel = $derived(app?.readOnly ? modelLabel(app.model, app.models) : "")
   const todos = $derived(app ? todoBar(app.view, running || (app.target.kind === "session" && app.running.includes(app.target.id))) : undefined)
 
   function suggest(text: string) {
@@ -71,12 +76,17 @@
     <Setup connection={app.connection} />
   {:else}
     {#if app.readOnly}
-      <header class="wtitle"><Codicon name="robot" /> <span class="wname">{app.workerTitle ?? "Worker"}</span> <span class="muted small">Read-only</span></header>
+      <header class="wtitle">
+        <Codicon name="robot" />
+        <span class="wname">{app.workerTitle ?? "Worker"}</span>
+        {#if workerModel}<span class="wmodel muted small" title={modelTitle(app.model)}>{workerModel}</span>{/if}
+        <span class="muted small wro">Read-only</span>
+      </header>
     {:else}
       <SessionSwitcher {app} hasDraftText={draft.trim().length > 0}>
         {#snippet extra()}
-          {#if app.workers.length > 0 || app.runningShells > 0}
-            <WorkersRow workers={app.workers} shells={app.runningShells} />
+          {#if shownWorkers > 0 || app.runningShells > 0}
+            <WorkersRow workers={app.workers} hidden={app.hiddenWorkers} models={app.models} shells={app.runningShells} />
           {/if}
         {/snippet}
       </SessionSwitcher>
@@ -117,4 +127,6 @@
   .qwrap { padding: 0.3em var(--oc-side) 0.7em; max-height: 65vh; overflow-y: auto; }
   .wtitle { display: flex; align-items: center; gap: 0.5em; padding: 0.5em var(--oc-side); border-bottom: 1px solid var(--oc-hairline); font-weight: 600; }
   .wname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .wmodel { flex: none; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 400; }
+  .wro { flex: none; margin-left: auto; font-weight: 400; }
 </style>
