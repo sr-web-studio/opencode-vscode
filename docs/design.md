@@ -47,6 +47,75 @@ Chosen UI direction: `docs/mockups/v2/` (compact, Claude Code style). The first 
 
   The normal prompt box and agent/model footer stay at the bottom.
 
+## Notifications (added 2026-11-06)
+
+Goal: tell Salim when OpenCode needs his attention or when work has finished. Use an OS-level notification where possible, otherwise a VS Code notification.
+
+### Triggers
+
+| Kind | Event | Default |
+| --- | --- | --- |
+| Needs attention: permission | `permission.asked` | on |
+| Needs attention: question | `form.created` | on |
+| Turn finished | `session.execution.succeeded` on a root session | on |
+| Turn failed | `session.execution.failed` on a root session | on |
+| Worker finished | `session.execution.succeeded/failed` on a child session (`parentID` set) | off |
+| Background shell finished | `shell.exited` for a shell whose `metadata.sessionID` belongs to this project | off |
+
+Rules:
+- Only notify for sessions of this window's project (location), so several VS Code windows don't duplicate each other.
+- Suppress when the window is focused AND that session is visible in the panel (`vscode.window.state.focused` + view visibility). Setting `opencode.notifications.whenFocused` (`"never" | "always"`, default `"never"`).
+- An attention notification clears itself when `permission.replied` / `form.replied` / `form.cancelled` arrives, for example after answering from another client.
+- Coalesce bursts: at most one notification per session every 5 s; a later attention event replaces an earlier one.
+- Actions: attention → `Open` (focus the panel and session), plus `Allow` / `Deny` for permissions. Finished → `Open`.
+- Settings: `opencode.notifications.enabled` (default `true`), `opencode.notifications.attention`, `.completed`, `.failed`, `.workers`, `.shells` (booleans with the defaults above), `opencode.notifications.os` (`"auto" | "off"`).
+
+### Delivery: where an OS notification is possible
+
+The extension host runs on the office server (Remote SSH). An OS notification sent from there would appear on the server, not on the laptop. VS Code has no stable API that lets extensions show OS notifications. Built-in chat has `chat.notifyWindowOnConfirmation`, but third-party access is still only a feature request (microsoft/vscode#346215).
+
+1. **VS Code notification (always, M1):** `showWarningMessage` for attention and `showInformationMessage` for finished, both with actions. These only appear inside the VS Code window.
+2. **OS notification on the laptop (option):** a tiny companion extension `opencode-vscode-notifier` with `extensionKind: ["ui"]`, so it runs on the laptop side. The main extension calls its command (`opencode.notifier.show`); commands work across extension hosts. The companion shows a native toast (Windows toast via PowerShell / WinRT, macOS `osascript`, Linux `notify-send`). Clicking it focuses VS Code through a `vscode://` URI handler. The main extension lists the companion in `extensionPack`, so one install brings both. If the companion is missing, delivery falls back to option 1.
+3. **Push through the OpenCode server (shared with the mobile app):** see *Mobile app* below. This also works when VS Code is closed.
+
+Notifications from the extension only exist while VS Code is open. Once the mobile app exists, push covers the rest.
+
+## Mobile app (Salim's "Phase 2", added 2026-11-06)
+
+The same UI as a phone app, without VS Code-specific actions. It is a client of the same OpenCode server reached over LAN, Tailscale or a public domain.
+
+### Scope
+
+- **All projects:** `project.list` (`GET /api/project`) → project list → `session.list` filtered by `project`/`directory` → the same transcript and controls as the extension. There is no fixed workspace folder.
+- **Removed or replaced:** open file in editor → read-only file/diff viewer from `session.diff` and tool metadata. VS Code terminal → read-only shell output view (`/api/shell/{id}/output`) with Stop. Status bar → connection indicator in the header.
+- **Kept:** transcript, agent/model footer, permission line, question chooser, session switcher, todo bar, drafts, workers list.
+
+### Connection and QR pairing
+
+- `opencode pair` already prints one-time links (single use, expire in 5 minutes) and a QR code. The link is `<server-url>/auth/connect/<code>`. `GET` with `Accept: application/json` returns `{ token }`, which is then used as the password. Sessions last 30 days, and changing the server password signs every client out.
+- The app has a QR scanner, plus manual entry of a URL and password. It saves several connection profiles in secure storage.
+- The VS Code extension gets a command **"OpenCode: Pair mobile device"**. It calls `POST /api/pair`, lets the user pick a reachable URL from `server.info.urls` (LAN / Tailscale) or a custom public URL, and shows the QR code in a webview with a 5-minute countdown.
+- `opencode pair --remote` (OpenTunnel) exposes the server to the internet. The app and the extension never trigger it themselves.
+
+### Push notifications
+
+The event stream is live-only, and a phone app in the background cannot keep it open. Push must therefore come from the server side: an **OpenCode server plugin** (`opencode-push`, in this repo) subscribes with `ctx.event.subscribe({ types: [...] })` to the trigger events above and sends pushes. The plugin is installed by Salim explicitly. The extension and the app never edit OpenCode config.
+
+Push channel options (decision pending):
+- **ntfy** (self-hosted or ntfy.sh): the plugin POSTs to a private topic, and the ntfy app shows the push with a click URL that deep-links into our app. No Firebase account or store account is needed.
+- **FCM (Android) / APNs (iOS):** native push inside our app. Needs a Firebase project, plus an Apple developer account for iOS. The plugin stores device tokens.
+- **Web Push (VAPID):** only if the app is a PWA. iOS supports it only for installed PWAs.
+
+To verify before building: whether a server plugin can expose a route or RPC for device registration (`rpc.*` events exist), and where plugin secrets live.
+
+### Code sharing (applies to M1 already)
+
+- `core`: API/state layer on `@opencode/client` (root entry only, no `node:` imports), reducers, form logic, grouping. No `vscode` imports. It can run in a browser webview.
+- `ui`: Svelte components that talk to the host only through a `HostBridge` interface (`openFile`, `openDiff`, `showTerminal`, `openExternal`, `notify`, `storage`, `postToHost`). VS Code and mobile each implement the bridge.
+- Splitting into a `packages/core`, `packages/ui`, `apps/vscode`, `apps/mobile` workspace happens at mobile kickoff. M1 only keeps these boundaries clean.
+
+Existing community clients for reference: OpenCode Mobile (getopencode.app; uses `opencode pair` QR) and `doza62/opencode-mobile` (Expo; push plugin plus QR).
+
 ## Decision: interactive input
 
 Option A. v1 provides live output, Stop and Background for agent shell commands. Interactive stdin is deferred until the persistent PTY path is confirmed.
@@ -77,7 +146,7 @@ Option A. v1 provides live output, Stop and Background for agent shell commands.
 | Prompt, agent, model, variant | `session.prompt`, `session.switchAgent`, `session.switchModel`, `agent.list`, `model.list`, `command.list`, `skill.list` | Pickers show what OpenCode reports and nothing else |
 | Open file links | Tool input/metadata paths → `vscode.window.showTextDocument` | |
 | Diffs | `session.diff` (`FileDiff.Info.patch`) → virtual "before" document + `vscode.diff` | Show per turn and for the whole session |
-| Permissions / questions | `permission.asked` → `session.permission.reply`; `form.created` → `session.form.reply` | Inline cards, optionally a native notification |
+| Permissions / questions | `permission.asked` → `session.permission.reply`; `form.created` → `session.form.reply` | Inline line (see Controls) and a notification (see Notifications) |
 | Shell commands in the terminal panel | `shell.created/exited` events, `GET /api/shell` (`metadata.sessionID`), `GET /api/shell/{id}/output` cursor paging → `vscode.Pseudoterminal` | One VS Code terminal per agent command, named `OpenCode: <cmd>` |
 | Stop a command | `DELETE /api/shell/{id}`, or `session.interrupt` | |
 | Move to background | `POST /api/session/{id}/background` | |
@@ -102,12 +171,16 @@ Options:
 - Webview UI: Svelte + Tailwind using VS Code theme CSS variables (`--vscode-*`), so the UI follows the user's theme.
 - `@opencode/client` for every API call. No hand-written HTTP client.
 
-## Build phases
+## Extension milestones (M1–M5)
 
-1. Scaffold + connection layer + status bar + session list/switch + chat view (read and send).
-2. Tool cards: file links, diff view, permission/question cards.
-3. Terminal mirror for shell tools (output, Stop, Background).
-4. Workers tree + worker editor tabs.
-5. Polish, settings (server URL, password stored in `SecretStorage`), packaging, README, publish decision.
+These are milestones of the VS Code extension. They are not the same as Salim's "Phase 2", which is the mobile app. Branch `phase-1` = M1.
 
-Each phase is a separate brief for a Sonnet 5.5 (high) developer worker, with a review after it.
+1. M1: scaffold, connection, status bar, session switcher, transcript, controls, todo bar, drafts and empty state, VS Code notifications. Keep the core/UI/bridge boundaries.
+2. M2: native diffs, file links polish.
+3. M3: terminal mirror for shell tools (output, Stop, Background).
+4. M4: workers list + worker editor tabs, OS notifications (companion), "Pair mobile device" command.
+5. M5: polish, remote server settings (password in `SecretStorage`), packaging, README, publish decision.
+
+Product phase 2 (mobile): workspace split, `opencode-push` server plugin, mobile app.
+
+Each milestone is a separate brief for a Sonnet 5.5 (high) developer worker, with a review after it.
