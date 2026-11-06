@@ -132,6 +132,21 @@ Salim installed the M1 vsix locally on Windows (OpenCode 2.1.4 there, workspace 
       - Fix: the todo bar is absolutely positioned over the transcript, anchored to the bottom of the transcript area just above the prompt box, with its own background and a shadow. The transcript runs underneath it.
       - The transcript gets bottom padding equal to the bar's measured height (ResizeObserver), so the last line can still scroll into view above it.
       - The jump-to-end button sits above the bar.
+    - **Fewer terminals, clearer commands:**
+      - Today every shell tool call opens its own terminal, so a working agent floods the terminal list.
+      - New default `opencode.terminal.mode = "session"`: one terminal per session, named `OpenCode: <session title>`, or `OpenCode (<agent>): <worker title>` for a worker.
+        - Each new command is appended to the same terminal.
+        - Only when a command starts while another one in that session is still running does it get a temporary extra terminal (`… #2`). The extra terminal is reused later and closed when `maxOpen` is reached.
+      - `"perCommand"` keeps today's behaviour.
+      - Each command in the terminal is a clearly separate block:
+        - a blank line, then a dim full-width rule with the time on the right: `──────── 12:33:05`
+        - the command line: a bold cyan `❯`, then the command in bold default color, wrapped for long commands
+        - the cwd (dim, `~` shortened) when it differs from the previous command's
+        - one blank line, then the output as-is
+        - the end line: `✓ exit 0 · 1.2s` in green or `✗ exit 1 · 0.4s` in red, with `stopped` or `timed out` in yellow
+      - The whole block is pure text in `terminal-text.ts`, with tests for the exact bytes.
+      - "Show terminal" on a tool line focuses the session terminal. It does not scroll to the block; the Pseudoterminal API has no scroll control, and that is acceptable.
+      - After a reload, re-attaching running shells appends to the session terminal the same way.
 10. **Edit session title**: a pencil icon on hover next to the header title (and F2 / double-click) turns it into an inline input. Enter saves via `session.update({ title })`, and Esc cancels. The session dropdown rows also get a rename action on hover.
 
 ## Voice input (proposed 2026-11-06, decision pending)
