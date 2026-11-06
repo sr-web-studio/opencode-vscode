@@ -20,6 +20,8 @@ const PINS_KEY = "opencode.pinnedModels"
 export function activate(context: vscode.ExtensionContext): void {
   const folder = vscode.workspace.workspaceFolders?.[0]
   const directory = folder?.uri.fsPath ?? ""
+  const output = vscode.window.createOutputChannel("OpenCode", { log: true })
+  context.subscriptions.push(output)
 
   const controller = new Controller({
     directory,
@@ -35,6 +37,7 @@ export function activate(context: vscode.ExtensionContext): void {
       get: () => context.globalState.get<string[]>(PINS_KEY, []),
       set: (pins) => void context.globalState.update(PINS_KEY, pins),
     },
+    log: (line) => output.info(line),
   })
   context.globalState.setKeysForSync([PINS_KEY])
   controller.setSettings(readViewSettings())

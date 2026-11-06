@@ -25,6 +25,21 @@ export function shortenHome(path: string, home: string | undefined): string {
   return path
 }
 
+export const isWindowsPath = (p: string): boolean => /^[A-Za-z]:/.test(p) || p.startsWith("\\\\")
+
+/**
+ * The same directory, as the server and VS Code may spell it: separators, trailing slashes, and on Windows the case
+ * (VS Code reports `d:\Work`, the server stores `D:\Work`).
+ */
+export function sameDirectory(a: string | undefined, b: string | undefined): boolean {
+  if (!a || !b) return false
+  const clean = (p: string) => normalize(p).replace(/(?<=.)\/+$/, "")
+  const x = clean(a)
+  const y = clean(b)
+  if (x === y) return true
+  return (isWindowsPath(a) || isWindowsPath(b)) && x.toLowerCase() === y.toLowerCase()
+}
+
 export function folderName(path: string): string {
   const parts = normalize(path).replace(/\/+$/, "").split("/")
   return parts[parts.length - 1] || path

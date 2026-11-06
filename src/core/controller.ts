@@ -14,6 +14,7 @@ import {
   type ViewSettings,
 } from "./protocol"
 import { isRoot, upsertSession } from "./sessions"
+import { isWindowsPath, sameDirectory } from "./paths"
 import { isRunning } from "./transcript/reducer"
 import { applyRevertEvent, revertFromServer, revertedPrompt } from "./transcript/revert"
 import { toPromptFiles, type PromptFile } from "./attachments"
@@ -29,6 +30,8 @@ export type ControllerOptions = {
   onEvent?: (ev: EventEnvelope) => void
   /** Pinned models. The host keeps them in `globalState`; they are never written to OpenCode config. */
   pins?: { get(): string[]; set(pins: string[]): void }
+  /** Diagnostics for the output channel. Never given secrets or message text. */
+  log?: (line: string) => void
 }
 
 /** Something that follows the event stream: worker tabs, the terminal mirror. */
@@ -89,7 +92,15 @@ export class Controller {
   private abort?: AbortController
   private synced = false
 
+  /** The server's spelling of the project folder (`location.get`), which can differ from VS Code's (e.g. `d:` vs `D:`). */
+  private serverDirectory?: string
+
   constructor(private readonly opts: ControllerOptions) {}
+
+  /** The project folder as the server spells it, once known; the workspace folder until then. */
+  private get dir(): string {
+    return this.serverDirectory ?? this.opts.directory
+  }
 
   /* ------------------------------------------------------------ observation */
 
@@ -106,7 +117,7 @@ export class Controller {
     return {
       connection: this.connection,
       settings: this.settings,
-      directory: this.opts.directory,
+      directory: this.dir,
       folderName: this.opts.folderName,
       displayPath: this.opts.displayPath,
       target: this.target,
@@ -177,7 +188,7 @@ export class Controller {
 
   /** Directory a session lives in. Shell calls use the session's own location. */
   locationOf(sessionID: string): { directory: string } {
-    return { directory: this.sessionMeta(sessionID)?.directory ?? this.opts.directory }
+    return { directory: this.sessionMeta(sessionID)?.directory ?? this.dir }
   }
 
   /** Pending permission requests of any session (worker tabs answer their own). */
@@ -186,7 +197,7 @@ export class Controller {
   }
 
   get directory(): string {
-    return this.opts.directory
+    return this.dir
   }
 
   /** The agent of a worker (child) session, for terminal names. Undefined for the session on screen and other roots. */
@@ -254,7 +265,7 @@ export class Controller {
   async shellSessionID(shellID: string): Promise<string | undefined> {
     if (!this.client) return undefined
     try {
-      const res = await this.client.shell.get({ id: shellID, location: { directory: this.opts.directory } })
+      const res = await this.client.shell.get({ id: shellID, location: { directory: this.dir } })
       const id = res.data.metadata?.sessionID
       return typeof id === "string" ? id : undefined
     } catch {
@@ -327,7 +338,7 @@ export class Controller {
       return
     }
     const dir = ev.location?.directory
-    if (dir && dir !== this.opts.directory) return
+    if (dir && !this.isOurs(dir)) return
     await this.apply(ev)
     this.opts.onEvent?.(ev)
     for (const o of this.observers) o.event?.(ev)
@@ -340,7 +351,7 @@ export class Controller {
       case "session.created": {
         if (!this.client) return
         const s = await this.client.session.get({ sessionID: d.sessionID }).catch(() => undefined)
-        if (!s || s.location?.directory !== this.opts.directory) return
+        if (!s || !this.isOurs(s.location?.directory)) return
         if (isRoot(s)) this.sessions = this.sort(upsertSession(this.sessions, s))
         else this.children.set(s.id, s)
         break
@@ -429,8 +440,8 @@ export class Controller {
   async sync(): Promise<void> {
     const client = this.client
     if (!client) return
-    const loc = { directory: this.opts.directory }
     try {
+      await this.resolveDirectory(client)
       await Promise.all([this.loadSessions(), this.loadPending(client), this.loadCatalog(client), this.loadShells(client)])
       const first = !this.synced
       this.synced = true
@@ -444,15 +455,32 @@ export class Controller {
     } catch (e) {
       this.setConnection({ ...this.connection, status: "error", message: message(e) })
     }
-    void loc
     this.emitNow()
     for (const o of this.observers) o.resync?.()
+  }
+
+  /**
+   * Ask the server how it spells this folder. Session lists filter on the exact stored path, so on Windows a
+   * `d:\\Work` from VS Code would miss sessions stored under `D:\\Work`. Older servers without `location.get` keep the
+   * workspace path.
+   */
+  private async resolveDirectory(client: OpenCodeClient): Promise<void> {
+    if (!this.opts.directory || this.serverDirectory) return
+    try {
+      const info = await client.location.get({ location: { directory: this.opts.directory } })
+      if (typeof info?.directory === "string" && sameDirectory(info.directory, this.opts.directory)) {
+        this.serverDirectory = info.directory
+      }
+      this.opts.log?.(`Folder ${this.opts.directory} → server location ${info?.directory ?? "?"} (project ${info?.project?.id ?? "?"} at ${info?.project?.directory ?? "?"})`)
+    } catch (e) {
+      this.opts.log?.(`location.get failed for ${this.opts.directory}: ${message(e)}. Using the folder path as is.`)
+    }
   }
 
   /** Background shells of this project (`shell.list`). A server without it just has none to show. */
   private async loadShells(client: OpenCodeClient): Promise<void> {
     try {
-      const res = await client.shell.list({ location: { directory: this.opts.directory } })
+      const res = await client.shell.list({ location: { directory: this.dir } })
       this.shells = new Map(res.data.map((i) => [i.id, { sessionID: typeof i.metadata?.sessionID === "string" ? i.metadata.sessionID : undefined, running: i.status === "running" }]))
     } catch {
       this.shells = new Map()
@@ -462,7 +490,8 @@ export class Controller {
   /** Children of a session: `session.list({ parentID })`. Live `session.created` events keep the map current afterwards. */
   private async loadChildren(client: OpenCodeClient, parentID: string): Promise<void> {
     try {
-      const res = await client.session.list({ directory: this.opts.directory, parentID, limit: 200 })
+      // The parent id alone picks the children; no folder filter, so a differently spelled path cannot hide them.
+      const res = await client.session.list({ parentID, limit: 200 })
       for (const [id, c] of this.children) if (c.parentID === parentID) this.children.delete(id)
       for (const c of res.data) if (c.parentID === parentID) this.children.set(c.id, c)
     } catch {
@@ -483,15 +512,25 @@ export class Controller {
     }
   }
 
+  /** A directory from the server is this window's folder, in either spelling. */
+  private isOurs(directory: string | undefined): boolean {
+    return sameDirectory(directory, this.dir) || sameDirectory(directory, this.opts.directory)
+  }
+
   private async loadSessions(): Promise<void> {
     const client = this.client
     if (!client) return
-    const directory = this.opts.directory
-    const [roots, active] = await Promise.all([
-      client.session.list({ directory, parentID: null, limit: 200 }),
+    const [scoped, active] = await Promise.all([
+      client.session.list({ directory: this.dir, parentID: null, limit: 200 }),
       client.session.active(),
     ])
-    this.sessions = this.sort(roots.data.filter((s) => isRoot(s) && s.location.directory === directory))
+    let roots = scoped
+    // The server filters on the exact stored path. On Windows its spelling can still differ (drive letter case, an
+    // older server without `location.get`), so look through the newest sessions of every folder instead.
+    if (roots.data.length === 0 && isWindowsPath(this.dir)) roots = await client.session.list({ parentID: null, limit: 200 })
+    this.sessions = this.sort(roots.data.filter((s) => isRoot(s) && this.isOurs(s.location.directory)))
+    const others = [...new Set(roots.data.filter((s) => !this.isOurs(s.location?.directory)).map((s) => s.location?.directory))]
+    this.opts.log?.(`Sessions: ${this.sessions.length} for this folder of ${roots.data.length} listed for ${this.dir}${others.length ? `; other folders: ${others.slice(0, 5).join(", ")}` : ""}`)
     this.running = new Set(Object.keys(active).filter((id) => this.sessions.some((s) => s.id === id) || this.children.has(id) || this.running.has(id) || id === this.currentSessionID))
     this.sessionsLoaded = true
     if (this.showArchived) await this.loadArchived()
@@ -501,13 +540,12 @@ export class Controller {
   private async loadArchived(): Promise<void> {
     const client = this.client
     if (!client) return
-    const directory = this.opts.directory
-    const res = await client.session.list({ directory, parentID: null, archived: true, limit: 200 })
-    this.archived = this.sort(res.data.filter((s) => isRoot(s) && s.location.directory === directory))
+    const res = await client.session.list({ directory: this.dir, parentID: null, archived: true, limit: 200 })
+    this.archived = this.sort(res.data.filter((s) => isRoot(s) && this.isOurs(s.location.directory)))
   }
 
   private async loadPending(client: OpenCodeClient): Promise<void> {
-    const location = { directory: this.opts.directory }
+    const location = { directory: this.dir }
     const [perms, forms] = await Promise.all([client.permission.request.list({ location }), client.form.list({ location })])
     this.permissions = new Map()
     for (const p of perms.data) this.permissions.set(p.sessionID, [...(this.permissions.get(p.sessionID) ?? []), p])
@@ -516,7 +554,7 @@ export class Controller {
   }
 
   private async loadCatalog(client: OpenCodeClient): Promise<void> {
-    const location = { directory: this.opts.directory }
+    const location = { directory: this.dir }
     const [agents, models, providers, def, config] = await Promise.all([
       client.agent.list({ location }),
       client.model.list({ location }),
@@ -685,11 +723,11 @@ export class Controller {
       this.sending = true
       this.emitNow()
       const created = await client.session.create({
-        location: { directory: this.opts.directory },
+        location: { directory: this.dir },
         agent: this.draftAgent ?? null,
         model: this.draftModel ?? null,
       })
-      this.sessions = this.sort(upsertSession(this.sessions, { ...created, location: created.location ?? { directory: this.opts.directory } } as SessionInfo))
+      this.sessions = this.sort(upsertSession(this.sessions, { ...created, location: created.location ?? { directory: this.dir } } as SessionInfo))
       this.target = { kind: "session", id: created.id }
       this.opts.storage?.set(LAST_SESSION_KEY, created.id)
       this.feed.startEmpty()

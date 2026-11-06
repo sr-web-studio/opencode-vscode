@@ -333,6 +333,14 @@ Option A. v1 provides live output, Stop and Background for agent shell commands.
 - Official client: `@opencode/client`. `@opencode/client/service` provides `Service.discover()`, `Service.ensure()` (starts `opencode serve --service` when needed), and `Service.headers()`.
 - Server API: 170 operations, OpenAPI at `/openapi.json`. Event stream: `GET /api/event`. The client only receives live events, with no replay, so the extension resyncs on `server.connected`.
 - VS Code `1.144.0` is installed on this host. Salim uses VS Code Remote SSH from the laptop, so the extension runs on the office server and reaches `127.0.0.1:4096` directly.
+- **Project folder spelling (0.2.5):**
+  - `session.list({ directory })` matches the stored path exactly. Checked here: a trailing slash or a subfolder returns 0 sessions.
+  - On Windows, VS Code's `fsPath` has a lowercase drive (`d:\Work\…`) while the server stores `D:\Work\…`, so the list was empty even though the browser showed the sessions. Reported 2026-11-06 on a colleague's laptop with a local OpenCode.
+  - The controller now calls `location.get({ location: { directory } })` on connect and uses the server's spelling for every call.
+  - Session, event and notification filters compare paths with `sameDirectory()`: separators and trailing slashes are ignored, and Windows paths compare case-insensitively.
+  - If a Windows folder still lists 0 sessions (for example on an older server), it falls back to the newest 200 sessions of all folders, filtered the same way.
+  - Workers are listed by `parentID` alone.
+  - The output channel "OpenCode" logs the resolved location and session counts, with no message text.
 - Existing extensions: `sst-dev.opencode` is only a terminal launcher. Community options include OpenChamber and ACP Patchbay (ACP). None of them meets the requirements below.
 
 ## Principles

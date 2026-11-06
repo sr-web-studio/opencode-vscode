@@ -1,5 +1,6 @@
 import { clip, firstLine } from "../format"
 import type { EventEnvelope } from "../api"
+import { sameDirectory } from "../paths"
 import {
   isAttention,
   type Notice,
@@ -125,7 +126,7 @@ export class NotificationEngine {
     const meta = opts.meta ?? (await this.deps.session(sessionID))
     // Per-project filter: the event's location wins, then the session's, otherwise skip (not ours).
     const dir = ev.location?.directory ?? meta?.directory
-    if (dir !== this.deps.directory) return
+    if (!sameDirectory(dir, this.deps.directory)) return
 
     const ui = this.deps.ui()
     if (settings.whenFocused === "never" && ui.windowFocused && ui.visibleSessionID === sessionID) return
