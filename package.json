@@ -215,7 +215,9 @@
     "test": "bun test test/unit",
     "test:host": "bun run build && bun test/host/run.mjs",
     "package": "bun run build && vsce package --no-dependencies --out opencode-vscode.vsix",
-    "sanitize-fixtures": "bun scripts/sanitize-fixtures.ts"
+    "sanitize-fixtures": "bun scripts/sanitize-fixtures.ts",
+    "publish:marketplace": "bun tools/publish.ts marketplace",
+    "publish:openvsx": "bun tools/publish.ts openvsx"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "7.3.1",
