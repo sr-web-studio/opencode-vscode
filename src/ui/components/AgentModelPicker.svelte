@@ -2,7 +2,7 @@
   import { tick } from "svelte"
   import { cycleVariant, footerLabel, modelSections, sameModel } from "../../core/models"
   import { pinKey } from "../../core/pins"
-  import { displayName } from "../../core/names"
+  import { displayName, variantName } from "../../core/names"
   import type { AppState } from "../../core/protocol"
   import { useStore } from "../context"
   import { focusGuarded } from "../focus"
@@ -109,7 +109,7 @@
               <button class="pin" class:on={isPinned} onclick={(e) => { e.stopPropagation(); store.dispatch({ type: "togglePin", key: pinKey(m) }) }} title={isPinned ? "Unpin" : "Pin to the top"} aria-label={isPinned ? `Unpin ${m.name}` : `Pin ${m.name}`} aria-pressed={isPinned}><Codicon name={isPinned ? "pinned" : "pin"} /></button>
               <span class="vars">
                 {#each m.variants as v (v.id)}
-                  <button class="var" class:on={current && app.model?.variant === v.id} onclick={(e) => { e.stopPropagation(); chooseModel(m.id, m.providerID, v.id) }}>{v.id}</button>
+                  <button class="var" class:on={current && app.model?.variant === v.id} onclick={(e) => { e.stopPropagation(); chooseModel(m.id, m.providerID, v.id) }}>{variantName(v.id)}</button>
                 {/each}
               </span>
             </div>

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { attachmentFromUri, base64Bytes, baseName, checkBlob, dataUri, fileUri, isImageMime, MAX_ATTACHMENT_BYTES, modelTakesImages, toPromptFiles } from "../../src/core/attachments"
-import { displayName } from "../../src/core/names"
+import { displayName, variantName } from "../../src/core/names"
 import { normalizePins, pinKey, togglePin } from "../../src/core/pins"
 import { groupModels, pinnedModels } from "../../src/core/models"
 import type { SlimModel } from "../../src/core/api"
@@ -93,5 +93,12 @@ describe("pasted and dropped blobs", () => {
     expect(f.thumb).toBeUndefined()
     expect(f.name).toBe("y.ts")
     expect(toPromptFiles([a, f])).toEqual([{ uri: "data:image/png;base64,AAAA", name: "shot.png" }, { uri: "file:///x/y.ts", name: "y.ts" }])
+  })
+})
+
+describe("variantName", () => {
+  test("model variants get display casing; the id sent to the server is unchanged", () => {
+    expect(["low", "medium", "high", "minimal", "max"].map(variantName)).toEqual(["Low", "Medium", "High", "Minimal", "Max"])
+    expect(variantName("xhigh")).toBe("X-High")
   })
 })

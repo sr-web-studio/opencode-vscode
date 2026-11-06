@@ -40,7 +40,8 @@ describe("model groups", () => {
     expect(groupModels({ models, providers, query: "zzz" })).toEqual([])
   })
   test("footer label and variant cycling", () => {
-    expect(footerLabel({ agent: "build", model: { id: "s", providerID: "anthropic", variant: "high" }, models })).toEqual({ agent: "build", model: "Sonnet", variant: "high" })
+    expect(footerLabel({ agent: "build", model: { id: "s", providerID: "anthropic", variant: "high" }, models })).toEqual({ agent: "build", model: "Sonnet", variant: "High" })
+    expect(footerLabel({ model: { id: "s", providerID: "anthropic", variant: "xhigh" }, models }).variant).toBe("X-High")
     expect(footerLabel({ models: [] }).model).toBe("model")
     expect(cycleVariant(models[0]!, "low")).toBe("high")
     expect(cycleVariant(models[0]!, "high")).toBe("low")

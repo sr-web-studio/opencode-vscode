@@ -1,3 +1,4 @@
+import { variantName } from "./names"
 import type { AgentInfo, SlimModel } from "./api"
 
 export type ModelGroup = { providerID: string; providerName: string; models: SlimModel[] }
@@ -78,7 +79,7 @@ export function footerLabel(args: {
   return {
     agent: args.agent ?? "agent",
     model: found?.name ?? args.model?.id ?? "model",
-    variant: args.model?.variant,
+    variant: args.model?.variant ? variantName(args.model.variant) : undefined,
   }
 }
 
