@@ -65,6 +65,20 @@ Salim installed the M1 vsix locally on Windows (OpenCode 2.1.4 there, workspace 
         - When `session.compaction.ended` arrives while the user is following (at the bottom), drop the turns before the compaction turn. Keep the history state, so "Show earlier messages" loads them again.
         - When the user has scrolled up, don't trim at once; trim at the next jump to the end, or on the next send.
         - The same applies in worker tabs.
+    - **Native diffs (moved forward from M2):**
+      - **Inline preview:** the inline diff under an expanded edit line looks like VS Code's own diff:
+        - the `Index:`/`===`/`---`/`+++` header lines are removed
+        - hunk headers become a slim muted `⋯ line 76` separator
+        - each row has old/new line-number gutters
+        - added rows are on `--vscode-diffEditor-insertedLineBackground`, removed rows on `--vscode-diffEditor-removedLineBackground`, with a `+`/`−` marker and the text in the editor font
+        - word-level highlights use `insertedTextBackground`/`removedTextBackground`
+      - **"Open diff"** (and clicking the file name with Alt) opens VS Code's real diff editor with `vscode.diff(before, after, "<file> (OpenCode edit)")`:
+        - `after` is the file on disk.
+        - `before` is a virtual `opencode-diff:` document. It is built by reverse-applying the tool's `metadata.files[].patch` to the current file text; the patches are in jsdiff format, so use jsdiff `applyPatch` on the reversed patch.
+        - If the file has changed since and the reverse-apply fails, fall back to a two-sided view of only the patch hunks (old side vs new side) built from the patch itself, titled "<file> (edit, hunks only)".
+        - Added files diff against an empty document, and deleted files against an empty "after".
+      - **Turn level:** the "N steps completed" line gets a `Changes (3 files)` link that opens a multi-file diff with `vscode.changes` (VS Code ≥1.88), using the same before/after pairs. On mobile it is a list.
+      - Pure helpers (patch parsing into rows, reversing, before-text reconstruction) get unit tests built from real patches in the fixtures.
 14. **Turn spacing and user prompts:**
     - Leave about 28px of vertical space between turns. A turn is one user prompt plus everything the agent did in answer.
     - The user prompt is a distinct block:
