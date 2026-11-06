@@ -5,6 +5,7 @@
   import type { TurnView } from "../../core/transcript/types"
   import { moment, turnStamp, type TimeEnv } from "../../core/turn-time"
   import { keepAnchored } from "../anchor"
+  import CompactionNote from "./CompactionNote.svelte"
   import { useStore, useTranscript } from "../context"
   import SentFiles from "./SentFiles.svelte"
   import Codicon from "./Codicon.svelte"
@@ -24,9 +25,7 @@
   const label = $derived(finished ? foldLabel(turn, split.work) : "")
   const folded = $derived(finished && settings.collapseCompletedSteps && label !== "")
   let userOpen = $state<boolean | undefined>(undefined)
-  let compactOpen = $state(false)
   let foldButton: HTMLElement | undefined = $state()
-  let compactButton: HTMLElement | undefined = $state()
   const showWork = $derived(!folded || userOpen === true)
   // A pending permission must stay visible even inside a folded turn.
   const needsAttention = $derived(turn.steps.some((s) => s.items.some((i) => i.kind === "tool" && permissions.has(i.id))))
@@ -34,7 +33,6 @@
 
   // `2:41 PM · 42s` after a finished turn. A running turn shows nothing.
   const stamp = $derived(turn.compaction ? undefined : turnStamp(turn, env()))
-  const compactedAt = $derived(turn.compaction?.created ? moment(turn.compaction.created, env()) : undefined)
   // The prompt's own time: above the bubble, on hover (always for the first prompt of a day).
   const promptTime = $derived(moment(turn.user?.created ?? turn.started, env()))
 
@@ -43,16 +41,7 @@
 </script>
 
 <section class="turn" class:compaction={!!turn.compaction}>
-  {#if turn.compaction}
-    <button class="compact muted" onclick={() => keepAnchored(compactButton ?? null, () => (compactOpen = !compactOpen))} bind:this={compactButton} aria-expanded={compactOpen} title={compactedAt?.title}>
-      <Codicon name={compactOpen ? "chevron-down" : "chevron-right"} />
-      <Codicon name="layers" />
-      Context compacted{compactedAt ? ` · ${compactedAt.text}` : ""}
-    </button>
-    {#if compactOpen}
-      <div class="summary"><Markdown text={turn.compaction.summary || "No summary was recorded."} /></div>
-    {/if}
-  {/if}
+  {#if turn.compaction}<CompactionNote compaction={turn.compaction} />{/if}
 
   {#if turn.user}
     <div class="uwrap">
@@ -72,6 +61,8 @@
       </div>
     </div>
   {/if}
+
+  {#if turn.compacted}<CompactionNote compaction={turn.compacted} />{/if}
 
   {#if folded}
     <button class="fold muted" bind:this={foldButton} onclick={() => keepAnchored(foldButton ?? null, () => (userOpen = !(userOpen ?? needsAttention)))} aria-expanded={expanded}>
@@ -105,9 +96,8 @@
   .revert { position: absolute; top: -10px; left: -10px; display: inline-flex; align-items: center; padding: 0.15em 0.3em; border-radius: 50%; color: var(--oc-muted); background: var(--oc-popover); border: 1px solid var(--oc-hairline); opacity: 0; }
   .user:hover .revert, .revert:focus-visible { opacity: 1; }
   .revert:hover:not(:disabled) { color: var(--oc-fg); background: var(--oc-hover); }
-  .fold, .compact { align-self: flex-start; display: inline-flex; align-items: center; gap: 0.35em; }
-  .fold:hover, .compact:hover { color: var(--oc-fg); }
-  .summary { margin-left: 1.4em; padding: 0.2em 0.8em; border-left: 2px solid var(--oc-hairline); }
+  .fold { align-self: flex-start; display: inline-flex; align-items: center; gap: 0.35em; }
+  .fold:hover { color: var(--oc-fg); }
   .answer { margin-top: 0.2em; }
   .stamp { margin-top: -0.1em; }
   /* About 12px between the bubble and the agent's part (the 4px margin plus the 0.5em gap). */

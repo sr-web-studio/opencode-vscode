@@ -109,6 +109,7 @@
 
   function jump() {
     if (!box) return
+    if (app.trimPending) store.dispatch({ type: "trimCompacted" })
     scroll = initialScroll
     smoothing = true
     box.scrollTo({ top: box.scrollHeight, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" })
@@ -124,6 +125,12 @@
     if (next === lastSignature) return
     lastSignature = next
     if (box) apply({ type: "content", metrics: metrics() })
+  })
+
+  // A live compaction replaced the turns before it. While the user is at the end they are dropped from the view
+  // ("Show earlier messages" brings them back); a user who scrolled up keeps them until the next jump or send.
+  $effect(() => {
+    if (app.trimPending && scroll.follow) store.dispatch({ type: "trimCompacted" })
   })
 
   // Sending always jumps to the end.

@@ -97,6 +97,8 @@ export type AppState = {
   loadingEarlier: boolean
   /** Bumped when older messages were added above, so the view can keep its place. */
   earlierTick: number
+  /** A live compaction ended: the turns before it can be trimmed once the user is at the end (`trimCompacted`). */
+  trimPending: boolean
   /** Bumped when the user sends a prompt: the transcript jumps to the end. */
   sentTick: number
   restore?: PromptRestore
@@ -112,6 +114,7 @@ export type Action =
   | { type: "revert"; messageID: string }
   | { type: "redo" }
   | { type: "loadEarlier" }
+  | { type: "trimCompacted" }
   | { type: "stop" }
   | { type: "pickAgent"; id: string }
   | { type: "pickModel"; model: ModelSelection }

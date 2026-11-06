@@ -137,6 +137,7 @@ export class Controller {
       hasEarlier: this.feed.hasEarlier,
       loadingEarlier: this.feed.loadingEarlier,
       earlierTick: this.feed.earlierTick,
+      trimPending: this.feed.trimPending,
       sentTick: this.sentTick,
       restore: this.restore,
     }
@@ -593,6 +594,10 @@ export class Controller {
           return await this.redo()
         case "loadEarlier":
           return await this.loadEarlier()
+        case "trimCompacted":
+          this.feed.trim()
+          this.emitNow()
+          return
         case "pickAgent":
           return await this.pickAgent(action.id)
         case "pickModel":
@@ -700,6 +705,7 @@ export class Controller {
     }
     // The server commits a staged revert by itself when a prompt arrives (live-checked on 2.2.5): no commit call here.
     this.restore = undefined
+    this.feed.trim()
     this.sentTick++
     this.emitNow()
     await client.session.prompt({ sessionID: this.target.id, text: body, ...filesInput(files) })

@@ -90,6 +90,7 @@ export class WorkerTab {
       hasEarlier: this.feed.hasEarlier,
       loadingEarlier: this.feed.loadingEarlier,
       earlierTick: this.feed.earlierTick,
+      trimPending: this.feed.trimPending,
       features: { ...base.features, revert: false },
       restore: undefined,
     }
@@ -105,6 +106,10 @@ export class WorkerTab {
         if (client) await this.feed.loadEarlier(client, this.sessionID)
         return
       }
+      case "trimCompacted":
+        this.feed.trim()
+        this.emitNow()
+        return
       case "permission":
         // Only this worker's own requests.
         if (action.sessionID === this.sessionID) await this.controller.dispatch(action)
