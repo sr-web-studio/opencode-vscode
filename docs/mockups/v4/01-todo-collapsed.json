@@ -1,0 +1,16 @@
+{
+  "file": "ui-mockup-of-the-bottom-half-of-a-vs-code-chat-01.jpg",
+  "prompt": "UI mockup of the bottom half of a VS Code chat sidebar panel, dark theme, portrait crop, minimal like Claude Code, 13px readable font, generous whitespace. Just above the slim prompt box floats a small collapsed todo bar, one line: a tiny circular progress ring, text \"3 of 7 \u00b7 Updating session middleware\" in muted text, and a chevron \"\u2303\" at the right. Above it, the end of a transcript with single-line tool steps \"\u25cf Edit src/auth/session.ts +4 \u22121\". Under the prompt box a quiet footer \"build \u2304 \u00b7 Sonnet 5.5 \u00b7 high \u2304\". Crisp readable text, no heavy borders.",
+  "model": "grok-imagine-image-2.0",
+  "mime_type": "image/jpeg",
+  "bytes": 131198,
+  "sha256": "cd9f7e6d47764813ce5883fc90ad9f0bef13b5bcf18a7ee9d727a2e09f9e21fa",
+  "generate_seconds": 12.01,
+  "created": "2026-11-06T08:34:49+0600",
+  "api_id": null,
+  "finish_reason": null,
+  "usage": {
+    "cost_in_usd_ticks": 400000000
+  },
+  "references": []
+}

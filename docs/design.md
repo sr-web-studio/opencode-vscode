@@ -33,6 +33,20 @@ Chosen UI direction: `docs/mockups/v2/` (compact, Claude Code style). The first 
   - Several fields: small tabs at the top (`Database ✓  Auth  Deploy`) with `2 / 3`. Tab moves to the next field. `when` conditions and `hidden` are applied. Submit appears on the last step.
 - **Session switcher** (v3/07): the header shows the session title with `⌄` and a `+` at the right. Clicking the title opens a dropdown with a search field and groups (Today / Yesterday / Last week / Older). Each session is one line: title, then the relative time right-aligned. Status is shown by dots: a running session gets the accent dot, one waiting for input (permission/form) gets an amber dot. The current session has a check. The footer row has `Show archived`. Only root sessions (no `parentID`) of this project are listed.
 
+## Todo list and empty state (approved 2026-11-06, mockups in `docs/mockups/v4/`)
+
+- **Todo bar** (v4/01, v4/02): appears only when the session's agent has used the todo tool. OpenCode marks it experimental (`experimental.todo` in config), and the extension never turns it on. The tool name and input shape must be read from real tool events. Do not guess them.
+  - Collapsed (default): one line floating just above the prompt box: a small progress ring, `3 of 7 · <current in-progress item>`, and a `⌃` chevron.
+  - Expanded: a small panel opens upward with a thin border. The header shows `Tasks 3 / 7` and a thin progress bar, followed by one line per item. Done items get ✓ and are muted with strikethrough. The in-progress item is shown in the accent color with a half-circle icon. Pending items get ○.
+  - It hides when every item is done and the turn has ended. Setting `opencode.todo.defaultExpanded` (default `false`).
+- **Draft session / `+` button**: `+` does NOT create a server session. It opens a local draft (title "New session", empty transcript). The server session is created only when the first prompt is sent, so no empty "Untitled" sessions pile up. Pressing `+` while already in an empty draft just focuses the prompt box.
+- **Empty project** (v4/03): when the project has no sessions, or a draft is open, the view shows calm centered content:
+  - OpenCode wordmark, the project folder name, and the muted path (`~` shortened)
+  - three one-line suggestion links that fill the prompt box (they don't send it): "Explain this codebase", "Find and fix a bug", "Write tests for the current file"
+  - a tiny muted note: "Sessions keep running on the OpenCode server after you close VS Code"
+
+  The normal prompt box and agent/model footer stay at the bottom.
+
 ## Decision: interactive input
 
 Option A. v1 provides live output, Stop and Background for agent shell commands. Interactive stdin is deferred until the persistent PTY path is confirmed.

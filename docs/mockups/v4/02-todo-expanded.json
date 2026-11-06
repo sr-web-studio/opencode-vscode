@@ -1,0 +1,16 @@
+{
+  "file": "ui-mockup-of-the-bottom-half-of-a-vs-code-chat-02.jpg",
+  "prompt": "UI mockup of the bottom half of a VS Code chat sidebar panel, dark theme, portrait crop, minimal like Claude Code, 13px readable font. Just above the slim prompt box, a floating todo panel is expanded upward with a thin border and subtle shadow: header line \"Tasks  3 / 7\" with a thin progress bar and a collapse chevron. Then a compact checklist, one line per item: \"\u2713 Read auth config\" (muted, strikethrough), \"\u2713 Find timeout setting\" (muted, strikethrough), \"\u2713 Update login timeout\" (muted, strikethrough), \"\u25d0 Updating session middleware\" (normal weight, accent color), \"\u25cb Add regression test\", \"\u25cb Run test suite\", \"\u25cb Summarize changes\". Crisp readable text, calm spacing.",
+  "model": "grok-imagine-image-2.0",
+  "mime_type": "image/jpeg",
+  "bytes": 156996,
+  "sha256": "e9ab77c8e194a56ebc7e52b2e08a7f6181b4fc5850e40ca9aadf341fe67581da",
+  "generate_seconds": 13.22,
+  "created": "2026-11-06T08:35:02+0600",
+  "api_id": null,
+  "finish_reason": null,
+  "usage": {
+    "cost_in_usd_ticks": 400000000
+  },
+  "references": []
+}
