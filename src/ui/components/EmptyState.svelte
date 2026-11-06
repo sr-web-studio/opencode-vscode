@@ -23,5 +23,5 @@
   .folder { margin-top: 0.8em; font-weight: 600; }
   .path { font-size: 0.9em; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .sugs { display: flex; flex-direction: column; gap: 0.3em; margin: 1.4em 0 1.6em; }
-  .note { font-size: 0.85em; max-width: 24em; }
+  .note { font-size: 0.9em; max-width: 24em; }
 </style>

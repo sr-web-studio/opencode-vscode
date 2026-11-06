@@ -288,7 +288,7 @@
   .seg button.on { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
   .hint, .small { font-size: 0.9em; margin-top: 0.25em; }
   .actions { display: flex; justify-content: space-between; align-items: baseline; gap: 0.6em; margin-top: 0.5em; }
-  .keys { font-size: 0.85em; }
+  .keys { font-size: 0.9em; }
   .btns { display: flex; gap: 0.9em; }
   .primary { color: var(--oc-accent); font-weight: 600; }
   .btns button:hover:not(:disabled) { text-decoration: underline; }

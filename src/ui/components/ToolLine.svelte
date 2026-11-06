@@ -1,20 +1,38 @@
 <script lang="ts">
   import type { PermissionRequest } from "../../core/api"
-  import { headLines, tailLines } from "../../core/format"
+  import { headLines } from "../../core/format"
+  import { toolIcon } from "../../core/transcript/icons"
   import { editStats, summarizeTool } from "../../core/transcript/tools"
   import type { ToolItem } from "../../core/transcript/types"
-  import { useStore } from "../context"
+  import { displayName } from "../../core/names"
+  import { toolChildID } from "../../core/workers"
+  import { keepAnchored } from "../anchor"
+  import { useStore, useTranscript } from "../context"
+  import Codicon from "./Codicon.svelte"
   import PermissionPrompt from "./PermissionPrompt.svelte"
+  import ShellBlock from "./ShellBlock.svelte"
 
   let { tool, cwd, permission, defaultOpen }: { tool: ToolItem; cwd: string; permission?: PermissionRequest; defaultOpen: boolean } = $props()
   const store = useStore()
+  const view = useTranscript()
 
   let userOpen = $state<boolean | undefined>(undefined)
+  let head: HTMLElement | undefined = $state()
   const open = $derived(userOpen ?? defaultOpen)
   const line = $derived(summarizeTool(tool, cwd))
   const active = $derived(tool.status === "running" || tool.status === "streaming")
   const edits = $derived(tool.name === "edit" || tool.name === "write" || tool.name === "patch" ? editStats(tool) : undefined)
   const shellID = $derived(typeof tool.metadata.shellID === "string" ? tool.metadata.shellID : undefined)
+  const isShell = $derived(tool.name === "shell")
+  const exit = $derived(typeof tool.metadata.exit === "number" ? tool.metadata.exit : tool.status === "completed" ? 0 : undefined)
+  const command = $derived(typeof tool.input.command === "string" ? tool.input.command : "")
+
+  // A worker: the child session comes from the tool's metadata/result, else from the matched Background row.
+  const isWorker = $derived(tool.name === "subagent")
+  const worker = $derived(isWorker ? view.workers().find((w) => w.toolID === tool.id) : undefined)
+  const childID = $derived(isWorker ? (toolChildID(tool) ?? worker?.sessionID) : undefined)
+  const workerStatus = $derived(worker?.status ?? (active ? "running" : tool.status === "error" ? "failed" : "done"))
+  const agentName = $derived(typeof tool.input.agent === "string" && tool.input.agent ? displayName(tool.input.agent) : "Agent")
 
   const str = (v: unknown) => (typeof v === "string" ? v : "")
   const range = $derived.by(() => {
@@ -27,22 +45,48 @@
   })
 
   const diffClass = (l: string) => (l.startsWith("+") && !l.startsWith("+++") ? "add" : l.startsWith("-") && !l.startsWith("---") ? "del" : "")
+
+  function toggle() {
+    void keepAnchored(head ?? null, () => (userOpen = !open))
+  }
+  function activate() {
+    if (isWorker && childID) store.bridge.openSession(childID, { readOnly: true })
+    else toggle()
+  }
 </script>
 
-<div class="tool" class:attn={!!permission}>
-  <div class="row">
-    <button class="lead" onclick={() => (userOpen = !open)} aria-expanded={open} aria-label={open ? "Collapse details" : "Expand details"}>
-      {#if active}<span class="spinner"></span>{:else}<span class="chev muted">{open ? "⌄" : "›"}</span>{/if}
-    </button>
-    <button class="label" onclick={() => (userOpen = !open)}>{line.label}</button>
-    {#if line.target}
-      {#if line.path}
-        <button class="target link" title={line.path} onclick={() => store.bridge.openFile(line.path!)}>{line.target}</button>
-      {:else}
+<div class="tool" class:attn={!!permission} class:open>
+  <div class="row" bind:this={head}>
+    <button class="main" onclick={activate} aria-expanded={isWorker && childID ? undefined : open} title={isWorker && childID ? "Open this worker in a tab" : undefined}>
+      <span class="dot" class:run={active} aria-hidden="true"></span>
+      {#if active}<Codicon name="loading" spin />{:else}<Codicon name={toolIcon(tool.name)} />{/if}
+      {#if isShell}
+        <span class="prompt-sign" aria-hidden="true">$</span>
+        <code class="cmd-chip" title={command}>{line.target}</code>
+      {:else if isWorker}
+        <span class="name">{agentName}</span>
         <span class="target muted" title={line.target}>{line.target}</span>
+      {:else}
+        <span class="name">{line.label}</span>
+        {#if line.target && !line.path}<span class="target muted" title={line.target}>{line.target}</span>{/if}
       {/if}
+    </button>
+    {#if line.path}
+      <button class="target link path" title={line.path} onclick={() => store.bridge.openFile(line.path!)}>{line.target}</button>
     {/if}
-    {#if line.result}<span class="result" class:ok={line.tone === "ok"} class:bad={line.tone === "error"} class:muted={line.tone === "muted"}>{line.result}</span>{/if}
+    {#if isWorker}
+      <span class="status" class:ok={workerStatus === "done"} class:bad={workerStatus === "failed"} class:muted={workerStatus === "running" || workerStatus === "stopped"}>
+        {workerStatus === "running" ? "Running" : workerStatus === "done" ? "Done" : workerStatus === "failed" ? "Failed" : "Stopped"}
+      </span>
+      {#if childID}<Codicon name="link-external" />{/if}
+    {:else if isShell && exit !== undefined && !active}
+      <span class="badge" class:ok={exit === 0} class:bad={exit !== 0}>{exit === 0 ? "✓" : "✗"} {exit}</span>
+    {:else if line.result && !isShell}
+      <span class="result" class:ok={line.tone === "ok"} class:bad={line.tone === "error"} class:muted={line.tone === "muted"}>{line.result}</span>
+    {/if}
+    {#if !isWorker || !childID}
+      <button class="chev muted" onclick={toggle} aria-label={open ? "Collapse details" : "Expand details"} tabindex="-1"><Codicon name={open ? "chevron-down" : "chevron-right"} /></button>
+    {/if}
     {#if permission}<PermissionPrompt request={permission} />{/if}
   </div>
 
@@ -60,15 +104,16 @@
             {/if}
           </div>
         {/each}
-      {:else if tool.name === "shell"}
-        <pre class="mono cmd">$ {str(tool.input.command)}</pre>
-        {#if tool.output}<pre class="out mono">{tailLines(tool.output, 12)}</pre>{/if}
+      {:else if isShell}
+        {#if tool.output}<ShellBlock output={tool.output} />{:else if !active}<div class="muted small">No output</div>{/if}
         {#if shellID}<button class="link" onclick={() => store.bridge.showTerminal(shellID, line.target)}>Show terminal</button>{/if}
+      {:else if isWorker}
+        {#if tool.output}<pre class="out mono">{headLines(tool.output, 14)}</pre>{/if}
       {:else if tool.name === "read"}
         <div class="muted">{range}</div>
       {:else}
         {#if Object.keys(tool.input).length}<pre class="out mono muted">{headLines(JSON.stringify(tool.input, null, 1), 12)}</pre>{/if}
-        {#if tool.output}<pre class="out mono">{tailLines(tool.output, 12)}</pre>{/if}
+        {#if tool.output}<pre class="out mono">{headLines(tool.output, 12)}</pre>{/if}
       {/if}
       {#if tool.error}<div class="err">{tool.error}</div>{/if}
     </div>
@@ -76,17 +121,28 @@
 </div>
 
 <style>
-  .tool { border-left: 2px solid transparent; margin-left: -2px; padding-left: 0.4em; }
+  .tool { position: relative; margin-left: -2px; border-left: 2px solid transparent; }
   .tool.attn { border-left-color: var(--oc-amber); }
-  .row { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 0.5em; min-height: 1.6em; }
-  .lead { width: 1.1em; display: inline-flex; align-items: center; justify-content: center; align-self: center; }
-  .label { font-weight: 600; }
-  .target { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; text-align: left; }
-  .result.ok { color: var(--oc-ok); }
-  .result.bad { color: var(--oc-error); }
-  .details { margin: 0.2em 0 0.4em 1.6em; font-size: 0.95em; }
+  .row { display: flex; align-items: center; gap: 0 0.5em; min-height: 28px; padding: 0 0.4em 0 0.2em; border-radius: 4px; }
+  .row:hover { background: var(--oc-hover); }
+  .main { display: inline-flex; align-items: center; gap: 0.5em; min-width: 0; text-align: left; flex: 0 1 auto; min-height: 28px; }
+  .name { font-weight: 600; color: var(--oc-fg); }
+  .target { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .path { text-align: left; }
+  .prompt-sign { color: var(--oc-ok); font-weight: 700; font-family: var(--vscode-editor-font-family, monospace); }
+  .cmd-chip { font-family: var(--vscode-editor-font-family, monospace); font-size: 0.92em; background: var(--oc-code-bg); padding: 0.05em 0.45em; border-radius: 4px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 36em; }
+  .badge, .status, .result { font-size: 0.9em; white-space: nowrap; }
+  .badge { border: 1px solid currentColor; border-radius: 999px; padding: 0 0.5em; line-height: 1.5; }
+  .ok { color: var(--oc-ok); }
+  .bad { color: var(--oc-error); }
+  .chev { margin-left: auto; display: inline-flex; align-items: center; min-height: 28px; padding: 0 0.2em; }
+  .row:hover .chev { color: var(--oc-fg); }
+  /* A dot on the connector line of the step list (the line itself is drawn by StepList). */
+  .dot { position: absolute; left: -18px; top: 50%; width: 7px; height: 7px; margin-top: -3.5px; border-radius: 50%; background: var(--oc-hairline); box-shadow: 0 0 0 3px var(--vscode-sideBar-background, var(--vscode-editor-background)); }
+  .dot.run { background: var(--oc-accent); }
+  .details { margin: 0.1em 0 0.5em 1.6em; font-size: 0.95em; }
   pre { margin: 0.25em 0; white-space: pre-wrap; word-break: break-word; }
-  .out, .cmd, .diff { background: var(--oc-code-bg); padding: 0.4em 0.6em; border-radius: 4px; max-height: 16em; overflow: auto; }
+  .out, .diff { background: var(--oc-code-bg); padding: 0.4em 0.6em; border-radius: 4px; max-height: 16em; overflow: auto; }
   .diff .add { color: var(--vscode-gitDecoration-addedResourceForeground); }
   .diff .del { color: var(--vscode-gitDecoration-deletedResourceForeground); }
   .right { margin-left: 0.8em; }

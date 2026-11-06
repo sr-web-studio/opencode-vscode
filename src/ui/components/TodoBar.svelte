@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { TodoSummary } from "../../core/todo"
+  import Codicon from "./Codicon.svelte"
 
   let { summary, defaultExpanded }: { summary: TodoSummary; defaultExpanded: boolean } = $props()
   let userOpen = $state<boolean | undefined>(undefined)
@@ -31,12 +32,12 @@
     </svg>
     <span class="muted">{summary.done} of {summary.total}{summary.current ? " · " : ""}</span>
     <span class="cur-text">{summary.current ?? ""}</span>
-    <span class="chev muted">{open ? "⌄" : "⌃"}</span>
+    <span class="chev muted"><Codicon name={open ? "chevron-down" : "chevron-up"} /></span>
   </button>
 </div>
 
 <style>
-  .todo { padding: 0 0.9em 0.3em; }
+  .todo { padding: 0 var(--oc-side) 0.3em; }
   .line { display: flex; align-items: center; gap: 0.5em; width: 100%; text-align: left; min-width: 0; }
   .cur-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .panel { border: 1px solid var(--oc-hairline); border-radius: 6px; padding: 0.5em 0.7em; margin-bottom: 0.35em; background: var(--oc-popover); }
