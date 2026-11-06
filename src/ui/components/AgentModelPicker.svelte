@@ -7,6 +7,7 @@
   import { useStore } from "../context"
   import { focusGuarded } from "../focus"
   import Codicon from "./Codicon.svelte"
+  import McpChip from "./McpChip.svelte"
 
   let { app }: { app: AppState } = $props()
   const store = useStore()
@@ -77,6 +78,8 @@
     <button onclick={() => show("agent")} aria-haspopup="listbox" aria-expanded={popover === "agent"} title="Agent (Tab cycles)">{displayName(label.agent)} <Codicon name="chevron-down" /></button>
     <span>·</span>
     <button onclick={() => show("model")} aria-haspopup="listbox" aria-expanded={popover === "model"} title="Model and variant">{label.model}{label.variant ? ` · ${label.variant}` : ""} <Codicon name="chevron-down" /></button>
+    <span class="grow"></span>
+    <McpChip {app} />
   </div>
 
   {#if popover === "agent"}
@@ -124,7 +127,8 @@
 
 <style>
   .picker { position: relative; }
-  .foot { display: flex; gap: 0.45em; align-items: baseline; font-size: 0.92em; }
+  .foot { display: flex; flex-wrap: wrap; gap: 0.2em 0.45em; align-items: baseline; font-size: 0.92em; }
+  .grow { flex: 1; }
   .foot button { display: inline-flex; align-items: center; gap: 0.25em; }
   .foot button:hover { color: var(--oc-fg); }
   .pin { display: inline-flex; align-items: center; padding: 0.1em 0.25em; border-radius: 4px; color: var(--oc-muted); opacity: 0; }

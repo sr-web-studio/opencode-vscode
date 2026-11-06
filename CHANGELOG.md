@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- **Slash commands** in the prompt box: type `/` for a popup of OpenCode commands and skills. Built in: `/mcps`, `/compact`, `/undo`, `/redo`, `/fork`, `/skills`. The popup never takes focus.
+- **MCP servers panel** (`/mcps`, **OpenCode: MCP Servers**, or the chip in the footer): status of each server, turn it on or off for the running server, and sign in or out of OAuth servers.
+
 ## 0.3.6 (preview)
 
 - **OpenCode: Set Server Password** (was "Set Remote Server Password"). It names the server it is for, and explains that OpenCode on this computer needs no password.
