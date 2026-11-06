@@ -80,10 +80,10 @@ Proposal:
   - b. Companion records with a native helper (`ffmpeg -f dshow` on Windows). This adds an extra dependency.
   - c. When #323602 ships, record directly in the webview.
 - **Mobile:** Capacitor has native mic access, so it uses the same engine directly. Gboard remains a free fallback.
-- **Decision 2026-11-06:** Soniox is chosen. Voice is a **paid feature** once the extension is public, because the STT cost must not land on the publisher. Proposed model, not built yet:
-  - **Bring your own key (free tier):** the user pastes their own Soniox key into SecretStorage. We pay nothing, and the user pays Soniox directly.
-  - **Hosted voice (paid):** a small Cloudflare Worker (`voice.<domain>`) checks a license key, mints a short-lived Soniox temporary key from our account, and meters minutes per license. Licenses are sold through a merchant of record (Lemon Squeezy / Polar / Paddle, to compare at build time). The extension stores the license key in SecretStorage and calls the Worker only to get a temp key; audio goes straight to Soniox.
-  - Everything else in the extension stays free. For Salim's own use during development, his own Soniox key is used (BYOK path).
+- **Decision 2026-11-06 (revised):** Soniox is chosen, and voice is **free, bring-your-own-key only**. There is no paid tier, no license server and no hosted key.
+  - Voice is off until the user runs `OpenCode: Set Voice API Key` and pastes their own Soniox key. It is stored in `SecretStorage` (secure storage on mobile) and the user pays Soniox directly. With no key, the mic button shows a short hint that links to the command.
+  - The extension host mints short-lived Soniox temporary keys from the user's key, so the long-lived key never reaches the webview.
+  - During development, Salim's key is in the repo's `.env` as `SONIOX_API_KEY`. Only dev scripts and live tests read it. The `.env` file is git-ignored and excluded from the vsix, and the shipped extension reads its key only from SecretStorage.
 - **UX:** a mic codicon in the prompt box (keyboard `Ctrl+Alt+V`). Click to start and click again or Esc to stop. A small level meter and the active language (`বাংলা + EN`) are shown while recording. Partial text is grey, and nothing is auto-sent.
 
 ## Controls (approved 2026-11-06, mockups in `docs/mockups/v3/`)
