@@ -9,7 +9,11 @@
 export type RawMessage = { id?: string; type?: string; status?: string; [k: string]: unknown }
 
 export type MessagePage = { data: ReadonlyArray<RawMessage>; cursor?: { next?: string | null } }
-export type FetchPage = (input: { order: "desc"; limit: number; cursor?: string }) => Promise<MessagePage>
+/**
+ * One `message.list` page. The server rejects `order` together with `cursor` ("Cursor cannot be combined with order"):
+ * the first page asks for `order: "desc"`, later pages pass only the cursor, which keeps the first page's order.
+ */
+export type FetchPage = (input: { limit: number } & ({ order: "desc"; cursor?: undefined } | { cursor: string; order?: undefined })) => Promise<MessagePage>
 
 export type HistoryState = {
   /** Fetched but not yet used, newest first (the rest of a page that crossed a chunk boundary). */
@@ -73,7 +77,7 @@ export async function loadChunk(fetchPage: FetchPage, from: HistoryState = initi
     }
     queue = []
     if (exhausted) break
-    const page = await fetchPage({ order: "desc", limit, cursor })
+    const page = await fetchPage(cursor ? { limit, cursor } : { order: "desc", limit })
     cursor = page.cursor?.next ?? undefined
     if (!cursor || page.data.length === 0) exhausted = true
     queue = page.data

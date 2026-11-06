@@ -8,7 +8,10 @@ const compaction = (n: number, status = "completed"): RawMessage => msg(n, "comp
 function fake(all: RawMessage[], pageSize = 4) {
   const calls: Array<{ cursor?: string; limit: number }> = []
   const desc = [...all].reverse()
-  const fetch: FetchPage = async ({ limit, cursor }) => {
+  const fetch: FetchPage = async (input) => {
+    const { limit, cursor } = input
+    // Same rule as the server (OpenCode 2.2.5): a cursor cannot be combined with order.
+    if (input.cursor !== undefined && input.order !== undefined) throw new Error("Cursor cannot be combined with order")
     calls.push({ cursor, limit })
     const start = cursor ? Number(cursor) : 0
     const size = Math.min(limit, pageSize)
@@ -104,5 +107,20 @@ describe("history paging", () => {
     const { fetch, calls } = fake([msg(1), msg(2)])
     await loadChunk(fetch, initialHistory, { pageSize: 50 })
     expect(calls[0]).toEqual({ cursor: undefined, limit: 50 })
+  })
+
+  test("later pages send only the cursor, never cursor and order together", async () => {
+    const inputs: Array<Record<string, unknown>> = []
+    const desc = Array.from({ length: 10 }, (_, i) => msg(10 - i))
+    const fetch: FetchPage = async (input) => {
+      inputs.push({ ...input })
+      const start = input.cursor ? Number(input.cursor) : 0
+      const next = start + 3 < desc.length ? String(start + 3) : null
+      return { data: desc.slice(start, start + 3), cursor: { next } }
+    }
+    await loadChunk(fetch, initialHistory, { pageSize: 3, cap: 100 })
+    expect(inputs[0]).toEqual({ order: "desc", limit: 3 })
+    expect(inputs.length).toBeGreaterThan(1)
+    for (const i of inputs.slice(1)) expect(i).toEqual({ limit: 3, cursor: expect.any(String) })
   })
 })
