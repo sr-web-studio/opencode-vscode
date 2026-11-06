@@ -38,6 +38,12 @@ export function groupModels({ models, providers, query }: ModelQueryInput): Mode
     .sort((a, b) => a.providerName.localeCompare(b.providerName))
 }
 
+/** Pinned models that still exist and are usable, in pin order (stale pins are skipped, not removed). */
+export function pinnedModels(models: ReadonlyArray<SlimModel>, pins: ReadonlyArray<string>): SlimModel[] {
+  const byKey = new Map(models.filter((m) => m.enabled && m.status !== "deprecated").map((m) => [`${m.providerID}/${m.id}`, m]))
+  return pins.flatMap((k) => (byKey.has(k) ? [byKey.get(k)!] : []))
+}
+
 export type ModelSelection = { id: string; providerID: string; variant?: string }
 
 export const sameModel = (a: ModelSelection | undefined, b: { id: string; providerID: string }) =>
