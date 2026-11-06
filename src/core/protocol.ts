@@ -90,6 +90,8 @@ export type AppState = {
   workerTitle?: string
   /** Workers (child sessions) of the current session, from the transcript plus `session.list({ parentID })`. */
   workers: Worker[]
+  /** `Worker.key`s the user removed from the list (this extension only; the sessions stay on the server). Running workers show anyway. */
+  hiddenWorkers: string[]
   /** Background shells of the current session that are still running. */
   runningShells: number
   /** Pinned model keys (`provider/model`), kept by the host in `globalState`. */
@@ -127,6 +129,8 @@ export type Action =
   | { type: "send"; text: string; files?: PromptFile[]; skills?: Array<{ id: string }> }
   | { type: "rename"; id: string; title: string }
   | { type: "togglePin"; key: string }
+  /** Remove finished workers (`Worker.key`) from the panel list. Never touches the sessions on the server. */
+  | { type: "hideWorkers"; keys: string[] }
   | { type: "revert"; messageID: string }
   | { type: "redo" }
   /** `/compact` and `/fork` on the current session. */
