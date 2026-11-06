@@ -1,0 +1,228 @@
+{
+  "name": "opencode-vscode",
+  "displayName": "OpenCode",
+  "description": "A VS Code client for OpenCode. Sessions live on the OpenCode server and keep running when you close the editor.",
+  "version": "0.1.0",
+  "publisher": "sr-web-studio",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sr-web-studio/opencode-vscode.git"
+  },
+  "engines": {
+    "vscode": "^1.144.0"
+  },
+  "categories": [
+    "AI",
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "extensionKind": [
+    "workspace"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "secondarySidebar": [
+        {
+          "id": "opencode",
+          "title": "OpenCode",
+          "icon": "media/opencode.svg"
+        }
+      ]
+    },
+    "views": {
+      "opencode": [
+        {
+          "type": "webview",
+          "id": "opencode.chat",
+          "name": "Chat"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "opencode.focus",
+        "title": "Focus Chat",
+        "category": "OpenCode"
+      },
+      {
+        "command": "opencode.newSession",
+        "title": "New Session",
+        "category": "OpenCode",
+        "icon": "$(add)"
+      },
+      {
+        "command": "opencode.reconnect",
+        "title": "Reconnect",
+        "category": "OpenCode"
+      },
+      {
+        "command": "opencode.setPassword",
+        "title": "Set Remote Server Password",
+        "category": "OpenCode"
+      },
+      {
+        "command": "opencode.clearPassword",
+        "title": "Clear Remote Server Password",
+        "category": "OpenCode"
+      },
+      {
+        "command": "opencode.setCliPath",
+        "title": "Set CLI Path",
+        "category": "OpenCode"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "opencode.newSession",
+          "when": "view == opencode.chat",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "OpenCode",
+      "properties": {
+        "opencode.serverUrl": {
+          "type": "string",
+          "default": "",
+          "scope": "machine-overridable",
+          "markdownDescription": "URL of an OpenCode server, for example `http://host:4096`. Leave empty to use the local shared service (started automatically if needed). The password for a remote server is stored in VS Code SecretStorage: run **OpenCode: Set Remote Server Password**."
+        },
+        "opencode.cliPath": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "markdownDescription": "Path to the `opencode` executable. Leave empty to look it up on `PATH`, then in `~/.opencode/bin`."
+        },
+        "opencode.transcript.collapseCompletedSteps": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "When a turn finishes, fold its steps under one `› N steps completed` line above the final answer."
+        },
+        "opencode.transcript.expandToolDetails": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Show tool details (input, output, errors) expanded by default."
+        },
+        "opencode.transcript.showReasoning": {
+          "type": "string",
+          "enum": [
+            "collapsed",
+            "expanded",
+            "hidden"
+          ],
+          "default": "collapsed",
+          "markdownDescription": "How the model's reasoning is shown in the transcript."
+        },
+        "opencode.transcript.fontSize": {
+          "type": "number",
+          "default": 0,
+          "minimum": 0,
+          "maximum": 32,
+          "markdownDescription": "Transcript font size in px. `0` inherits `#chat.editor.fontSize#`, falling back to 13."
+        },
+        "opencode.todo.defaultExpanded": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Show the task list panel expanded by default. It only appears when the agent uses the `todowrite` tool (OpenCode setting `experimental.todo`, which this extension never changes)."
+        },
+        "opencode.notifications.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Show VS Code notifications when OpenCode needs your attention or finishes work. Master switch for the settings below."
+        },
+        "opencode.notifications.attention": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Notify when a session asks for a permission or a question (`permission.asked`, `form.created`)."
+        },
+        "opencode.notifications.completed": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Notify when a turn finishes in a root session."
+        },
+        "opencode.notifications.failed": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Notify when a turn fails in a root session."
+        },
+        "opencode.notifications.workers": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Also notify when a worker (child session) finishes or fails."
+        },
+        "opencode.notifications.shells": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Also notify when a background shell of this project exits."
+        },
+        "opencode.notifications.whenFocused": {
+          "type": "string",
+          "enum": [
+            "never",
+            "always"
+          ],
+          "default": "never",
+          "enumDescriptions": [
+            "Stay quiet while this window is focused and the session is visible in the panel.",
+            "Notify even when the session is on screen."
+          ],
+          "markdownDescription": "Whether to notify while the VS Code window is focused and the session is visible in the OpenCode panel."
+        },
+        "opencode.notifications.os": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "off"
+          ],
+          "default": "auto",
+          "enumDescriptions": [
+            "Use an OS notifier when one is installed (a later companion extension); VS Code notifications otherwise.",
+            "VS Code notifications only."
+          ],
+          "markdownDescription": "Delivery channel. In this version notifications are always shown inside VS Code; `auto` is reserved for the OS-notifier companion."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "bun run build:ext && bun run build:webview",
+    "build:ext": "bun esbuild.mjs",
+    "build:webview": "vite build",
+    "watch": "bun run watch:ext & bun run watch:webview & wait",
+    "watch:ext": "bun esbuild.mjs --watch",
+    "watch:webview": "vite build --watch",
+    "dev:webview": "vite --config vite.dev.config.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json && svelte-check --tsconfig tsconfig.webview.json",
+    "test": "bun test test/unit",
+    "test:host": "bun run build && bun test/host/run.mjs",
+    "package": "bun run build && vsce package --no-dependencies --out opencode-vscode.vsix",
+    "sanitize-fixtures": "bun scripts/sanitize-fixtures.ts"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "7.3.1",
+    "@tailwindcss/vite": "4.3.4",
+    "@types/bun": "1.4.4",
+    "@types/node": "24.19.2",
+    "@types/vscode": "1.144.0",
+    "@vscode/test-electron": "3.1.0",
+    "@vscode/vsce": "4.1.0",
+    "esbuild": "0.28.2",
+    "svelte": "5.57.3",
+    "svelte-check": "4.7.8",
+    "tailwindcss": "4.3.4",
+    "typescript": "7.0.2",
+    "vite": "8.3.6"
+  },
+  "dependencies": {
+    "@opencode/client": "2.2.5",
+    "dompurify": "3.4.17",
+    "effect": "4.0.6",
+    "marked": "18.1.3"
+  }
+}
