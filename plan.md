@@ -26,6 +26,7 @@ What I miss is a good VS Code extension that lets me use OpenCode inside VS Code
 ### What it does
 
 **Chat panel, in a Claude Code-like style:**
+
 - Compact one-line tool calls that expand and collapse.
 - `N steps completed` above the final answer, collapsed by default (configurable).
 - Readable text: at least 14px, line-height 1.6, codicons, and capitalized names such as `Assistant`.
@@ -36,6 +37,7 @@ What I miss is a good VS Code extension that lets me use OpenCode inside VS Code
 - Only messages since the last compaction load, plus "Show earlier messages".
 
 **Controls:**
+
 - Header session dropdown, with rename (pencil, F2 or double-click).
 - `+` opens a draft. A server session is created only on the first send, so no empty "Untitled" sessions pile up.
 - Agent and model popovers in the prompt footer, with pinned models.
@@ -47,6 +49,7 @@ What I miss is a good VS Code extension that lets me use OpenCode inside VS Code
   - The prompt comes back into the box for editing, and Redo cancels the revert.
 
 **VS Code integration:**
+
 - Clicking a file link opens the file in the editor, and edits show as native diffs.
 - Agent shell commands appear in VS Code's terminal panel, like Copilot Chat, and I can stop them.
   - Typing input such as `y`/`n` is deferred until OpenCode's persistent PTY path is confirmed.
@@ -56,6 +59,7 @@ What I miss is a good VS Code extension that lets me use OpenCode inside VS Code
   - The main session stays in the panel.
 
 **Notifications:**
+
 - When OpenCode needs me (a permission or question) or a task finishes or fails.
 - Shown as VS Code notifications now. Laptop OS toasts come later from a small companion extension.
 
