@@ -147,6 +147,17 @@ Salim installed the M1 vsix locally on Windows (OpenCode 2.1.4 there, workspace 
       - The whole block is pure text in `terminal-text.ts`, with tests for the exact bytes.
       - "Show terminal" on a tool line focuses the session terminal. It does not scroll to the block; the Pseudoterminal API has no scroll control, and that is acceptable.
       - After a reload, re-attaching running shells appends to the session terminal the same way.
+    - **Sent images stay viewable:**
+      - **Cause:** in 0.2.x, `fileChips()` keeps only `name` and `mime`, so sent images lose their pixels. Verified live: stored user messages carry `files: [{ data: <base64>, mime, name, source: { type: "inline" } }]`, and file attachments carry `source.uri`.
+      - **Thumbnails:** image attachments on a user message show as real thumbnails, about 64px high with rounded corners, in a row under the text. Build them from `data:<mime>;base64,<data>`; the CSP already allows `data:` images. Only images get thumbnails; other files stay chips.
+      - **Preview:** clicking a thumbnail opens a preview:
+        - In VS Code, the host writes the image to a temp file under the extension's `globalStorageUri/previews/` and opens it with `vscode.open` in the built-in image viewer, which has zoom. Old previews are cleaned on start.
+        - On mobile, it opens a full-screen viewer through the bridge (`openImage`).
+      - **File chips:** non-image file chips with a `file://` URI open the file in the editor.
+      - **Performance:**
+        - Keep the base64 out of the main state. The reducer stores a reference (message id + index), and the webview asks the host for the thumbnail data lazily, when the chip becomes visible.
+        - Cap the inline thumbnail size; large images are downscaled in the webview with a canvas once.
+        - Big sessions must not post megabytes of state on every emit.
 10. **Edit session title**: a pencil icon on hover next to the header title (and F2 / double-click) turns it into an inline input. Enter saves via `session.update({ title })`, and Esc cancels. The session dropdown rows also get a rename action on hover.
 
 ## Voice input (proposed 2026-11-06, decision pending)
