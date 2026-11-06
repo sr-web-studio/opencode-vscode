@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { tick } from "svelte"
+  import { tick, type Snippet } from "svelte"
   import { relativeTime } from "../../core/format"
   import type { AppState } from "../../core/protocol"
   import { DRAFT_TITLE, flattenGroups, groupSessions, toRows, UNTITLED } from "../../core/sessions"
@@ -7,7 +7,8 @@
   import { focusGuarded } from "../focus"
   import Codicon from "./Codicon.svelte"
 
-  let { app, hasDraftText }: { app: AppState; hasDraftText: boolean } = $props()
+  /** `extra`: controls shown before the + button (the background workers chip). */
+  let { app, hasDraftText, extra }: { app: AppState; hasDraftText: boolean; extra?: Snippet } = $props()
   const store = useStore()
 
   let open = $state(false)
@@ -99,6 +100,7 @@
       {/if}
     </div>
   {/if}
+  {@render extra?.()}
   <button class="plus muted" onclick={() => store.dispatch({ type: "newDraft", hasText: hasDraftText })} title="New session" aria-label="New session"><Codicon name="add" /></button>
 
   {#if open}

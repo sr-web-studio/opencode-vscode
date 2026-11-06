@@ -228,6 +228,10 @@ Proposal:
   - Pure check `core/voice.ts` (`checkSonioxKey`, `keyShapeProblem`) has unit tests. The same code serves mobile with its own `fetch`.
 - **UX:** a mic codicon in the prompt box (keyboard `Ctrl+Alt+V`). Click to start and click again or Esc to stop. A small level meter and the active language (`বাংলা + EN`) are shown while recording. Partial text is grey, and nothing is auto-sent.
 
+### Background workers as a floating panel (0.3.1, Salim, 2026-11-06)
+- The "Background · N workers" row under the header took more space as workers grew. It is now a small chip in the header next to **+**, showing `running/total` with a spinner while any worker runs, or the count with a robot icon.
+- Clicking the chip opens the same list as a floating panel under the header, over the transcript, up to 50vh tall with scrolling. Escape, a click outside, or opening a worker closes it.
+
 ### Voice capture (0.3.0, built 2026-11-06)
 - **Two extensions.** Webviews have no microphone, and with Remote SSH the main extension runs on the server. Recording lives in the companion **OpenCode Voice** (`sr-web-studio.opencode-voice`, folder `companion/`, `extensionKind: ["ui"]`), which runs on the machine with the microphone.
 - **Flow:**

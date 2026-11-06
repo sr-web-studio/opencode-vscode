@@ -73,13 +73,16 @@
     {#if app.readOnly}
       <header class="wtitle"><Codicon name="robot" /> <span class="wname">{app.workerTitle ?? "Worker"}</span> <span class="muted small">Read-only</span></header>
     {:else}
-      <SessionSwitcher {app} hasDraftText={draft.trim().length > 0} />
+      <SessionSwitcher {app} hasDraftText={draft.trim().length > 0}>
+        {#snippet extra()}
+          {#if app.workers.length > 0 || app.runningShells > 0}
+            <WorkersRow workers={app.workers} shells={app.runningShells} />
+          {/if}
+        {/snippet}
+      </SessionSwitcher>
     {/if}
     {#if app.connection.status === "disconnected"}
       <div class="banner muted">Connection lost. Reconnecting…</div>
-    {/if}
-    {#if !app.readOnly && (app.workers.length > 0 || app.runningShells > 0)}
-      <WorkersRow workers={app.workers} shells={app.runningShells} />
     {/if}
     {#if empty}
       <EmptyState folderName={app.folderName} displayPath={app.displayPath} onsuggest={suggest} />
