@@ -51,6 +51,30 @@ Salim installed the M1 vsix locally on Windows (OpenCode 2.1.4 there, workspace 
     - `shell.output` and `shell.get` are scoped to the session's location.
 10. **Edit session title**: a pencil icon on hover next to the header title (and F2 / double-click) turns it into an inline input. Enter saves via `session.update({ title })`, and Esc cancels. The session dropdown rows also get a rename action on hover.
 
+## Voice input (proposed 2026-11-06, decision pending)
+
+Goal: dictate prompts, Bangla first, plus English and mixed Bangla-English. Speech becomes text in the prompt box and is never sent automatically.
+
+Facts checked on 2026-11-06:
+- **Webviews have no microphone access** in VS Code: `getUserMedia` fails with "Permissions policy violation: microphone is not allowed". There is only a proposed API for it (microsoft/vscode#323602, backlog). Built-in VS Code speech/dictation works only in VS Code's own inputs, and a public speech-provider API for extensions doesn't exist yet (#310069).
+- **Windows voice typing (Win+H) has no Bangla.** Android Gboard voice typing does support Bangla.
+- **OpenCode 2.2.5** has `experimental.voice.*` (realtime voice-agent models from OpenAI, xAI and Google; all `available: false` here). Those models are voice agents, not dictation, and general models do poorly on Bangla.
+- **Bangla STT benchmark** (Riverborn/BanSpeech, Sept 2026, 1,001 clips, character error rate):
+  - streaming: Soniox `stt-rt` 7.4% CER, Sarvam realtime 9.0%
+  - batch: Sarvam `saarika:v2.5` 6.9%, Soniox 8.1%
+  - OpenAI `gpt-4o-transcribe` 24–29% and Whisper large-v3 ~31% are 4–5× worse
+  - prices: Soniox about $0.10 per audio hour, Sarvam about $0.31
+
+Proposal:
+- **Engine:** Soniox real-time STT, with `language_hints` from `opencode.voice.languages` (default `["bn", "en"]`). It handles code-switching and has 60+ languages. The text streams live into the prompt box, and the final text replaces partial text. Swapping to a different engine is possible through a small `SpeechEngine` interface (Soniox, Sarvam, OpenAI).
+- **Key:** the user's own STT API key is stored in VS Code `SecretStorage`, or in secure storage on mobile. The extension host mints short-lived temporary keys, so the long-lived key never reaches the webview. It is never stored in OpenCode config.
+- **Capture in VS Code:** the webview cannot record, so the laptop-side companion extension (`extensionKind: ["ui"]`, also used for OS notifications) does the recording. Possible ways, to be tested in a spike on Salim's laptop:
+  - a. Companion opens a tiny `localhost` capture page. Either VS Code's integrated browser, which has mic permission prompts since 2026-05 (#303293), or the default browser. The page streams to Soniox and returns the text to the extension.
+  - b. Companion records with a native helper (`ffmpeg -f dshow` on Windows). This adds an extra dependency.
+  - c. When #323602 ships, record directly in the webview.
+- **Mobile:** Capacitor has native mic access, so it uses the same engine directly. Gboard remains a free fallback.
+- **UX:** a mic codicon in the prompt box (keyboard `Ctrl+Alt+V`). Click to start and click again or Esc to stop. A small level meter and the active language (`বাংলা + EN`) are shown while recording. Partial text is grey, and nothing is auto-sent.
+
 ## Controls (approved 2026-11-06, mockups in `docs/mockups/v3/`)
 
 - **Agent / model** (v3/01, v3/02): one quiet footer row of plain muted text under the prompt textarea: `build ⌄ · Sonnet 5.5 · high ⌄`. No pills, chips or borders. Clicking opens a small popover anchored to that text.
