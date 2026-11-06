@@ -47,7 +47,7 @@ export const SILENT_PEAK = 8
 export const SILENCE_FRAMES = 20
 
 export const silenceMessage = (device?: string): string =>
-  `The microphone${device ? ` “${device}”` : ""} sends only silence. On Windows, turn on Settings → Privacy & security → Microphone → “Let desktop apps access your microphone”, and check that it is not muted. Or pick another one with “OpenCode Voice: Choose Microphone”.`
+  `The microphone${device ? ` “${device}”` : ""} sends only silence, although access is allowed. Run “Test Microphone”: it records 3 seconds from every microphone and shows which ones deliver audio.`
 
 export type SessionOptions = {
   key: string
