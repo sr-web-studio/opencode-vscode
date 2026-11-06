@@ -112,7 +112,26 @@ Salim installed the M1 vsix locally on Windows (OpenCode 2.1.4 there, workspace 
         - then the output, with ANSI colors, in the terminal font (`terminal.integrated.fontFamily`, falling back to the editor font) on `--vscode-terminal-background`
         - a footer `Show all N lines` when the output is cut
       - The exit badge keeps green/red, because that carries meaning.
+    - **History paging bug (fixed in 0.2.2):** the server rejects `cursor` together with `order` ("Cursor cannot be combined with order"). The first page sends `order: "desc"`, and later pages send only the cursor.
     - **Full shell command:** when a shell line is expanded, the block starts with the full command: `$ <command>`, wrapped, monospace, with a copy button. The output follows. The collapsed line keeps the one-line ellipsis plus the hover title.
+18. **Round 2c (after the 0.2.1 screenshots):**
+    - **User messages like Claude Code:**
+      - The user message is a right-leaning bubble. It has a left margin of at least 15% of the panel width (min 32px), so it is indented from the left while the agent's text uses the full width.
+      - Bubble style: `--vscode-input-background` (or `--vscode-chat-requestBackground` when visibly different), a 1px border, 8px radius, 10/14px padding. The heavy accent left border and the "You" header row are removed.
+      - The prompt's time moves **outside and above** the bubble, right-aligned, muted and small (`12:33 PM`), visible on hover only, plus always for the first prompt of a day. That way it never looks like the agent's end-of-turn stamp.
+      - The agent's end-of-turn stamp stays left-aligned under the answer.
+      - The revert button sits on the bubble's top-left edge on hover.
+    - **Sticky last prompt:**
+      - When the user prompt of the turn currently in view has scrolled above the top, a compact sticky bar sits at the top of the transcript.
+      - It shows that prompt in one line (ellipsis, max 2 lines on hover), in the same bubble style but slimmer, with a shadow (`--vscode-widget-shadow`).
+      - Clicking it scrolls back to that prompt.
+      - It follows the turn under the top edge, so in a long chat it always shows "what was asked for the text I'm reading now". Use an IntersectionObserver on the user bubbles, not scroll math on every frame.
+      - It is hidden when that prompt is visible, and never covers the session header.
+    - **Todo bar truly floating:**
+      - Today it is a flex sibling between the transcript and the prompt box. The scroll area therefore ends above it, and the area above the bar becomes the visible bottom of the panel.
+      - Fix: the todo bar is absolutely positioned over the transcript, anchored to the bottom of the transcript area just above the prompt box, with its own background and a shadow. The transcript runs underneath it.
+      - The transcript gets bottom padding equal to the bar's measured height (ResizeObserver), so the last line can still scroll into view above it.
+      - The jump-to-end button sits above the bar.
 10. **Edit session title**: a pencil icon on hover next to the header title (and F2 / double-click) turns it into an inline input. Enter saves via `session.update({ title })`, and Esc cancels. The session dropdown rows also get a rename action on hover.
 
 ## Voice input (proposed 2026-11-06, decision pending)
