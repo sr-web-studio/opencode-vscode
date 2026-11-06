@@ -1,5 +1,6 @@
 import DOMPurify from "dompurify"
 import { marked } from "marked"
+import { codeLanguage } from "../core/code-block"
 import { looksLikePath } from "../core/paths"
 
 marked.setOptions({ gfm: true, breaks: false })
@@ -21,6 +22,29 @@ export function renderMarkdown(text: string): string {
   const clean = purify.sanitize(raw, { FORBID_ATTR: ["style"], FORBID_TAGS: ["style", "form", "input", "button"] })
   const tpl = document.createElement("template")
   tpl.innerHTML = clean
+  // Added after sanitizing on purpose: the sanitizer keeps forbidding `button`.
+  for (const pre of Array.from(tpl.content.querySelectorAll("pre"))) {
+    const code = pre.querySelector("code")
+    if (!code) continue
+    const wrap = document.createElement("div")
+    wrap.className = "oc-code"
+    const head = document.createElement("div")
+    head.className = "oc-code-head"
+    const lang = document.createElement("span")
+    lang.className = "oc-code-lang"
+    lang.textContent = codeLanguage(code.getAttribute("class"))
+    const btn = document.createElement("button")
+    btn.type = "button"
+    btn.className = "oc-copy"
+    btn.title = "Copy code"
+    btn.setAttribute("aria-label", "Copy code")
+    const icon = document.createElement("span")
+    icon.className = "codicon codicon-copy"
+    btn.appendChild(icon)
+    head.append(lang, btn)
+    pre.replaceWith(wrap)
+    wrap.append(head, pre)
+  }
   for (const code of Array.from(tpl.content.querySelectorAll("code"))) {
     if (code.closest("pre") || code.closest("a")) continue
     const label = code.textContent ?? ""

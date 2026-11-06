@@ -1,5 +1,6 @@
 <script lang="ts">
   import { splitLine } from "../../core/paths"
+  import { copyCodeBlock } from "../code-copy"
   import { useStore } from "../context"
   import { renderMarkdown } from "../markdown"
 
@@ -8,7 +9,14 @@
   const html = $derived(renderMarkdown(text))
 
   function onclick(e: MouseEvent) {
-    const a = (e.target as HTMLElement).closest("a")
+    const target = e.target as HTMLElement
+    const copyBtn = target.closest<HTMLElement>("button.oc-copy")
+    if (copyBtn) {
+      e.preventDefault()
+      void copyCodeBlock(copyBtn)
+      return
+    }
+    const a = target.closest("a")
     if (!a) return
     e.preventDefault()
     const path = a.dataset.path
