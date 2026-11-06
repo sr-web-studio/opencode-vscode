@@ -26,7 +26,17 @@ export class HostActions {
     private readonly workers: () => WorkerPanels,
   ) {}
 
+  /** Run a request from a webview. A failure is shown to the user; it never disappears silently. */
   async handle(req: HostRequest, surface: Surface): Promise<void> {
+    try {
+      await this.run(req, surface)
+    } catch (e) {
+      const what = req.type === "openSession" ? "Could not open the worker" : req.type === "showTerminal" ? "Could not show the terminal" : "OpenCode could not do that"
+      void vscode.window.showErrorMessage(`${what}: ${e instanceof Error ? e.message : "unknown error"}`)
+    }
+  }
+
+  private async run(req: HostRequest, surface: Surface): Promise<void> {
     switch (req.type) {
       case "openFile":
         return this.openFile(req.path, req.line)
