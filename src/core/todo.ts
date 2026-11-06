@@ -5,7 +5,12 @@ export type TodoItem = { content: string; status: TodoStatus }
 
 const STATUSES: ReadonlySet<string> = new Set<TodoStatus>(["pending", "in_progress", "completed", "cancelled"])
 
-/** Tool name confirmed from the OpenCode binary (`todowrite`, enabled by `experimental.todo`). */
+/**
+ * Tool name and shape, captured live from OpenCode 2.2.5 with `experimental.todo` on (see
+ * `test/fixtures/todowrite-live.json`): `todowrite`, input `{ todos: [{ content, status }] }`,
+ * completed metadata `{ todos, truncated }`, output "Todos updated: 0/2 completed, 1 in progress, 1 pending. …".
+ * In V2 the tool exists only when `experimental.todo` is true; this extension never changes that setting.
+ */
 export const TODO_TOOL = "todowrite"
 
 /**
@@ -23,6 +28,11 @@ export function parseTodos(input: unknown): TodoItem[] {
   })
 }
 
+/** `state.input.todos`, falling back to `state.metadata.todos` when the input carries no list. */
+export function todosOf(tool: Pick<ToolItem, "input" | "metadata">): TodoItem[] {
+  return parseTodos(Array.isArray(tool.input.todos) ? tool.input.todos : tool.metadata.todos)
+}
+
 /** Todo list from the latest completed `todowrite` call in the session, or undefined if none was made. */
 export function latestTodos(view: SessionView): TodoItem[] | undefined {
   for (let t = view.turns.length - 1; t >= 0; t--) {
@@ -32,7 +42,7 @@ export function latestTodos(view: SessionView): TodoItem[] | undefined {
       for (let i = items.length - 1; i >= 0; i--) {
         const item = items[i]!
         if (item.kind === "tool" && item.name === TODO_TOOL && (item as ToolItem).status === "completed") {
-          return parseTodos((item as ToolItem).input.todos)
+          return todosOf(item as ToolItem)
         }
       }
     }

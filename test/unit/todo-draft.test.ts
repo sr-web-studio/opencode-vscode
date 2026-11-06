@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test"
-import { latestTodos, parseTodos, summarizeTodos, todoBar } from "../../src/core/todo"
+import todoLive from "../fixtures/todowrite-live.json"
+import { latestTodos, parseTodos, summarizeTodos, todoBar, todosOf } from "../../src/core/todo"
+import { applyEvent, viewFromMessages } from "../../src/core/transcript/reducer"
 import { initialTarget, planNewSession, showEmptyState } from "../../src/core/draft"
 import { emptyView, type SessionView, type ToolItem } from "../../src/core/transcript/types"
 import { folderName, looksLikePath, relativeTo, shortenHome, splitLine } from "../../src/core/paths"
@@ -12,13 +14,36 @@ const viewWith = (...tools: ToolItem[]): SessionView => ({
   turns: tools.map((t, i) => ({ id: `t${i}`, steps: [{ id: `s${i}`, items: [t] }] })),
 })
 
-describe("todo parser (shape from the OpenCode binary; not live-captured)", () => {
+describe("todo parser (shape captured live from OpenCode 2.2.5 with experimental.todo on)", () => {
   test("drops entries without content, defaults unknown status to pending", () => {
     expect(parseTodos([{ content: "a", status: "completed" }, { content: "" }, { status: "pending" }, { content: "b", status: "weird" }, null, 3])).toEqual([
       { content: "a", status: "completed" },
       { content: "b", status: "pending" },
     ])
     expect(parseTodos("nope")).toEqual([])
+  })
+  test("live fixture: history and replayed events give the same list", () => {
+    const hist = viewFromMessages(todoLive.messages as any)
+    const live = (todoLive.events as any[]).reduce((v, e) => applyEvent(v, e), emptyView())
+    for (const view of [hist, live]) {
+      const items = latestTodos(view)!
+      expect(items).toEqual([{ content: "First task", status: "in_progress" }, { content: "Second task", status: "pending" }])
+      const bar = todoBar(view, false)!
+      expect([bar.done, bar.total, bar.current]).toEqual([0, 2, "First task"])
+    }
+  })
+  test("live tool state carries metadata.todos next to the input", () => {
+    const tool = viewFromMessages(todoLive.messages as any).turns[0]!.steps.flatMap((s) => s.items).find((i) => i.kind === "tool" && i.name === "todowrite") as ToolItem
+    expect(tool.status).toBe("completed")
+    expect(tool.metadata.todos).toEqual(tool.input.todos)
+    expect(tool.output).toMatch(/^Todos updated: 0\/2 completed, 1 in progress, 1 pending/)
+  })
+  test("falls back to metadata.todos when the input has no list", () => {
+    const meta = [{ content: "m", status: "in_progress" as const }]
+    expect(todosOf({ input: {}, metadata: { todos: meta } })).toEqual(meta)
+    expect(todosOf({ input: { todos: [{ content: "i", status: "pending" }] }, metadata: { todos: meta } })).toEqual([{ content: "i", status: "pending" }])
+    expect(todosOf({ input: { todos: [] }, metadata: { todos: meta } })).toEqual([])
+    expect(todosOf({ input: {}, metadata: {} })).toEqual([])
   })
   test("latest completed todowrite wins; running calls are ignored", () => {
     const v = viewWith(todoTool([{ content: "old", status: "pending" }]), todoTool([{ content: "new", status: "in_progress" }]), todoTool([{ content: "x", status: "pending" }], "running"))

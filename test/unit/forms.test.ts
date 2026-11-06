@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import questionForm from "../fixtures/question-form.json"
 import type { FormField } from "../../src/core/api"
-import { OTHER, buildAnswer, clampStep, defaultAnswers, isChoice, tabsFor, validateField, validateForm, visibleFields } from "../../src/core/forms"
+import { OTHER, buildAnswer, choiceOf, clampStep, defaultAnswers, isChoice, tabsFor, validateField, validateForm, visibleFields } from "../../src/core/forms"
 
 const f = (x: unknown) => x as FormField
 
@@ -105,6 +105,8 @@ describe("real question form (captured from the server)", () => {
     expect(form.metadata.kind).toBe("question")
     expect(fields[0]!.key).toBe("q0")
     expect(isChoice(fields[0]!)).toBe(true)
+    expect(choiceOf(fields[0]!)?.key).toBe("q0")
+    expect(choiceOf({ key: "t", type: "string" } as FormField)).toBeUndefined()
     expect((fields[0] as { custom?: boolean }).custom).toBe(true)
   })
   test("the reply matches what the server accepted", () => {

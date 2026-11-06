@@ -1,0 +1,52 @@
+import * as vscode from "vscode"
+import { defaultNotificationSettings, type NotificationSettings } from "../core/notifications/types"
+import type { ViewSettings } from "../core/protocol"
+
+const cfg = () => vscode.workspace.getConfiguration("opencode")
+
+/** Resolved transcript font: the setting, else the chat editor font size, else 13. */
+function fontSize(): number {
+  const own = cfg().get<number>("transcript.fontSize", 0)
+  if (own > 0) return own
+  const chat = vscode.workspace.getConfiguration("chat.editor").get<number>("fontSize", 0)
+  return chat > 0 ? chat : 13
+}
+
+export function readViewSettings(): ViewSettings {
+  const c = cfg()
+  const reasoning = c.get<string>("transcript.showReasoning", "collapsed")
+  return {
+    collapseCompletedSteps: c.get<boolean>("transcript.collapseCompletedSteps", true),
+    expandToolDetails: c.get<boolean>("transcript.expandToolDetails", false),
+    showReasoning: reasoning === "expanded" || reasoning === "hidden" ? reasoning : "collapsed",
+    fontSize: fontSize(),
+    todoDefaultExpanded: c.get<boolean>("todo.defaultExpanded", false),
+  }
+}
+
+export function readNotificationSettings(): NotificationSettings {
+  const c = cfg()
+  const d = defaultNotificationSettings
+  return {
+    enabled: c.get<boolean>("notifications.enabled", d.enabled),
+    attention: c.get<boolean>("notifications.attention", d.attention),
+    completed: c.get<boolean>("notifications.completed", d.completed),
+    failed: c.get<boolean>("notifications.failed", d.failed),
+    workers: c.get<boolean>("notifications.workers", d.workers),
+    shells: c.get<boolean>("notifications.shells", d.shells),
+    whenFocused: c.get<string>("notifications.whenFocused", d.whenFocused) === "always" ? "always" : "never",
+    os: c.get<string>("notifications.os", d.os) === "off" ? "off" : "auto",
+  }
+}
+
+export const readConnectionSettings = () => ({
+  serverUrl: cfg().get<string>("serverUrl", ""),
+  cliPath: cfg().get<string>("cliPath", ""),
+})
+
+/** Config keys whose change requires a new connection. */
+export const affectsConnection = (e: vscode.ConfigurationChangeEvent) =>
+  e.affectsConfiguration("opencode.serverUrl") || e.affectsConfiguration("opencode.cliPath")
+
+export const affectsView = (e: vscode.ConfigurationChangeEvent) =>
+  e.affectsConfiguration("opencode.transcript") || e.affectsConfiguration("opencode.todo") || e.affectsConfiguration("chat.editor.fontSize")

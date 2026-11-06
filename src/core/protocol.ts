@@ -5,6 +5,8 @@ import type { SessionView } from "./transcript/types"
 
 export type ConnectionState = {
   status: "connecting" | "connected" | "disconnected" | "setup" | "error"
+  /** For `setup`: what is missing. `cli` shows install instructions and "Set CLI path"; `folder` asks to open a folder. */
+  reason?: "cli" | "folder"
   message?: string
   url?: string
   version?: string
@@ -87,7 +89,7 @@ export type Action =
 /** Messages from the extension host to the webview. */
 export type ToWebview =
   | { type: "state"; state: AppState }
-  | { type: "visible"; visible: boolean }
+  | { type: "command"; name: "newSession" }
 
 /** Host-side effects the webview asks for (files, terminals, links). Not state changes. */
 export type HostRequest =
@@ -98,8 +100,6 @@ export type HostRequest =
   | { type: "setCliPath" }
   | { type: "reconnect" }
   | { type: "notify"; level: "info" | "warning" | "error"; message: string }
-  | { type: "storage.set"; key: string; value: unknown }
-  | { type: "focusState"; focused: boolean }
 
 /** Messages from the webview to the extension host. */
 export type ToHost = { type: "action"; action: Action } | { type: "host"; request: HostRequest }

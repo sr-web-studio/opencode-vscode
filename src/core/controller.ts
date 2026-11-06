@@ -168,6 +168,24 @@ export class Controller {
     }
   }
 
+  /** The session a background shell belongs to (`metadata.sessionID` on the shell). */
+  async shellSessionID(shellID: string): Promise<string | undefined> {
+    if (!this.client) return undefined
+    try {
+      const res = await this.client.shell.get({ id: shellID, location: { directory: this.opts.directory } })
+      const id = res.data.metadata?.sessionID
+      return typeof id === "string" ? id : undefined
+    } catch {
+      return undefined
+    }
+  }
+
+  /** Captured output of a shell, for "Show terminal". */
+  async shellOutput(shellID: string): Promise<string> {
+    const res = await this.need().shell.output({ id: shellID, location: { directory: this.opts.directory } })
+    return res.data.output
+  }
+
   /** Attach a ready client and start following events. Replaces any previous attachment. */
   attach(client: OpenCodeClient) {
     this.detach()

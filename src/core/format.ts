@@ -38,3 +38,15 @@ export function relativeTime(then: number, now: number): string {
 export function plural(n: number, one: string, many = `${one}s`): string {
   return `${n} ${n === 1 ? one : many}`
 }
+
+/** Last `n` lines of a text, with a marker when something was cut. */
+export function tailLines(text: string, n: number): string {
+  const lines = text.replace(/\s+$/, "").split("\n")
+  return lines.length <= n ? lines.join("\n") : `…\n${lines.slice(-n).join("\n")}`
+}
+
+/** First `n` lines of a text, with a marker when something was cut. */
+export function headLines(text: string, n: number): string {
+  const lines = text.split("\n")
+  return lines.length <= n ? text : `${lines.slice(0, n).join("\n")}\n…`
+}

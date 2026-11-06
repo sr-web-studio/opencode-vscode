@@ -1,0 +1,419 @@
+{
+ "events": [
+  {
+   "id": "evt_1aee77231001JrD6tJs8wgyzUD",
+   "type": "server.connected",
+   "data": {}
+  },
+  {
+   "id": "evt_1aee772350012Rit52MeUimTAd",
+   "created": 1793935766069,
+   "type": "session.inbox.enqueued",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "inboxID": "msg_1aee77234001SGaGAp8jJ04QGo",
+    "sessionID": "ses_e51188dd3ffeCm2xcY5LMsJkS0",
+    "item": {
+     "type": "user",
+     "payload": {
+      "text": "Use the todowrite tool to create a 2-item todo list (first item in_progress, second pending), then reply with the word ok."
+     },
+     "delivery": "steer"
+    }
+   }
+  },
+  {
+   "id": "evt_1aee77236001bGnFI63BsC6aRC",
+   "created": 1793935766070,
+   "type": "session.execution.started",
+   "data": {
+    "sessionID": "ses_e51188dd3ffeCm2xcY5LMsJkS0"
+   }
+  },
+  {
+   "id": "evt_1aee772c00013jue49tjyh5TCY",
+   "created": 1793935766208,
+   "type": "session.inbox.delivered",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e51188dd3ffeCm2xcY5LMsJkS0",
+    "inboxID": "msg_1aee77234001SGaGAp8jJ04QGo"
+   }
+  },
+  {
+   "id": "evt_1aee7816c001v48eVlgbzxevob",
+   "created": 1793935769964,
+   "type": "session.step.started",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e51188dd3ffeCm2xcY5LMsJkS0",
+    "agent": "build",
+    "model": {
+     "id": "deepseek-v4.1-flash",
+     "providerID": "cli-proxy-api",
+     "variant": "low"
+    },
+    "assistantMessageID": "msg_1aee772c4001gQ3C0bmYDlEbaP",
+    "started": 1793935766217
+   }
+  },
+  {
+   "id": "evt_1aee7816e001oO4QhgcY3G4CCm",
+   "created": 1793935769966,
+   "type": "session.tool.input.started",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e51188dd3ffeCm2xcY5LMsJkS0",
+    "assistantMessageID": "msg_1aee772c4001gQ3C0bmYDlEbaP",
+    "id": "call_65eab6d6ae4a4d81b6341864",
+    "name": "todowrite"
+   }
+  },
+  {
+   "id": "evt_1aee78339001NGbJ6hQGNKX9UF",
+   "created": 1793935770425,
+   "type": "session.tool.input.ended",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e51188dd3ffeCm2xcY5LMsJkS0",
+    "assistantMessageID": "msg_1aee772c4001gQ3C0bmYDlEbaP",
+    "id": "call_65eab6d6ae4a4d81b6341864",
+    "text": "{\"todos\":[{\"content\":\"First task\",\"status\":\"in_progress\"},{\"content\":\"Second task\",\"status\":\"pending\"}]}"
+   }
+  },
+  {
+   "id": "evt_1aee7833a001HIQLG11P80tH6y",
+   "created": 1793935770426,
+   "type": "session.tool.called",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e51188dd3ffeCm2xcY5LMsJkS0",
+    "assistantMessageID": "msg_1aee772c4001gQ3C0bmYDlEbaP",
+    "id": "call_65eab6d6ae4a4d81b6341864",
+    "input": {
+     "todos": [
+      {
+       "content": "First task",
+       "status": "in_progress"
+      },
+      {
+       "content": "Second task",
+       "status": "pending"
+      }
+     ]
+    },
+    "executed": false
+   }
+  },
+  {
+   "id": "evt_1aee7833b001V9mlhFqQD8r4oq",
+   "created": 1793935770427,
+   "type": "session.step.streamed",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e51188dd3ffeCm2xcY5LMsJkS0",
+    "assistantMessageID": "msg_1aee772c4001gQ3C0bmYDlEbaP"
+   }
+  },
+  {
+   "id": "evt_1aee7833f001z4YhBsFuqyT0pb",
+   "created": 1793935770431,
+   "type": "session.tool.success",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e51188dd3ffeCm2xcY5LMsJkS0",
+    "assistantMessageID": "msg_1aee772c4001gQ3C0bmYDlEbaP",
+    "id": "call_65eab6d6ae4a4d81b6341864",
+    "content": [
+     {
+      "type": "text",
+      "text": "Todos updated: 0/2 completed, 1 in progress, 1 pending. In progress: \"First task\""
+     }
+    ],
+    "metadata": {
+     "todos": [
+      {
+       "content": "First task",
+       "status": "in_progress"
+      },
+      {
+       "content": "Second task",
+       "status": "pending"
+      }
+     ],
+     "truncated": false
+    },
+    "executed": false
+   }
+  },
+  {
+   "id": "evt_1aee78340001bACGMSTbQfmU52",
+   "created": 1793935770432,
+   "type": "session.step.ended",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e51188dd3ffeCm2xcY5LMsJkS0",
+    "assistantMessageID": "msg_1aee772c4001gQ3C0bmYDlEbaP",
+    "finish": "tool-calls",
+    "rawFinish": "tool_calls",
+    "tokens": {
+     "input": 8475,
+     "output": 70,
+     "reasoning": 0,
+     "cache": {
+      "read": 256,
+      "write": 0
+     }
+    },
+    "cost": 0
+   }
+  },
+  {
+   "id": "evt_1aee78bec001Y0mZ9EpDcq0ggJ",
+   "created": 1793935772652,
+   "type": "session.step.started",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e51188dd3ffeCm2xcY5LMsJkS0",
+    "agent": "build",
+    "model": {
+     "id": "deepseek-v4.1-flash",
+     "providerID": "cli-proxy-api",
+     "variant": "low"
+    },
+    "assistantMessageID": "msg_1aee783630011vTjEY7juBa385",
+    "started": 1793935770471
+   }
+  },
+  {
+   "id": "evt_1aee78bee001x81RQ08MQohg99",
+   "created": 1793935772654,
+   "type": "session.text.started",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e51188dd3ffeCm2xcY5LMsJkS0",
+    "assistantMessageID": "msg_1aee783630011vTjEY7juBa385",
+    "ordinal": 0
+   }
+  },
+  {
+   "id": "evt_1aee78c1e0018n2iurSyqT5GDY",
+   "created": 1793935772702,
+   "type": "session.text.delta",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e51188dd3ffeCm2xcY5LMsJkS0",
+    "assistantMessageID": "msg_1aee783630011vTjEY7juBa385",
+    "ordinal": 0,
+    "delta": "ok"
+   }
+  },
+  {
+   "id": "evt_1aee78c1e002OxWErHGiw1we4O",
+   "created": 1793935772702,
+   "type": "session.text.ended",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e51188dd3ffeCm2xcY5LMsJkS0",
+    "assistantMessageID": "msg_1aee783630011vTjEY7juBa385",
+    "ordinal": 0,
+    "text": "ok"
+   }
+  },
+  {
+   "id": "evt_1aee78c1f001333P3spfrHUXlC",
+   "created": 1793935772703,
+   "type": "session.step.streamed",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e51188dd3ffeCm2xcY5LMsJkS0",
+    "assistantMessageID": "msg_1aee783630011vTjEY7juBa385"
+   }
+  },
+  {
+   "id": "evt_1aee78c20001mBxzG6julHtKPc",
+   "created": 1793935772704,
+   "type": "session.step.ended",
+   "location": {
+    "directory": "/tmp/opencode/occ-test"
+   },
+   "data": {
+    "sessionID": "ses_e51188dd3ffeCm2xcY5LMsJkS0",
+    "assistantMessageID": "msg_1aee783630011vTjEY7juBa385",
+    "finish": "stop",
+    "rawFinish": "stop",
+    "tokens": {
+     "input": 133,
+     "output": 3,
+     "reasoning": 0,
+     "cache": {
+      "read": 8704,
+      "write": 0
+     }
+    },
+    "cost": 0
+   }
+  },
+  {
+   "id": "evt_1aee78c230015kfPydxpz2Bi2P",
+   "created": 1793935772707,
+   "type": "session.execution.succeeded",
+   "data": {
+    "sessionID": "ses_e51188dd3ffeCm2xcY5LMsJkS0"
+   }
+  }
+ ],
+ "messages": [
+  {
+   "id": "msg_1aee77234001SGaGAp8jJ04QGo",
+   "time": {
+    "created": 1793935766208
+   },
+   "text": "Use the todowrite tool to create a 2-item todo list (first item in_progress, second pending), then reply with the word ok.",
+   "type": "user"
+  },
+  {
+   "id": "msg_1aee772c4001gQ3C0bmYDlEbaP",
+   "time": {
+    "created": 1793935766217,
+    "streamed": 1793935770427,
+    "completed": 1793935770432
+   },
+   "type": "assistant",
+   "agent": "build",
+   "model": {
+    "id": "deepseek-v4.1-flash",
+    "providerID": "cli-proxy-api",
+    "variant": "low"
+   },
+   "content": [
+    {
+     "type": "tool",
+     "id": "call_65eab6d6ae4a4d81b6341864",
+     "name": "todowrite",
+     "executed": false,
+     "state": {
+      "status": "completed",
+      "input": {
+       "todos": [
+        {
+         "content": "First task",
+         "status": "in_progress"
+        },
+        {
+         "content": "Second task",
+         "status": "pending"
+        }
+       ]
+      },
+      "content": [
+       {
+        "type": "text",
+        "text": "Todos updated: 0/2 completed, 1 in progress, 1 pending. In progress: \"First task\""
+       }
+      ],
+      "metadata": {
+       "todos": [
+        {
+         "content": "First task",
+         "status": "in_progress"
+        },
+        {
+         "content": "Second task",
+         "status": "pending"
+        }
+       ],
+       "truncated": false
+      }
+     },
+     "time": {
+      "created": 1793935769966,
+      "ran": 1793935770426,
+      "completed": 1793935770431
+     }
+    }
+   ],
+   "finish": "tool-calls",
+   "rawFinish": "tool_calls",
+   "cost": 0,
+   "tokens": {
+    "input": 8475,
+    "output": 70,
+    "reasoning": 0,
+    "cache": {
+     "read": 256,
+     "write": 0
+    }
+   }
+  },
+  {
+   "id": "msg_1aee783630011vTjEY7juBa385",
+   "time": {
+    "created": 1793935770471,
+    "streamed": 1793935772703,
+    "completed": 1793935772704
+   },
+   "type": "assistant",
+   "agent": "build",
+   "model": {
+    "id": "deepseek-v4.1-flash",
+    "providerID": "cli-proxy-api",
+    "variant": "low"
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "ok"
+    }
+   ],
+   "finish": "stop",
+   "rawFinish": "stop",
+   "cost": 0,
+   "tokens": {
+    "input": 133,
+    "output": 3,
+    "reasoning": 0,
+    "cache": {
+     "read": 8704,
+     "write": 0
+    }
+   }
+  },
+  {
+   "id": "msg_1aee78c230015kfPydxpz2Bi2P",
+   "time": {
+    "created": 1793935772707
+   },
+   "type": "idle",
+   "outcome": "succeeded"
+  }
+ ]
+}
