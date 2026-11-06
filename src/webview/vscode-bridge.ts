@@ -6,6 +6,7 @@ declare function acquireVsCodeApi(): VsCodeApi
 
 /** `HostBridge` for a VS Code webview: messages go over `postMessage`, storage is the webview state. */
 let pickSeq = 0
+let imageSeq = 0
 
 export function createVsCodeBridge(): HostBridge {
   const api = acquireVsCodeApi()
@@ -15,6 +16,22 @@ export function createVsCodeBridge(): HostBridge {
 
   return {
     openFile: (path, line) => host({ type: "openFile", path, line }),
+    imageData: (ref) =>
+      new Promise<string | undefined>((resolve) => {
+        const requestID = `img-${++imageSeq}`
+        const done = (dataUri?: string) => {
+          window.removeEventListener("message", listener)
+          clearTimeout(timer)
+          resolve(dataUri)
+        }
+        const listener = (e: MessageEvent<ToWebview>) => {
+          if (e.data?.type === "image" && e.data.requestID === requestID) done(e.data.dataUri)
+        }
+        const timer = setTimeout(() => done(undefined), 30_000)
+        window.addEventListener("message", listener)
+        host({ type: "imageData", requestID, ref })
+      }),
+    openImage: (ref, name) => host({ type: "openImage", ref, name }),
     openDiff: (file, patch) => host({ type: "openDiff", file, patch }),
     showTerminal: (shellID, title) => host({ type: "showTerminal", shellID, title }),
     openSession: (id, options) => host({ type: "openSession", id, readOnly: options.readOnly }),

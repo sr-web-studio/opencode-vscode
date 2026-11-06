@@ -4,6 +4,7 @@ import { isAbsolutePath } from "../core/paths"
 import type { HostRequest, PickedFile, ToWebview } from "../core/protocol"
 import type { WorkerPanels } from "./workers"
 import type { ShellTerminals } from "./terminal"
+import type { ImagePreviews } from "./images"
 
 const REVERT_PROMPT =
   "Revert to before this prompt? Messages after it are hidden, and files changed by later steps are restored. Shell side effects (git, databases, other files) are not undone."
@@ -24,6 +25,7 @@ export class HostActions {
     private readonly directory: string,
     private readonly terminals: () => ShellTerminals,
     private readonly workers: () => WorkerPanels,
+    private readonly images: () => ImagePreviews,
   ) {}
 
   /** Run a request from a webview. A failure is shown to the user; it never disappears silently. */
@@ -31,7 +33,8 @@ export class HostActions {
     try {
       await this.run(req, surface)
     } catch (e) {
-      const what = req.type === "openSession" ? "Could not open the worker" : req.type === "showTerminal" ? "Could not show the terminal" : "OpenCode could not do that"
+      const what =
+        req.type === "openSession" ? "Could not open the worker" : req.type === "showTerminal" ? "Could not show the terminal" : req.type === "openImage" ? "Could not open the image" : "OpenCode could not do that"
       void vscode.window.showErrorMessage(`${what}: ${e instanceof Error ? e.message : "unknown error"}`)
     }
   }
@@ -40,6 +43,13 @@ export class HostActions {
     switch (req.type) {
       case "openFile":
         return this.openFile(req.path, req.line)
+      case "imageData": {
+        const dataUri = await this.images().thumbnail(surface.sessionID(), req.ref).catch(() => undefined)
+        surface.post({ type: "image", requestID: req.requestID, dataUri })
+        return
+      }
+      case "openImage":
+        return this.images().open(surface.sessionID(), req.ref, req.name)
       case "openDiff":
         return this.openDiff(req.file, req.patch)
       case "showTerminal":
@@ -69,6 +79,7 @@ export class HostActions {
 
   /** Relative paths resolve against the project directory. */
   private resolve(path: string): vscode.Uri {
+    if (/^file:\/\//i.test(path)) return vscode.Uri.parse(path)
     return isAbsolutePath(path) ? vscode.Uri.file(path) : vscode.Uri.joinPath(vscode.Uri.file(this.directory), ...path.split(/[\\/]+/).filter(Boolean))
   }
 

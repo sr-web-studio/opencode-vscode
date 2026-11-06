@@ -1,3 +1,4 @@
+import type { ImageRef } from "../core/images"
 import type { PickedFile, ToHost, ToWebview } from "../core/protocol"
 
 /** Small key/value store that survives webview reloads (VS Code: `getState`/`setState`). */
@@ -14,6 +15,10 @@ export interface BridgeStorage {
 export interface HostBridge {
   /** Open a project file, optionally at a 1-based line. Relative paths are resolved by the host. */
   openFile(path: string, line?: number): void
+  /** The picture of a sent image as a `data:` URI (undefined when it is gone). Asked lazily; the state never carries it. */
+  imageData(ref: ImageRef): Promise<string | undefined>
+  /** Open a sent image in full: VS Code's image viewer, or a full-screen viewer on mobile. */
+  openImage(ref: ImageRef, name?: string): void
   /** Show a unified diff for a file. */
   openDiff(file: string, patch: string): void
   /** Focus the terminal that mirrors a shell command (the host creates it when needed). */
