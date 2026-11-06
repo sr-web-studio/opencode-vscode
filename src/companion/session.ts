@@ -1,5 +1,4 @@
 import {
-  SAMPLE_RATE,
   SONIOX_WS_URL,
   applySonioxMessage,
   nothingHeard,
@@ -8,16 +7,10 @@ import {
   sonioxStartMessage,
   type Heard,
 } from "../core/dictation"
+import { MicCapture, emptyReason, errorText, safe, silenceMessage, type Recorder, type SessionUpdate } from "./shared"
 
-/** The part of a microphone recorder this session uses (`@picovoice/pvrecorder-node` in production). */
-export interface Recorder {
-  readonly sampleRate: number
-  start(): void
-  read(): Promise<Int16Array>
-  stop(): void
-  release(): void
-  getSelectedDevice?(): string
-}
+export { SILENCE_FRAMES, SILENT_PEAK, silenceMessage } from "./shared"
+export type { Recorder, SessionStats, SessionUpdate } from "./shared"
 
 /** The part of a WebSocket this session uses (the global `WebSocket` of Node 22+). */
 export interface Socket {
@@ -30,24 +23,6 @@ export interface Socket {
   onerror: ((ev: unknown) => void) | null
   onclose: ((ev: { code?: number }) => void) | null
 }
-
-/** What one recording received: for the log, and to tell "silent microphone" from "nothing said". */
-export type SessionStats = { frames: number; peak: number; answers: number; device?: string }
-
-export type SessionUpdate =
-  | { kind: "listening"; device?: string }
-  | { kind: "heard"; final: string; partial: string }
-  | { kind: "done"; final: string; error?: string; stats?: SessionStats }
-
-/**
- * A blocked or muted microphone delivers (near) digital zeros; any real microphone has a noise floor above this.
- * Checked after `SILENCE_FRAMES` frames (100 ms each), so the user is told within 2 s instead of talking to nothing.
- */
-export const SILENT_PEAK = 8
-export const SILENCE_FRAMES = 20
-
-export const silenceMessage = (device?: string): string =>
-  `The microphone${device ? ` “${device}”` : ""} sends only silence. Check that it is not muted (mute key, headset switch, or Windows Sound settings), or pick another one with “Choose Microphone”.`
 
 export type SessionOptions = {
   key: string
@@ -74,35 +49,30 @@ const OPEN = 1
  */
 export class DictationSession {
   private heard: Heard = nothingHeard()
-  private recorder?: Recorder
+  private readonly mic: MicCapture
   private socket?: Socket
   private pending: Uint8Array[] = []
-  private recording = false
   private ended = false
   private stopping = false
   private lastHeard = 0
   private started = 0
   private drainTimer?: ReturnType<typeof setTimeout>
-  private frames = 0
-  private peak = 0
   private answers = 0
-  private device?: string
   private readonly now: () => number
 
   constructor(private readonly o: SessionOptions) {
     this.now = o.now ?? Date.now
+    this.mic = new MicCapture(o.recorder, {
+      onFrame: (frame) => this.onFrame(frame),
+      onSilent: () => this.finish(silenceMessage(this.mic.device)),
+      onError: (m) => this.finish(m),
+    })
   }
 
   start(): void {
     this.started = this.lastHeard = this.now()
-    try {
-      this.recorder = this.o.recorder()
-      if (this.recorder.sampleRate !== SAMPLE_RATE) throw new Error(`The microphone gives ${this.recorder.sampleRate} Hz audio; ${SAMPLE_RATE} Hz is needed.`)
-      this.recorder.start()
-      this.recording = true
-    } catch (e) {
-      return this.finish(`Could not open the microphone: ${errorText(e)}`)
-    }
+    const opened = this.mic.open()
+    if (opened) return this.finish(opened)
     try {
       const ws = this.o.socket(SONIOX_WS_URL, sonioxProtocols(this.o.key))
       this.socket = ws
@@ -123,16 +93,15 @@ export class DictationSession {
     } catch (e) {
       return this.finish(`Could not connect to Soniox: ${errorText(e)}`)
     }
-    this.device = safe(() => this.recorder?.getSelectedDevice?.())
-    this.o.emit({ kind: "listening", device: this.device })
-    void this.pump()
+    this.o.emit({ kind: "listening", device: this.mic.device })
+    void this.mic.run()
   }
 
   /** The user clicked the mic again (or sent the prompt). */
   stop(): void {
     if (this.ended || this.stopping) return
     this.stopping = true
-    this.stopRecorder()
+    this.mic.stop()
     const ws = this.socket
     if (ws && ws.readyState === OPEN) ws.send("")
     this.drainTimer = setTimeout(() => this.finish(), this.o.drainMs ?? 4000)
@@ -147,34 +116,13 @@ export class DictationSession {
     return this.ended
   }
 
-  private async pump(): Promise<void> {
-    const idleMs = this.o.idleMs ?? 60_000
-    const maxMs = this.o.maxMs ?? 10 * 60_000
-    while (this.recording && !this.ended) {
-      let frame: Int16Array
-      try {
-        frame = await this.recorder!.read()
-      } catch (e) {
-        if (this.recording && !this.ended) this.finish(`The microphone stopped: ${errorText(e)}`)
-        return
-      }
-      if (!this.recording || this.ended) return
-      this.frames++
-      for (let i = 0; i < frame.length; i++) {
-        const v = Math.abs(frame[i]!)
-        if (v > this.peak) this.peak = v
-      }
-      if (this.frames === SILENCE_FRAMES && this.peak < SILENT_PEAK) return this.finish(silenceMessage(this.device))
-      const bytes = pcmBytes(frame)
-      const ws = this.socket
-      if (ws && ws.readyState === OPEN) ws.send(bytes)
-      else this.pending.push(bytes)
-      const t = this.now()
-      if (t - this.lastHeard > idleMs || t - this.started > maxMs) {
-        this.stop()
-        return
-      }
-    }
+  private onFrame(frame: Int16Array): void {
+    const bytes = pcmBytes(frame)
+    const ws = this.socket
+    if (ws && ws.readyState === OPEN) ws.send(bytes)
+    else this.pending.push(bytes)
+    const t = this.now()
+    if (t - this.lastHeard > (this.o.idleMs ?? 60_000) || t - this.started > (this.o.maxMs ?? 10 * 60_000)) this.stop()
   }
 
   private onMessage(data: unknown): void {
@@ -194,21 +142,11 @@ export class DictationSession {
     }
   }
 
-  private stopRecorder(): void {
-    if (!this.recorder) return
-    this.recording = false
-    safe(() => this.recorder!.stop())
-  }
-
   private finish(error?: string): void {
     if (this.ended) return
     this.ended = true
     if (this.drainTimer) clearTimeout(this.drainTimer)
-    this.stopRecorder()
-    const rec = this.recorder
-    this.recorder = undefined
-    // release() after any read in flight has settled.
-    if (rec) setTimeout(() => safe(() => rec.release()), 50)
+    this.mic.release()
     const ws = this.socket
     this.socket = undefined
     if (ws) {
@@ -218,22 +156,8 @@ export class DictationSession {
     // The last guess counts when the user stopped before Soniox made it final.
     const final = (this.heard.final + (error ? "" : this.heard.partial)).trim() ? this.heard.final + (error ? "" : this.heard.partial) : ""
     // Never end quietly with nothing: say why, so the user is not left guessing.
-    if (!error && !final && this.now() - this.started > 1500) {
-      if (this.frames === 0) error = `The microphone${this.device ? ` “${this.device}”` : ""} delivered no audio. Pick another one with “OpenCode Voice: Choose Microphone”.`
-      else if (this.peak < SILENT_PEAK) error = silenceMessage(this.device)
-      else if (this.answers === 0) error = "Soniox did not answer. Check the internet connection and try again."
-      else error = "No words were heard. Speak a little louder or closer to the microphone, or pick another one with “OpenCode Voice: Choose Microphone”."
-    }
-    this.o.emit({ kind: "done", final, error, stats: { frames: this.frames, peak: this.peak, answers: this.answers, device: this.device } })
-  }
-}
-
-const errorText = (e: unknown): string => (e instanceof Error ? e.message : typeof e === "string" ? e : "unknown error")
-
-function safe<T>(f: () => T): T | undefined {
-  try {
-    return f()
-  } catch {
-    return undefined
+    const stats = { frames: this.mic.frames, peak: this.mic.peak, answers: this.answers, device: this.mic.device }
+    if (!error && !final && this.now() - this.started > 1500) error = emptyReason(stats, "Soniox did not answer. Check the internet connection and try again.")
+    this.o.emit({ kind: "done", final, error, stats })
   }
 }

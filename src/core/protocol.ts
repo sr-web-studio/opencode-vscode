@@ -3,6 +3,7 @@ import type { ViewTarget } from "./draft"
 import type { ModelSelection } from "./models"
 import type { PromptFile } from "./attachments"
 import type { ImageRef } from "./images"
+import type { VoiceEngine } from "./dictation"
 import type { SessionView } from "./transcript/types"
 import type { Worker } from "./workers"
 
@@ -103,10 +104,11 @@ export type AppState = {
   sentTick: number
   restore?: PromptRestore
   /**
-   * Voice input. `keySet`: the user saved a working Soniox key (the key itself never reaches the webview).
+   * Voice input. `engine`: the chosen speech engine. `ready`: a click on the mic can start dictation (local: this
+   * computer has the engine; soniox: the user saved a working key, which itself never reaches the webview).
    * `capture`: the recording companion is reachable. `recording`: the state of the current dictation.
    */
-  voice: { keySet: boolean; capture: boolean; recording: "off" | "starting" | "on" | "stopping" }
+  voice: { engine: VoiceEngine; ready: boolean; capture: boolean; recording: "off" | "starting" | "on" | "stopping" }
 }
 
 export type Action =

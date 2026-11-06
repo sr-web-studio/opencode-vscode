@@ -194,6 +194,7 @@ export function activate(context: vscode.ExtensionContext): void {
       await vscode.workspace.getConfiguration("opencode").update("cliPath", file, vscode.ConfigurationTarget.Global)
     }),
     vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration("opencode.voice.engine")) void voice.refresh()
       if (affectsView(e)) controller.setSettings(readViewSettings())
       if (affectsConnection(e)) void start()
     }),

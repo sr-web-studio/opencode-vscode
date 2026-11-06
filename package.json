@@ -248,6 +248,26 @@
           "maximum": 50,
           "markdownDescription": "Most OpenCode terminals kept open. When there are more, the least recently used idle one is closed. A terminal with a running command is never closed."
         },
+        "opencode.voice.engine": {
+          "type": "string",
+          "enum": [
+            "local",
+            "soniox"
+          ],
+          "enumDescriptions": [
+            "On this computer: free and offline. Bangla only for now. Downloads about 190 MB once.",
+            "Cloud, with your own paid Soniox key: better accuracy, mixed Bangla and English, many languages."
+          ],
+          "default": "local",
+          "markdownDescription": "Which speech engine voice input uses.\n\n- `local`: free, offline, runs on this computer. **Bangla only for now.** Downloads about 190 MB once (speech engine and models), the first time you use it.\n- `soniox`: cloud, with your own paid key (**OpenCode: Set Voice API Key (Soniox)**). Better accuracy, mixed Bangla and English, many languages."
+        },
+        "opencode.voice.localThreads": {
+          "type": "number",
+          "default": 2,
+          "minimum": 1,
+          "maximum": 8,
+          "markdownDescription": "CPU threads the on-device engine uses for each of its two models. The default is fine; raise it only on a slow computer with many cores."
+        },
         "opencode.voice.languages": {
           "type": "array",
           "items": {
@@ -257,12 +277,12 @@
             "bn",
             "en"
           ],
-          "markdownDescription": "Languages you speak, as ISO codes (for example `bn`, `en`, `hi`). Soniox uses them as hints; it still hears other languages."
+          "markdownDescription": "Languages you speak, as ISO codes (for example `bn`, `en`, `hi`). Soniox uses them as hints; it still hears other languages. The on-device engine understands only Bangla (`bn`) for now."
         },
         "opencode.voice.model": {
           "type": "string",
           "default": "stt-rt-v6",
-          "markdownDescription": "Soniox real-time model for voice input."
+          "markdownDescription": "Soniox real-time model for voice input (engine `soniox` only)."
         }
       }
     }

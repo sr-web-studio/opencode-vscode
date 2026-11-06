@@ -58,7 +58,7 @@ export class Controller {
 
   private connection: ConnectionState = { status: "connecting" }
   private settings: ViewSettings = defaultViewSettings
-  private voice: AppState["voice"] = { keySet: false, capture: false, recording: "off" }
+  private voice: AppState["voice"] = { engine: "local", ready: true, capture: false, recording: "off" }
   private target: ViewTarget = { kind: "draft" }
   private sessions: SessionInfo[] = []
   private archived: SessionInfo[] = []
@@ -234,7 +234,7 @@ export class Controller {
     this.emitNow()
   }
 
-  /** The host tells whether a voice key is saved and whether it can record. */
+  /** The host tells which voice engine is chosen, whether the mic can start, and whether the companion records. */
   setVoice(v: AppState["voice"]) {
     this.voice = v
     this.emitNow()
