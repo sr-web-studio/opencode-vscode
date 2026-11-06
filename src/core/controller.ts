@@ -1,17 +1,23 @@
 import type { EventEnvelope, FormInfo, OpenCodeClient, PermissionRequest, SessionInfo, SlimModel } from "./api"
 import { initialTarget, planNewSession, type ViewTarget } from "./draft"
+import { SessionFeed } from "./feed"
+import { detectFeatures, isUnsupported } from "./features"
 import { primaryAgents, type ModelSelection } from "./models"
+import { normalizePins, togglePin } from "./pins"
 import {
   defaultViewSettings,
   type Action,
   type AgentSummary,
   type AppState,
   type ConnectionState,
+  type PromptRestore,
   type ViewSettings,
 } from "./protocol"
 import { isRoot, upsertSession } from "./sessions"
-import { applyEvent, viewFromMessages } from "./transcript/reducer"
-import { emptyView, type SessionView } from "./transcript/types"
+import { isRunning } from "./transcript/reducer"
+import { applyRevertEvent, revertFromServer, revertedPrompt } from "./transcript/revert"
+import { toPromptFiles, type PromptFile } from "./attachments"
+import { deriveWorkers, type ChildSession } from "./workers"
 
 export type ControllerOptions = {
   directory: string
@@ -21,14 +27,19 @@ export type ControllerOptions = {
   storage?: { get(key: string): unknown; set(key: string, value: unknown): void }
   /** Called with every event after state has been updated (host feeds the notification engine). */
   onEvent?: (ev: EventEnvelope) => void
+  /** Pinned models. The host keeps them in `globalState`; they are never written to OpenCode config. */
+  pins?: { get(): string[]; set(pins: string[]): void }
 }
 
-const HISTORY_PAGE = 200
-const HISTORY_MAX = 1000
+/** Something that follows the event stream: worker tabs, the terminal mirror. */
+export type Observer = {
+  event?(ev: EventEnvelope): void
+  /** The stream (re)connected and state was refetched: anything that mirrors server state should refetch too. */
+  resync?(): void
+}
+
 const EMIT_MS = 30
 const LAST_SESSION_KEY = "lastSession"
-
-const isDelta = (type: string) => type === "session.text.delta" || type === "session.reasoning.delta" || type === "session.tool.input.delta"
 
 const message = (e: unknown): string => (e instanceof Error ? e.message : typeof e === "string" ? e : "Request failed")
 
@@ -52,10 +63,18 @@ export class Controller {
   private running = new Set<string>()
   private permissions = new Map<string, PermissionRequest[]>()
   private forms = new Map<string, FormInfo[]>()
-  private view: SessionView = emptyView()
-  private loadingView = false
-  private buffered: EventEnvelope[] = []
-  private loadToken = 0
+  private readonly feed = new SessionFeed(
+    (immediate) => (immediate ? this.emitNow() : this.emit()),
+    (m) => {
+      this.error = m
+    },
+  )
+  private observers = new Set<Observer>()
+  private shells = new Map<string, { sessionID?: string; running: boolean }>()
+  private broken: { revert?: boolean; rename?: boolean } = {}
+  private sentTick = 0
+  private restoreTick = 0
+  private restore?: PromptRestore
   private agents: AgentSummary[] = []
   private models: SlimModel[] = []
   private providers: { id: string; name: string }[] = []
@@ -97,8 +116,8 @@ export class Controller {
       sessionsLoaded: this.sessionsLoaded,
       running: [...this.running],
       waiting: [...waiting],
-      view: this.view,
-      loadingView: this.loadingView,
+      view: this.feed.view,
+      loadingView: this.feed.loading,
       permissions: id ? (this.permissions.get(id) ?? []) : [],
       form: id ? this.forms.get(id)?.[0] : undefined,
       agents: this.agents,
@@ -110,7 +129,69 @@ export class Controller {
       sending: this.sending,
       focusTick: this.focusTick,
       draftEpoch: this.draftEpoch,
+      readOnly: false,
+      workers: this.workers(),
+      runningShells: this.runningShells(),
+      pins: this.pins(),
+      features: detectFeatures(this.client, this.connection.version, this.broken),
+      hasEarlier: this.feed.hasEarlier,
+      loadingEarlier: this.feed.loadingEarlier,
+      earlierTick: this.feed.earlierTick,
+      sentTick: this.sentTick,
+      restore: this.restore,
     }
+  }
+
+  private pins(): string[] {
+    return normalizePins(this.opts.pins?.get())
+  }
+
+  private childList(): ChildSession[] {
+    const id = this.currentSessionID
+    return id ? [...this.children.values()].filter((c) => c.parentID === id) : []
+  }
+
+  private workers() {
+    return deriveWorkers({ view: this.feed.view, children: this.childList(), running: this.running })
+  }
+
+  private runningShells(): number {
+    const id = this.currentSessionID
+    if (!id) return 0
+    let n = 0
+    for (const sh of this.shells.values()) if (sh.running && sh.sessionID === id) n++
+    return n
+  }
+
+  /** Follow the event stream and resyncs (worker tabs, the terminal mirror). */
+  observe(o: Observer): () => void {
+    this.observers.add(o)
+    return () => this.observers.delete(o)
+  }
+
+  /** The ready client, or undefined while disconnected. For host features that talk to the server themselves. */
+  get api(): OpenCodeClient | undefined {
+    return this.client
+  }
+
+  /** Directory a session lives in. Shell calls use the session's own location. */
+  locationOf(sessionID: string): { directory: string } {
+    return { directory: this.sessionMeta(sessionID)?.directory ?? this.opts.directory }
+  }
+
+  /** Pending permission requests of any session (worker tabs answer their own). */
+  permissionsOf(sessionID: string): PermissionRequest[] {
+    return this.permissions.get(sessionID) ?? []
+  }
+
+  get directory(): string {
+    return this.opts.directory
+  }
+
+  /** The agent of a worker (child) session, for terminal names. Undefined for the session on screen and other roots. */
+  agentOf(sessionID: string): string | undefined {
+    const child = this.children.get(sessionID)
+    return child ? (child.agent ?? "worker") : undefined
   }
 
   private emit() {
@@ -180,11 +261,6 @@ export class Controller {
     }
   }
 
-  /** Captured output of a shell, for "Show terminal". */
-  async shellOutput(shellID: string): Promise<string> {
-    const res = await this.need().shell.output({ id: shellID, location: { directory: this.opts.directory } })
-    return res.data.output
-  }
 
   /** Attach a ready client and start following events. Replaces any previous attachment. */
   attach(client: OpenCodeClient) {
@@ -253,6 +329,7 @@ export class Controller {
     if (dir && dir !== this.opts.directory) return
     await this.apply(ev)
     this.opts.onEvent?.(ev)
+    for (const o of this.observers) o.event?.(ev)
   }
 
   private async apply(ev: EventEnvelope): Promise<void> {
@@ -260,13 +337,29 @@ export class Controller {
     const sessionID: string | undefined = d.sessionID ?? d.form?.sessionID
     switch (ev.type) {
       case "session.created": {
-        if (d.parentID || !this.client) return
+        if (!this.client) return
         const s = await this.client.session.get({ sessionID: d.sessionID }).catch(() => undefined)
-        if (s && isRoot(s) && s.location?.directory === this.opts.directory) this.sessions = this.sort(upsertSession(this.sessions, s))
+        if (!s || s.location?.directory !== this.opts.directory) return
+        if (isRoot(s)) this.sessions = this.sort(upsertSession(this.sessions, s))
+        else this.children.set(s.id, s)
         break
       }
       case "session.renamed":
         this.sessions = this.sessions.map((s) => (s.id === d.sessionID ? { ...s, title: d.title } : s))
+        if (this.children.has(d.sessionID)) this.children.set(d.sessionID, { ...this.children.get(d.sessionID)!, title: d.title })
+        break
+      case "shell.created": {
+        const info = d.info
+        if (info?.id) this.shells.set(info.id, { sessionID: typeof info.metadata?.sessionID === "string" ? info.metadata.sessionID : undefined, running: info.status === "running" })
+        break
+      }
+      case "shell.exited": {
+        const sh = this.shells.get(d.id)
+        if (sh) this.shells.set(d.id, { ...sh, running: false })
+        break
+      }
+      case "shell.deleted":
+        this.shells.delete(d.id)
         break
       case "session.deleted":
         this.sessions = this.sessions.filter((s) => s.id !== d.sessionID)
@@ -292,10 +385,16 @@ export class Controller {
         break
       case "session.execution.succeeded":
       case "session.execution.failed":
-      case "session.execution.interrupted":
+      case "session.execution.interrupted": {
         this.running.delete(d.sessionID)
         this.touch(d.sessionID, ev.created)
+        const child = this.children.get(d.sessionID)
+        if (child) {
+          const outcome = ev.type === "session.execution.succeeded" ? "succeeded" : ev.type === "session.execution.failed" ? "failed" : "interrupted"
+          this.children.set(child.id, { ...child, outcome })
+        }
         break
+      }
       case "permission.asked":
         this.permissions.set(d.sessionID, [...(this.permissions.get(d.sessionID) ?? []).filter((p) => p.id !== d.id), d as PermissionRequest])
         break
@@ -310,13 +409,7 @@ export class Controller {
         this.forms.set(d.sessionID, (this.forms.get(d.sessionID) ?? []).filter((f) => f.id !== d.id))
         break
     }
-    if (sessionID && sessionID === this.currentSessionID && ev.type.startsWith("session.")) {
-      if (this.loadingView) this.buffered.push(ev)
-      else {
-        const next = applyEvent(this.view, ev)
-        if (next !== this.view) this.view = next
-      }
-    }
+    if (sessionID && sessionID === this.currentSessionID && ev.type.startsWith("session.")) this.feed.apply(ev)
     this.emit()
   }
 
@@ -337,7 +430,7 @@ export class Controller {
     if (!client) return
     const loc = { directory: this.opts.directory }
     try {
-      await Promise.all([this.loadSessions(), this.loadPending(client), this.loadCatalog(client)])
+      await Promise.all([this.loadSessions(), this.loadPending(client), this.loadCatalog(client), this.loadShells(client)])
       const first = !this.synced
       this.synced = true
       if (first) {
@@ -345,12 +438,48 @@ export class Controller {
         this.target = initialTarget(this.sessions.map((s) => s.id), typeof remembered === "string" ? remembered : undefined)
       }
       if (this.target.kind === "session") await this.loadView(this.target.id)
+      else this.children.clear()
       this.error = undefined
     } catch (e) {
       this.setConnection({ ...this.connection, status: "error", message: message(e) })
     }
     void loc
     this.emitNow()
+    for (const o of this.observers) o.resync?.()
+  }
+
+  /** Background shells of this project (`shell.list`). A server without it just has none to show. */
+  private async loadShells(client: OpenCodeClient): Promise<void> {
+    try {
+      const res = await client.shell.list({ location: { directory: this.opts.directory } })
+      this.shells = new Map(res.data.map((i) => [i.id, { sessionID: typeof i.metadata?.sessionID === "string" ? i.metadata.sessionID : undefined, running: i.status === "running" }]))
+    } catch {
+      this.shells = new Map()
+    }
+  }
+
+  /** Children of a session: `session.list({ parentID })`. Live `session.created` events keep the map current afterwards. */
+  private async loadChildren(client: OpenCodeClient, parentID: string): Promise<void> {
+    try {
+      const res = await client.session.list({ directory: this.opts.directory, parentID, limit: 200 })
+      for (const [id, c] of this.children) if (c.parentID === parentID) this.children.delete(id)
+      for (const c of res.data) if (c.parentID === parentID) this.children.set(c.id, c)
+    } catch {
+      // Older server or a transient error: the Background row then relies on the tool lines alone.
+    }
+  }
+
+  /** Children that are executing now (so a background worker shows as running after its tool call returned). */
+  private async refreshChildRunning(client: OpenCodeClient): Promise<void> {
+    try {
+      const active = await client.session.active()
+      for (const id of this.children.keys()) {
+        if (active[id]) this.running.add(id)
+        else this.running.delete(id)
+      }
+    } catch {
+      // keep what events told us
+    }
   }
 
   private async loadSessions(): Promise<void> {
@@ -362,7 +491,7 @@ export class Controller {
       client.session.active(),
     ])
     this.sessions = this.sort(roots.data.filter((s) => isRoot(s) && s.location.directory === directory))
-    this.running = new Set(Object.keys(active).filter((id) => this.sessions.some((s) => s.id === id) || this.running.has(id) || id === this.currentSessionID))
+    this.running = new Set(Object.keys(active).filter((id) => this.sessions.some((s) => s.id === id) || this.children.has(id) || this.running.has(id) || id === this.currentSessionID))
     this.sessionsLoaded = true
     if (this.showArchived) await this.loadArchived()
     this.emit()
@@ -399,6 +528,7 @@ export class Controller {
     this.models = models.data.map((m) => ({
       id: m.id, modelID: m.modelID, providerID: m.providerID, name: m.name, enabled: m.enabled, status: m.status,
       variants: m.variants.map((v) => ({ id: v.id })),
+      input: m.capabilities?.input,
     }))
     this.providers = providers.data.map((p) => ({ id: p.id, name: p.name }))
     const dm = def?.data
@@ -406,38 +536,27 @@ export class Controller {
     this.defaultAgent = readDefaultAgent(config) ?? this.agents.find((a) => a.id === "build")?.id ?? this.agents[0]?.id
   }
 
-  /** Load the transcript for a session. Events that arrive meanwhile are buffered, then replayed minus deltas. */
+  /** Load the transcript since the last compaction, the children (workers) and any staged revert. */
   private async loadView(id: string): Promise<void> {
     const client = this.client
     if (!client) return
-    const token = ++this.loadToken
-    this.loadingView = true
-    this.buffered = []
-    this.view = emptyView()
+    this.restore = undefined
+    this.children.clear()
+    await this.feed.load(client, id)
+    if (this.currentSessionID !== id) return
+    await Promise.all([this.loadChildren(client, id), this.loadRevert(client, id)])
+    await this.refreshChildRunning(client)
     this.emitNow()
+  }
+
+  /** A session that was left with a staged rollback shows its bar again (`Session.Info.revert`). */
+  private async loadRevert(client: OpenCodeClient, id: string): Promise<void> {
     try {
-      const all: any[] = []
-      let cursor: string | undefined
-      while (all.length < HISTORY_MAX) {
-        const page = await client.message.list({ sessionID: id, order: "desc", limit: HISTORY_PAGE, cursor })
-        all.push(...page.data)
-        cursor = page.cursor.next ?? undefined
-        if (!cursor || page.data.length < HISTORY_PAGE) break
-      }
-      if (token !== this.loadToken) return
-      let view = viewFromMessages(all.reverse())
-      for (const ev of this.buffered) if (!isDelta(ev.type)) view = applyEvent(view, ev)
-      this.view = view
-    } catch (e) {
-      if (token !== this.loadToken) return
-      this.view = { ...emptyView(), loaded: true }
-      this.error = `Could not load the session: ${message(e)}`
-    } finally {
-      if (token === this.loadToken) {
-        this.loadingView = false
-        this.buffered = []
-        this.emitNow()
-      }
+      const info = await client.session.get({ sessionID: id })
+      const revert = revertFromServer(info.revert as never)
+      if (revert) this.feed.view = { ...this.feed.view, revert }
+    } catch {
+      // No revert info: the transcript is shown as is.
     }
   }
 
@@ -461,9 +580,19 @@ export class Controller {
         case "newDraft":
           return this.newDraft(action.hasText)
         case "send":
-          return await this.send(action.text)
+          return await this.send(action.text, action.files)
         case "stop":
           return await this.stop()
+        case "rename":
+          return await this.rename(action.id, action.title)
+        case "togglePin":
+          return this.togglePin(action.key)
+        case "revert":
+          return await this.revert(action.messageID)
+        case "redo":
+          return await this.redo()
+        case "loadEarlier":
+          return await this.loadEarlier()
         case "pickAgent":
           return await this.pickAgent(action.id)
         case "pickModel":
@@ -510,7 +639,7 @@ export class Controller {
   }
 
   async open(id: string): Promise<void> {
-    if (this.target.kind === "session" && this.target.id === id && this.view.loaded) return
+    if (this.target.kind === "session" && this.target.id === id && this.feed.view.loaded) return
     this.target = { kind: "session", id }
     this.opts.storage?.set(LAST_SESSION_KEY, id)
     await this.loadView(id)
@@ -520,9 +649,9 @@ export class Controller {
     this.target = { kind: "draft" }
     this.draftAgent = undefined
     this.draftModel = undefined
-    this.view = emptyView()
-    this.loadToken++
-    this.loadingView = false
+    this.feed.reset()
+    this.children.clear()
+    this.restore = undefined
     this.draftEpoch++
     this.emitNow()
   }
@@ -542,9 +671,9 @@ export class Controller {
     }
   }
 
-  private async send(text: string): Promise<void> {
+  private async send(text: string, files: PromptFile[] = []): Promise<void> {
     const body = text.trim()
-    if (!body) return
+    if (!body && files.length === 0) return
     const client = this.need()
     if (this.target.kind === "draft") {
       // First prompt of a draft: create the session, then prompt. This is the only place a session is created.
@@ -558,18 +687,87 @@ export class Controller {
       this.sessions = this.sort(upsertSession(this.sessions, { ...created, location: created.location ?? { directory: this.opts.directory } } as SessionInfo))
       this.target = { kind: "session", id: created.id }
       this.opts.storage?.set(LAST_SESSION_KEY, created.id)
-      this.view = { ...emptyView(), loaded: true }
-      this.loadToken++
-      this.loadingView = false
+      this.feed.startEmpty()
+      this.children.clear()
+      this.sentTick++
       try {
-        await client.session.prompt({ sessionID: created.id, text: body })
+        await client.session.prompt({ sessionID: created.id, text: body, ...filesInput(files) })
       } finally {
         this.sending = false
         this.emitNow()
       }
       return
     }
-    await client.session.prompt({ sessionID: this.target.id, text: body })
+    // The server commits a staged revert by itself when a prompt arrives (live-checked on 2.2.5): no commit call here.
+    this.restore = undefined
+    this.sentTick++
+    this.emitNow()
+    await client.session.prompt({ sessionID: this.target.id, text: body, ...filesInput(files) })
+  }
+
+  /* ----------------------------------------------------------- title, pins */
+
+  private async rename(id: string, title: string): Promise<void> {
+    const next = title.trim()
+    const known = this.sessions.find((s) => s.id === id) ?? this.archived.find((s) => s.id === id)
+    if (!next || !known || next === (known.title ?? "")) return
+    const client = this.need()
+    try {
+      await client.session.update({ sessionID: id, title: next })
+    } catch (e) {
+      if (isUnsupported(e)) this.broken.rename = true
+      throw e
+    }
+    // `session.renamed` normally follows; apply it now so the title does not flicker back.
+    this.sessions = this.sessions.map((s) => (s.id === id ? { ...s, title: next } : s))
+    this.archived = this.archived.map((s) => (s.id === id ? { ...s, title: next } : s))
+    this.emitNow()
+  }
+
+  private togglePin(key: string): void {
+    this.opts.pins?.set(togglePin(this.pins(), key))
+    this.emitNow()
+  }
+
+  /* ---------------------------------------------------------------- revert */
+
+  private canRevertNow(): boolean {
+    return detectFeatures(this.client, this.connection.version, this.broken).revert
+  }
+
+  /** Stage a rollback to a prompt: files restored by the server, the prompt text goes back to the prompt box. */
+  private async revert(messageID: string): Promise<void> {
+    const id = this.currentSessionID
+    if (!id || !this.canRevertNow()) return
+    if (this.running.has(id) || isRunning(this.feed.view)) throw new Error("Stop the session first, then revert.")
+    const view = this.feed.view
+    const prompt = view.turns.find((t) => t.user?.id === messageID)?.user?.text
+    let staged: unknown
+    try {
+      staged = await this.need().session.revert.stage({ sessionID: id, messageID, files: true })
+    } catch (e) {
+      if (isUnsupported(e)) this.broken.revert = true
+      throw e
+    }
+    // The `session.revert.staged` event follows. Apply the answer now so the bar and the hidden turns appear at once.
+    this.feed.view = applyRevertEvent(this.feed.view, "session.revert.staged", { revert: staged })
+    const text = prompt ?? revertedPrompt(this.feed.view) ?? ""
+    this.restore = { tick: ++this.restoreTick, text }
+    this.focusTick++
+    this.emitNow()
+  }
+
+  private async redo(): Promise<void> {
+    const id = this.currentSessionID
+    if (!id) return
+    await this.need().session.revert.clear({ sessionID: id })
+    this.feed.view = applyRevertEvent(this.feed.view, "session.revert.cleared", { sessionID: id })
+    this.emitNow()
+  }
+
+  private async loadEarlier(): Promise<void> {
+    const id = this.currentSessionID
+    if (id) await this.feed.loadEarlier(this.need(), id)
   }
 
   private async stop(): Promise<void> {
@@ -601,6 +799,8 @@ export class Controller {
     await this.need().session.switchModel({ sessionID: id, model })
   }
 }
+
+const filesInput = (files: readonly PromptFile[]) => (files.length > 0 ? { files: toPromptFiles(files as never) } : {})
 
 /** `config.get` returns an array of documents; the first document that sets `default_agent` wins. */
 function readDefaultAgent(config: unknown): string | undefined {

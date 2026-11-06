@@ -86,3 +86,37 @@ export const attachmentFromUri = (id: string, uri: string, name?: string, mime?:
   mime,
   thumb: uri.startsWith("data:image/") ? uri : undefined,
 })
+
+const MIME: Record<string, string> = {
+  png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", bmp: "image/bmp",
+  svg: "image/svg+xml", avif: "image/avif", pdf: "application/pdf", txt: "text/plain", md: "text/markdown", json: "application/json",
+}
+
+/** A guess from the extension, enough for the chip icon and the image warning. The server reads the real type. */
+export function mimeFromName(name: string): string | undefined {
+  const ext = /\.([A-Za-z0-9]+)$/.exec(name)?.[1]?.toLowerCase()
+  return ext ? MIME[ext] : undefined
+}
+
+/**
+ * `file:` URIs from a drag out of the VS Code Explorer. Depending on the VS Code version the payload arrives as
+ * `text/uri-list`, `application/vnd.code.uri-list`, a `resourceurls` JSON array, or plain text.
+ */
+export function droppedFileUris(data: { uriList?: string; codeUriList?: string; resourceUrls?: string; text?: string }): string[] {
+  const out: string[] = []
+  const push = (u: string) => {
+    const t = u.trim()
+    if (/^file:\/\//i.test(t) && !out.includes(t)) out.push(t)
+  }
+  for (const list of [data.uriList, data.codeUriList]) for (const line of (list ?? "").split(/\r?\n/)) if (!line.startsWith("#")) push(line)
+  if (data.resourceUrls) {
+    try {
+      const parsed: unknown = JSON.parse(data.resourceUrls)
+      if (Array.isArray(parsed)) for (const u of parsed) if (typeof u === "string") push(u)
+    } catch {
+      // not JSON: ignore
+    }
+  }
+  for (const line of (data.text ?? "").split(/\r?\n/)) push(line)
+  return out
+}

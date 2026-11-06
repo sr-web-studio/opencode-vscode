@@ -1,7 +1,9 @@
 import type { FormInfo, PermissionRequest, SessionInfo, SlimModel, SlimProvider } from "./api"
 import type { ViewTarget } from "./draft"
 import type { ModelSelection } from "./models"
+import type { PromptFile } from "./attachments"
 import type { SessionView } from "./transcript/types"
+import type { Worker } from "./workers"
 
 export type ConnectionState = {
   status: "connecting" | "connected" | "disconnected" | "setup" | "error"
@@ -17,7 +19,7 @@ export type ViewSettings = {
   collapseCompletedSteps: boolean
   expandToolDetails: boolean
   showReasoning: "collapsed" | "expanded" | "hidden"
-  /** Resolved px size (setting, else chat.editor.fontSize, else 13). */
+  /** Resolved px size: the setting, else `max(chat.editor.fontSize, 14)`. */
   fontSize: number
   todoDefaultExpanded: boolean
 }
@@ -26,9 +28,15 @@ export const defaultViewSettings: ViewSettings = {
   collapseCompletedSteps: true,
   expandToolDetails: false,
   showReasoning: "collapsed",
-  fontSize: 13,
+  fontSize: 14,
   todoDefaultExpanded: false,
 }
+
+/** What this server version can do. The UI hides what is missing instead of failing. */
+export type Features = { revert: boolean; rename: boolean }
+
+/** Text to put back into the prompt box (after a revert). `tick` changes with every request. */
+export type PromptRestore = { tick: number; text: string }
 
 export type AgentSummary = { id: string; name: string; description?: string }
 
@@ -69,13 +77,37 @@ export type AppState = {
   focusTick: number
   /** Bumped when a fresh draft opens: the prompt box clears. */
   draftEpoch: number
+  /** A read-only worker tab: no prompt box, no session switcher, no revert. */
+  readOnly: boolean
+  /** Header of a worker tab. */
+  workerTitle?: string
+  /** Workers (child sessions) of the current session, from the transcript plus `session.list({ parentID })`. */
+  workers: Worker[]
+  /** Background shells of the current session that are still running. */
+  runningShells: number
+  /** Pinned model keys (`provider/model`), kept by the host in `globalState`. */
+  pins: string[]
+  features: Features
+  /** Older messages exist above the loaded part ("Show earlier messages"). */
+  hasEarlier: boolean
+  loadingEarlier: boolean
+  /** Bumped when older messages were added above, so the view can keep its place. */
+  earlierTick: number
+  /** Bumped when the user sends a prompt: the transcript jumps to the end. */
+  sentTick: number
+  restore?: PromptRestore
 }
 
 export type Action =
   | { type: "ready" }
   | { type: "openSession"; id: string }
   | { type: "newDraft"; hasText: boolean }
-  | { type: "send"; text: string }
+  | { type: "send"; text: string; files?: PromptFile[] }
+  | { type: "rename"; id: string; title: string }
+  | { type: "togglePin"; key: string }
+  | { type: "revert"; messageID: string }
+  | { type: "redo" }
+  | { type: "loadEarlier" }
   | { type: "stop" }
   | { type: "pickAgent"; id: string }
   | { type: "pickModel"; model: ModelSelection }
@@ -90,12 +122,19 @@ export type Action =
 export type ToWebview =
   | { type: "state"; state: AppState }
   | { type: "command"; name: "newSession" }
+  | { type: "picked"; requestID: string; files: PickedFile[] }
+
+/** A file chosen in the host's file dialog. `uri` is `vscode.Uri.file(path).toString()`. */
+export type PickedFile = { uri: string; name: string; mime?: string }
 
 /** Host-side effects the webview asks for (files, terminals, links). Not state changes. */
 export type HostRequest =
   | { type: "openFile"; path: string; line?: number }
   | { type: "openDiff"; file: string; patch: string }
-  | { type: "showTerminal"; shellID: string; title?: string }
+  | { type: "showTerminal"; shellID: string; title?: string; sessionID?: string }
+  | { type: "openSession"; id: string; readOnly: boolean }
+  | { type: "pickFiles"; requestID: string }
+  | { type: "confirmRevert"; messageID: string }
   | { type: "openExternal"; url: string }
   | { type: "setCliPath" }
   | { type: "reconnect" }

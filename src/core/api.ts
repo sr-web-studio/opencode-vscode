@@ -25,6 +25,8 @@ export type SlimModel = {
   enabled: boolean
   status?: string
   variants: ReadonlyArray<{ id: string }>
+  /** `capabilities.input` (`text`, `image`, …). Undefined when the server does not report it. */
+  input?: ReadonlyArray<string>
 }
 
 export type SlimProvider = { id: string; name: string }
