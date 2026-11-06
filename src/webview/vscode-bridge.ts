@@ -32,7 +32,8 @@ export function createVsCodeBridge(): HostBridge {
         host({ type: "imageData", requestID, ref })
       }),
     openImage: (ref, name) => host({ type: "openImage", ref, name }),
-    openDiff: (file, patch) => host({ type: "openDiff", file, patch }),
+    openDiff: (file, patches) => host({ type: "openDiff", file, patches }),
+    openChanges: (files, title) => host({ type: "openChanges", files, title }),
     showTerminal: (shellID, title) => host({ type: "showTerminal", shellID, title }),
     openSession: (id, options) => host({ type: "openSession", id, readOnly: options.readOnly }),
     confirmRevert: (messageID) => host({ type: "confirmRevert", messageID }),

@@ -5,6 +5,7 @@ import type { HostRequest, PickedFile, ToWebview } from "../core/protocol"
 import type { WorkerPanels } from "./workers"
 import type { ShellTerminals } from "./terminal"
 import type { ImagePreviews } from "./images"
+import type { DiffViews } from "./diffs"
 
 const REVERT_PROMPT =
   "Revert to before this prompt? Messages after it are hidden, and files changed by later steps are restored. Shell side effects (git, databases, other files) are not undone."
@@ -26,7 +27,11 @@ export class HostActions {
     private readonly terminals: () => ShellTerminals,
     private readonly workers: () => WorkerPanels,
     private readonly images: () => ImagePreviews,
+    private readonly diffs: () => DiffViews,
   ) {}
+
+  /** Used by the diff views to find a file of the project. */
+  resolvePath = (path: string): vscode.Uri => this.resolve(path)
 
   /** Run a request from a webview. A failure is shown to the user; it never disappears silently. */
   async handle(req: HostRequest, surface: Surface): Promise<void> {
@@ -34,7 +39,7 @@ export class HostActions {
       await this.run(req, surface)
     } catch (e) {
       const what =
-        req.type === "openSession" ? "Could not open the worker" : req.type === "showTerminal" ? "Could not show the terminal" : req.type === "openImage" ? "Could not open the image" : "OpenCode could not do that"
+        req.type === "openSession" ? "Could not open the worker" : req.type === "showTerminal" ? "Could not show the terminal" : req.type === "openImage" ? "Could not open the image" : req.type === "openDiff" || req.type === "openChanges" ? "Could not open the diff" : "OpenCode could not do that"
       void vscode.window.showErrorMessage(`${what}: ${e instanceof Error ? e.message : "unknown error"}`)
     }
   }
@@ -51,7 +56,9 @@ export class HostActions {
       case "openImage":
         return this.images().open(surface.sessionID(), req.ref, req.name)
       case "openDiff":
-        return this.openDiff(req.file, req.patch)
+        return this.diffs().open(req.file, req.patches)
+      case "openChanges":
+        return this.diffs().changes(req.files, req.title ?? "OpenCode changes")
       case "showTerminal":
         return this.terminals().show(req.shellID, req.sessionID ?? surface.sessionID())
       case "openSession":
@@ -102,11 +109,6 @@ export class HostActions {
     } catch (e) {
       void vscode.window.showWarningMessage(`Could not open ${path}: ${e instanceof Error ? e.message : String(e)}`)
     }
-  }
-
-  private async openDiff(file: string, patch: string): Promise<void> {
-    const doc = await vscode.workspace.openTextDocument({ language: "diff", content: patch || `No changes recorded for ${file}` })
-    await vscode.window.showTextDocument(doc, { preview: true })
   }
 
   /** The paperclip: a native file dialog. The URI is exactly `Uri.file(path).toString()`, so Windows paths are right. */

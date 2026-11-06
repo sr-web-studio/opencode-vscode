@@ -19,8 +19,10 @@ export interface HostBridge {
   imageData(ref: ImageRef): Promise<string | undefined>
   /** Open a sent image in full: VS Code's image viewer, or a full-screen viewer on mobile. */
   openImage(ref: ImageRef, name?: string): void
-  /** Show a unified diff for a file. */
-  openDiff(file: string, patch: string): void
+  /** The real before/after diff of a file. `patches` are the edit tool's patches for it, oldest first. */
+  openDiff(file: string, patches: string[]): void
+  /** Every file a turn changed, in one view (VS Code: the multi-file diff editor; mobile: a list). */
+  openChanges(files: Array<{ file: string; patches: string[] }>, title?: string): void
   /** Focus the terminal that mirrors a shell command (the host creates it when needed). */
   showTerminal(shellID: string, title?: string): void
   /**

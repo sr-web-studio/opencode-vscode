@@ -143,7 +143,10 @@ export type HostRequest =
   | { type: "imageData"; requestID: string; ref: ImageRef }
   /** Open a sent image in the host's viewer (VS Code: the built-in image viewer). */
   | { type: "openImage"; ref: ImageRef; name?: string }
-  | { type: "openDiff"; file: string; patch: string }
+  /** VS Code's diff editor for a file: `patches` are the edit tool's `metadata.files[].patch` of that file, oldest first. */
+  | { type: "openDiff"; file: string; patches: string[] }
+  /** One editor with all files a turn changed (`vscode.changes`). */
+  | { type: "openChanges"; files: Array<{ file: string; patches: string[] }>; title?: string }
   | { type: "showTerminal"; shellID: string; title?: string; sessionID?: string }
   | { type: "openSession"; id: string; readOnly: boolean }
   | { type: "pickFiles"; requestID: string }

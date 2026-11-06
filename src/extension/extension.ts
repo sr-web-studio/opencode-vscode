@@ -10,6 +10,7 @@ import { VscodeNotifier } from "./notifier"
 import { affectsConnection, affectsView, readConnectionSettings, readNotificationSettings, readTerminalSettings, readViewSettings } from "./settings"
 import { ShellTerminals } from "./terminal"
 import { ImagePreviews } from "./images"
+import { DiffViews } from "./diffs"
 import { ChatViewProvider, VIEW_ID } from "./view"
 import { WorkerPanels } from "./workers"
 
@@ -42,7 +43,8 @@ export function activate(context: vscode.ExtensionContext): void {
   let workers!: WorkerPanels
   const images = new ImagePreviews(context.globalStorageUri, controller)
   void images.cleanup()
-  const host = new HostActions(directory, () => terminals, () => workers, () => images)
+  const host: HostActions = new HostActions(directory, () => terminals, () => workers, () => images, () => diffs)
+  const diffs = new DiffViews((path) => host.resolvePath(path))
   terminals = new ShellTerminals(controller, readTerminalSettings)
   workers = new WorkerPanels(context.extensionUri, controller, () => host)
   const provider = new ChatViewProvider(context.extensionUri, controller, host)
@@ -126,6 +128,7 @@ export function activate(context: vscode.ExtensionContext): void {
     terminals,
     workers,
     images,
+    diffs,
     { dispose: () => { generation++; controller.detach() } },
     vscode.window.registerWebviewViewProvider(VIEW_ID, provider),
     vscode.commands.registerCommand("opencode.focus", () => vscode.commands.executeCommand(`${VIEW_ID}.focus`)),
