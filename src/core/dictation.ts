@@ -106,11 +106,10 @@ export const COMPANION = {
   /** Open the operating system's microphone privacy page (Windows, macOS). */
   micSettings: "opencode.companion.voice.micSettings",
   chooseMicrophone: "opencode.companion.voice.chooseMicrophone",
-  testMicrophone: "opencode.companion.voice.testMicrophone",
 } as const
 
 /** What the user can do about a failed recording; the main extension turns it into a button. */
-export type VoiceFix = "micSettings" | "chooseMicrophone" | "testMicrophone"
+export type VoiceFix = "micSettings" | "chooseMicrophone"
 
 /** The main extension's command that receives dictation updates from the companion. */
 export const VOICE_FEED_COMMAND = "opencode.voice.feed"

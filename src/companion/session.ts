@@ -47,7 +47,7 @@ export const SILENT_PEAK = 8
 export const SILENCE_FRAMES = 20
 
 export const silenceMessage = (device?: string): string =>
-  `The microphone${device ? ` “${device}”` : ""} sends only silence, although access is allowed. Run “Test Microphone”: it records 3 seconds from every microphone and shows which ones deliver audio.`
+  `The microphone${device ? ` “${device}”` : ""} sends only silence. Check that it is not muted (mute key, headset switch, or Windows Sound settings), or pick another one with “Choose Microphone”.`
 
 export type SessionOptions = {
   key: string

@@ -200,12 +200,10 @@ export class Voice implements vscode.Disposable {
     const actions =
       fix === "micSettings" ? ["Open Microphone Settings", "Choose Microphone"]
       : fix === "chooseMicrophone" ? ["Choose Microphone"]
-      : fix === "testMicrophone" ? ["Test Microphone", "Choose Microphone"]
       : []
     void vscode.window.showErrorMessage(`Voice input: ${reason}`, ...actions).then((pick) => {
       if (pick === "Open Microphone Settings") void vscode.commands.executeCommand(COMPANION.micSettings)
       if (pick === "Choose Microphone") void vscode.commands.executeCommand(COMPANION.chooseMicrophone)
-      if (pick === "Test Microphone") void vscode.commands.executeCommand(COMPANION.testMicrophone)
     })
   }
 

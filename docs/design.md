@@ -228,18 +228,9 @@ Proposal:
   - Pure check `core/voice.ts` (`checkSonioxKey`, `keyShapeProblem`) has unit tests. The same code serves mobile with its own `fetch`.
 - **UX:** a mic codicon in the prompt box (keyboard `Ctrl+Alt+V`). Click to start and click again or Esc to stop. A small level meter and the active language (`বাংলা + EN`) are shown while recording. Partial text is grey, and nothing is auto-sent.
 
-### Follow-ups 0.3.4: zeros from an allowed microphone (2026-11-06)
-- **What happened:** Salim's Windows log shows every privacy switch allowed (`reg` check and the Settings screenshot, where VS Code is listed with "Last accessed 6:14 PM"). Yet "Microphone Array (AMD Audio Device)" gave 20 frames with peak 0. So the 0.3.2 privacy hint was wrong in his case.
-- **Two known causes of exact zeros:**
-  - **`pvrecorder` 1.2.9 never writing the JS buffer** under some runtimes (pi-voice #13, under Bun).
-  - **Windows capture drivers returning zeros to clients that don't request the native mix format**, when audio enhancements such as Voice clarity or device effects are on (Handy #2141 on Realtek, cpal #1200 on Windows 11 24H2).
-- **`OpenCode Voice: Test Microphone`** records 3 s from the system default and from every device in the recorder process, calling the native `read` directly with buffers prefilled with `0x4242`.
-  - The verdict per device is one of: works, not-written (the library problem), driver-zeros (the driver problem), quiet, failed.
-  - The full report goes to the "OpenCode Voice" output.
-  - A silent recording now offers **Test Microphone** / **Choose Microphone** and no longer suggests privacy settings. Privacy is still checked before recording, and named if it is denied.
-- **Next step depends on the verdict:**
-  - not-written: replace `pvrecorder` (or capture via a different path).
-  - driver-zeros: ask to turn off enhancements, or record at the device's native format with our own resampling, which needs a different capture library.
+### Follow-ups 0.3.5 (2026-11-06)
+- The silent recording (peak 0) turned out to be a microphone muted on Salim's PC; our side was fine. The temporary "Test Microphone" probe was removed again.
+- A silent recording still ends after 2 s. The message now says to check mute first (mute key, headset switch, Windows Sound settings), and offers **Choose Microphone**.
 
 ### Follow-ups 0.3.3: one install, permission asked (Salim, 2026-11-06)
 - **One install.** The main vsix carries `dist/opencode-voice.vsix`, which `bun run package` (`tools/package.ts`) builds with the same version. About 4 s after activation, and before each recording, `Voice.ensureCompanion()` pings the companion. If it is missing or a different version, it runs `workbench.extensions.installExtension(<vsix uri>)`.

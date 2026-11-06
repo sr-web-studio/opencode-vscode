@@ -2,7 +2,6 @@ import * as vscode from "vscode"
 import { execFile, fork, spawn, type ChildProcess } from "node:child_process"
 import { join } from "node:path"
 import { COMPANION, VOICE_FEED_COMMAND, type CompanionInfo, type VoiceFeed, type VoiceFix, type VoiceStartArgs } from "../core/dictation"
-import { probeSummary, probeText, type ProbeReport } from "./probe"
 import { WINDOWS_QUERIES, deniedMessage, micSettingsTarget, windowsMicPermission, type MicPermission } from "./privacy"
 import { SILENT_PEAK, type SessionUpdate } from "./session"
 
@@ -35,7 +34,6 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand(COMPANION.start, (args: VoiceStartArgs) => start(context, args)),
     vscode.commands.registerCommand(COMPANION.stop, (id?: string) => stop(id)),
     vscode.commands.registerCommand(COMPANION.chooseMicrophone, () => chooseMicrophone(context)),
-    vscode.commands.registerCommand(COMPANION.testMicrophone, () => testMicrophone(context)),
     { dispose: () => kill() },
   )
 }
@@ -95,42 +93,9 @@ function fixFor(u: Extract<SessionUpdate, { kind: "done" }>): VoiceFix | undefin
   if (!u.error || u.final) return undefined
   const st = u.stats
   if (!st) return u.error.startsWith("Could not open the microphone") ? "chooseMicrophone" : undefined
-  if (st.frames > 0 && st.peak < SILENT_PEAK) return "testMicrophone"
+  if (st.frames > 0 && st.peak < SILENT_PEAK) return "chooseMicrophone"
   if (st.frames === 0 || /No words were heard/.test(u.error)) return "chooseMicrophone"
   return undefined
-}
-
-/* ------------------------------------------------------------ test */
-
-/** Record 3 s from every microphone in a separate process and say which ones deliver audio. */
-async function testMicrophone(context: vscode.ExtensionContext): Promise<void> {
-  const report = await vscode.window.withProgress(
-    { location: vscode.ProgressLocation.Notification, title: "OpenCode Voice: testing the microphones. Keep speaking…" },
-    () =>
-      new Promise<ProbeReport>((resolve) => {
-        let child: ChildProcess
-        try {
-          child = fork(join(context.extensionPath, "dist", "recorder.js"), [], { env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" }, stdio: ["ignore", "ignore", "pipe", "ipc"] })
-        } catch (e) {
-          return resolve({ kind: "probe", runtime: "", devices: [], error: e instanceof Error ? e.message : String(e) })
-        }
-        let stderr = ""
-        child.stderr?.on("data", (b: Buffer) => (stderr = (stderr + b.toString()).slice(-1500)))
-        const timer = setTimeout(() => child.kill(), 60_000)
-        child.on("message", (m: ProbeReport) => {
-          if (m?.kind === "probe") resolve(m)
-        })
-        child.on("exit", (code) => {
-          clearTimeout(timer)
-          resolve({ kind: "probe", runtime: "", devices: [], error: stderr.trim().split("\n").pop() || `the test process ended (${code})` })
-        })
-        child.send({ type: "probe", ms: 3000 })
-      }),
-  )
-  log.info(probeText(report))
-  const pick = await vscode.window.showInformationMessage(`OpenCode Voice: ${probeSummary(report)}`, "Show Details", "Choose Microphone")
-  if (pick === "Show Details") log.show(true)
-  if (pick === "Choose Microphone") await chooseMicrophone(context)
 }
 
 /* ------------------------------------------------------------ devices */
