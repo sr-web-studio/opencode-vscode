@@ -31,7 +31,7 @@ OpenCode stays in charge: models, providers, MCP servers, skills, agents and all
 
 - VS Code 1.144 or newer.
 - [OpenCode](https://opencode.ai) V2 installed, so the `opencode` command works. If it is missing, the panel shows how to install it. You can also set **OpenCode: Set CLI Path**.
-- An OpenCode server. If none is running, the extension starts OpenCode's shared background service (`opencode serve --service`), which keeps running on its own. To use a server elsewhere, set `opencode.serverUrl` and run **OpenCode: Set Remote Server Password**.
+- An OpenCode server. If none is running, the extension starts OpenCode's shared background service (`opencode serve --service`), which keeps running on its own. To use a server on another computer, set `opencode.serverUrl` (see [Settings](#settings)); if that server has a password, run **OpenCode: Set Server Password**.
 
 The workspace folder you open is the OpenCode project.
 
@@ -53,7 +53,7 @@ Open Settings and search for **OpenCode**:
 
 | Setting | What it does |
 | --- | --- |
-| `opencode.serverUrl` | URL of a remote OpenCode server. Empty: use the local shared service. |
+| `opencode.serverUrl` | Address of an OpenCode server on another computer. Empty (default): use OpenCode on this computer. Examples: `http://192.168.1.10:4096`, `http://my-server.tail1234.ts.net:4096`, `https://opencode.example.com`. `http://` is added if you leave it out; `4096` is OpenCode's default port. |
 | `opencode.cliPath` | Path to `opencode`. Empty: `PATH`, then `~/.opencode/bin`. |
 | `opencode.transcript.*` | Fold finished steps, expand tool details, reasoning display, font size. |
 | `opencode.todo.defaultExpanded` | Show the task list expanded. |

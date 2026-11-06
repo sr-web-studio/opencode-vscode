@@ -21,7 +21,7 @@
   "bugs": {
     "url": "https://github.com/sr-web-studio/opencode-vscode/issues"
   },
-  "version": "0.3.5",
+  "version": "0.3.6",
   "publisher": "sr-web-studio",
   "license": "MIT",
   "repository": {
@@ -80,12 +80,12 @@
       },
       {
         "command": "opencode.setPassword",
-        "title": "Set Remote Server Password",
+        "title": "Set Server Password",
         "category": "OpenCode"
       },
       {
         "command": "opencode.clearPassword",
-        "title": "Clear Remote Server Password",
+        "title": "Clear Server Password",
         "category": "OpenCode"
       },
       {
@@ -117,7 +117,7 @@
           "type": "string",
           "default": "",
           "scope": "machine-overridable",
-          "markdownDescription": "URL of an OpenCode server, for example `http://host:4096`. Leave empty to use the local shared service (started automatically if needed). The password for a remote server is stored in VS Code SecretStorage: run **OpenCode: Set Remote Server Password**."
+          "markdownDescription": "Address of an OpenCode server to connect to, for example one running on another computer. **Leave empty** to use OpenCode on this computer (the extension starts its shared service if needed; no password required).\n\nExamples:\n- `http://192.168.1.10:4096`: a computer on your network (`4096` is OpenCode's default port)\n- `http://my-server.tail1234.ts.net:4096`: over Tailscale\n- `https://opencode.example.com`: behind a domain with HTTPS (no port needed)\n\n`http://` is added when you leave it out. Without a port, `http` uses 80 and `https` uses 443. If the server has a password (`OPENCODE_SERVER_PASSWORD`), run **OpenCode: Set Server Password**."
         },
         "opencode.cliPath": {
           "type": "string",

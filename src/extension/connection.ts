@@ -1,5 +1,6 @@
 import { OpenCode, type OpenCodeClient } from "@opencode/client"
 import { Service, type Endpoint } from "@opencode/client/service"
+import { normalizeServerUrl, serverUrlProblem } from "../core/server-url"
 import { resolveCli } from "./cli"
 
 export class SetupError extends Error {
@@ -36,7 +37,9 @@ export async function connect(opts: ConnectOptions): Promise<Connected> {
   let headers: Record<string, string> | undefined
 
   if (remote) {
-    url = remote.replace(/\/+$/, "")
+    const problem = serverUrlProblem(remote)
+    if (problem) throw new Error(`opencode.serverUrl: ${problem}`)
+    url = normalizeServerUrl(remote)
     if (opts.password) headers = { Authorization: basic("opencode", opts.password) }
   } else {
     let endpoint: Endpoint | undefined = await Service.discover()
@@ -56,6 +59,16 @@ export async function connect(opts: ConnectOptions): Promise<Connected> {
   }
 
   const client = OpenCode.make({ baseUrl: url, headers })
-  const info = await client.server.info()
+  const info = await client.server.info().catch((e: unknown) => {
+    const msg = e instanceof Error ? e.message : String(e)
+    if (remote && /authentication required|unauthori[sz]ed|\b401\b/i.test(msg)) {
+      throw new Error(
+        opts.password
+          ? `The OpenCode server at ${url} rejected the password. Run “OpenCode: Set Server Password” again.`
+          : `The OpenCode server at ${url} needs a password. Run “OpenCode: Set Server Password”.`,
+      )
+    }
+    throw e
+  })
   return { client, url, version: info.version }
 }

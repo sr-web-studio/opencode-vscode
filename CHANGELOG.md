@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.6 (preview)
+
+- **OpenCode: Set Server Password** (was "Set Remote Server Password"). It names the server it is for, and explains that OpenCode on this computer needs no password.
+- `opencode.serverUrl` shows examples (LAN, Tailscale, HTTPS domain). `http://` is added when left out, and a malformed address gets a clear message.
+
 ## 0.3.5 (preview): first public release
 
 The first release on the VS Code Marketplace and Open VSX.

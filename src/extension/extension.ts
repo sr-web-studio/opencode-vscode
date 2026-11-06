@@ -14,6 +14,7 @@ import { DiffViews } from "./diffs"
 import { ChatViewProvider, VIEW_ID } from "./view"
 import { WorkerPanels } from "./workers"
 import { Voice } from "./voice"
+import { normalizeServerUrl } from "../core/server-url"
 import { VOICE_FEED_COMMAND, type VoiceFeed } from "../core/dictation"
 
 const PASSWORD_KEY = "opencode.serverPassword"
@@ -161,7 +162,22 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand(VOICE_FEED_COMMAND, (u: VoiceFeed) => voice.feed(u)),
     voice.watchCompanion(),
     vscode.commands.registerCommand("opencode.setPassword", async () => {
-      const value = await vscode.window.showInputBox({ prompt: "Password for the remote OpenCode server", password: true, ignoreFocusOut: true })
+      const url = normalizeServerUrl(readConnectionSettings().serverUrl)
+      if (!url) {
+        // The local service needs no password: the extension reads its credentials itself.
+        const pick = await vscode.window.showInformationMessage(
+          "A password is only needed for an OpenCode server you connect to by address. Set its address first in the OpenCode: Server Url setting.",
+          "Open Setting",
+        )
+        if (pick) void vscode.commands.executeCommand("workbench.action.openSettings", "opencode.serverUrl")
+        return
+      }
+      const value = await vscode.window.showInputBox({
+        title: "OpenCode Server Password",
+        prompt: `Password of the OpenCode server at ${url} (its OPENCODE_SERVER_PASSWORD). Stored in VS Code's secret storage.`,
+        password: true,
+        ignoreFocusOut: true,
+      })
       if (value === undefined) return
       await context.secrets.store(PASSWORD_KEY, value)
       await start()
