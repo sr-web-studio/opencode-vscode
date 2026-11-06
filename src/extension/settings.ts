@@ -4,12 +4,21 @@ import type { ViewSettings } from "../core/protocol"
 
 const cfg = () => vscode.workspace.getConfiguration("opencode")
 
-/** Resolved transcript font: the setting, else the chat editor font size, else 13. */
+/** Resolved transcript font: the setting, else `max(chat editor font size, 14)` (readable by default). */
 function fontSize(): number {
   const own = cfg().get<number>("transcript.fontSize", 0)
   if (own > 0) return own
   const chat = vscode.workspace.getConfiguration("chat.editor").get<number>("fontSize", 0)
-  return chat > 0 ? chat : 13
+  return Math.max(chat > 0 ? chat : 0, 14)
+}
+
+export type TerminalSettings = { reveal: "onStart" | "never" | "off"; maxOpen: number }
+
+export function readTerminalSettings(): TerminalSettings {
+  const c = cfg()
+  const reveal = c.get<string>("terminal.reveal", "onStart")
+  const max = c.get<number>("terminal.maxOpen", 5)
+  return { reveal: reveal === "never" || reveal === "off" ? reveal : "onStart", maxOpen: Number.isFinite(max) && max >= 1 ? Math.floor(max) : 5 }
 }
 
 export function readViewSettings(): ViewSettings {

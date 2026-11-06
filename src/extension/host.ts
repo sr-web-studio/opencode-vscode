@@ -1,20 +1,45 @@
 import * as vscode from "vscode"
+import { mimeFromName } from "../core/attachments"
 import { isAbsolutePath } from "../core/paths"
-import type { Controller } from "../core/controller"
-import type { HostRequest } from "../core/protocol"
+import type { HostRequest, PickedFile, ToWebview } from "../core/protocol"
+import type { WorkerPanels } from "./workers"
+import type { ShellTerminals } from "./terminal"
+
+const REVERT_PROMPT =
+  "Revert to before this prompt? Messages after it are hidden, and files changed by later steps are restored. Shell side effects (git, databases, other files) are not undone."
+
+/** What a webview (the chat view or a worker tab) lets the host do on its behalf. */
+export type Surface = {
+  /** Tell the webview something (picked files). */
+  post(message: ToWebview): void
+  /** Run a chat action (confirmed revert). Worker tabs ignore it. */
+  act(action: { type: "revert"; messageID: string }): void
+  /** The session the surface shows, for shell location lookups. */
+  sessionID(): string | undefined
+}
 
 /** Host-side effects the webview asks for. Everything here needs `vscode`, so it cannot live in core/ or ui/. */
 export class HostActions {
-  constructor(private readonly controller: Controller, private readonly directory: string) {}
+  constructor(
+    private readonly directory: string,
+    private readonly terminals: () => ShellTerminals,
+    private readonly workers: () => WorkerPanels,
+  ) {}
 
-  async handle(req: HostRequest): Promise<void> {
+  async handle(req: HostRequest, surface: Surface): Promise<void> {
     switch (req.type) {
       case "openFile":
         return this.openFile(req.path, req.line)
       case "openDiff":
         return this.openDiff(req.file, req.patch)
       case "showTerminal":
-        return this.showTerminal(req.shellID, req.title)
+        return this.terminals().show(req.shellID, req.sessionID ?? surface.sessionID())
+      case "openSession":
+        return this.workers().open(req.id, req.readOnly)
+      case "pickFiles":
+        return this.pickFiles(req.requestID, surface)
+      case "confirmRevert":
+        return this.confirmRevert(req.messageID, surface)
       case "openExternal": {
         // Only web links leave VS Code; anything else (file:, command:) is ignored.
         if (/^https?:\/\//i.test(req.url)) await vscode.env.openExternal(vscode.Uri.parse(req.url))
@@ -34,7 +59,7 @@ export class HostActions {
 
   /** Relative paths resolve against the project directory. */
   private resolve(path: string): vscode.Uri {
-    return vscode.Uri.file(isAbsolutePath(path) ? path : `${this.directory}/${path}`)
+    return isAbsolutePath(path) ? vscode.Uri.file(path) : vscode.Uri.joinPath(vscode.Uri.file(this.directory), ...path.split(/[\\/]+/).filter(Boolean))
   }
 
   private async openFile(path: string, line?: number): Promise<void> {
@@ -52,21 +77,25 @@ export class HostActions {
     await vscode.window.showTextDocument(doc, { preview: true })
   }
 
-  /** Background shells run on the server. The terminal shows their captured output (read-only). */
-  private async showTerminal(shellID: string, title?: string): Promise<void> {
-    let output: string
-    try {
-      output = await this.controller.shellOutput(shellID)
-    } catch {
-      void vscode.window.showWarningMessage("The shell output is no longer available.")
-      return
-    }
-    const write = new vscode.EventEmitter<string>()
-    const pty: vscode.Pseudoterminal = {
-      onDidWrite: write.event,
-      open: () => write.fire(output.replace(/\r?\n/g, "\r\n")),
-      close: () => write.dispose(),
-    }
-    vscode.window.createTerminal({ name: title ? `OpenCode: ${title}` : "OpenCode shell", pty }).show()
+  /** The paperclip: a native file dialog. The URI is exactly `Uri.file(path).toString()`, so Windows paths are right. */
+  private async pickFiles(requestID: string, surface: Surface): Promise<void> {
+    const picked = await vscode.window.showOpenDialog({
+      canSelectMany: true,
+      canSelectFolders: false,
+      openLabel: "Attach",
+      defaultUri: vscode.Uri.file(this.directory),
+    })
+    if (!picked || picked.length === 0) return
+    const files: PickedFile[] = picked.map((uri) => {
+      const name = uri.path.split("/").pop() ?? "file"
+      return { uri: uri.toString(), name, mime: mimeFromName(name) }
+    })
+    surface.post({ type: "picked", requestID, files })
+  }
+
+  private async confirmRevert(messageID: string, surface: Surface): Promise<void> {
+    const revert = "Revert"
+    const pick = await vscode.window.showWarningMessage(REVERT_PROMPT, { modal: true }, revert)
+    if (pick === revert) surface.act({ type: "revert", messageID })
   }
 }

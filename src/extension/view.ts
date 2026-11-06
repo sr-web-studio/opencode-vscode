@@ -1,7 +1,7 @@
 import * as vscode from "vscode"
 import type { Controller } from "../core/controller"
 import type { ToHost, ToWebview } from "../core/protocol"
-import type { HostActions } from "./host"
+import type { HostActions, Surface } from "./host"
 import { webviewHtml } from "./html"
 
 export const VIEW_ID = "opencode.chat"
@@ -57,7 +57,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
 
   private async onMessage(m: ToHost): Promise<void> {
     if (m.type === "action") await this.controller.dispatch(m.action)
-    else if (m.type === "host") await this.host.handle(m.request)
+    else if (m.type === "host") await this.host.handle(m.request, this.surface)
+  }
+
+  private readonly surface: Surface = {
+    post: (message) => this.post(message),
+    act: (action) => void this.controller.dispatch(action),
+    sessionID: () => this.controller.currentSessionID,
   }
 
   dispose(): void {

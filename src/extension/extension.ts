@@ -7,10 +7,13 @@ import { homedir } from "node:os"
 import { SetupError, connect } from "./connection"
 import { HostActions } from "./host"
 import { VscodeNotifier } from "./notifier"
-import { affectsConnection, affectsView, readConnectionSettings, readNotificationSettings, readViewSettings } from "./settings"
+import { affectsConnection, affectsView, readConnectionSettings, readNotificationSettings, readTerminalSettings, readViewSettings } from "./settings"
+import { ShellTerminals } from "./terminal"
 import { ChatViewProvider, VIEW_ID } from "./view"
+import { WorkerPanels } from "./workers"
 
 const PASSWORD_KEY = "opencode.serverPassword"
+const PINS_KEY = "opencode.pinnedModels"
 
 export function activate(context: vscode.ExtensionContext): void {
   const folder = vscode.workspace.workspaceFolders?.[0]
@@ -25,10 +28,20 @@ export function activate(context: vscode.ExtensionContext): void {
       set: (key, value) => void context.workspaceState.update(key, value),
     },
     onEvent: (ev) => void engine.handle(ev).catch(() => undefined),
+    // Pins follow the user across windows and machines (Settings Sync keys), and never touch OpenCode config.
+    pins: {
+      get: () => context.globalState.get<string[]>(PINS_KEY, []),
+      set: (pins) => void context.globalState.update(PINS_KEY, pins),
+    },
   })
+  context.globalState.setKeysForSync([PINS_KEY])
   controller.setSettings(readViewSettings())
 
-  const host = new HostActions(controller, directory)
+  let terminals!: ShellTerminals
+  let workers!: WorkerPanels
+  const host = new HostActions(directory, () => terminals, () => workers)
+  terminals = new ShellTerminals(controller, readTerminalSettings)
+  workers = new WorkerPanels(context.extensionUri, controller, () => host)
   const provider = new ChatViewProvider(context.extensionUri, controller, host)
 
   /* ---------------------------------------------------------- notifications */
@@ -107,6 +120,8 @@ export function activate(context: vscode.ExtensionContext): void {
     status,
     { dispose: unsubStatus },
     provider,
+    terminals,
+    workers,
     { dispose: () => { generation++; controller.detach() } },
     vscode.window.registerWebviewViewProvider(VIEW_ID, provider),
     vscode.commands.registerCommand("opencode.focus", () => vscode.commands.executeCommand(`${VIEW_ID}.focus`)),
