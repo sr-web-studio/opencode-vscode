@@ -72,13 +72,24 @@ export class HostActions {
     return isAbsolutePath(path) ? vscode.Uri.file(path) : vscode.Uri.joinPath(vscode.Uri.file(this.directory), ...path.split(/[\\/]+/).filter(Boolean))
   }
 
+  /**
+   * `vscode.open` picks the right editor for the file: text, image preview, PDF, notebook, or a custom editor.
+   * `openTextDocument` only handles text and fails on images and other binary files.
+   */
   private async openFile(path: string, line?: number): Promise<void> {
+    const uri = this.resolve(path)
     try {
-      const doc = await vscode.workspace.openTextDocument(this.resolve(path))
-      const at = line && line > 0 ? new vscode.Position(line - 1, 0) : undefined
-      await vscode.window.showTextDocument(doc, { preview: true, selection: at ? new vscode.Range(at, at) : undefined })
+      await vscode.workspace.fs.stat(uri)
     } catch {
-      void vscode.window.showWarningMessage(`Could not open ${path}`)
+      void vscode.window.showWarningMessage(`File not found: ${path}`)
+      return
+    }
+    try {
+      const at = line && line > 0 ? new vscode.Position(line - 1, 0) : undefined
+      const options: vscode.TextDocumentShowOptions = { preview: true, selection: at ? new vscode.Range(at, at) : undefined }
+      await vscode.commands.executeCommand("vscode.open", uri, options)
+    } catch (e) {
+      void vscode.window.showWarningMessage(`Could not open ${path}: ${e instanceof Error ? e.message : String(e)}`)
     }
   }
 
