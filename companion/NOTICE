@@ -2,3 +2,17 @@ OpenCode Voice includes @picovoice/pvrecorder-node 1.2.9 (dist/pvrecorder),
 Copyright Picovoice Inc., licensed under the Apache License, Version 2.0:
 https://www.apache.org/licenses/LICENSE-2.0
 Source: https://github.com/Picovoice/pvrecorder
+
+On-device voice (optional, downloaded on first use; nothing below is shipped inside this extension):
+
+- sherpa-onnx 2.0.1 (npm packages sherpa-onnx-<platform>-<arch>: the native addon and onnxruntime),
+  Copyright the sherpa-onnx authors (k2-fsa) and Microsoft (onnxruntime), Apache License 2.0 / MIT:
+  https://github.com/k2-fsa/sherpa-onnx
+- Vosk small streaming Bengali model (alphacep/vosk-model-small-streaming-bn), Apache License 2.0:
+  https://huggingface.co/alphacep/vosk-model-small-streaming-bn
+- bangla-zipformer-onnx (SayedShaun/bangla-zipformer-onnx, int8 files), by Sayed Shaun, licensed under
+  Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0):
+  https://huggingface.co/SayedShaun/bangla-zipformer-onnx
+  https://creativecommons.org/licenses/by-sa/4.0/
+  The model files are downloaded unchanged from the pinned revision 16bec01c5f554d3f0dc8f0139de3a00839a72efc and are
+  used only to turn speech into text on the user's computer. They are not part of this extension.

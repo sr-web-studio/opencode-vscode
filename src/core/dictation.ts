@@ -106,23 +106,36 @@ export const COMPANION = {
   /** Open the operating system's microphone privacy page (Windows, macOS). */
   micSettings: "opencode.companion.voice.micSettings",
   chooseMicrophone: "opencode.companion.voice.chooseMicrophone",
+  /** Show the companion's "OpenCode Voice" output channel (diagnostics of the on-device engine). */
+  showLog: "opencode.companion.voice.showLog",
 } as const
 
+/** Which engine turns speech into text: on this computer (free, offline) or Soniox (cloud, the user's own key). */
+export type VoiceEngine = "local" | "soniox"
+export const DEFAULT_ENGINE: VoiceEngine = "local"
+export const normalizeEngine = (raw: unknown): VoiceEngine => (raw === "soniox" ? "soniox" : DEFAULT_ENGINE)
+
 /** What the user can do about a failed recording; the main extension turns it into a button. */
-export type VoiceFix = "micSettings" | "chooseMicrophone"
+export type VoiceFix = "micSettings" | "chooseMicrophone" | "showLog"
 
 /** The main extension's command that receives dictation updates from the companion. */
 export const VOICE_FEED_COMMAND = "opencode.voice.feed"
 
-export type CompanionInfo = { version: string; capture: boolean; problem?: string; platform?: string }
+/** `local`: this computer has a build of the on-device engine (the microphone may work without it). */
+export type CompanionInfo = { version: string; capture: boolean; problem?: string; platform?: string; local?: boolean; localProblem?: string }
 
 export type VoiceStartArgs = {
   /** Correlates feed updates with this recording. */
   id: string
-  /** A short-lived Soniox key minted by the main extension; the user's own key never leaves it. */
-  key: string
-  model: string
+  /** Missing means `soniox` (older callers). */
+  engine?: VoiceEngine
+  /** soniox only: a short-lived key minted by the main extension; the user's own key never leaves it. */
+  key?: string
+  /** soniox only. */
+  model?: string
   languages: string[]
+  /** local only: threads per recognizer. */
+  threads?: number
 }
 
 /** One update from the companion. `heard` is cumulative for the recording `id`. */

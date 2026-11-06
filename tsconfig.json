@@ -15,6 +15,6 @@
     "esModuleInterop": true,
     "resolveJsonModule": true
   },
-  "include": ["src/core/**/*.ts", "src/extension/**/*.ts", "test/**/*.ts", "scripts/**/*.ts"],
+  "include": ["src/core/**/*.ts", "src/extension/**/*.ts", "src/companion/**/*.ts", "test/**/*.ts", "scripts/**/*.ts"],
   "exclude": ["node_modules", "dist", "scratch"]
 }

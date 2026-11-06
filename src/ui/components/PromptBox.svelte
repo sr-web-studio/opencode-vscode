@@ -11,6 +11,7 @@
     type Attachment,
   } from "../../core/attachments"
   import { mergeDictation } from "../../core/dictation"
+  import { micLabel, micTitle } from "../../core/local-voice"
   import { shouldFocusPrompt } from "../../core/focus"
   import { cycleAgent, findModel } from "../../core/models"
   import { promptHeight } from "../../core/prompt-height"
@@ -397,17 +398,17 @@
     <div class="actions">
       <button class="clip muted" onclick={pick} title="Attach files" aria-label="Attach files"><Codicon name="attach" /></button>
       <span class="grow"></span>
-      <!-- Without a key the mic only looks disabled: a click opens the key dialog, so it stays focusable and clickable. -->
+      <!-- When it cannot start yet (no Soniox key) the mic only looks disabled: a click opens the key dialog, so it stays focusable and clickable. -->
       <button
         class="mic muted"
-        class:off={!app.voice.keySet}
+        class:off={!app.voice.ready}
         class:rec={recording === "on"}
         class:wait={recording === "starting" || recording === "stopping"}
-        aria-disabled={!app.voice.keySet}
-        aria-pressed={app.voice.keySet ? recording !== "off" : undefined}
+        aria-disabled={!app.voice.ready}
+        aria-pressed={app.voice.ready ? recording !== "off" : undefined}
         onclick={() => store.bridge.voice()}
-        title={!app.voice.keySet ? "Voice input is off: click to add your Soniox API key" : recording === "on" ? "Listening: click to stop" : recording === "starting" ? "Starting the microphone… (click to cancel)" : recording === "stopping" ? "Finishing the last words…" : "Voice input"}
-        aria-label={!app.voice.keySet ? "Voice input (set API key)" : recording === "off" ? "Voice input" : "Stop voice input"}
+        title={micTitle({ engine: app.voice.engine, ready: app.voice.ready, recording })}
+        aria-label={micLabel({ engine: app.voice.engine, ready: app.voice.ready, recording })}
       >{#if recording === "starting" || recording === "stopping"}<Codicon name="loading" spin />{:else if recording === "on"}<Codicon name="record" />{:else}<Codicon name="mic" />{/if}</button>
       {#if running}
         <button class="stop" onclick={() => store.dispatch({ type: "stop" })} title="Stop (Esc)" aria-label="Stop"><span class="sq"></span></button>

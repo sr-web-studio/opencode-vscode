@@ -1,5 +1,6 @@
 import * as vscode from "vscode"
-import { COMPANION, DEFAULT_LANGUAGES, SONIOX_MODEL, spokenText, type CompanionInfo, type VoiceFeed, type VoiceFix } from "../core/dictation"
+import { COMPANION, DEFAULT_LANGUAGES, SONIOX_MODEL, normalizeEngine, spokenText, type CompanionInfo, type VoiceEngine, type VoiceFeed, type VoiceFix } from "../core/dictation"
+import { startArgs, voiceReady } from "../core/local-voice"
 import type { AppState, ToWebview } from "../core/protocol"
 import { checkSonioxKey, mintSonioxTempKey } from "../core/voice"
 
@@ -9,8 +10,11 @@ const COMPANION_ID = "sr-web-studio.opencode-voice"
 type VoiceState = AppState["voice"]
 
 /**
- * Voice input, bring-your-own-key (Soniox).
+ * Voice input. Two engines (setting `opencode.voice.engine`):
+ * - `local` (default): free, offline, Bangla, runs in the companion on the user's computer; nothing to configure here.
+ * - `soniox`: cloud, bring-your-own-key.
  *
+ * Soniox:
  * - The user's own key lives only in VS Code SecretStorage of this extension: never in settings, OpenCode config, logs,
  *   the webview or the companion.
  * - Recording happens in the companion extension (`opencode-voice`, `extensionKind: ["ui"]`), which runs on the
@@ -20,6 +24,8 @@ type VoiceState = AppState["voice"]
  */
 export class Voice implements vscode.Disposable {
   private keySet = false
+  private engine: VoiceEngine = "local"
+  private info?: CompanionInfo
   private capture = false
   private recording: VoiceState["recording"] = "off"
   private current?: string
@@ -42,12 +48,18 @@ export class Voice implements vscode.Disposable {
   }
 
   private emit(): void {
-    this.publish({ keySet: this.keySet, capture: this.capture, recording: this.recording })
+    this.publish({ engine: this.engine, ready: voiceReady(this.engine, this.keySet, this.info), capture: this.capture, recording: this.recording })
+  }
+
+  private readEngine(): VoiceEngine {
+    return normalizeEngine(vscode.workspace.getConfiguration("opencode.voice").get("engine"))
   }
 
   async refresh(): Promise<void> {
+    this.engine = this.readEngine()
     this.keySet = !!(await this.secrets.get(KEY))
-    this.capture = !!(await this.companion())
+    this.info = await this.companion()
+    this.capture = !!this.info
     this.emit()
   }
 
@@ -60,9 +72,10 @@ export class Voice implements vscode.Disposable {
     }
   }
 
-  /** The mic button (and `OpenCode: Voice Input`): ask for a key, or start/stop dictation. */
+  /** The mic button (and `OpenCode: Voice Input`): (soniox without a key) ask for a key, or start/stop dictation. */
   async click(): Promise<void> {
-    if (!this.keySet) return this.setKey()
+    this.engine = this.readEngine()
+    if (this.engine === "soniox" && !this.keySet) return this.setKey()
     if (this.recording !== "off") return this.stop()
     await this.start()
   }
@@ -134,23 +147,30 @@ export class Voice implements vscode.Disposable {
     this.capture = !!info
     if (!info) return this.finish(id)
     if (!info.capture) return this.failed(id, info.problem ?? "Voice recording is not available on this computer.")
-    const key = await this.secrets.get(KEY)
-    if (!key) {
-      this.finish(id)
-      return this.setKey()
-    }
-    const temp = await mintSonioxTempKey((url, init) => fetch(url, init), key)
-    if (this.current !== id) return
-    if (!temp.ok) return this.failed(id, temp.reason)
+    this.info = info
     const cfg = vscode.workspace.getConfiguration("opencode.voice")
+    const engine = this.engine
     const languages = cfg.get<string[]>("languages", DEFAULT_LANGUAGES).filter((l) => typeof l === "string" && l.trim())
+    let soniox: { key: string; model: string } | undefined
+    if (engine === "soniox") {
+      const key = await this.secrets.get(KEY)
+      if (!key) {
+        this.finish(id)
+        return this.setKey()
+      }
+      const temp = await mintSonioxTempKey((url, init) => fetch(url, init), key)
+      if (this.current !== id) return
+      if (!temp.ok) return this.failed(id, temp.reason)
+      soniox = { key: temp.key, model: cfg.get<string>("model", SONIOX_MODEL) || SONIOX_MODEL }
+    } else if (info.local === false) {
+      return this.failed(id, info.localProblem ?? "The on-device engine is not available on this computer.")
+    }
+    this.log(`Voice: engine ${engine}`)
     try {
-      const ok = await vscode.commands.executeCommand<boolean>(COMPANION.start, {
-        id,
-        key: temp.key,
-        model: cfg.get<string>("model", SONIOX_MODEL) || SONIOX_MODEL,
-        languages: languages.length ? languages : DEFAULT_LANGUAGES,
-      })
+      const ok = await vscode.commands.executeCommand<boolean>(
+        COMPANION.start,
+        startArgs({ id, engine, languages: languages.length ? languages : DEFAULT_LANGUAGES, threads: cfg.get<number>("localThreads"), soniox }),
+      )
       if (ok === false) this.failed(id, "The companion could not start recording.")
     } catch (e) {
       this.failed(id, `The companion could not start recording: ${e instanceof Error ? e.message : e}`)
@@ -188,7 +208,7 @@ export class Voice implements vscode.Disposable {
       return this.emit()
     }
     const st = u.stats
-    if (st) this.log(`Voice: ended after ${(st.frames / 10).toFixed(1)} s on ${st.device ?? "the default microphone"}, peak level ${st.peak}/32767, ${st.answers} answers from Soniox, ${u.final.length} characters`)
+    if (st) this.log(`Voice: ended after ${(st.frames / 10).toFixed(1)} s on ${st.device ?? "the default microphone"}, peak level ${st.peak}/32767, ${st.answers} ${this.engine === "local" ? "segments" : "answers from Soniox"}, ${u.final.length} characters`)
     this.post({ type: "dictation", id: u.id, text: spokenText({ final: u.final, partial: "", finished: true }), done: true })
     if (u.error) return this.failed(u.id, u.error, u.fix)
     this.finish(u.id)
@@ -200,10 +220,12 @@ export class Voice implements vscode.Disposable {
     const actions =
       fix === "micSettings" ? ["Open Microphone Settings", "Choose Microphone"]
       : fix === "chooseMicrophone" ? ["Choose Microphone"]
+      : fix === "showLog" ? ["Show Log"]
       : []
     void vscode.window.showErrorMessage(`Voice input: ${reason}`, ...actions).then((pick) => {
       if (pick === "Open Microphone Settings") void vscode.commands.executeCommand(COMPANION.micSettings)
       if (pick === "Choose Microphone") void vscode.commands.executeCommand(COMPANION.chooseMicrophone)
+      if (pick === "Show Log") void vscode.commands.executeCommand(COMPANION.showLog)
     })
   }
 
