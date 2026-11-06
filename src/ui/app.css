@@ -16,10 +16,12 @@
   --oc-selected: var(--vscode-list-activeSelectionBackground);
   --oc-selected-fg: var(--vscode-list-activeSelectionForeground);
   --oc-bubble: var(--vscode-textBlockQuote-background, var(--vscode-editorWidget-background));
-  --oc-user-border: var(--vscode-textBlockQuote-border, var(--vscode-focusBorder));
-  --oc-user-bg: var(--vscode-chat-requestBackground, var(--vscode-textBlockQuote-background, var(--vscode-editorWidget-background)));
+  /* The prompt card must stand out in dark themes: input background, a visible border, a link-coloured accent. */
+  --oc-user-line: var(--vscode-input-border, var(--oc-hairline));
+  --oc-user-accent: var(--vscode-textLink-foreground, var(--vscode-focusBorder));
+  --oc-user-bg: var(--vscode-input-background, var(--vscode-editorWidget-background));
   --oc-side: 16px;
-  --oc-turn-gap: 28px;
+  --oc-turn-gap: 40px;
   --oc-popover: var(--vscode-editorWidget-background);
   --oc-code-bg: var(--vscode-textCodeBlock-background);
 }

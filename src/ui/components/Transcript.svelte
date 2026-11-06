@@ -117,8 +117,8 @@
           <button class="link" disabled={app.loadingEarlier} onclick={loadEarlier}>{app.loadingEarlier ? "Loading earlier messages…" : "Show earlier messages"}</button>
         </div>
       {/if}
-      {#each turns as turn (turn.id)}
-        <Turn {turn} cwd={app.directory} settings={app.settings} permissions={byTool} />
+      {#each turns as turn, i (turn.id)}
+        <Turn {turn} last={i === turns.length - 1 && !revert} cwd={app.directory} settings={app.settings} permissions={byTool} />
       {/each}
       {#if revert}
         <div class="rbar" role="status">
@@ -130,6 +130,7 @@
         {#each app.view.queued as q (q.id)}
           <div class="queued">
             <div class="user">
+              <div class="uhead"><Codicon name="account" /> You</div>
               {#if q.text}<div>{q.text}</div>{/if}
               {#if q.files?.length}<div class="chips">{#each q.files as f, i (i)}<Chip name={f.name} mime={f.mime} />{/each}</div>{/if}
             </div>
@@ -165,7 +166,8 @@
   .pad { padding: 0.5em 0; }
   .earlier { display: flex; justify-content: center; margin-bottom: 1em; }
   .queued { opacity: 0.75; margin-bottom: var(--oc-turn-gap); }
-  .user { padding: 8px 12px; border-left: 2px solid var(--oc-user-border); background: var(--oc-user-bg); border-radius: 6px; white-space: pre-wrap; word-break: break-word; }
+  .user { padding: 10px 14px; border: 1px solid var(--oc-user-line); border-left: 3px solid var(--oc-user-accent); background: var(--oc-user-bg); border-radius: 6px; white-space: pre-wrap; word-break: break-word; }
+  .uhead { display: flex; align-items: center; gap: 0.45em; margin-bottom: 0.35em; font-weight: 600; white-space: normal; }
   .chips { display: flex; flex-wrap: wrap; gap: 0.4em; margin-top: 0.5em; }
   .orphan { display: flex; gap: 0.6em; align-items: baseline; flex-wrap: wrap; border-left: 2px solid var(--oc-amber); padding-left: 0.5em; margin: 0.4em 0; }
   .label { font-weight: 600; }

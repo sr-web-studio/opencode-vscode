@@ -49,14 +49,18 @@ export function compactTime(at: number, env: TimeEnv): string {
 export const fullDateTime = (at: number, env: Pick<TimeEnv, "locale" | "timeZone">): string =>
   fmt(env, { dateStyle: "full", timeStyle: "medium" }).format(at)
 
+/** A moment as the compact text plus the full date and time for the hover title. Used for the prompt time in a card header. */
+export const moment = (at: number | undefined, env: TimeEnv): { text: string; title: string } | undefined =>
+  at === undefined || !Number.isFinite(at) ? undefined : { text: compactTime(at, env), title: fullDateTime(at, env) }
+
 /**
- * `2:41 PM · 42s`, or empty for a turn that has not finished. `started` is the user prompt, `ended` the last step.
- * A missing or negative duration leaves just the time.
+ * `2:41 PM · 42s`, or undefined for a turn that has not finished. `started` is the user prompt, `ended` the last step.
+ * No positive duration (missing start, or both times equal) leaves just the time.
  */
 export function turnStamp(turn: { started?: number; ended?: number; outcome?: string }, env: TimeEnv): { text: string; title: string } | undefined {
   if (!turn.outcome || turn.ended === undefined) return undefined
   const when = compactTime(turn.ended, env)
-  const hasDuration = turn.started !== undefined && turn.ended >= turn.started
+  const hasDuration = turn.started !== undefined && turn.ended > turn.started
   const text = hasDuration ? `${when} · ${formatDuration(turn.ended - turn.started!)}` : when
   return { text, title: fullDateTime(turn.ended, env) }
 }

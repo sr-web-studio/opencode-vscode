@@ -1,5 +1,6 @@
 import type { EventEnvelope, SessionMessageInfo } from "../api"
 import { baseName } from "../attachments"
+import { settledTurn } from "./turn"
 import { applyRevertEvent } from "./revert"
 import {
   emptyView,
@@ -104,6 +105,11 @@ export function viewFromMessages(messages: ReadonlyArray<SessionMessageInfo>): S
   for (const raw of messages) {
     const m = raw as any
     if (m.type === "user") {
+      // A new prompt ends the previous turn even when its `idle` marker is missing.
+      if (current && !current.outcome && current.steps.length > 0) {
+        const done = settledTurn(current, { last: false, running: false })
+        turns[turns.indexOf(current)] = done
+      }
       current = { id: m.id, user: { id: m.id, text: m.text ?? "", created: m.time?.created, files: fileChips(m.files) }, steps: [], started: m.time?.created }
       turns.push(current)
     } else if (m.type === "assistant") {

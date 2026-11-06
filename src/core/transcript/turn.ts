@@ -18,6 +18,33 @@ export function countSteps(work: StepView[]): number {
   return tools > 0 ? tools : work.filter((s) => s.items.some((i) => i.kind !== "text" || i.text.trim())).length
 }
 
+/** The latest time any step, text or tool of the turn reports. Undefined when nothing carries a time. */
+export function lastActivity(turn: TurnView): number | undefined {
+  let last: number | undefined
+  const see = (t: number | undefined) => {
+    if (typeof t === "number" && Number.isFinite(t) && (last === undefined || t > last)) last = t
+  }
+  for (const s of turn.steps) {
+    see(s.started)
+    see(s.completed)
+    for (const i of s.items) if (i.kind === "tool") { see(i.created); see(i.completed) }
+  }
+  return last
+}
+
+/**
+ * A turn that is over but has no execution marker (history that lost its `idle` message, a turn cut by a chunk edge,
+ * an event that never reached the reducer) still gets an outcome and an end time, so it folds and shows its time.
+ * Only the turn that is really running (the last one, in a running session) and turns with nothing in them are left alone.
+ */
+export function settledTurn(turn: TurnView, ctx: { last: boolean; running: boolean }): TurnView {
+  if (turn.outcome || turn.compaction) return turn
+  if (ctx.last && ctx.running) return turn
+  const hasAnswer = turn.steps.some((s) => s.items.some((i) => i.kind === "text" && i.text.trim().length > 0))
+  if (turn.steps.length === 0 || (!hasAnswer && lastActivity(turn) === undefined && turn.steps.every((s) => s.items.length === 0))) return turn
+  return { ...turn, outcome: "succeeded", ended: turn.ended ?? lastActivity(turn) ?? turn.started }
+}
+
 export function turnDuration(turn: TurnView): number | undefined {
   if (turn.started === undefined || turn.ended === undefined) return undefined
   return Math.max(0, turn.ended - turn.started)
