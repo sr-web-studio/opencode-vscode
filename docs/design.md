@@ -41,6 +41,14 @@ Salim installed the M1 vsix locally on Windows (OpenCode 2.1.4 there, workspace 
    - dragging a file from the Explorer adds it as a `file://` URI
    - attachments show as small removable chips above the textarea, with an image thumbnail where applicable
    - if the current model's `capabilities.input` does not include `image`, show a muted warning on image chips
+11. **Agent shell commands in the VS Code terminal panel** (moved forward from M3, like Copilot Chat).
+    - When a `shell` tool starts, `session.tool.progress` carries `metadata.shellID` (`sh_…`), as confirmed in the fixtures. The extension then opens a VS Code terminal named `OpenCode: <command>` (codicon `terminal`) backed by a `vscode.Pseudoterminal`.
+    - The terminal prints `$ <command>` and `cwd`, then streams `shell.output` pages by byte cursor (poll every ~300 ms while running, stop on `shell.exited`/status ≠ running), and ends with a colored `exit N` line. Output is written as-is, so ANSI colors work, and `\n` is converted to `\r\n`.
+    - The terminal is input-free (Option A). Ctrl+C or closing the terminal while the command runs asks "Stop this command?" and then calls `shell.remove`. A command that has already exited only closes the tab.
+    - Reveal behavior: `opencode.terminal.reveal` = `"onStart"` (default: shown without stealing focus, `preserveFocus: true`) | `"never"` (created in the background) | `"off"` (no terminals). At most `opencode.terminal.maxOpen` (default 5) OpenCode terminals stay open; the oldest finished one is disposed first.
+    - Only for the main session of this window and its workers. Workers' terminals are named `OpenCode (<agent>): <command>`.
+    - The tool line's "Show terminal" link focuses that terminal. After a reload, running shells (`shell.list`) for this project's sessions are reattached from cursor 0.
+    - `shell.output` and `shell.get` are scoped to the session's location.
 10. **Edit session title**: a pencil icon on hover next to the header title (and F2 / double-click) turns it into an inline input. Enter saves via `session.update({ title })`, and Esc cancels. The session dropdown rows also get a rename action on hover.
 
 ## Controls (approved 2026-11-06, mockups in `docs/mockups/v3/`)
