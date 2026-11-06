@@ -57,7 +57,7 @@ Open Settings and search for **OpenCode**:
 | `opencode.cliPath` | Path to `opencode`. Empty: `PATH`, then `~/.opencode/bin`. |
 | `opencode.transcript.*` | Fold finished steps, expand tool details, reasoning display, font size. |
 | `opencode.todo.defaultExpanded` | Show the task list expanded. |
-| `opencode.notifications.*` | Which events notify you, and whether to notify while the window is focused. |
+| `opencode.notifications.*` | Which events notify you, and whether to notify while the window is focused. With the OpenCode Voice companion, an unfocused window also flashes its taskbar button (`os`: `auto`/`off`). |
 | `opencode.terminal.*` | When to reveal terminals, one per session or per command, how many to keep open. |
 | `opencode.voice.engine` | `local` (free, offline, Bangla) or `soniox` (your own key). |
 | `opencode.voice.languages`, `opencode.voice.model` | Languages and model for the Soniox engine. |
