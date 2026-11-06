@@ -75,7 +75,7 @@ Rules:
 The extension host runs on the office server (Remote SSH). An OS notification sent from there would appear on the server, not on the laptop. VS Code has no stable API that lets extensions show OS notifications. Built-in chat has `chat.notifyWindowOnConfirmation`, but third-party access is still only a feature request (microsoft/vscode#346215).
 
 1. **VS Code notification (always, M1):** `showWarningMessage` for attention and `showInformationMessage` for finished, both with actions. These only appear inside the VS Code window.
-2. **OS notification on the laptop (option):** a tiny companion extension `opencode-vscode-notifier` with `extensionKind: ["ui"]`, so it runs on the laptop side. The main extension calls its command (`opencode.notifier.show`); commands work across extension hosts. The companion shows a native toast (Windows toast via PowerShell / WinRT, macOS `osascript`, Linux `notify-send`). Clicking it focuses VS Code through a `vscode://` URI handler. The main extension lists the companion in `extensionPack`, so one install brings both. If the companion is missing, delivery falls back to option 1.
+2. **OS notification on the laptop (chosen, M4):** a tiny companion extension `opencode-vscode-notifier` with `extensionKind: ["ui"]`, so it runs on the laptop side. The main extension calls its command (`opencode.notifier.show`); commands work across extension hosts. The companion shows a native toast (Windows toast via PowerShell / WinRT, macOS `osascript`, Linux `notify-send`). Clicking it focuses VS Code through a `vscode://` URI handler. The main extension lists the companion in `extensionPack`, so one install brings both. If the companion is missing, delivery falls back to option 1.
 3. **Push through the OpenCode server (shared with the mobile app):** see *Mobile app* below. This also works when VS Code is closed.
 
 Notifications from the extension only exist while VS Code is open. Once the mobile app exists, push covers the rest.
@@ -101,7 +101,9 @@ The same UI as a phone app, without VS Code-specific actions. It is a client of 
 
 The event stream is live-only, and a phone app in the background cannot keep it open. Push must therefore come from the server side: an **OpenCode server plugin** (`opencode-push`, in this repo) subscribes with `ctx.event.subscribe({ types: [...] })` to the trigger events above and sends pushes. The plugin is installed by Salim explicitly. The extension and the app never edit OpenCode config.
 
-Push channel options (decision pending):
+**Decisions (2026-11-06):** laptop OS notifications come from the companion extension (M4). Mobile push goes through **ntfy**. The target platform is **Android** first (APK sideload; no store needed at first). Proposed stack, to re-check at kickoff: Capacitor 8 (`@capacitor/core` 8.6.0) wrapping the same Svelte UI, with `@capacitor-mlkit/barcode-scanning` for QR.
+
+Push channel options considered:
 - **ntfy** (self-hosted or ntfy.sh): the plugin POSTs to a private topic, and the ntfy app shows the push with a click URL that deep-links into our app. No Firebase account or store account is needed.
 - **FCM (Android) / APNs (iOS):** native push inside our app. Needs a Firebase project, plus an Apple developer account for iOS. The plugin stores device tokens.
 - **Web Push (VAPID):** only if the app is a PWA. iOS supports it only for installed PWAs.
