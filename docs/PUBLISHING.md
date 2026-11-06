@@ -1,6 +1,6 @@
 # Publishing
 
-How SR Web Studio ships this extension, `sr-web-studio.opencode-vscode`. This is the same setup as `grok-build-unofficial`, which is already published from these accounts.
+How SR Web Studio ships this extension, `sr-web-studio.opencode-unofficial` (Marketplace names are unique across publishers and `opencode-vscode` was taken), with the companion `sr-web-studio.opencode-voice`. This is the same setup as `grok-build-unofficial`, which is already published from these accounts.
 
 ## Accounts (already exist)
 
@@ -29,8 +29,8 @@ cp .env.example .env    # then fill in VSCE_PAT and OVSX_PAT
 4. Publish:
 
    ```bash
-   bun run publish:marketplace   # → https://marketplace.visualstudio.com/items?itemName=sr-web-studio.opencode-vscode
-   bun run publish:openvsx       # → https://open-vsx.org/extension/sr-web-studio/opencode-vscode
+   bun run publish:marketplace   # → https://marketplace.visualstudio.com/items?itemName=sr-web-studio.opencode-unofficial
+   bun run publish:openvsx       # → https://open-vsx.org/extension/sr-web-studio/opencode-unofficial
    ```
 
 5. Commit, then tag `vX.Y.Z` and push the tag.
@@ -39,5 +39,5 @@ cp .env.example .env    # then fill in VSCE_PAT and OVSX_PAT
 
 - **Name:** `sst-dev.opencode` ("opencode") and `sst-dev.opencode-v2` ("OpenCode Beta") are the official extensions. The Marketplace rejects a display name that is already taken, and "OpenCode" belongs to the OpenCode team. Use an unofficial name, as with Grok Build, for example "OpenCode Client (unofficial)", with a disclaimer at the top of the README.
 - **Listing:** 128×128 PNG icon (the Marketplace does not accept SVG), README with screenshots and the `opencode` CLI requirement, CHANGELOG, `repository`/`bugs`/`homepage` in `package.json`, and a LICENSE file.
-- **Repo:** `sr-web-studio/opencode-vscode` is private. Decide whether to make it public before linking it from the listing.
+- **Repo:** `sr-web-studio/opencode-vscode` is public (since 0.3.5).
 - **CI (optional):** a tag-triggered GitHub Action like `grok-build-unofficial/.github/workflows/release.yml`, with `VSCE_PAT` and `OVSX_PAT` as repository secrets.

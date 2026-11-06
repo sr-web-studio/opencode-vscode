@@ -5,7 +5,7 @@ const vscode = require("vscode")
 
 exports.run = async function run() {
   await vscode.workspace.getConfiguration("opencode").update("serverUrl", "http://127.0.0.1:9", vscode.ConfigurationTarget.Global)
-  const ext = vscode.extensions.getExtension("sr-web-studio.opencode-vscode")
+  const ext = vscode.extensions.getExtension("sr-web-studio.opencode-unofficial")
   assert.ok(ext, "extension is installed from the development path")
   await ext.activate()
   assert.strictEqual(ext.isActive, true)

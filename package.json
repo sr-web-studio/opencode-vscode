@@ -1,5 +1,5 @@
 {
-  "name": "opencode-vscode",
+  "name": "opencode-unofficial",
   "displayName": "OpenCode (unofficial)",
   "description": "Chat with OpenCode in the VS Code sidebar. Sessions live on your OpenCode server and keep running when you close the editor. Native diffs, terminal, voice input. Unofficial — not affiliated with the OpenCode team.",
   "icon": "media/icon.png",
