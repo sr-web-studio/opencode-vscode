@@ -35,7 +35,13 @@ Chosen UI direction: `docs/mockups/v2/` (compact, Claude Code style). The first 
 
 ## Todo list and empty state (approved 2026-11-06, mockups in `docs/mockups/v4/`)
 
-- **Todo bar** (v4/01, v4/02): appears only when the session's agent has used the todo tool. OpenCode marks it experimental (`experimental.todo` in config), and the extension never turns it on. The tool name and input shape must be read from real tool events. Do not guess them.
+- **Todo bar** (v4/01, v4/02): appears only when the session's agent has used the todo tool. Shown only when the agent has called it.
+  - The tool is `todowrite`. In V1 it was always built in. In V2 (`opencode.ai/v2/docs/config`, "Todos") it exists only when `experimental.todo: true`, and the default is `false`. The extension never turns it on.
+  - Shape, confirmed from the OpenCode 2.2.5 binary's own TUI fixtures (2026-11-06):
+    - input `{ todos: [{ content: string, status: "pending" | "in_progress" | "completed" | "cancelled" }] }`
+    - completed state `metadata: { todos }`, output like `"1 completed, 1 in progress, 1 pending, 1 cancelled"`
+    - The TUI derives the current list from the latest `todowrite` call in the session, and hides it when nothing is pending or in progress.
+  - On this server, as of 2026-11-06, neither `~/.config/opencode/opencode.json` nor `/api/config` has an `experimental` key, and the session history has no `todowrite` calls. The bar stays hidden until it is enabled.
   - Collapsed (default): one line floating just above the prompt box: a small progress ring, `3 of 7 · <current in-progress item>`, and a `⌃` chevron.
   - Expanded: a small panel opens upward with a thin border. The header shows `Tasks 3 / 7` and a thin progress bar, followed by one line per item. Done items get ✓ and are muted with strikethrough. The in-progress item is shown in the accent color with a half-circle icon. Pending items get ○.
   - It hides when every item is done and the turn has ended. Setting `opencode.todo.defaultExpanded` (default `false`).
