@@ -2,7 +2,7 @@
   "name": "opencode-vscode",
   "displayName": "OpenCode",
   "description": "A VS Code client for OpenCode. Sessions live on the OpenCode server and keep running when you close the editor.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "sr-web-studio",
   "license": "MIT",
   "repository": {
@@ -93,7 +93,7 @@
         "opencode.transcript.collapseCompletedSteps": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "When a turn finishes, fold its steps under one `› N steps completed` line above the final answer."
+          "markdownDescription": "When a turn finishes, fold its steps under one `N steps completed` line above the final answer."
         },
         "opencode.transcript.expandToolDetails": {
           "type": "boolean",
@@ -115,7 +115,7 @@
           "default": 0,
           "minimum": 0,
           "maximum": 32,
-          "markdownDescription": "Transcript font size in px. `0` inherits `#chat.editor.fontSize#`, falling back to 13."
+          "markdownDescription": "Transcript font size in px. `0` uses the larger of `#chat.editor.fontSize#` and 14."
         },
         "opencode.todo.defaultExpanded": {
           "type": "boolean",
@@ -177,6 +177,28 @@
             "VS Code notifications only."
           ],
           "markdownDescription": "Delivery channel. In this version notifications are always shown inside VS Code; `auto` is reserved for the OS-notifier companion."
+        },
+        "opencode.terminal.reveal": {
+          "type": "string",
+          "enum": [
+            "onStart",
+            "never",
+            "off"
+          ],
+          "default": "onStart",
+          "enumDescriptions": [
+            "Open a terminal for each shell command when it starts, without taking keyboard focus.",
+            "Create the terminal but do not reveal it. Use Show terminal on the tool line.",
+            "Do not mirror shell commands into terminals."
+          ],
+          "markdownDescription": "Mirror OpenCode shell commands into a read-only VS Code terminal named `OpenCode: <command>`. The command itself runs on the OpenCode server."
+        },
+        "opencode.terminal.maxOpen": {
+          "type": "number",
+          "default": 5,
+          "minimum": 1,
+          "maximum": 50,
+          "markdownDescription": "Most OpenCode terminals kept open. When there are more, the oldest finished one is closed. Running commands are never closed."
         }
       }
     }
@@ -201,6 +223,7 @@
     "@types/bun": "1.4.4",
     "@types/node": "24.19.2",
     "@types/vscode": "1.144.0",
+    "@vscode/codicons": "^0.0.46-24",
     "@vscode/test-electron": "3.1.0",
     "@vscode/vsce": "4.1.0",
     "esbuild": "0.28.2",
