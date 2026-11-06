@@ -1,0 +1,18 @@
+{
+  "file": "high-fidelity-ui-mockup-screenshot-of-visual-01.jpg",
+  "prompt": "High-fidelity UI mockup screenshot of Visual Studio Code, dark modern theme, 16:9. Left: file explorer. Center editor area has two tabs: \"server.ts\" and a read-only tab \"Worker: explore - map auth flow\" showing a chat transcript with a small lock icon. Right secondary sidebar titled \"OPENCODE\" shows the main agent chat: user message, assistant markdown reply, compact tool cards like \"Edit  src/auth/login.ts  +12 -3\" with a clickable blue file link and a small \"Diff\" button, and \"Shell  bun test\" card with a \"Running in terminal\" badge. Above the chat a collapsible section \"WORKERS (2)\" lists two subagent sessions with spinner and check icons. Bottom of the sidebar: multiline prompt box with chips for agent \"build\", model \"claude-sonnet-5-5\", and a send button. Bottom panel shows the VS Code terminal tab \"OpenCode: bun test\" with live test output. Status bar right side shows \"OpenCode: connected 127.0.0.1:4096\". Clean, realistic, crisp readable text, no extra decorations.",
+  "model": "gemini-3.1-flash-image",
+  "mime_type": "image/jpeg",
+  "bytes": 644731,
+  "sha256": "868315d54436e1d5e6b3c3fd6473be63a60e1a884ba91d92cbcf25cb4a5563ad",
+  "generate_seconds": 14.8,
+  "created": "2026-11-06T08:14:49+0600",
+  "api_id": "DDjtarz0OfWMqfkPpqHymQU",
+  "finish_reason": "stop",
+  "usage": {
+    "completion_tokens": 1625,
+    "total_tokens": 1876,
+    "prompt_tokens": 251
+  },
+  "references": []
+}

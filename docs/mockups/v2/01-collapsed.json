@@ -1,0 +1,18 @@
+{
+  "file": "high-fidelity-ui-mockup-of-a-vs-code-secondary-01.jpg",
+  "prompt": "High-fidelity UI mockup of a VS Code secondary sidebar chat panel titled \"OPENCODE\", dark theme, tall portrait, generous whitespace, 13px readable sans-serif font, minimal and calm like Claude Code. Content top to bottom: a user message in a subtle rounded bubble \"Fix the login timeout and run the tests\". Below it one collapsed muted single line with a chevron \"\u203a 7 steps completed \u00b7 42s\". Below that the assistant final answer as clean markdown paragraphs with one inline code span and a short bullet list. No cards, no boxes around tool calls. Bottom: slim prompt input with small muted chips \"build\" and \"claude-sonnet-5-5 \u00b7 high\" and a send arrow. Crisp readable text.",
+  "model": "gemini-3.1-flash-image",
+  "mime_type": "image/jpeg",
+  "bytes": 468279,
+  "sha256": "1b98089b5e18d9b7e88ba821dc16d33362df27db9ac6ebbe8cf51b78bc0a0bb4",
+  "generate_seconds": 13.21,
+  "created": "2026-11-06T08:22:25+0600",
+  "api_id": "1jntauuOB4vq1_oP5ZqQMA",
+  "finish_reason": "stop",
+  "usage": {
+    "completion_tokens": 1643,
+    "total_tokens": 1798,
+    "prompt_tokens": 155
+  },
+  "references": []
+}

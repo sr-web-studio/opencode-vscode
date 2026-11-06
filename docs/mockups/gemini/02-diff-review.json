@@ -1,0 +1,18 @@
+{
+  "file": "high-fidelity-ui-mockup-screenshot-of-visual-02.jpg",
+  "prompt": "High-fidelity UI mockup screenshot of Visual Studio Code, dark theme, 16:9. The editor area shows a native side-by-side diff view titled \"login.ts (OpenCode edit) \u2194 login.ts\" with red and green highlighted lines. Right secondary sidebar titled \"OPENCODE\" shows the chat with a list card \"Changed files (3)\": login.ts +12 -3, session.ts +4 -1, README.md +8 -0, each row with \"Open\" and \"Diff\" icon buttons, one row highlighted as selected. Status bar shows \"OpenCode: connected\". Realistic, crisp readable text.",
+  "model": "gemini-3.1-flash-image",
+  "mime_type": "image/jpeg",
+  "bytes": 696425,
+  "sha256": "66c872695561ca213601702908adab2837f2aeb228bb23f3594db691aa82eadb",
+  "generate_seconds": 14.73,
+  "created": "2026-11-06T08:15:04+0600",
+  "api_id": "GzjtaoyTMtmsg8UP7Pym2Q0",
+  "finish_reason": "stop",
+  "usage": {
+    "completion_tokens": 1757,
+    "total_tokens": 1895,
+    "prompt_tokens": 138
+  },
+  "references": []
+}

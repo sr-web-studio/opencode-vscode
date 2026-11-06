@@ -1,0 +1,18 @@
+{
+  "file": "high-fidelity-ui-mockup-of-a-vs-code-secondary-02.jpg",
+  "prompt": "High-fidelity UI mockup of a VS Code secondary sidebar chat panel titled \"OPENCODE\", dark theme, tall portrait, generous whitespace, 13px readable font, minimal like Claude Code. Shows an expanded step chain: a header line with a down chevron \"\u2304 7 steps completed \u00b7 42s\", then a vertical thin connector line on the left linking small dots, each step is ONE single line in monospace-styled muted text with a bold tool name: \"\u25cf Read  src/auth/login.ts\", \"\u25cf Grep  \\\"timeout\\\" in src\", \"\u25cf Edit  src/auth/login.ts  +12 \u22123\", \"\u25cf Shell  bun test  \u2713 exit 0\", \"\u25cf Subagent  explore \u2014 map auth flow\", \"\u25cf Edit  src/auth/session.ts  +4 \u22121\", \"\u25cf Shell  bun test  \u2713 exit 0\". File paths are underlined link-styled. One step line \"\u25cf Edit src/auth/login.ts\" is expanded below it showing a tiny 4-line inline diff preview with red and green lines and a small \"Open diff\" text link. No cards, no big boxes. Crisp readable text.",
+  "model": "gemini-3.1-flash-image",
+  "mime_type": "image/jpeg",
+  "bytes": 418133,
+  "sha256": "78378f43f56e917708b1b3a7ab1b37cff6d3f4e05e8d7b874ab32ff293799b41",
+  "generate_seconds": 11.34,
+  "created": "2026-11-06T08:22:36+0600",
+  "api_id": "4jntapTOHYTPz7sPvbmC-QM",
+  "finish_reason": "stop",
+  "usage": {
+    "completion_tokens": 1495,
+    "total_tokens": 1746,
+    "prompt_tokens": 251
+  },
+  "references": []
+}

@@ -1,0 +1,18 @@
+{
+  "file": "high-fidelity-ui-mockup-screenshot-of-the-right-04.jpg",
+  "prompt": "High-fidelity UI mockup screenshot of the right secondary sidebar of Visual Studio Code, dark theme, tall portrait panel titled \"OPENCODE\". Top: session header \"Refactor auth module\" with a session switcher dropdown and a \"+\" new session button. Below it a collapsible \"BACKGROUND (3)\" section listing: a worker \"explore \u2014 map auth flow\" with spinner, a worker \"review \u2014 check tests\" with green check \"done 2m ago\", a shell \"npm run dev\" with a green dot \"running\" and a stop icon. Middle: chat transcript where a small system notice says \"Background worker finished \u2014 agent resumed\". Bottom: prompt box with agent chip \"build\", model chip \"claude-sonnet-5-5 \u00b7 high\", attach \"@\" and \"/\" command buttons, Stop button. Realistic, crisp readable text.",
+  "model": "gemini-3.1-flash-image",
+  "mime_type": "image/jpeg",
+  "bytes": 372572,
+  "sha256": "dce4c551ce4e8233f35c4391868f3cd594d95ef5ddffb21625570bb06003e40b",
+  "generate_seconds": 11.18,
+  "created": "2026-11-06T08:15:29+0600",
+  "api_id": "Njjtaqv1O-eQ694PgJzq8Ag",
+  "finish_reason": "stop",
+  "usage": {
+    "completion_tokens": 1432,
+    "total_tokens": 1603,
+    "prompt_tokens": 171
+  },
+  "references": []
+}
