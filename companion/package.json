@@ -41,11 +41,7 @@
     "onCommand:opencode.companion.ping",
     "onCommand:opencode.companion.voice.start",
     "onCommand:opencode.companion.voice.stop",
-    "onCommand:opencode.companion.voice.chooseMicrophone",
-    "onCommand:opencode.companion.voice.micSettings",
-    "onCommand:opencode.companion.voice.showLog",
-    "onCommand:opencode.companion.attention",
-    "onCommand:opencode.companion.testAttention"
+    "onCommand:opencode.companion.attention"
   ],
   "contributes": {
     "commands": [
