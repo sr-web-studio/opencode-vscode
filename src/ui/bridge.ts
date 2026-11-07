@@ -34,6 +34,8 @@ export interface HostBridge {
   pickFiles(): Promise<PickedFile[]>
   /** Ask for confirmation in the host's own UI (a VS Code modal), then revert. */
   confirmRevert(messageID: string): void
+  /** Ask for confirmation in the host's own UI (a VS Code modal), then delete the session on the server. */
+  confirmDeleteSession(sessionID: string, title: string): void
   /** Open a web link outside the app. */
   openExternal(url: string): void
   /**

@@ -74,6 +74,11 @@
         "icon": "$(add)"
       },
       {
+        "command": "opencode.deleteSession",
+        "title": "Delete Session…",
+        "category": "OpenCode"
+      },
+      {
         "command": "opencode.mcps",
         "title": "MCP Servers",
         "category": "OpenCode"
