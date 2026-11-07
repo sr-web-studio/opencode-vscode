@@ -9,8 +9,8 @@ import {
 } from "../core/dictation"
 import { MicCapture, emptyReason, errorText, safe, silenceMessage, type Recorder, type SessionUpdate } from "./shared"
 
-export { SILENCE_FRAMES, SILENT_PEAK, silenceMessage } from "./shared"
-export type { Recorder, SessionStats, SessionUpdate } from "./shared"
+export { SILENT_PEAK } from "./shared"
+export type { Recorder, SessionUpdate } from "./shared"
 
 /** The part of a WebSocket this session uses (the global `WebSocket` of Node 22+). */
 export interface Socket {

@@ -319,8 +319,3 @@ export async function removeUnknownModels(o: StateOptions): Promise<string[]> {
   }
   return removed
 }
-
-/** Remove everything the local engine downloaded (not used by the extension itself; for the dev script and support). */
-export async function removeLocal(storage: string): Promise<void> {
-  await rm(join(storage, LOCAL_ROOT), { recursive: true, force: true })
-}

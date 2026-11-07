@@ -220,11 +220,6 @@ export function rowTitle(action: RowAction, line: Pick<ToolLine, "target">): str
   }
 }
 
-/** Child session id for a subagent tool, when the server has reported it. */
-export function subagentSessionID(tool: ToolItem): string | undefined {
-  return tool.name === "subagent" ? str(tool.metadata.sessionID) || undefined : undefined
-}
-
 export type AskedQuestion = { question: string; header?: string; options: Array<{ label: string; description?: string }>; answer?: string }
 
 /**

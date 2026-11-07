@@ -53,10 +53,8 @@ export function activate(context: vscode.ExtensionContext): void {
       return {
         version,
         capture,
-        platform: process.platform,
         problem: capture ? undefined : `Voice recording is not available on ${platform}.`,
         local,
-        attention: true,
         installedLanguages: installed,
         localProblem: local ? undefined : `The on-device engine is not available on ${platform}${capture ? " (the microphone works: use the Soniox engine)" : ""}. It runs on: ${SHERPA_PLATFORMS.join(", ")}.`,
       }
@@ -264,7 +262,7 @@ let cleaned = false
 
 /**
  * Once per window, after the engine for the chosen language is ready: delete model folders the catalog no longer lists
- * (the English Zipformer + Moonshine of earlier versions, ~200 MB). Only our own folders under `models/`; see
+ * (the English Zipformer + Moonshine models of 0.3.x test builds, ~200 MB). Only our own folders under `models/`; see
  * `removeUnknownModels`. Never blocks or fails a recording.
  */
 async function cleanOldModels(context: vscode.ExtensionContext): Promise<void> {

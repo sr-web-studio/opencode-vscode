@@ -62,9 +62,6 @@ export type ModelSelection = { id: string; providerID: string; variant?: string 
 export const sameModel = (a: ModelSelection | undefined, b: { id: string; providerID: string }) =>
   !!a && a.id === b.id && a.providerID === b.providerID
 
-/** Keyboard order for the model popover: each model, then its variants are reachable by click or ←/→. */
-export const flattenModels = (groups: ReadonlyArray<ModelGroup>): SlimModel[] => groups.flatMap((g) => g.models)
-
 export function findModel(models: ReadonlyArray<SlimModel>, ref: { id: string; providerID: string } | undefined) {
   return ref ? models.find((m) => m.id === ref.id && m.providerID === ref.providerID) : undefined
 }

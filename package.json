@@ -440,7 +440,6 @@
     "watch": "bun run watch:ext & bun run watch:webview & wait",
     "watch:ext": "bun esbuild.mjs --watch",
     "watch:webview": "vite build --watch",
-    "dev:webview": "vite --config vite.dev.config.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json && svelte-check --tsconfig tsconfig.webview.json",
     "test": "bun test test/unit",
     "test:host": "bun run build && bun test/host/run.mjs",
