@@ -23,6 +23,7 @@ I'm also working on an Android app with the same UI, for the same always-on setu
 - **Permissions and questions** inline: `Allow · Always · Deny`, and question forms that stay fully readable.
 - **Agent and model picker**, session switcher, pinned sessions, a floating task list, and background workers in a header chip. Click a worker to open it read-only.
 - **Slash commands** in the prompt box (`/compact`, `/undo`, `/fork`, `/skills`, your own commands) and an **MCP servers** panel (`/mcps`) to check status, switch servers on or off and sign in.
+- **Delete a session** you no longer need (trash icon in the session switcher, or **OpenCode: Delete Session…**): only stopped sessions, only after you confirm. It is deleted on the server for every client, with its workers. The extension never deletes anything on its own.
 - **Notifications** when OpenCode needs you or finishes work.
 - **Voice input**: speak into the prompt box. Free and offline on your own computer (one multilingual model for English and about 28 other languages, Bangla as an optional pack), or Soniox with your own key for mixed languages and many more. See [Voice input](#voice-input).
 

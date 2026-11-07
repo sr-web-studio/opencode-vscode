@@ -18,7 +18,8 @@ import { isWindowsPath, sameDirectory, withinDirectory } from "./paths"
 import { isRunning } from "./transcript/reducer"
 import { applyRevertEvent, revertFromServer, revertedPrompt } from "./transcript/revert"
 import { toPromptFiles, type PromptFile } from "./attachments"
-import { errorMessage as message } from "./errors"
+import { errorMessage as message, isGone } from "./errors"
+import { NOT_DELETABLE, STOP_FIRST, WAITING_FOR_USER, WORKER_RUNNING } from "./delete-session"
 import { CommandCatalog } from "./commands"
 import { McpManager, type McpHost } from "./mcp"
 import { commandBlock, isClientCommand, isEmptySession, parseSlash } from "./slash"
@@ -453,14 +454,7 @@ export class Controller {
         this.shells.delete(d.id)
         break
       case "session.deleted":
-        this.sessions = this.sessions.filter((s) => s.id !== d.sessionID)
-        this.archived = this.archived.filter((s) => s.id !== d.sessionID)
-        this.running.delete(d.sessionID)
-        this.permissions.delete(d.sessionID)
-        this.forms.delete(d.sessionID)
-        this.children.delete(d.sessionID)
-        this.setHidden(forgetSession(this.hidden, d.sessionID))
-        if (this.currentSessionID === d.sessionID) await this.showDefaultTarget()
+        await this.forget(d.sessionID)
         break
       case "session.archived":
       case "session.unarchived":
@@ -701,6 +695,28 @@ export class Controller {
     }
   }
 
+  /**
+   * A session is gone from the server (`session.deleted`, or our own confirmed delete): drop everything we keep for it.
+   * Safe to run twice (the event follows our own delete), and the session on screen falls back to the default target.
+   * The only per-session state besides the lists is the hidden-worker map and the remembered last session; the draft
+   * text and model pins are not keyed by session.
+   */
+  private async forget(id: string): Promise<void> {
+    const gone = new Set([id])
+    for (const [cid, c] of this.children) if (c.parentID === id) gone.add(cid)
+    this.sessions = this.sessions.filter((s) => s.id !== id)
+    this.archived = this.archived.filter((s) => s.id !== id)
+    for (const g of gone) {
+      this.running.delete(g)
+      this.permissions.delete(g)
+      this.forms.delete(g)
+      this.children.delete(g)
+    }
+    this.setHidden(forgetSession(this.hidden, id))
+    if (this.opts.storage?.get(LAST_SESSION_KEY) === id) this.opts.storage.set(LAST_SESSION_KEY, undefined)
+    if (this.currentSessionID === id) await this.showDefaultTarget()
+  }
+
   private async showDefaultTarget() {
     const first = this.sessions[0]
     if (first) await this.open(first.id)
@@ -733,6 +749,8 @@ export class Controller {
           return await this.rename(action.id, action.title)
         case "togglePin":
           return this.togglePin(action.key)
+        case "deleteSession":
+          return await this.deleteSession(action.sessionID)
         case "hideWorkers":
           return this.hideWorkers(action.keys)
         case "revert":
@@ -956,6 +974,48 @@ export class Controller {
     // `session.renamed` normally follows; apply it now so the title does not flicker back.
     this.sessions = this.sessions.map((s) => (s.id === id ? { ...s, title: next } : s))
     this.archived = this.archived.map((s) => (s.id === id ? { ...s, title: next } : s))
+    this.emitNow()
+  }
+
+  /**
+   * Delete a session on the server. Only ever reached from an explicit, confirmed user action (the host asks first).
+   * Refused, with a line on the error state and no server call, for anything but a stopped, answered root session of
+   * this folder: workers go with their parent. The checks run against the server's view (`session.active`, the
+   * children) as well as ours, because a worker of a session that is not open here is not tracked locally.
+   */
+  private async deleteSession(id: string): Promise<void> {
+    const client = this.need()
+    const known = this.sessions.find((s) => s.id === id) ?? this.archived.find((s) => s.id === id)
+    if (!known || !isRoot(known) || this.children.has(id)) return this.refuse(NOT_DELETABLE)
+    if (this.running.has(id) || (id === this.currentSessionID && isRunning(this.feed.view))) return this.refuse(STOP_FIRST)
+    const family = await this.family(client, id)
+    if (family.some((f) => (this.permissions.get(f)?.length ?? 0) > 0 || (this.forms.get(f)?.length ?? 0) > 0)) return this.refuse(WAITING_FOR_USER)
+    const active = await client.session.active()
+    if (active[id]) return this.refuse(STOP_FIRST)
+    if (family.some((f) => active[f] || this.running.has(f))) return this.refuse(WORKER_RUNNING)
+    try {
+      await client.session.remove({ sessionID: id })
+    } catch (e) {
+      // Already gone (deleted from the TUI a moment ago): the outcome is the one the user asked for.
+      if (!isGone(e)) throw e
+    }
+    // `session.deleted` follows; apply it now so the row disappears at once. The event handler does the same, idempotently.
+    await this.forget(id)
+    this.emitNow()
+  }
+
+  /** The session and all its descendants (workers, their workers), from the server. Capped: a runaway tree is not walked forever. */
+  private async family(client: OpenCodeClient, id: string): Promise<string[]> {
+    const seen = [id]
+    for (let i = 0; i < seen.length && seen.length < 200; i++) {
+      const res = await client.session.list({ parentID: seen[i]!, limit: CHILD_PAGE })
+      for (const c of res.data) if (c.parentID === seen[i] && !seen.includes(c.id)) seen.push(c.id)
+    }
+    return seen
+  }
+
+  private refuse(line: string): void {
+    this.error = line
     this.emitNow()
   }
 

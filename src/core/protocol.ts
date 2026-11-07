@@ -134,6 +134,11 @@ export type Action =
   /** Remove finished workers (`Worker.key`) from the panel list. Never touches the sessions on the server. */
   | { type: "hideWorkers"; keys: string[] }
   | { type: "revert"; messageID: string }
+  /**
+   * Delete a stopped root session on the server, for every client. Only dispatched after the host's confirmation
+   * (`confirmDeleteSession`); the controller refuses running, waiting, worker and unknown sessions.
+   */
+  | { type: "deleteSession"; sessionID: string }
   | { type: "redo" }
   /** `/compact` and `/fork` on the current session. */
   | { type: "compact" }
@@ -187,6 +192,8 @@ export type HostRequest =
   | { type: "openSession"; id: string; readOnly: boolean }
   | { type: "pickFiles"; requestID: string }
   | { type: "confirmRevert"; messageID: string }
+  /** The trash icon of a session row: the host shows a modal, and only "Delete" runs the `deleteSession` action. */
+  | { type: "confirmDeleteSession"; sessionID: string; title?: string }
   | { type: "openExternal"; url: string }
   | { type: "setCliPath" }
   | { type: "voice" }

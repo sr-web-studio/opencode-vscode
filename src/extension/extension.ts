@@ -5,6 +5,7 @@ import type { NoticeCommand } from "../core/notifications/types"
 import { folderName, shortenHome } from "../core/paths"
 import { homedir } from "node:os"
 import { SetupError, connect } from "./connection"
+import { deleteSessionCommand } from "./delete-session"
 import { openGlobalConfigCommand } from "./global-config"
 import { HostActions } from "./host"
 import { createMcpHost } from "./mcp"
@@ -160,6 +161,7 @@ export function activate(context: vscode.ExtensionContext): void {
       await vscode.commands.executeCommand(`${VIEW_ID}.focus`)
       provider.newSession()
     }),
+    vscode.commands.registerCommand("opencode.deleteSession", () => deleteSessionCommand(controller)),
     vscode.commands.registerCommand("opencode.mcps", async () => {
       await vscode.commands.executeCommand(`${VIEW_ID}.focus`)
       await controller.dispatch({ type: "mcp", op: "open" })
