@@ -1,7 +1,7 @@
 {
   "name": "opencode-workspace",
   "private": true,
-  "description": "Bun workspace for the OpenCode (unofficial) clients: packages/core, packages/ui, apps/vscode. See docs/monorepo.md.",
+  "description": "Bun workspace for the OpenCode (unofficial) clients: packages/core, packages/ui, apps/vscode, apps/mobile. See docs/monorepo.md.",
   "workspaces": [
     "packages/*",
     "apps/*"
@@ -9,7 +9,9 @@
   "scripts": {
     "build": "bun run --cwd apps/vscode build",
     "watch": "bun run --cwd apps/vscode watch",
-    "typecheck": "bun run --cwd packages/core typecheck && bun run --cwd packages/ui typecheck && bun run --cwd apps/vscode typecheck",
+    "typecheck": "bun run --cwd packages/core typecheck && bun run --cwd packages/ui typecheck && bun run --cwd apps/vscode typecheck && bun run --cwd apps/mobile typecheck",
+    "mobile:build": "bun run --cwd apps/mobile build",
+    "mobile:apk": "bun run --cwd apps/mobile apk",
     "test": "bun test test/unit",
     "test:host": "bun run --cwd apps/vscode test:host",
     "package": "bun run --cwd apps/vscode package",
