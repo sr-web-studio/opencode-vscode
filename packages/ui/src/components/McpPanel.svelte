@@ -14,6 +14,7 @@
   let { app, returnTo }: { app: AppState; returnTo?: HTMLElement } = $props()
   const store = useStore()
   const mcp = $derived(app.mcp)
+  const caps = store.bridge.capabilities ?? {}
 
   let panel: HTMLElement | undefined = $state()
   let before: Element | null = null
@@ -90,7 +91,7 @@
               ><span class="knob"></span></button>
               {#if busy(r)}<Codicon name="loading" spin />{/if}
             {/if}
-            {#if a.signIn}<button class="btn" disabled={!!mcp.signIn} onclick={() => act("signIn", r.name)}><Codicon name="sign-in" /> Sign in</button>{/if}
+            {#if a.signIn && caps.mcpSignIn !== false}<button class="btn" disabled={!!mcp.signIn} onclick={() => act("signIn", r.name)}><Codicon name="sign-in" /> Sign in</button>{/if}
             {#if a.signOut}<button class="btn" disabled={busy(r)} onclick={() => act("signOut", r.name)}><Codicon name="sign-out" /> Sign out</button>{/if}
           </div>
         {/if}
@@ -99,10 +100,12 @@
       <li class="empty muted">{mcp.loading || !mcp.loaded ? "Loading…" : "No MCP servers are set up for this project. OpenCode reads them from its own config."}</li>
     {/each}
   </ul>
-  <div class="foot">
-    <!-- mousedown is cancelled so the click never moves focus off the prompt box; the editor that opens takes it. -->
-    <button class="link edit" onmousedown={(e) => e.preventDefault()} onclick={() => store.bridge.postToHost({ type: "host", request: { type: "openGlobalConfig" } })} title="Open your global OpenCode config file in the editor. This extension never edits it."><Codicon name="settings-gear" /> Edit config</button>
-  </div>
+  {#if caps.editConfig !== false}
+    <div class="foot">
+      <!-- mousedown is cancelled so the click never moves focus off the prompt box; the editor that opens takes it. -->
+      <button class="link edit" onmousedown={(e) => e.preventDefault()} onclick={() => store.bridge.postToHost({ type: "host", request: { type: "openGlobalConfig" } })} title="Open your global OpenCode config file in the editor. This extension never edits it."><Codicon name="settings-gear" /> Edit config</button>
+    </div>
+  {/if}
 </div>
 
 <style>

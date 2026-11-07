@@ -360,6 +360,15 @@ export class Controller {
     void this.follow(client, this.abort.signal)
   }
 
+  /**
+   * Drop the current event stream so it reconnects now and the state is refetched (`server.connected` → `sync`). A
+   * phone suspends sockets while the app is in the background; the stream can look alive but be dead. Keeps the
+   * attached client and the open session. Does nothing while detached.
+   */
+  reconnect() {
+    if (this.client) this.restartStream(this.client)
+  }
+
   detach() {
     this.abort?.abort()
     this.abort = undefined
