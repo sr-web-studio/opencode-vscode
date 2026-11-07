@@ -10,6 +10,7 @@ import { openGlobalConfigCommand } from "./global-config"
 import { HostActions } from "./host"
 import { createMcpHost } from "./mcp"
 import { VscodeNotifier } from "./notifier"
+import { pairMobileCommand } from "./pair-mobile"
 import { affectsConnection, affectsView, readConnectionSettings, readNotificationSettings, readTerminalSettings, readViewSettings } from "./settings"
 import { ShellTerminals } from "./terminal"
 import { ImagePreviews } from "./images"
@@ -170,6 +171,9 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
     vscode.commands.registerCommand("opencode.openGlobalConfig", () => openGlobalConfigCommand(serverHostname)),
     vscode.commands.registerCommand("opencode.reconnect", () => start()),
+    vscode.commands.registerCommand("opencode.pairMobileDevice", () =>
+      pairMobileCommand({ client: () => (controller.snapshot().connection.status === "connected" ? controller.api : undefined), windowUrl: () => controller.snapshot().connection.url, log: (line) => output.info(line) }),
+    ),
     voice,
     vscode.commands.registerCommand("opencode.voice.setKey", () => voice.setKey()),
     vscode.commands.registerCommand("opencode.voice.clearKey", () => voice.clearKey()),

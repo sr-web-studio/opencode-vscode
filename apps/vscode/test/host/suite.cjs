@@ -11,7 +11,7 @@ exports.run = async function run() {
   assert.strictEqual(ext.isActive, true)
 
   const commands = await vscode.commands.getCommands(true)
-  for (const id of ["opencode.focus", "opencode.newSession", "opencode.reconnect", "opencode.setPassword", "opencode.clearPassword", "opencode.setCliPath", "opencode.openGlobalConfig", "opencode.deleteSession"]) {
+  for (const id of ["opencode.focus", "opencode.newSession", "opencode.reconnect", "opencode.setPassword", "opencode.clearPassword", "opencode.setCliPath", "opencode.openGlobalConfig", "opencode.deleteSession", "opencode.pairMobileDevice"]) {
     assert.ok(commands.includes(id), `command ${id} is registered`)
   }
   await vscode.commands.executeCommand("opencode.focus")
