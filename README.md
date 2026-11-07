@@ -23,6 +23,7 @@ I'm also working on an Android app with the same UI, for the same always-on setu
 - **Permissions and questions** inline: `Allow · Always · Deny`, and question forms that stay fully readable.
 - **Agent and model picker**, session switcher, pinned sessions, a floating task list, and background workers in a header chip. Click a worker to open it read-only.
 - **Slash commands** in the prompt box (`/compact`, `/undo`, `/fork`, `/skills`, your own commands) and an **MCP servers** panel (`/mcps`) to check status, switch servers on or off and sign in.
+- **Delete a session** you no longer need (trash icon in the session switcher, or **OpenCode: Delete Session…**): only stopped sessions, only after you confirm. It is deleted on the server for every client, with its workers. The extension never deletes anything on its own.
 - **Notifications** when OpenCode needs you or finishes work.
 - **Voice input**: speak into the prompt box. Free and offline on your own computer (one multilingual model for English and about 28 other languages, Bangla as an optional pack), or Soniox with your own key for mixed languages and many more. See [Voice input](#voice-input).
 
@@ -57,6 +58,7 @@ Open Settings and search for **OpenCode**:
 | --- | --- |
 | `opencode.serverUrl` | Address of an OpenCode server on another computer. Empty (default): use OpenCode on this computer. Examples: `http://192.168.1.10:4096`, `http://my-server.tail1234.ts.net:4096`, `https://opencode.example.com`. `http://` is added if you leave it out; `4096` is OpenCode's default port. |
 | `opencode.cliPath` | Path to `opencode`. Empty: `PATH`, then `~/.opencode/bin`. |
+| **OpenCode: Open Global Config** (command; gear in the view title, "Edit config" in the MCP panel) | Opens your global OpenCode config (`~/.config/opencode/opencode.jsonc` or `.json`, or under `XDG_CONFIG_HOME` / `OPENCODE_CONFIG_DIR`) in an editor so you can edit it yourself. If there is none it asks before creating one. If `opencode.serverUrl` points at another computer, it tells you the config lives there. The extension never edits it. |
 | `opencode.transcript.*` | Fold finished steps, expand tool details, reasoning display, font size. |
 | `opencode.todo.defaultExpanded` | Show the task list expanded. |
 | `opencode.notifications.*` | Which events notify you, and whether to notify while the window is focused. With the OpenCode Voice companion, an unfocused window also flashes its taskbar button (`os`: `auto`/`off`). |

@@ -12,6 +12,16 @@ export function splitTurn(turn: TurnView): { work: StepView[]; answer?: { text: 
   return { work, answer: { text: lastText.text, key: lastText.key } }
 }
 
+/**
+ * A failed turn shows its error once, at the end of the turn. A step that failed with the same message (the usual case:
+ * the provider refuses, the step fails, then the execution fails with the same text) drops its copy.
+ */
+export function withoutTurnError(steps: StepView[], turnError: string | undefined): StepView[] {
+  const shown = turnError?.trim()
+  if (!shown) return steps
+  return steps.map((s) => (s.error?.trim() === shown ? { ...s, error: undefined } : s))
+}
+
 /** Number of "steps" shown in the fold: tool calls, or the step messages when no tools ran. */
 export function countSteps(work: StepView[]): number {
   const tools = work.reduce((n, s) => n + s.items.filter((i) => i.kind === "tool").length, 0)

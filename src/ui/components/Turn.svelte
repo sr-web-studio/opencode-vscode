@@ -3,7 +3,7 @@
   import type { ViewSettings } from "../../core/protocol"
   import { changedFiles, changesLabel } from "../../core/diff"
   import { relativeTo } from "../../core/paths"
-  import { allTools, foldLabel, settledTurn, splitTurn } from "../../core/transcript/turn"
+  import { allTools, foldLabel, settledTurn, splitTurn, withoutTurnError } from "../../core/transcript/turn"
   import type { TurnView } from "../../core/transcript/types"
   import { moment, turnStamp, type TimeEnv } from "../../core/turn-time"
   import { keepAnchored } from "../anchor"
@@ -25,6 +25,8 @@
   const finished = $derived(!!turn.outcome)
   const split = $derived(finished ? splitTurn(turn) : { work: turn.steps, answer: undefined })
   const label = $derived(finished ? foldLabel(turn, split.work) : "")
+  // The turn's error line already says it; a step that failed with the same text does not repeat it.
+  const workSteps = $derived(turn.outcome === "failed" ? withoutTurnError(split.work, turn.error) : split.work)
   const folded = $derived(finished && settings.collapseCompletedSteps && label !== "")
   let userOpen = $state<boolean | undefined>(undefined)
   let foldButton: HTMLElement | undefined = $state()
@@ -83,7 +85,7 @@
     </div>
   {/if}
   {#if expanded && split.work.length > 0}
-    <StepList steps={split.work} {cwd} {settings} {permissions} />
+    <StepList steps={workSteps} {cwd} {settings} {permissions} />
   {/if}
 
   {#if split.answer}

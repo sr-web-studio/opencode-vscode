@@ -355,6 +355,14 @@ The OAuth callback is a loopback port on the machine where the OpenCode server r
 
 Toggling a server (connect/disconnect) changes the running server only. It is not written to config, and the panel says so. OpenCode owns all config; the extension never writes it.
 
+### Open Global Config (added 2026-11-07)
+
+The extension only *opens* the user's global OpenCode config for them; it never edits it. Command `opencode.openGlobalConfig` (palette, gear in the view title, "Edit config" link at the bottom of the MCP panel via the host request `openGlobalConfig`). Logic is in `src/core/global-config.ts`, effects in `src/extension/global-config.ts`.
+
+- Directory (OpenCode 2.2.5; binary and https://opencode.ai/v2/docs/config): `$OPENCODE_CONFIG_DIR`, else `$XDG_CONFIG_HOME/opencode`, else `<home>/.config/opencode` (Windows too: `%USERPROFILE%\.config\opencode`). Files: `opencode.json`, then `opencode.jsonc`; the later one overrides, so `opencode.jsonc` wins when both exist. `OPENCODE_CONFIG` (one extra file) is not the global config and is ignored.
+- Nothing exists: ask "Create <path>?" (modal, Create / Cancel); only on Create write `{ "$schema": "https://opencode.ai/config.json" }` (flag `wx`, never overwrites) at `opencode.jsonc`, then open it.
+- Which computer: the extension runs where the files are (Remote-SSH: the remote host). With no `opencode.serverUrl` or a loopback address the server is on this machine. Another address counts as this machine only when `/api/info` `hostname` equals `os.hostname()`. Otherwise an info message says the config is on the server's computer (`<hostname>`), says where it usually is, and no local file is opened.
+
 ### State and hooks
 
 `AppState` gains `commands`, `skills` and `mcp` (`open`, `loading`, `loaded`, `servers`, `busy`, `signIn`, `notice`, `error`). New actions: `compact`, `fork`, `loadCommands`, `loadSkills`, `mcp` (`open|close|refresh|cancelSignIn|toggle|signIn|signOut`), and `send` with `skills`. Errors use the existing `error` line. VS Code-only effects go through `ControllerOptions.mcp` (`openSignIn`, `askCode`, `confirm`), implemented in `src/extension/mcp.ts`. Logic lives in `src/core/{slash,commands,mcp,errors}.ts`.
@@ -392,8 +400,8 @@ The extension host runs on the office server (Remote SSH). An OS notification se
 
 Notifications from the extension only exist while VS Code is open. Once the mobile app exists, push covers the rest.
 
-### Browser tool: not published yet (Salim, 2026-11-06)
-- The VS Code integrated-browser tool (agent drives VS Code's browser via `vscode.lm.invokeTool`) is an experiment. It must not ship in a Marketplace / Open VSX release until Salim tests it and says so. Build it on its own branch, or behind a setting that is off by default; share it only as a local vsix.
+### Browser tool: dropped (Salim, 2026-11-07)
+- The extension has no browser tool. Agents use OpenCode's own [browse](https://opencode.ai/product/browse) MCP server, which drives the user's real Chrome-family browser, logins included. A VS Code integrated-browser tool was prototyped and removed: browse covers the need in any editor.
 
 ## Mobile app (Salim's "Phase 2", added 2026-11-06)
 
@@ -461,7 +469,7 @@ Option A. v1 provides live output, Stop and Background for agent shell commands.
 
 ## Principles
 
-1. The extension is a client only. The OpenCode server owns sessions, models, providers, MCPs, skills, agents and permissions. The extension never writes OpenCode config.
+1. The extension is a client only. The OpenCode server owns sessions, models, providers, MCPs, skills, agents and permissions. The extension never writes OpenCode config. It never deletes, archives or changes a session on its own. The only delete is the user's explicit, confirmed one (see "Delete a session" below).
 2. Closing VS Code must never affect a session. The extension does not own any process the agent depends on. If it starts the service, it uses `Service.ensure()`, which starts the detached shared service. It never starts a child process tied to the extension host.
 3. Reconnect means re-reading the session state. Do not cache state that the server already holds.
 
@@ -480,9 +488,19 @@ Option A. v1 provides live output, Stop and Background for agent shell commands.
 | Shell commands in the terminal panel | `shell.created/exited` events, `GET /api/shell` (`metadata.sessionID`), `GET /api/shell/{id}/output` cursor paging → `vscode.Pseudoterminal` | One VS Code terminal per agent command, named `OpenCode: <cmd>` |
 | Stop a command | `DELETE /api/shell/{id}`, or `session.interrupt` | |
 | Move to background | `POST /api/session/{id}/background` | |
+| Delete a session | `DELETE /api/session/{id}` (`session.remove`, also removes child sessions); `session.deleted` event | User-initiated and confirmed only. See "Delete a session" |
 | Workers (subagents) | sessions whose `parentID` is the main session; their events | Expandable tree; clicking opens a read-only editor tab (WebviewPanel) |
 | Background wake-up | Handled by the server. The UI shows inbox/synthetic messages and `session.execution.started` | |
 | Status bar | connection + `session.active` | |
+
+## Delete a session
+
+The only delete in the extension is the user's explicit, confirmed one. Nothing else (events, cleanup, timers, startup) calls `session.remove`.
+
+- **Where:** a trash icon on each row of the session switcher (shown on hover, focus or the highlighted row; always on touch screens; not shown for running or waiting sessions), the Delete key on the highlighted row (empty search field), and the command `OpenCode: Delete Session…` (a QuickPick of this folder's stopped root sessions, newest first, archived ones included once "Show archived" has loaded them).
+- **Confirmation** is the host's modal (webviews cannot show one), the same pattern as revert: the webview sends `confirmDeleteSession`, the host shows `Delete “<title>”?` with the detail "This deletes the session and its workers on the OpenCode server for every client (TUI, other windows). It cannot be undone." and a Delete button. Cancel, Escape and a closed dialog do nothing. Only Delete dispatches the `deleteSession` action.
+- **Refusals** (error line, no server call): the session or any of its workers is running (`running`, `session.active`, the transcript), it or a worker has a pending permission or form, or it is not a root session of this folder's list (workers go with their parent; unknown ids). Read-only worker tabs ignore the action.
+- **After the call:** the same local removal as the `session.deleted` event runs at once (lists, running/pending maps, hidden-worker entries in `workspaceState`, the remembered last session); the event handler is idempotent. A 404 (`SessionNotFoundError`) counts as already gone. If the open session was deleted, the panel shows the newest remaining session, or a draft.
 
 ## Known gap: interactive input (y/n)
 

@@ -1,5 +1,6 @@
 import * as vscode from "vscode"
 import { mimeFromName } from "../core/attachments"
+import { confirmDelete } from "../core/delete-session"
 import { isAbsolutePath } from "../core/paths"
 import type { HostRequest, PickedFile, ToWebview } from "../core/protocol"
 import type { WorkerPanels } from "./workers"
@@ -14,8 +15,8 @@ const REVERT_PROMPT =
 export type Surface = {
   /** Tell the webview something (picked files). */
   post(message: ToWebview): void
-  /** Run a chat action (confirmed revert). Worker tabs ignore it. */
-  act(action: { type: "revert"; messageID: string }): void
+  /** Run a chat action (confirmed revert or delete). Worker tabs ignore it. */
+  act(action: { type: "revert"; messageID: string } | { type: "deleteSession"; sessionID: string }): void
   /** The session the surface shows, for shell location lookups. */
   sessionID(): string | undefined
 }
@@ -67,6 +68,8 @@ export class HostActions {
         return this.pickFiles(req.requestID, surface)
       case "confirmRevert":
         return this.confirmRevert(req.messageID, surface)
+      case "confirmDeleteSession":
+        return this.confirmDeleteSession(req.sessionID, req.title, surface)
       case "openExternal": {
         // Only web links leave VS Code; anything else (file:, command:) is ignored.
         if (/^https?:\/\//i.test(req.url)) await vscode.env.openExternal(vscode.Uri.parse(req.url))
@@ -80,6 +83,8 @@ export class HostActions {
         return void (await vscode.commands.executeCommand("opencode.setCliPath"))
       case "reconnect":
         return void (await vscode.commands.executeCommand("opencode.reconnect"))
+      case "openGlobalConfig":
+        return void (await vscode.commands.executeCommand("opencode.openGlobalConfig"))
       case "notify": {
         const show = req.level === "error" ? vscode.window.showErrorMessage : req.level === "warning" ? vscode.window.showWarningMessage : vscode.window.showInformationMessage
         void show(req.message)
@@ -135,5 +140,10 @@ export class HostActions {
     const revert = "Revert"
     const pick = await vscode.window.showWarningMessage(REVERT_PROMPT, { modal: true }, revert)
     if (pick === revert) surface.act({ type: "revert", messageID })
+  }
+
+  /** The modal of the trash icon. Cancel, Escape and a closed dialog do nothing: only "Delete" runs the action. */
+  private async confirmDeleteSession(sessionID: string, title: string | undefined, surface: Surface): Promise<void> {
+    if (await confirmDelete((message, options, ...buttons) => vscode.window.showWarningMessage(message, options, ...buttons), title)) surface.act({ type: "deleteSession", sessionID })
   }
 }

@@ -5,6 +5,8 @@ import type { NoticeCommand } from "../core/notifications/types"
 import { folderName, shortenHome } from "../core/paths"
 import { homedir } from "node:os"
 import { SetupError, connect } from "./connection"
+import { deleteSessionCommand } from "./delete-session"
+import { openGlobalConfigCommand } from "./global-config"
 import { HostActions } from "./host"
 import { createMcpHost } from "./mcp"
 import { VscodeNotifier } from "./notifier"
@@ -108,9 +110,12 @@ export function activate(context: vscode.ExtensionContext): void {
 
   /* ------------------------------------------------------------ connection */
   let generation = 0
+  /** The connected server's host name, for "Open Global Config" (its config is on that computer). */
+  let serverHostname: string | undefined
   const start = async (): Promise<void> => {
     const mine = ++generation
     controller.detach()
+    serverHostname = undefined
     if (!directory) {
       controller.setConnection({ status: "setup", reason: "folder", message: "Open a folder to use OpenCode." })
       return
@@ -123,6 +128,7 @@ export function activate(context: vscode.ExtensionContext): void {
         const password = await context.secrets.get(PASSWORD_KEY)
         const conn = await connect({ ...settings, password })
         if (mine !== generation) return
+        serverHostname = conn.hostname
         controller.setConnection({ status: "connecting", url: conn.url, version: conn.version })
         controller.attach(conn.client)
         return
@@ -155,10 +161,12 @@ export function activate(context: vscode.ExtensionContext): void {
       await vscode.commands.executeCommand(`${VIEW_ID}.focus`)
       provider.newSession()
     }),
+    vscode.commands.registerCommand("opencode.deleteSession", () => deleteSessionCommand(controller)),
     vscode.commands.registerCommand("opencode.mcps", async () => {
       await vscode.commands.executeCommand(`${VIEW_ID}.focus`)
       await controller.dispatch({ type: "mcp", op: "open" })
     }),
+    vscode.commands.registerCommand("opencode.openGlobalConfig", () => openGlobalConfigCommand(serverHostname)),
     vscode.commands.registerCommand("opencode.reconnect", () => start()),
     voice,
     vscode.commands.registerCommand("opencode.voice.setKey", () => voice.setKey()),

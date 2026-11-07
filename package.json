@@ -21,7 +21,7 @@
   "bugs": {
     "url": "https://github.com/sr-web-studio/opencode-vscode/issues"
   },
-  "version": "0.3.7",
+  "version": "0.3.8",
   "publisher": "sr-web-studio",
   "license": "MIT",
   "repository": {
@@ -74,9 +74,20 @@
         "icon": "$(add)"
       },
       {
+        "command": "opencode.deleteSession",
+        "title": "Delete Session…",
+        "category": "OpenCode"
+      },
+      {
         "command": "opencode.mcps",
         "title": "MCP Servers",
         "category": "OpenCode"
+      },
+      {
+        "command": "opencode.openGlobalConfig",
+        "title": "Open Global Config",
+        "category": "OpenCode",
+        "icon": "$(settings-gear)"
       },
       {
         "command": "opencode.reconnect",
@@ -125,6 +136,15 @@
         "icon": "$(mic)"
       }
     ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "opencode.openGlobalConfig",
+          "when": "view == opencode.chat",
+          "group": "navigation@90"
+        }
+      ]
+    },
     "configuration": {
       "title": "OpenCode",
       "properties": {

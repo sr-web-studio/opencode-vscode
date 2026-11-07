@@ -48,6 +48,15 @@
     else if (e.key === "ArrowUp") { index = Math.max(0, index - 1); e.preventDefault() }
     else if (e.key === "Enter") { const id = flat[index]; if (id) pick(id); e.preventDefault() }
     else if (e.key === "F2") { const id = flat[index]; if (id) startEdit(id, "row"); e.preventDefault() }
+    // With text in the search field, Delete edits the text as usual.
+    else if (e.key === "Delete" && query === "") { const id = flat[index]; if (id) { askDelete(id); e.preventDefault() } }
+  }
+
+  /** The host shows the confirmation modal. Running sessions are not offered (the controller refuses them too). */
+  function askDelete(id: string) {
+    const row = rows.find((r) => r.id === id)
+    if (!row || row.dot !== "none") return
+    store.bridge.confirmDeleteSession(id, row.title)
   }
 
   async function startEdit(id: string, where: "header" | "row") {
@@ -122,6 +131,10 @@
                 {#if canRename}
                   <button class="ren muted" onclick={(e) => { e.stopPropagation(); void startEdit(r.id, "row") }} title="Rename (F2)" aria-label="Rename {r.title}"><Codicon name="edit" /></button>
                 {/if}
+                {#if r.dot === "none"}
+                  <!-- mousedown keeps the focus where it is (the search field); the modal is the host's -->
+                  <button class="del muted" onmousedown={(e) => e.preventDefault()} onclick={(e) => { e.stopPropagation(); askDelete(r.id) }} title="Delete session…" aria-label="Delete {r.title}"><Codicon name="trash" /></button>
+                {/if}
                 <span class="when muted">{relativeTime(r.updated, now)}</span>
               {/if}
             </div>
@@ -145,6 +158,10 @@
   .pencil, .ren { display: inline-flex; align-items: center; padding: 0.15em 0.25em; border-radius: 4px; opacity: 0; }
   .titlewrap:hover .pencil, .pencil:focus-visible, .row:hover .ren, .ren:focus-visible { opacity: 1; }
   .pencil:hover, .ren:hover { color: var(--oc-fg); background: var(--oc-hover); }
+  .del { display: inline-flex; align-items: center; padding: 0.15em 0.25em; border-radius: 4px; opacity: 0; }
+  .row:hover .del, .row:focus-within .del, .row.sel .del, .del:focus-visible { opacity: 1; }
+  .del:hover { color: var(--vscode-errorForeground, var(--oc-fg)); background: var(--oc-hover); }
+  @media (hover: none) { .del { opacity: 1; } }
   .plus { display: inline-flex; align-items: center; padding: 0.2em 0.3em; border-radius: 4px; }
   .plus:hover { color: var(--oc-fg); background: var(--oc-hover); }
   .drop { position: absolute; z-index: 20; left: 0.6em; right: 0.6em; top: 100%; background: var(--oc-popover); border: 1px solid var(--oc-hairline); border-radius: 6px; box-shadow: 0 4px 16px var(--vscode-widget-shadow); display: flex; flex-direction: column; max-height: 70vh; }
