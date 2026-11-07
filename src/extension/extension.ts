@@ -6,6 +6,7 @@ import { folderName, shortenHome } from "../core/paths"
 import { homedir } from "node:os"
 import { SetupError, connect } from "./connection"
 import { HostActions } from "./host"
+import { createMcpHost } from "./mcp"
 import { VscodeNotifier } from "./notifier"
 import { affectsConnection, affectsView, readConnectionSettings, readNotificationSettings, readTerminalSettings, readViewSettings } from "./settings"
 import { ShellTerminals } from "./terminal"
@@ -41,6 +42,7 @@ export function activate(context: vscode.ExtensionContext): void {
       set: (pins) => void context.globalState.update(PINS_KEY, pins),
     },
     log: (line) => output.info(line),
+    mcp: createMcpHost((line) => output.info(line)),
   })
   context.globalState.setKeysForSync([PINS_KEY])
   // `provider` is created below; dictation text is only posted after a recording starts, long after activation.
@@ -75,7 +77,7 @@ export function activate(context: vscode.ExtensionContext): void {
       await controller.dispatch({ type: "permission", sessionID: cmd.sessionID, requestID: cmd.requestID, decision: cmd.decision })
     }
   }
-  const notifier = new VscodeNotifier(runNotice)
+  const notifier = new VscodeNotifier(runNotice, { os: () => readNotificationSettings().os, log: (line) => output.debug(line) })
   const engine = new NotificationEngine({
     directory,
     settings: readNotificationSettings,
@@ -153,11 +155,18 @@ export function activate(context: vscode.ExtensionContext): void {
       await vscode.commands.executeCommand(`${VIEW_ID}.focus`)
       provider.newSession()
     }),
+    vscode.commands.registerCommand("opencode.mcps", async () => {
+      await vscode.commands.executeCommand(`${VIEW_ID}.focus`)
+      await controller.dispatch({ type: "mcp", op: "open" })
+    }),
     vscode.commands.registerCommand("opencode.reconnect", () => start()),
     voice,
     vscode.commands.registerCommand("opencode.voice.setKey", () => voice.setKey()),
     vscode.commands.registerCommand("opencode.voice.clearKey", () => voice.clearKey()),
     vscode.commands.registerCommand("opencode.voice.toggle", () => voice.click()),
+    vscode.commands.registerCommand("opencode.voice.chooseLanguage", () => voice.chooseLanguage()),
+    // From the palette: pick among the active languages; from the label next to the mic ("next"): cycle.
+    vscode.commands.registerCommand("opencode.voice.switchLanguage", (how?: unknown) => voice.switchLanguage(how !== "next")),
     // The companion (laptop side) sends the heard text here.
     vscode.commands.registerCommand(VOICE_FEED_COMMAND, (u: VoiceFeed) => voice.feed(u)),
     voice.watchCompanion(),
@@ -194,6 +203,8 @@ export function activate(context: vscode.ExtensionContext): void {
       await vscode.workspace.getConfiguration("opencode").update("cliPath", file, vscode.ConfigurationTarget.Global)
     }),
     vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration("opencode.voice.engine")) void voice.refresh()
+      if (e.affectsConfiguration("opencode.voice.localLanguages") || e.affectsConfiguration("opencode.voice.localLanguage") || e.affectsConfiguration("opencode.voice.maxLanguages")) voice.syncLanguages()
       if (affectsView(e)) controller.setSettings(readViewSettings())
       if (affectsConnection(e)) void start()
     }),

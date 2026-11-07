@@ -74,6 +74,8 @@ export class HostActions {
       }
       case "voice":
         return void (await vscode.commands.executeCommand("opencode.voice.toggle"))
+      case "voiceLanguage":
+        return void (await vscode.commands.executeCommand("opencode.voice.switchLanguage", "next"))
       case "setCliPath":
         return void (await vscode.commands.executeCommand("opencode.setCliPath"))
       case "reconnect":

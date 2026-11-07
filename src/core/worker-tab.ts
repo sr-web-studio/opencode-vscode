@@ -65,6 +65,7 @@ export class WorkerTab {
   private onEvent(ev: EventEnvelope): void {
     const d = ev.data ?? {}
     if (ev.type === "session.renamed" && d.sessionID === this.sessionID && this.info) this.info = { ...this.info, title: d.title }
+    if (ev.type === "session.model.selected" && d.sessionID === this.sessionID && this.info) this.info = { ...this.info, model: d.model }
     if (d.sessionID !== this.sessionID || !ev.type.startsWith("session.")) return
     if (this.feed.apply(ev)) this.emit()
   }
@@ -86,6 +87,7 @@ export class WorkerTab {
       readOnly: true,
       workerTitle: this.title,
       workers: [],
+      hiddenWorkers: [],
       runningShells: 0,
       hasEarlier: this.feed.hasEarlier,
       loadingEarlier: this.feed.loadingEarlier,
@@ -114,6 +116,18 @@ export class WorkerTab {
         // Only this worker's own requests.
         if (action.sessionID === this.sessionID) await this.controller.dispatch(action)
         return
+      case "stopWorker": {
+        // Only this worker itself, never another session. The controller checks that it is a child of the open session.
+        if (action.sessionID !== this.sessionID) return
+        await this.controller.dispatch(action)
+        // The controller shows its own errors on its own state; this tab has its own error line.
+        const failed = this.controller.snapshot().error
+        if (failed) {
+          this.error = failed
+          this.emitNow()
+        }
+        return
+      }
       case "dismissError":
         this.error = undefined
         this.emitNow()

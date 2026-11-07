@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { applySonioxMessage, mergeDictation, nothingHeard, pcmBytes, sonioxProtocols, sonioxStartMessage, spokenText } from "../../src/core/dictation"
+import { applySonioxMessage, isNewerVersion, mergeDictation, nothingHeard, pcmBytes, sonioxProtocols, sonioxStartMessage, spokenText } from "../../src/core/dictation"
 
 describe("sonioxStartMessage", () => {
   test("raw 16 kHz mono PCM, Bangla and English by default, no key in the message", () => {
@@ -51,5 +51,30 @@ describe("mergeDictation", () => {
 describe("pcmBytes", () => {
   test("little-endian 16-bit samples", () => {
     expect([...pcmBytes(new Int16Array([1, -2, 0x1234]))]).toEqual([1, 0, 0xfe, 0xff, 0x34, 0x12])
+  })
+})
+
+describe("isNewerVersion", () => {
+  test("only a strictly newer version upgrades the companion (no downgrade ping-pong)", () => {
+    expect(isNewerVersion("0.3.6", "0.3.4")).toBe(true)
+    expect(isNewerVersion("0.3.4", "0.3.6")).toBe(false)
+    expect(isNewerVersion("0.3.6", "0.3.6")).toBe(false)
+    expect(isNewerVersion("0.10.0", "0.9.9")).toBe(true)
+    expect(isNewerVersion("1.0.0", "0.99.99")).toBe(true)
+    expect(isNewerVersion("0.3.6-test5", "0.3.6")).toBe(false)
+  })
+  test("test builds (prerelease) order among themselves and below the release", () => {
+    expect(isNewerVersion("0.3.7-test.12", "0.3.7-test.11")).toBe(true)
+    expect(isNewerVersion("0.3.7-test.11", "0.3.7-test.12")).toBe(false)
+    expect(isNewerVersion("0.3.7-test.11", "0.3.7-test.11")).toBe(false)
+    expect(isNewerVersion("0.3.7-test.11", "0.3.6")).toBe(true)
+    expect(isNewerVersion("0.3.7", "0.3.7-test.11")).toBe(true)
+    expect(isNewerVersion("0.3.7-test.11", "0.3.7")).toBe(false)
+    expect(isNewerVersion("0.3.7-test.10", "0.3.7-test.9")).toBe(true)
+  })
+  test("unreadable versions", () => {
+    expect(isNewerVersion("0.3.6", "")).toBe(true)
+    expect(isNewerVersion("", "0.3.6")).toBe(false)
+    expect(isNewerVersion("x", "y")).toBe(false)
   })
 })

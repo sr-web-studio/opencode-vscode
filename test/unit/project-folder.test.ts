@@ -47,7 +47,7 @@ function windowsServer(opts: { locationGet: boolean }) {
     session: {
       list: async (input: Record<string, unknown>) => {
         calls.push(input)
-        const roots = all.filter((s) => input.parentID === null || input.parentID === undefined)
+        const roots = all.filter(() => input.parentID === null || input.parentID === undefined)
         if (input.archived) return { data: [] }
         if (typeof input.project === "string") return { data: roots.filter((s) => s.projectID === input.project) }
         if (typeof input.directory === "string") return { data: roots.filter((s) => s.location.directory === input.directory) }

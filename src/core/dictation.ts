@@ -106,23 +106,94 @@ export const COMPANION = {
   /** Open the operating system's microphone privacy page (Windows, macOS). */
   micSettings: "opencode.companion.voice.micSettings",
   chooseMicrophone: "opencode.companion.voice.chooseMicrophone",
+  /** Show the companion's "OpenCode Voice" output channel (diagnostics of the on-device engine). */
+  showLog: "opencode.companion.voice.showLog",
+  /** Ask the operating system to draw attention to this window (taskbar flash). Argument: `AttentionRequest`. */
+  attention: "opencode.companion.attention",
+  /** Palette command of the companion: waits 5 s, then asks for attention (to test it from another window). */
+  testAttention: "opencode.companion.testAttention",
 } as const
 
+/** Which engine turns speech into text: on this computer (free, offline) or Soniox (cloud, the user's own key). */
+export type VoiceEngine = "local" | "soniox"
+export const DEFAULT_ENGINE: VoiceEngine = "local"
+export const normalizeEngine = (raw: unknown): VoiceEngine => (raw === "soniox" ? "soniox" : DEFAULT_ENGINE)
+
 /** What the user can do about a failed recording; the main extension turns it into a button. */
-export type VoiceFix = "micSettings" | "chooseMicrophone"
+export type VoiceFix = "micSettings" | "chooseMicrophone" | "showLog"
 
 /** The main extension's command that receives dictation updates from the companion. */
 export const VOICE_FEED_COMMAND = "opencode.voice.feed"
 
-export type CompanionInfo = { version: string; capture: boolean; problem?: string; platform?: string }
+/**
+ * Whether version `a` is newer than `b` (`major.minor.patch`, numeric parts; anything after `-` or `+` is ignored).
+ * An unreadable `b` counts as older, an unreadable `a` as not newer. Used so the companion is only ever upgraded:
+ * two installed copies of the main extension (e.g. an old ID next to the new one) must not keep reinstalling their
+ * own companion over each other.
+ */
+export function isNewerVersion(a: string, b: string): boolean {
+  const parse = (v: string): { core: number[]; pre: string[] } | undefined => {
+    const m = /^\s*v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+.*)?\s*$/.exec(v)
+    return m ? { core: [Number(m[1]), Number(m[2]), Number(m[3])], pre: m[4] ? m[4].split(".") : [] } : undefined
+  }
+  const x = parse(a)
+  if (!x) return false
+  const y = parse(b)
+  if (!y) return true
+  for (let i = 0; i < 3; i++) {
+    const p = x.core[i] ?? 0
+    const q = y.core[i] ?? 0
+    if (p !== q) return p > q
+  }
+  return comparePrerelease(x.pre, y.pre) > 0
+}
+
+/** Semver precedence of prerelease parts: none ranks above any (`0.3.7` > `0.3.7-test.11`), numbers compare as numbers. */
+function comparePrerelease(a: string[], b: string[]): number {
+  if (!a.length || !b.length) return a.length === b.length ? 0 : a.length ? -1 : 1
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const p = a[i]
+    const q = b[i]
+    if (p === undefined) return -1
+    if (q === undefined) return 1
+    if (p === q) continue
+    const pn = /^\d+$/.test(p)
+    const qn = /^\d+$/.test(q)
+    if (pn && qn) return Number(p) - Number(q)
+    if (pn !== qn) return pn ? -1 : 1
+    return p < q ? -1 : 1
+  }
+  return 0
+}
+
+/** `local`: this computer has a build of the on-device engine (the microphone may work without it). */
+export type CompanionInfo = {
+  version: string
+  capture: boolean
+  problem?: string
+  local?: boolean
+  localProblem?: string
+  /**
+   * On-device language packs fully downloaded on this computer (ids from the catalog). Missing in older versions and
+   * when unknown: then nothing is shown as downloaded.
+   */
+  installedLanguages?: string[]
+}
 
 export type VoiceStartArgs = {
   /** Correlates feed updates with this recording. */
   id: string
-  /** A short-lived Soniox key minted by the main extension; the user's own key never leaves it. */
-  key: string
-  model: string
+  /** Missing means `soniox` (older callers). */
+  engine?: VoiceEngine
+  /** soniox only: a short-lived key minted by the main extension; the user's own key never leaves it. */
+  key?: string
+  /** soniox only. */
+  model?: string
   languages: string[]
+  /** local only: threads per recognizer. */
+  threads?: number
+  /** local only: the language to speak (a catalog id: the first of `opencode.voice.localLanguages`). Missing (older callers) means the default language. */
+  localLanguage?: string
 }
 
 /** One update from the companion. `heard` is cumulative for the recording `id`. */

@@ -192,9 +192,9 @@ Salim installed the M1 vsix locally on Windows (OpenCode 2.1.4 there, workspace 
   - Live-checked on 2.2.5 (`/tmp/opencode/occ-test`): queued prompts wait until the turn ends and run in order; steer delivers at the next step; cancel removes the item.
 - **Questions are read in full.** The question form (`QuestionPrompt`) no longer cuts option descriptions with an ellipsis: the title, description, labels and option descriptions wrap, and the form scrolls at 65% of the view height. The expanded `question` tool line shows the questions, options and the chosen answer as text instead of JSON (`askedQuestions()`).
 
-## Voice input (proposed 2026-11-06, decision pending)
+## Voice input (decided 2026-11-06, built)
 
-Goal: dictate prompts, Bangla first, plus English and mixed Bangla-English. Speech becomes text in the prompt box and is never sent automatically.
+Goal: dictate prompts, Bangla first, plus English and mixed Bangla-English. Speech becomes text in the prompt box and is never sent automatically. This section is the decision log of the Soniox engine and the companion. The free on-device engine (the default since 0.3.7) is described in `docs/local-voice.md`.
 
 Facts checked on 2026-11-06:
 - **Webviews have no microphone access** in VS Code: `getUserMedia` fails with "Permissions policy violation: microphone is not allowed". There is only a proposed API for it (microsoft/vscode#323602, backlog). Built-in VS Code speech/dictation works only in VS Code's own inputs, and a public speech-provider API for extensions doesn't exist yet (#310069).
@@ -206,7 +206,7 @@ Facts checked on 2026-11-06:
   - OpenAI `gpt-4o-transcribe` 24–29% and Whisper large-v3 ~31% are 4–5× worse
   - prices: Soniox about $0.10 per audio hour, Sarvam about $0.31
 
-Proposal:
+Decision (the Soniox engine; `opencode.voice.engine` = `soniox`):
 - **Engine:** Soniox real-time STT, with `language_hints` from `opencode.voice.languages` (default `["bn", "en"]`). It handles code-switching and has 60+ languages. The text streams live into the prompt box, and the final text replaces partial text. Swapping to a different engine is possible through a small `SpeechEngine` interface (Soniox, Sarvam, OpenAI).
 - **Key:** the user's own STT API key is stored in VS Code `SecretStorage`, or in secure storage on mobile. The extension host mints short-lived temporary keys, so the long-lived key never reaches the webview. It is never stored in OpenCode config.
 - **Capture in VS Code:** the webview cannot record, so the laptop-side companion extension (`extensionKind: ["ui"]`, also used for OS notifications) does the recording. Possible ways, to be tested in a spike on Salim's laptop:
@@ -217,7 +217,7 @@ Proposal:
 - **Decision 2026-11-06 (revised):** Soniox is chosen, and voice is **free, bring-your-own-key only**. There is no paid tier, no license server and no hosted key.
   - Voice is off until the user runs `OpenCode: Set Voice API Key` and pastes their own Soniox key. It is stored in `SecretStorage` (secure storage on mobile) and the user pays Soniox directly. With no key, the mic button shows a short hint that links to the command.
   - The extension host mints short-lived Soniox temporary keys from the user's key, so the long-lived key never reaches the webview.
-  - During development, Salim's key is in the repo's `.env` as `SONIOX_API_KEY`. Only dev scripts and live tests read it. The `.env` file is git-ignored and excluded from the vsix, and the shipped extension reads its key only from SecretStorage.
+  - The shipped extension reads the key only from SecretStorage. The repo's `.env` (git-ignored, excluded from the vsix) holds only the publishing tokens.
 - **Shipped in 0.2.7 (Salim, 2026-11-06):** the mic button and the key flow. Recording waits for the companion extension (M4), which Salim chose over a browser capture page.
   - With no key, the mic looks disabled (dimmed) but stays clickable (`aria-disabled`). A click opens a VS Code password input box.
   - The host checks the key by requesting a 60-second Soniox temporary key (`POST /v1/auth/temporary-api-key`). Checked live: a valid key returns 201, a wrong key 401.
@@ -226,7 +226,7 @@ Proposal:
   - Commands: `OpenCode: Set Voice API Key (Soniox)`, `Clear Voice API Key`, `Voice Input`.
   - `AppState.voice = { keySet, capture, recording }`, and `HostBridge.voice()`. The key never reaches the webview or the logs.
   - Pure check `core/voice.ts` (`checkSonioxKey`, `keyShapeProblem`) has unit tests. The same code serves mobile with its own `fetch`.
-- **UX:** a mic codicon in the prompt box (keyboard `Ctrl+Alt+V`). Click to start and click again or Esc to stop. A small level meter and the active language (`বাংলা + EN`) are shown while recording. Partial text is grey, and nothing is auto-sent.
+- **UX:** a mic codicon in the prompt box. Click to start and click again to stop (sending a prompt also stops it). The mic pulses red while recording; with the on-device engine a small label with the current language (`EN`, `BN`) sits next to it. Nothing is auto-sent. (No keyboard shortcut and no level meter were built.)
 
 ### Follow-ups 0.3.5 (2026-11-06)
 - The silent recording (peak 0) turned out to be a microphone muted on Salim's PC; our side was fine. The temporary "Test Microphone" probe was removed again.
@@ -321,6 +321,44 @@ Proposal:
 
   The normal prompt box and agent/model footer stay at the bottom.
 
+## Slash commands and /mcps (added 2026-11-06)
+
+Typing `/` as the first character of the prompt opens a popup above the box. It never takes focus: the popup is a `listbox` driven from the textarea (`combobox`, `aria-activedescendant`), and `mousedown` on a row is cancelled.
+
+### Behavior
+
+- Sources, in precedence order: **client commands** (`/mcps`, `/compact`, `/undo`, `/redo`, `/fork`, `/skills`), then **server commands** from `command.list` (built-in, config, MCP prompts and skills). A client command hides a server command of the same name; the server-side `/compact` is never called.
+- Arrows move, Tab or Enter completes a partial name, Enter on a fully typed client command runs it, Esc closes the popup (and does not stop the agent).
+- `/skills <filter>` lists `skill.list`; choosing one adds a chip under the prompt. The skills go out as `skills: [{ id }]` on the next send.
+- Sending `/name args` for a known server command calls `session.command`. Anything else is a normal prompt. A message sent while the agent works still steers (no `delivery` field).
+- `/undo` uses the same confirmation as the revert button, then the host dispatches `revert`, which puts the prompt text back. A second `/undo` goes one turn further back. `/redo` clears the revert. `/fork` creates a new session from the current one (it appears in the list through `session.forked`). In an empty session `/compact` and `/fork` show a short note instead of calling the server.
+- `/mcps` (also the command **OpenCode: MCP Servers** and the chip in the footer) opens a panel above the prompt box: one row per server with status, tool count, error text, a toggle, and **Sign in** / **Sign out** for OAuth servers. The list refreshes every 3 s while the panel is open.
+
+### API calls
+
+| Need | Call |
+| --- | --- |
+| Commands | `command.list` (cached 15 s, dropped on `command.updated` / `skill.updated`) |
+| Run command | `session.command` (`skills` accepted) |
+| Compact, fork | `session.compact`, `session.fork` |
+| Skills | `skill.list`, plus `skills: [{ id }]` on `session.prompt` / `session.command` |
+| MCP list | `mcp.list` |
+| MCP toggle | `experimental.mcp.connect` / `experimental.mcp.disconnect` |
+| MCP sign in | `integration.get` (find the OAuth method), `integration.oauth.connect`, then poll `integration.oauth.status`, then `integration.oauth.complete`; Cancel calls `integration.oauth.cancel` |
+| MCP sign out | `integration.get` (credential id, fetched once per integration), `credential.remove` |
+
+### Remote SSH and OAuth
+
+The OAuth callback is a loopback port on the machine where the OpenCode server runs. When VS Code runs remote and the server is local to that remote, the host calls `vscode.env.asExternalUri(http://127.0.0.1:<port>)` before `openExternal`, so VS Code forwards the port to the laptop's browser. If the forwarded port differs from the original, it is logged to the output channel and the panel shows a notice. If `opencode.serverUrl` points at another machine, the sign-in finishes on that machine: the panel says so and still opens the URL. This path is covered by unit tests with fakes only; it has not been tried through a real Remote SSH window.
+
+### Runtime-only
+
+Toggling a server (connect/disconnect) changes the running server only. It is not written to config, and the panel says so. OpenCode owns all config; the extension never writes it.
+
+### State and hooks
+
+`AppState` gains `commands`, `skills` and `mcp` (`open`, `loading`, `loaded`, `servers`, `busy`, `signIn`, `notice`, `error`). New actions: `compact`, `fork`, `loadCommands`, `loadSkills`, `mcp` (`open|close|refresh|cancelSignIn|toggle|signIn|signOut`), and `send` with `skills`. Errors use the existing `error` line. VS Code-only effects go through `ControllerOptions.mcp` (`openSignIn`, `askCode`, `confirm`), implemented in `src/extension/mcp.ts`. Logic lives in `src/core/{slash,commands,mcp,errors}.ts`.
+
 ## Notifications (added 2026-11-06)
 
 Goal: tell Salim when OpenCode needs his attention or when work has finished. Use an OS-level notification where possible, otherwise a VS Code notification.
@@ -349,10 +387,13 @@ Rules:
 The extension host runs on the office server (Remote SSH). An OS notification sent from there would appear on the server, not on the laptop. VS Code has no stable API that lets extensions show OS notifications. Built-in chat has `chat.notifyWindowOnConfirmation`, but third-party access is still only a feature request (microsoft/vscode#346215).
 
 1. **VS Code notification (always, M1):** `showWarningMessage` for attention and `showInformationMessage` for finished, both with actions. These only appear inside the VS Code window.
-2. **OS notification on the laptop (chosen, M4):** a tiny companion extension `opencode-vscode-notifier` with `extensionKind: ["ui"]`, so it runs on the laptop side. The main extension calls its command (`opencode.notifier.show`); commands work across extension hosts. The companion shows a native toast (Windows toast via PowerShell / WinRT, macOS `osascript`, Linux `notify-send`). Clicking it focuses VS Code through a `vscode://` URI handler. The main extension lists the companion in `extensionPack`, so one install brings both. If the companion is missing, delivery falls back to option 1.
+2. **Window attention on the laptop (built, 0.3.7):** the OpenCode Voice companion (`extensionKind: ["ui"]`, so it runs on the laptop side; the same one that records the microphone) has the command `opencode.companion.attention`; commands work across extension hosts. The main extension calls it when a notice is raised and the window is not focused (setting `opencode.notifications.os`, `auto` | `off`). The companion flashes the taskbar button on Windows (a PowerShell helper calling `FlashWindowEx`), marks the window urgent on Linux X11 (`wmctrl`, else `notify-send`) and shows a system notification on macOS. It never moves focus. If the companion is missing or older, only the VS Code notification (option 1) appears. A separate notifier extension, `extensionPack` and a `vscode://` URI handler were not built. **OpenCode Voice: Test Window Attention** checks the path.
 3. **Push through the OpenCode server (shared with the mobile app):** see *Mobile app* below. This also works when VS Code is closed.
 
 Notifications from the extension only exist while VS Code is open. Once the mobile app exists, push covers the rest.
+
+### Browser tool: not published yet (Salim, 2026-11-06)
+- The VS Code integrated-browser tool (agent drives VS Code's browser via `vscode.lm.invokeTool`) is an experiment. It must not ship in a Marketplace / Open VSX release until Salim tests it and says so. Build it on its own branch, or behind a setting that is off by default; share it only as a local vsix.
 
 ## Mobile app (Salim's "Phase 2", added 2026-11-06)
 

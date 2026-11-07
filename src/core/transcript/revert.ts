@@ -14,8 +14,6 @@ export function revertFromServer(raw: ServerRevert): RevertState | undefined {
   return { messageID: raw.messageID, files }
 }
 
-export const withRevert = (view: SessionView, revert: RevertState | undefined): SessionView => ({ ...view, revert })
-
 /** Index of the turn that starts at the boundary prompt, or -1 when it is not (yet) in the view. */
 export const boundaryIndex = (view: SessionView, messageID: string): number => view.turns.findIndex((t) => t.user?.id === messageID)
 

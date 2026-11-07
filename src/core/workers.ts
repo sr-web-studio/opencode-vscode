@@ -1,13 +1,42 @@
+import type { SlimModel } from "./api"
+import { relativeTime } from "./format"
+import { variantName } from "./names"
 import type { SessionView, ToolItem } from "./transcript/types"
+
+/** The model a session runs on (`SessionInfo.model`). */
+export type WorkerModel = { id: string; providerID: string; variant?: string }
 
 /** What the worker list needs to know about a child session (a subset of `SessionInfo`). */
 export type ChildSession = {
   id: string
   title?: string
   agent?: string
+  model?: WorkerModel
   outcome?: "succeeded" | "failed" | "interrupted"
   time: { created: number; updated: number }
 }
+
+/**
+ * A short readable model name: the model list's `name` when it has the model (matched on provider and `id`/`modelID`),
+ * else the model id; the variant follows (`Claude Sonnet 5.5 · high`). `short` drops the vendor word and joins the
+ * variant with a space (`Sonnet 5.5 high`) for tight rows. Empty when the session has no model.
+ */
+export function modelLabel(
+  model: WorkerModel | null | undefined,
+  models: ReadonlyArray<Pick<SlimModel, "id" | "modelID" | "providerID" | "name">>,
+  opts: { short?: boolean } = {},
+): string {
+  if (!model?.id) return ""
+  const found = models.find((m) => m.providerID === model.providerID && (m.id === model.id || m.modelID === model.id))
+  let name = found?.name?.trim() || model.id
+  if (opts.short) name = name.replace(/^claude\s+/i, "") || name
+  const variant = model.variant?.trim() ? variantName(model.variant) : ""
+  return variant ? `${name}${opts.short ? " " : " · "}${variant}` : name
+}
+
+/** The full, unabbreviated model for a tooltip: `provider/model` and the variant. */
+export const modelTitle = (model: WorkerModel | null | undefined): string =>
+  model?.id ? `${model.providerID}/${model.id}${model.variant ? ` (${model.variant})` : ""}` : ""
 
 export type WorkerStatus = "running" | "done" | "failed" | "stopped"
 
@@ -23,10 +52,33 @@ export type Worker = {
   /** How many `subagent` calls went to this worker. */
   calls: number
   agent: string
+  /** The model the worker session runs on, once the child session is known. */
+  model?: WorkerModel
   /** The latest call's description. */
   description: string
   status: WorkerStatus
   started?: number
+  /** When the child session last showed activity (`time.updated`), once the child is known. */
+  updated?: number
+}
+
+/** A running worker with no activity for this long shows "quiet …" in the list. */
+export const QUIET_AFTER_MS = 60_000
+
+/**
+ * How long a running worker has been silent, or undefined when it is not running, has no known activity time, or was
+ * active within `QUIET_AFTER_MS`. Pure: the caller passes `now`.
+ */
+export function quietFor(w: Pick<Worker, "status" | "updated">, now: number): number | undefined {
+  if (w.status !== "running" || !w.updated) return undefined
+  const idle = now - w.updated
+  return idle > QUIET_AFTER_MS ? idle : undefined
+}
+
+/** `quiet 3m`, `quiet 2h`: compact, for a one-line row. Empty when the worker is not quiet. */
+export function quietLabel(w: Pick<Worker, "status" | "updated">, now: number): string {
+  const idle = quietFor(w, now)
+  return idle === undefined ? "" : `quiet ${relativeTime(now - idle, now)}`
 }
 
 const str = (v: unknown): string => (typeof v === "string" ? v : "")
@@ -133,10 +185,12 @@ export function deriveWorkers({ view, children, running }: WorkerInput): Worker[
       toolIDs: [...(earlier?.toolIDs ?? []), tool.id],
       calls: (earlier?.calls ?? 0) + 1,
       agent: str(tool.input.agent) || earlier?.agent || child?.agent || "agent",
+      model: child?.model ?? earlier?.model,
       description: str(tool.input.description) || child?.title || earlier?.description || "",
       // The latest call is the one that decides while the child is unknown; the child decides once it is known.
       status: statusOf(tool, child, running),
       started: minTime(earlier?.started, startedHere),
+      updated: child?.time.updated ?? earlier?.updated,
     })
   }
   const workers = order.map((k) => rows.get(k)!)
@@ -148,9 +202,11 @@ export function deriveWorkers({ view, children, running }: WorkerInput): Worker[
       toolIDs: [],
       calls: 0,
       agent: child.agent ?? "agent",
+      model: child.model,
       description: child.title ?? "",
       status: statusOf(undefined, child, running),
       started: child.time.created,
+      updated: child.time.updated,
     })
   }
   return workers.sort((a, b) => (a.started ?? 0) - (b.started ?? 0))

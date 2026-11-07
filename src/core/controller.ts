@@ -18,7 +18,12 @@ import { isWindowsPath, sameDirectory, withinDirectory } from "./paths"
 import { isRunning } from "./transcript/reducer"
 import { applyRevertEvent, revertFromServer, revertedPrompt } from "./transcript/revert"
 import { toPromptFiles, type PromptFile } from "./attachments"
+import { errorMessage as message } from "./errors"
+import { CommandCatalog } from "./commands"
+import { McpManager, type McpHost } from "./mcp"
+import { commandBlock, isClientCommand, isEmptySession, parseSlash } from "./slash"
 import { deriveWorkers, type ChildSession } from "./workers"
+import { addHidden, clearable, forgetSession, normalizeHidden, pruneHidden, removeHidden, type HiddenWorkers } from "./worker-hidden"
 
 export type ControllerOptions = {
   directory: string
@@ -32,6 +37,8 @@ export type ControllerOptions = {
   pins?: { get(): string[]; set(pins: string[]): void }
   /** Diagnostics for the output channel. Never given secrets or message text. */
   log?: (line: string) => void
+  /** What `/mcps` needs from the machine we run on: open a browser, forward a port, ask for a code, confirm. */
+  mcp?: McpHost
 }
 
 /** Something that follows the event stream: worker tabs, the terminal mirror. */
@@ -43,8 +50,9 @@ export type Observer = {
 
 const EMIT_MS = 30
 const LAST_SESSION_KEY = "lastSession"
+const HIDDEN_WORKERS_KEY = "hiddenWorkers"
+const CHILD_PAGE = 200
 
-const message = (e: unknown): string => (e instanceof Error ? e.message : typeof e === "string" ? e : "Request failed")
 
 /**
  * State for one project. It talks to the server only through the root `@opencode/client` API and keeps no
@@ -58,7 +66,7 @@ export class Controller {
 
   private connection: ConnectionState = { status: "connecting" }
   private settings: ViewSettings = defaultViewSettings
-  private voice: AppState["voice"] = { keySet: false, capture: false, recording: "off" }
+  private voice: AppState["voice"] = { engine: "local", ready: true, capture: false, recording: "off", languages: ["en"] }
   private target: ViewTarget = { kind: "draft" }
   private sessions: SessionInfo[] = []
   private archived: SessionInfo[] = []
@@ -92,13 +100,36 @@ export class Controller {
   private draftEpoch = 0
   private abort?: AbortController
   private synced = false
+  private readonly catalog = new CommandCatalog()
+  private readonly mcp = new McpManager({
+    client: () => this.client,
+    directory: () => this.dir,
+    host: () => this.opts.mcp ?? {},
+    changed: () => this.emitNow(),
+    fail: (m) => {
+      this.error = m
+      this.emitNow()
+    },
+    log: (line) => this.opts.log?.(line),
+  })
 
   /** The server's spelling of the project folder (`location.get`), which can differ from VS Code's (e.g. `d:` vs `D:`). */
   private serverDirectory?: string
   /** The server's project of this folder. Session lists use it: it matches every spelling of the folder. */
   private projectID?: string
 
-  constructor(private readonly opts: ControllerOptions) {}
+  /** Workers the user removed from the panel, per parent session. Only this list changes; server sessions are untouched. */
+  private hidden: HiddenWorkers
+
+  constructor(private readonly opts: ControllerOptions) {
+    this.hidden = normalizeHidden(opts.storage?.get(HIDDEN_WORKERS_KEY))
+  }
+
+  private setHidden(next: HiddenWorkers): void {
+    if (next === this.hidden) return
+    this.hidden = next
+    this.opts.storage?.set(HIDDEN_WORKERS_KEY, next)
+  }
 
   /** The project folder as the server spells it, once known; the workspace folder until then. */
   private get dir(): string {
@@ -145,6 +176,7 @@ export class Controller {
       draftEpoch: this.draftEpoch,
       readOnly: false,
       workers: this.workers(),
+      hiddenWorkers: id ? (this.hidden[id] ?? []) : [],
       runningShells: this.runningShells(),
       pins: this.pins(),
       features: detectFeatures(this.client, this.connection.version, this.broken),
@@ -155,6 +187,9 @@ export class Controller {
       sentTick: this.sentTick,
       restore: this.restore,
       voice: this.voice,
+      commands: this.catalog.commands,
+      skills: this.catalog.skills,
+      mcp: this.mcp.state,
     }
   }
 
@@ -169,6 +204,26 @@ export class Controller {
 
   private workers() {
     return deriveWorkers({ view: this.feed.view, children: this.childList(), running: this.running })
+  }
+
+  /** "x" and "Clear done": hide finished workers of the current session. Running ones are skipped. */
+  private hideWorkers(keys: readonly string[]): void {
+    const id = this.currentSessionID
+    if (!id) return
+    const allowed = new Set(clearable(this.workers()).map((w) => w.key))
+    const picked = keys.filter((k) => allowed.has(k))
+    if (picked.length === 0) return
+    this.setHidden(addHidden(this.hidden, id, picked))
+    this.emitNow()
+  }
+
+  /** A worker that runs again shows again, and stays visible once it finishes. */
+  private unhideRunning(): void {
+    const id = this.currentSessionID
+    const stored = id ? this.hidden[id] : undefined
+    if (!id || !stored) return
+    const running = this.workers().filter((w) => w.status === "running" && stored.includes(w.key)).map((w) => w.key)
+    if (running.length) this.setHidden(removeHidden(this.hidden, id, running))
   }
 
   private runningShells(): number {
@@ -234,7 +289,7 @@ export class Controller {
     this.emitNow()
   }
 
-  /** The host tells whether a voice key is saved and whether it can record. */
+  /** The host tells which voice engine is chosen, whether the mic can start, and whether the companion records. */
   setVoice(v: AppState["voice"]) {
     this.voice = v
     this.emitNow()
@@ -289,6 +344,7 @@ export class Controller {
     this.detach()
     this.client = client
     this.synced = false
+    this.mcp.reset()
     this.abort = new AbortController()
     void this.follow(client, this.abort.signal)
   }
@@ -297,6 +353,7 @@ export class Controller {
     this.abort?.abort()
     this.abort = undefined
     this.client = undefined
+    this.mcp.reset()
   }
 
   /* -------------------------------------------------------- event stream */
@@ -357,8 +414,10 @@ export class Controller {
   private async apply(ev: EventEnvelope): Promise<void> {
     const d = ev.data ?? {}
     const sessionID: string | undefined = d.sessionID ?? d.form?.sessionID
+    if (sessionID && ev.type.startsWith("session.")) this.touchChild(sessionID, ev.created)
     switch (ev.type) {
-      case "session.created": {
+      case "session.created":
+      case "session.forked": {
         if (!this.client) return
         const s = await this.client.session.get({ sessionID: d.sessionID }).catch(() => undefined)
         if (!s || !this.isListed(s.location?.directory)) return
@@ -369,6 +428,16 @@ export class Controller {
       case "session.renamed":
         this.sessions = this.sessions.map((s) => (s.id === d.sessionID ? { ...s, title: d.title } : s))
         if (this.children.has(d.sessionID)) this.children.set(d.sessionID, { ...this.children.get(d.sessionID)!, title: d.title })
+        break
+      case "mcp.status.changed":
+        this.mcp.statusChanged()
+        break
+      case "command.updated":
+        this.catalog.invalidateCommands()
+        void this.loadCommands()
+        break
+      case "skill.updated":
+        this.catalog.invalidateSkills()
         break
       case "shell.created": {
         const info = d.info
@@ -389,6 +458,8 @@ export class Controller {
         this.running.delete(d.sessionID)
         this.permissions.delete(d.sessionID)
         this.forms.delete(d.sessionID)
+        this.children.delete(d.sessionID)
+        this.setHidden(forgetSession(this.hidden, d.sessionID))
         if (this.currentSessionID === d.sessionID) await this.showDefaultTarget()
         break
       case "session.archived":
@@ -400,10 +471,13 @@ export class Controller {
         break
       case "session.model.selected":
         this.sessions = this.sessions.map((s) => (s.id === d.sessionID ? { ...s, model: d.model } : s))
+        // A worker's own model change shows in the panel too.
+        if (this.children.has(d.sessionID)) this.children.set(d.sessionID, { ...this.children.get(d.sessionID)!, model: d.model })
         break
       case "session.execution.started":
         this.running.add(d.sessionID)
         this.touch(d.sessionID, ev.created)
+        if (this.children.has(d.sessionID)) this.unhideRunning()
         break
       case "session.execution.succeeded":
       case "session.execution.failed":
@@ -435,6 +509,13 @@ export class Controller {
     this.emit()
   }
 
+  /** Any event of a worker is a sign of life: the Background row's "quiet for …" counts from the last one. */
+  private touchChild(id: string, at: number | undefined) {
+    const child = this.children.get(id)
+    const when = at || Date.now()
+    if (child && when > child.time.updated) this.children.set(id, { ...child, time: { ...child.time, updated: when } })
+  }
+
   private touch(id: string, at: number | undefined) {
     if (!at) return
     this.sessions = this.sort(this.sessions.map((s) => (s.id === id ? { ...s, time: { ...s.time, updated: at } } : s)))
@@ -452,7 +533,9 @@ export class Controller {
     if (!client) return
     try {
       await this.resolveDirectory(client)
-      await Promise.all([this.loadSessions(), this.loadPending(client), this.loadCatalog(client), this.loadShells(client)])
+      this.catalog.invalidateCommands()
+      this.catalog.invalidateSkills()
+      await Promise.all([this.loadSessions(), this.loadPending(client), this.loadCatalog(client), this.loadShells(client), this.catalog.loadCommands(client, this.dir, this.opts.log), this.mcp.refresh()])
       const first = !this.synced
       this.synced = true
       if (first) {
@@ -507,9 +590,11 @@ export class Controller {
   private async loadChildren(client: OpenCodeClient, parentID: string): Promise<void> {
     try {
       // The parent id alone picks the children; no folder filter, so a differently spelled path cannot hide them.
-      const res = await client.session.list({ parentID, limit: 200 })
+      const res = await client.session.list({ parentID, limit: CHILD_PAGE })
       for (const [id, c] of this.children) if (c.parentID === parentID) this.children.delete(id)
       for (const c of res.data) if (c.parentID === parentID) this.children.set(c.id, c)
+      // Hidden keys of children the server no longer has are dropped (only when the list is complete).
+      this.setHidden(pruneHidden(this.hidden, parentID, res.data.map((c) => c.id), res.data.length < CHILD_PAGE))
     } catch {
       // Older server or a transient error: the Background row then relies on the tool lines alone.
     }
@@ -526,11 +611,6 @@ export class Controller {
     } catch {
       // keep what events told us
     }
-  }
-
-  /** A directory from the server is this window's folder, in either spelling. */
-  private isOurs(directory: string | undefined): boolean {
-    return sameDirectory(directory, this.dir) || sameDirectory(directory, this.opts.directory)
   }
 
   /** A session belongs in this window's list: started in this folder or a folder inside it (any spelling). */
@@ -606,6 +686,7 @@ export class Controller {
     if (this.currentSessionID !== id) return
     await Promise.all([this.loadChildren(client, id), this.loadRevert(client, id)])
     await this.refreshChildRunning(client)
+    this.unhideRunning()
     this.emitNow()
   }
 
@@ -629,7 +710,8 @@ export class Controller {
   /* -------------------------------------------------------------- actions */
 
   async dispatch(action: Action): Promise<void> {
-    if (action.type !== "dismissError" && action.type !== "ready") this.error = undefined
+    // Refreshing the popup's lists is not something the user did: it must not wipe an error they have not read yet.
+    if (action.type !== "dismissError" && action.type !== "ready" && action.type !== "loadCommands" && action.type !== "loadSkills") this.error = undefined
     try {
       switch (action.type) {
         case "ready":
@@ -640,19 +722,34 @@ export class Controller {
         case "newDraft":
           return this.newDraft(action.hasText)
         case "send":
-          return await this.send(action.text, action.files)
+          return await this.send(action.text, action.files, action.skills)
         case "stop":
           return await this.stop()
+        case "stopWorker":
+          return await this.stopWorker(action.sessionID)
         case "queued":
           return await this.queuedAction(action.inboxID, action.op)
         case "rename":
           return await this.rename(action.id, action.title)
         case "togglePin":
           return this.togglePin(action.key)
+        case "hideWorkers":
+          return this.hideWorkers(action.keys)
         case "revert":
           return await this.revert(action.messageID)
         case "redo":
           return await this.redo()
+        case "compact":
+          return await this.compact()
+        case "fork":
+          return await this.fork()
+        case "loadCommands":
+          return await this.loadCommands()
+        case "loadSkills":
+          if (await this.catalog.loadSkills(this.need(), this.dir, this.opts.log)) this.emitNow()
+          return
+        case "mcp":
+          return await this.mcpAction(action)
         case "loadEarlier":
           return await this.loadEarlier()
         case "trimCompacted":
@@ -737,10 +834,20 @@ export class Controller {
     }
   }
 
-  private async send(text: string, files: PromptFile[] = []): Promise<void> {
+  /**
+   * A prompt, or a server slash command (`/review args`) when the text names one we know. Unknown `/xyz` text is an
+   * ordinary prompt. Client commands (`/undo`, …) never get here: the prompt box runs them itself.
+   */
+  private async send(text: string, files: PromptFile[] = [], skills: Array<{ id: string }> = []): Promise<void> {
     const body = text.trim()
     if (!body && files.length === 0) return
     const client = this.need()
+    const slash = parseSlash(body)
+    const command = slash && !isClientCommand(slash.name) && this.catalog.has(slash.name) ? slash : undefined
+    const deliver = (sessionID: string) =>
+      command
+        ? client.session.command({ sessionID, name: command.name, text: command.args, ...filesInput(files), ...skillsInput(skills) })
+        : client.session.prompt({ sessionID, text: body, ...filesInput(files), ...skillsInput(skills) })
     if (this.target.kind === "draft") {
       // First prompt of a draft: create the session, then prompt. This is the only place a session is created.
       this.sending = true
@@ -757,7 +864,7 @@ export class Controller {
       this.children.clear()
       this.sentTick++
       try {
-        await client.session.prompt({ sessionID: created.id, text: body, ...filesInput(files) })
+        await deliver(created.id)
       } finally {
         this.sending = false
         this.emitNow()
@@ -772,7 +879,56 @@ export class Controller {
     this.emitNow()
     // No `delivery`: the server default is `steer`, so a prompt sent while the agent works joins the running turn at
     // its next step (Salim wants this). Prompts queued by other clients still show, with Send now / Remove.
-    await client.session.prompt({ sessionID: id, text: body, ...filesInput(files) })
+    await deliver(id)
+  }
+
+  /* ------------------------------------------------------ slash commands */
+
+  /** The server's commands, for the popup. Cheap: cached for a few seconds. */
+  private async loadCommands(): Promise<void> {
+    if (!this.client) return
+    if (await this.catalog.loadCommands(this.client, this.dir, this.opts.log)) this.emitNow()
+  }
+
+  /** `/compact`: the server queues it like a prompt (steer by default), so it also works while the agent runs. */
+  private async compact(): Promise<void> {
+    const id = this.currentSessionID
+    const block = commandBlock("compact", { hasSession: !!id, running: false, revertStaged: false, canRevert: true })
+    if (!id || block) throw new Error(block)
+    await this.need().session.compact({ sessionID: id })
+  }
+
+  /** `/fork`: a new root session with this history (`fork` metadata), opened right away and added to the list. */
+  private async fork(): Promise<void> {
+    const id = this.currentSessionID
+    if (!id) throw new Error(commandBlock("fork", { hasSession: false, running: false, revertStaged: false, canRevert: true }))
+    let created: SessionInfo
+    try {
+      created = await this.need().session.fork({ sessionID: id })
+    } catch (e) {
+      throw isEmptySession(e) ? new Error("Nothing to fork yet.") : e
+    }
+    this.sessions = this.sort(upsertSession(this.sessions, { ...created, location: created.location ?? { directory: this.dir } } as SessionInfo))
+    await this.open(created.id)
+  }
+
+  private async mcpAction(action: Extract<Action, { type: "mcp" }>): Promise<void> {
+    switch (action.op) {
+      case "open":
+        return this.mcp.open()
+      case "close":
+        return this.mcp.close()
+      case "refresh":
+        return await this.mcp.refresh()
+      case "cancelSignIn":
+        return await this.mcp.cancelSignIn()
+      case "toggle":
+        return await this.mcp.toggle(action.server)
+      case "signIn":
+        return await this.mcp.signIn(action.server)
+      case "signOut":
+        return await this.mcp.signOut(action.server)
+    }
   }
 
   /** Send a queued prompt now (it joins the running turn at the next step) or remove it from the queue. */
@@ -854,6 +1010,21 @@ export class Controller {
     if (id) await this.need().session.interrupt({ sessionID: id })
   }
 
+  /**
+   * Stop one worker. Only a known child of the current session is interrupted, never an arbitrary session id. The
+   * server then publishes `session.execution.interrupted` for the child: the row turns "Stopped" through `apply`.
+   */
+  private async stopWorker(sessionID: string): Promise<void> {
+    const parent = this.currentSessionID
+    const child = this.children.get(sessionID)
+    if (!parent || !child || child.parentID !== parent) {
+      this.error = "This worker belongs to a session that is not open here, so it cannot be stopped from this view."
+      this.emitNow()
+      return
+    }
+    await this.need().session.interrupt({ sessionID })
+  }
+
   private async pickAgent(agent: string): Promise<void> {
     const id = this.currentSessionID
     if (!id) {
@@ -878,6 +1049,8 @@ export class Controller {
     await this.need().session.switchModel({ sessionID: id, model })
   }
 }
+
+const skillsInput = (skills: ReadonlyArray<{ id: string }>) => (skills.length > 0 ? { skills: skills.map(({ id }) => ({ id })) } : {})
 
 const filesInput = (files: readonly PromptFile[]) => (files.length > 0 ? { files: toPromptFiles(files as never) } : {})
 

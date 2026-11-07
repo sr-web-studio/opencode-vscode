@@ -1,4 +1,6 @@
 import * as vscode from "vscode"
+import { attentionFor, type OsSetting } from "../core/attention"
+import { COMPANION } from "../core/dictation"
 import type { NotificationEngine } from "../core/notifications/engine"
 import type { Notice, NoticeCommand, Notifier } from "../core/notifications/types"
 
@@ -14,7 +16,16 @@ export class VscodeNotifier implements Notifier {
   private live = new Map<string, Notice>()
   private engine?: NotificationEngine
 
-  constructor(private readonly run: (cmd: NoticeCommand) => void | Promise<void>) {}
+  private askedMissing = false
+
+  /**
+   * `os` reads the `opencode.notifications.os` setting; `log` is the OpenCode output channel (debug level). Without
+   * `os` the window never asks for attention.
+   */
+  constructor(
+    private readonly run: (cmd: NoticeCommand) => void | Promise<void>,
+    private readonly options: { os?: () => OsSetting; log?: (line: string) => void } = {},
+  ) {}
 
   bind(engine: NotificationEngine) {
     this.engine = engine
@@ -26,6 +37,26 @@ export class VscodeNotifier implements Notifier {
     const text = `${notice.title}: ${notice.body}`
     const pending = notice.severity === "warning" ? vscode.window.showWarningMessage(text, ...labels) : vscode.window.showInformationMessage(text, ...labels)
     void Promise.resolve(pending).then((picked) => this.picked(notice, picked))
+    this.askForAttention(notice)
+  }
+
+  /**
+   * Fire and forget, after the toast is on its way: the OpenCode Voice companion (on the user's computer) makes the
+   * window ask for attention (taskbar flash and the like). An older or missing companion has no such command.
+   */
+  private askForAttention(notice: Notice): void {
+    try {
+      const request = attentionFor(notice, { os: this.options.os?.() ?? "off", focused: vscode.window.state.focused })
+      if (!request) return
+      void Promise.resolve(vscode.commands.executeCommand(COMPANION.attention, request)).then(undefined, (e: unknown) => {
+        if (this.askedMissing) return
+        this.askedMissing = true
+        const message = e instanceof Error ? e.message : String(e)
+        this.options.log?.(`Window attention: the OpenCode Voice companion did not take the request (${message}). Install or update it to flash the taskbar.`)
+      })
+    } catch (e) {
+      this.options.log?.(`Window attention: ${e instanceof Error ? e.message : String(e)}`)
+    }
   }
 
   dismiss(id: string): void {

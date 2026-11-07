@@ -72,8 +72,8 @@ describe("focus call sites", () => {
     const hits = walk("src/extension")
       .filter((f) => f.endsWith(".ts"))
       .flatMap((f) => readFileSync(f, "utf8").split("\n").map((l, i) => ({ f, i: i + 1, l })).filter(({ l }) => /VIEW_ID\}\.focus/.test(l)).map(({ f, l }) => `${f}: ${l.trim()}`))
-    // runNotice (user clicked "Open"), opencode.focus, opencode.newSession. Nothing in a state/event path.
-    expect(hits.length).toBe(3)
+    // runNotice (user clicked "Open"), opencode.focus, opencode.newSession, opencode.mcps. Nothing in a state/event path.
+    expect(hits.length).toBe(4)
     expect(hits.every((h) => h.startsWith(join("src", "extension", "extension.ts")))).toBe(true)
   })
 })

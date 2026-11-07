@@ -2,7 +2,10 @@ import type { FormInfo, PermissionRequest, SessionInfo, SlimModel, SlimProvider 
 import type { ViewTarget } from "./draft"
 import type { ModelSelection } from "./models"
 import type { PromptFile } from "./attachments"
+import type { CommandSummary, SkillSummary } from "./commands"
 import type { ImageRef } from "./images"
+import type { McpState } from "./mcp"
+import type { VoiceEngine } from "./dictation"
 import type { SessionView } from "./transcript/types"
 import type { Worker } from "./workers"
 
@@ -87,6 +90,8 @@ export type AppState = {
   workerTitle?: string
   /** Workers (child sessions) of the current session, from the transcript plus `session.list({ parentID })`. */
   workers: Worker[]
+  /** `Worker.key`s the user removed from the list (this extension only; the sessions stay on the server). Running workers show anyway. */
+  hiddenWorkers: string[]
   /** Background shells of the current session that are still running. */
   runningShells: number
   /** Pinned model keys (`provider/model`), kept by the host in `globalState`. */
@@ -103,24 +108,46 @@ export type AppState = {
   sentTick: number
   restore?: PromptRestore
   /**
-   * Voice input. `keySet`: the user saved a working Soniox key (the key itself never reaches the webview).
+   * Voice input. `engine`: the chosen speech engine. `ready`: a click on the mic can start dictation (local: this
+   * computer has the engine; soniox: the user saved a working key, which itself never reaches the webview).
    * `capture`: the recording companion is reachable. `recording`: the state of the current dictation.
+   * `languages`: the active on-device languages (`opencode.voice.localLanguages`), the first one records; the label
+   * next to the mic shows it (only for the `local` engine, and a click switches when there are two or more).
    */
-  voice: { keySet: boolean; capture: boolean; recording: "off" | "starting" | "on" | "stopping" }
+  voice: { engine: VoiceEngine; ready: boolean; capture: boolean; recording: "off" | "starting" | "on" | "stopping"; languages: string[] }
+  /** The server's slash commands (`command.list`), refreshed when the popup opens. */
+  commands: CommandSummary[]
+  /** The server's skills (`skill.list`), loaded when `/skills` is used. */
+  skills: SkillSummary[]
+  /** The `/mcps` panel and the status chip. */
+  mcp: McpState
 }
 
 export type Action =
   | { type: "ready" }
   | { type: "openSession"; id: string }
   | { type: "newDraft"; hasText: boolean }
-  | { type: "send"; text: string; files?: PromptFile[] }
+  /** `skills`: skills chosen with `/skills`, sent with this prompt. */
+  | { type: "send"; text: string; files?: PromptFile[]; skills?: Array<{ id: string }> }
   | { type: "rename"; id: string; title: string }
   | { type: "togglePin"; key: string }
+  /** Remove finished workers (`Worker.key`) from the panel list. Never touches the sessions on the server. */
+  | { type: "hideWorkers"; keys: string[] }
   | { type: "revert"; messageID: string }
   | { type: "redo" }
+  /** `/compact` and `/fork` on the current session. */
+  | { type: "compact" }
+  | { type: "fork" }
+  /** The popup opened: refresh the server's commands or skills (cached for a few seconds). */
+  | { type: "loadCommands" }
+  | { type: "loadSkills" }
+  | { type: "mcp"; op: "open" | "close" | "refresh" | "cancelSignIn" }
+  | { type: "mcp"; op: "toggle" | "signIn" | "signOut"; server: string }
   | { type: "loadEarlier" }
   | { type: "trimCompacted" }
   | { type: "stop" }
+  /** Stop one worker (a child session of the current session). The lead keeps running. Refused for any other session id. */
+  | { type: "stopWorker"; sessionID: string }
   /** A queued prompt: `steer` hands it to the agent at its next step ("Send now"); `cancel` removes it. */
   | { type: "queued"; inboxID: string; op: "steer" | "cancel" }
   | { type: "pickAgent"; id: string }
@@ -163,6 +190,8 @@ export type HostRequest =
   | { type: "openExternal"; url: string }
   | { type: "setCliPath" }
   | { type: "voice" }
+  /** The language label next to the mic: the next active on-device language becomes the current one. */
+  | { type: "voiceLanguage" }
   | { type: "reconnect" }
   | { type: "notify"; level: "info" | "warning" | "error"; message: string }
 

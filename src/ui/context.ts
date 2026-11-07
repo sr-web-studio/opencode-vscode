@@ -1,4 +1,5 @@
 import { getContext, setContext } from "svelte"
+import type { SlimModel } from "../core/api"
 import type { Features } from "../core/protocol"
 import type { Worker } from "../core/workers"
 import type { Store } from "./store.svelte"
@@ -12,6 +13,8 @@ export const useStore = (): Store => getContext<Store>(KEY)
 /** What transcript lines need from the surrounding view, as getters so they stay current. */
 export type TranscriptContext = {
   workers: () => Worker[]
+  /** The model list, to turn a worker's model id into a readable name. */
+  models: () => SlimModel[]
   features: () => Features
   readOnly: () => boolean
   running: () => boolean
