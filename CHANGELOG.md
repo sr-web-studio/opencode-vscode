@@ -3,6 +3,7 @@
 ## Unreleased
 
 - **Open Global Config:** a gear in the OpenCode view's title bar, **Edit config** at the bottom of the MCP servers panel, or **OpenCode: Open Global Config** opens your global OpenCode config (`~/.config/opencode/opencode.json` or `.jsonc`) in the editor. The extension only opens it; if there is none yet it asks before creating one with just the schema line. When the server runs on another computer, it tells you the config is there instead of opening a file on this one.
+- **A failed turn shows its error once.** When a step and the turn failed with the same message (for example a provider refusing a model), the message appeared twice; now only the turn's error line shows it.
 
 ## 0.3.7 (preview)
 
