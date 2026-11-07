@@ -1,4 +1,5 @@
 import type { SlimModel } from "./api"
+import { variantName } from "./names"
 import type { SessionView, ToolItem } from "./transcript/types"
 
 /** The model a session runs on (`SessionInfo.model`). */
@@ -28,7 +29,7 @@ export function modelLabel(
   const found = models.find((m) => m.providerID === model.providerID && (m.id === model.id || m.modelID === model.id))
   let name = found?.name?.trim() || model.id
   if (opts.short) name = name.replace(/^claude\s+/i, "") || name
-  const variant = model.variant?.trim()
+  const variant = model.variant?.trim() ? variantName(model.variant) : ""
   return variant ? `${name}${opts.short ? " " : " · "}${variant}` : name
 }
 

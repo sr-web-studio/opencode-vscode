@@ -10,16 +10,17 @@ const models = [
 const sonnet = { id: "claude-sonnet-5-5", providerID: "cli-proxy-api", variant: "high" }
 
 describe("modelLabel", () => {
-  test("uses the model list name and appends the variant", () => {
-    expect(modelLabel(sonnet, models)).toBe("Claude Sonnet 5.5 · high")
+  test("uses the model list name and appends the variant in display casing (like the model picker)", () => {
+    expect(modelLabel(sonnet, models)).toBe("Claude Sonnet 5.5 · High")
+    expect(modelLabel({ ...sonnet, variant: "xhigh" }, models)).toBe("Claude Sonnet 5.5 · X-High")
   })
   test("short form drops the vendor word and joins with a space", () => {
-    expect(modelLabel(sonnet, models, { short: true })).toBe("Sonnet 5.5 high")
+    expect(modelLabel(sonnet, models, { short: true })).toBe("Sonnet 5.5 High")
   })
   test("falls back to the model id when the list does not have it", () => {
     expect(modelLabel({ id: "gpt-9", providerID: "p" }, models)).toBe("gpt-9")
     expect(modelLabel({ id: "claude-sonnet-5-5", providerID: "other-provider" }, models)).toBe("claude-sonnet-5-5")
-    expect(modelLabel(sonnet, [])).toBe("claude-sonnet-5-5 · high")
+    expect(modelLabel(sonnet, [])).toBe("claude-sonnet-5-5 · High")
   })
   test("matches modelID too", () => {
     expect(modelLabel({ id: "y", providerID: "other" }, models)).toBe("Why")
