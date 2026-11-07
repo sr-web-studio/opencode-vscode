@@ -1,5 +1,5 @@
 import * as vscode from "vscode"
-import { COMPANION, DEFAULT_LANGUAGES, SONIOX_MODEL, normalizeEngine, spokenText, type CompanionInfo, type VoiceEngine, type VoiceFeed, type VoiceFix } from "../core/dictation"
+import { COMPANION, DEFAULT_LANGUAGES, SONIOX_MODEL, isNewerVersion, normalizeEngine, spokenText, type CompanionInfo, type VoiceEngine, type VoiceFeed, type VoiceFix } from "../core/dictation"
 import { startArgs, voiceReady } from "../core/local-voice"
 import type { AppState, ToWebview } from "../core/protocol"
 import { checkSonioxKey, mintSonioxTempKey } from "../core/voice"
@@ -88,7 +88,8 @@ export class Voice implements vscode.Disposable {
    */
   async ensureCompanion(interactive: boolean): Promise<CompanionInfo | undefined> {
     const info = await this.companion()
-    if (info && info.version === this.bundled.version) return info
+    // Only ever upgrade: an equal or newer companion (e.g. installed by another copy of this extension) is kept.
+    if (info && !isNewerVersion(this.bundled.version, info.version)) return info
     this.installing ??= this.installCompanion(info)
     const result = await this.installing
     // A failed install may be retried by the next mic click.

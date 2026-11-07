@@ -125,6 +125,29 @@ export type VoiceFix = "micSettings" | "chooseMicrophone" | "showLog"
 /** The main extension's command that receives dictation updates from the companion. */
 export const VOICE_FEED_COMMAND = "opencode.voice.feed"
 
+/**
+ * Whether version `a` is newer than `b` (`major.minor.patch`, numeric parts; anything after `-` or `+` is ignored).
+ * An unreadable `b` counts as older, an unreadable `a` as not newer. Used so the companion is only ever upgraded:
+ * two installed copies of the main extension (e.g. an old ID next to the new one) must not keep reinstalling their
+ * own companion over each other.
+ */
+export function isNewerVersion(a: string, b: string): boolean {
+  const parse = (v: string): number[] | undefined => {
+    const m = /^\s*v?(\d+)\.(\d+)\.(\d+)/.exec(v)
+    return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : undefined
+  }
+  const x = parse(a)
+  if (!x) return false
+  const y = parse(b)
+  if (!y) return true
+  for (let i = 0; i < 3; i++) {
+    const p = x[i] ?? 0
+    const q = y[i] ?? 0
+    if (p !== q) return p > q
+  }
+  return false
+}
+
 /** `local`: this computer has a build of the on-device engine (the microphone may work without it). */
 export type CompanionInfo = {
   version: string
