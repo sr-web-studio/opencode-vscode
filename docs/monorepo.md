@@ -1,6 +1,6 @@
 # Monorepo
 
-One Bun workspace, three workspace packages today, a fourth (`apps/mobile`) later.
+One Bun workspace with four packages: `packages/core`, `packages/ui`, `apps/vscode` and `apps/mobile`.
 
 ```
 .
@@ -11,6 +11,10 @@ One Bun workspace, three workspace packages today, a fourth (`apps/mobile`) late
 │   ├── core/           @occ/core: API/state layer on @opencode/client, reducers, forms, grouping
 │   └── ui/             @occ/ui: Svelte components, store, HostBridge interface (src/bridge.ts)
 ├── apps/
+│   ├── mobile/         @occ/mobile (Capacitor 8 Android app, id dev.srwebstudio.opencode)
+│   │   ├── src/lib/         pure modules (bridge, workspace, nav, profiles, pairing, deep links): unit-tested from test/unit
+│   │   ├── src/screens/     one Svelte file per screen; src/model.svelte.ts is the app state
+│   │   └── android/         the generated Capacitor project (committed; build outputs are git-ignored)
 │   └── vscode/         @occ/vscode (extension id sr-web-studio.opencode-unofficial)
 │       ├── src/extension/   extension host
 │       ├── src/webview/     webview entry + VS Code HostBridge
@@ -30,7 +34,7 @@ One Bun workspace, three workspace packages today, a fourth (`apps/mobile`) late
 | `@occ/core` | `@opencode/client` (root entry, types only) | `vscode`, `node:*` (and bare `fs`, `path`, …), any other `@occ/*`, `apps/*` |
 | `@occ/ui` | `@occ/core`, `svelte`, `marked`, `dompurify`, tailwind | `vscode`, `node:*`, `@occ/vscode`, any `apps/*` |
 | `apps/vscode` | `@occ/core`, `@occ/ui`, `vscode`, `node:*`, `@opencode/client/service` | |
-| `apps/mobile` (future) | `@occ/core`, `@occ/ui`, Capacitor | `vscode`, `apps/vscode` |
+| `apps/mobile` | `@occ/core`, `@occ/ui`, Capacitor plugins, `@opencode/client` | `vscode`, `apps/vscode` |
 
 `test/unit/boundaries.test.ts` enforces this on every `bun test`: it fails if `packages/core` or `packages/ui` import `vscode`, `node:*` or a Node builtin, if `core` imports another workspace package, if `ui` imports anything from the workspace except `@occ/core`, or if the webview entry pulls in `@opencode/client/*` beyond the root entry.
 
@@ -61,7 +65,19 @@ bun run test:host                 # real VS Code smoke test (needs a display, e.
 
 vsce packs `README.md`, `CHANGELOG.md` and `LICENSE` from the extension folder. The root files are the source of truth; `apps/vscode/tools/package.ts` copies them into `apps/vscode/` before packaging (the copies are git-ignored), so the vsix content is the same as before the split.
 
-## Adding `apps/mobile` (Capacitor)
+## `apps/mobile` (Capacitor)
+
+Built (M1, no voice). The controllers of `@occ/core` run inside the app, and the bridge calls `controller.dispatch` directly (`src/lib/bridge.ts`). One controller per open project, disposed when its last screen closes (`src/lib/workspace.ts`).
+
+```sh
+bun run mobile:build                      # Vite build into apps/mobile/dist
+bun run --cwd apps/mobile dev             # dev server on http://127.0.0.1:5173 (the server's CORS list allows it)
+source ~/android/env.sh && bun run mobile:apk    # cap sync + gradlew assembleDebug; the APK is in apps/mobile/android/app/build/outputs/apk/debug/
+```
+
+The WebView origin (`http://tauri.localhost`) is set in one place, `apps/mobile/capacitor.config.ts`. Code that tests import (`apps/mobile/src/lib/*`) must not touch the DOM: the root tests are typechecked without a DOM lib.
+
+The steps that were planned for it:
 
 1. Create `apps/mobile` with `package.json` (`"name": "@occ/mobile"`, `"private": true`, dependencies `@occ/core` and `@occ/ui` as `workspace:*`).
 2. Write its `HostBridge` implementation (same interface as `apps/vscode/src/webview/vscode-bridge.ts`) and a Vite entry that mounts `@occ/ui/App.svelte`. Capacitor plugins (QR scanner, push, storage) live only in this app.
