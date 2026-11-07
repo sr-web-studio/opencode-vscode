@@ -193,6 +193,8 @@ export type HostRequest =
   /** The language label next to the mic: the next active on-device language becomes the current one. */
   | { type: "voiceLanguage" }
   | { type: "reconnect" }
+  /** "Edit config" in the MCP panel: the host opens the user's global OpenCode config (it never edits it). */
+  | { type: "openGlobalConfig" }
   | { type: "notify"; level: "info" | "warning" | "error"; message: string }
 
 /** Messages from the webview to the extension host. */

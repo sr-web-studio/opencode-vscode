@@ -355,6 +355,14 @@ The OAuth callback is a loopback port on the machine where the OpenCode server r
 
 Toggling a server (connect/disconnect) changes the running server only. It is not written to config, and the panel says so. OpenCode owns all config; the extension never writes it.
 
+### Open Global Config (added 2026-11-07)
+
+The extension only *opens* the user's global OpenCode config for them; it never edits it. Command `opencode.openGlobalConfig` (palette, gear in the view title, "Edit config" link at the bottom of the MCP panel via the host request `openGlobalConfig`). Logic is in `src/core/global-config.ts`, effects in `src/extension/global-config.ts`.
+
+- Directory (OpenCode 2.2.5; binary and https://opencode.ai/v2/docs/config): `$OPENCODE_CONFIG_DIR`, else `$XDG_CONFIG_HOME/opencode`, else `<home>/.config/opencode` (Windows too: `%USERPROFILE%\.config\opencode`). Files: `opencode.json`, then `opencode.jsonc`; the later one overrides, so `opencode.jsonc` wins when both exist. `OPENCODE_CONFIG` (one extra file) is not the global config and is ignored.
+- Nothing exists: ask "Create <path>?" (modal, Create / Cancel); only on Create write `{ "$schema": "https://opencode.ai/config.json" }` (flag `wx`, never overwrites) at `opencode.jsonc`, then open it.
+- Which computer: the extension runs where the files are (Remote-SSH: the remote host). With no `opencode.serverUrl` or a loopback address the server is on this machine. Another address counts as this machine only when `/api/info` `hostname` equals `os.hostname()`. Otherwise an info message says the config is on the server's computer (`<hostname>`), says where it usually is, and no local file is opened.
+
 ### State and hooks
 
 `AppState` gains `commands`, `skills` and `mcp` (`open`, `loading`, `loaded`, `servers`, `busy`, `signIn`, `notice`, `error`). New actions: `compact`, `fork`, `loadCommands`, `loadSkills`, `mcp` (`open|close|refresh|cancelSignIn|toggle|signIn|signOut`), and `send` with `skills`. Errors use the existing `error` line. VS Code-only effects go through `ControllerOptions.mcp` (`openSignIn`, `askCode`, `confirm`), implemented in `src/extension/mcp.ts`. Logic lives in `src/core/{slash,commands,mcp,errors}.ts`.

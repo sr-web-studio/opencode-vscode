@@ -80,6 +80,8 @@ export class HostActions {
         return void (await vscode.commands.executeCommand("opencode.setCliPath"))
       case "reconnect":
         return void (await vscode.commands.executeCommand("opencode.reconnect"))
+      case "openGlobalConfig":
+        return void (await vscode.commands.executeCommand("opencode.openGlobalConfig"))
       case "notify": {
         const show = req.level === "error" ? vscode.window.showErrorMessage : req.level === "warning" ? vscode.window.showWarningMessage : vscode.window.showInformationMessage
         void show(req.message)

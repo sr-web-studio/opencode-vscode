@@ -10,7 +10,7 @@ export class SetupError extends Error {
   }
 }
 
-export type Connected = { client: OpenCodeClient; url: string; version?: string }
+export type Connected = { client: OpenCodeClient; url: string; version?: string; /** The server's own host name (`/api/info`), to tell whether its config is on this machine. */ hostname?: string }
 
 export type ConnectOptions = {
   serverUrl: string
@@ -70,5 +70,5 @@ export async function connect(opts: ConnectOptions): Promise<Connected> {
     }
     throw e
   })
-  return { client, url, version: info.version }
+  return { client, url, version: info.version, hostname: info.hostname }
 }
