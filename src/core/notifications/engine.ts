@@ -25,6 +25,13 @@ export type EngineDeps = {
   session: (sessionID: string) => SessionMeta | undefined | Promise<SessionMeta | undefined>
   /** `shell.exited` carries only the shell id. The shell's `metadata.sessionID` links it to a session. */
   shellSession: (shellID: string) => string | undefined | Promise<string | undefined>
+  /**
+   * The window already lists this session (it is in the project's session list, whatever the spelling of its folder).
+   * Such a session belongs to this window even when its recorded folder does not match `directory` textually.
+   */
+  owns?: (sessionID: string) => boolean
+  /** Debug log (OpenCode output channel). Receives one line per dropped notice: kind, session id, reason. */
+  log?: (line: string) => void
 }
 
 type Shown = { notice: Notice; at: number }
@@ -119,25 +126,39 @@ export class NotificationEngine {
     kind: NoticeKind,
     opts: { meta?: SessionMeta; body: string; requestID?: string; failed?: boolean },
   ): Promise<void> {
-    if (!sessionID) return
+    if (!sessionID) {
+      this.drop(kind, "-", "the event has no session id")
+      return
+    }
     const settings = this.deps.settings()
-    if (!settings.enabled || !settings[KIND_SETTING[kind]]) return
+    if (!settings.enabled) return this.drop(kind, sessionID, "opencode.notifications.enabled is off")
+    if (!settings[KIND_SETTING[kind]]) return this.drop(kind, sessionID, `opencode.notifications.${KIND_SETTING[kind]} is off`)
 
     const meta = opts.meta ?? (await this.deps.session(sessionID))
-    // Per-project filter: the event's location wins, then the session's, otherwise skip (not ours).
-    const dir = ev.location?.directory ?? meta?.directory
-    if (!withinDirectory(dir, this.deps.directory)) return
+    // Per-project filter. Turn-end events (`session.execution.*`) carry no `location` (live-checked on 2.2.5), so they
+    // depend on the session's recorded folder; question and permission events carry one. Either spelling may match, and
+    // a session this window already lists is ours whatever its folder is called.
+    const eventDir = ev.location?.directory
+    const dir = eventDir ?? meta?.directory
+    const inProject = withinDirectory(eventDir, this.deps.directory) || withinDirectory(meta?.directory, this.deps.directory) || this.deps.owns?.(sessionID) === true
+    if (!inProject) {
+      return this.drop(kind, sessionID, `not this project (event folder ${eventDir ? "differs" : "absent"}, session ${meta ? (meta.directory ? "folder differs" : "has no folder") : "not found"})`)
+    }
 
     const ui = this.deps.ui()
-    if (settings.whenFocused === "never" && ui.windowFocused && ui.visibleSessionID === sessionID) return
+    if (settings.whenFocused === "never" && ui.windowFocused && ui.visibleSessionID === sessionID) {
+      return this.drop(kind, sessionID, "window focused with this session on screen (opencode.notifications.whenFocused is never)")
+    }
 
     const id = noticeID(sessionID)
     const prior = this.shown.get(id)
     const t = this.now()
     // The same request can be announced twice (replay after a reconnect); the first one stands.
-    if (prior && opts.requestID !== undefined && prior.notice.requestID === opts.requestID) return
+    if (prior && opts.requestID !== undefined && prior.notice.requestID === opts.requestID) return this.drop(kind, sessionID, "the same request was already announced")
     // Inside the 5 s window only attention gets through, and it replaces what is showing.
-    if (prior && t - prior.at < COALESCE_MS && !isAttention(kind)) return
+    if (prior && t - prior.at < COALESCE_MS && !isAttention(kind)) {
+      return this.drop(kind, sessionID, `a ${prior.notice.kind} notice for this session was shown ${t - prior.at} ms ago (coalesce window ${COALESCE_MS} ms)`)
+    }
 
     const title = meta?.title?.trim() || "OpenCode"
     const bad = kind === "failed" || ((kind === "worker" || kind === "shell") && opts.failed === true)
@@ -163,7 +184,20 @@ export class NotificationEngine {
       directory: dir,
     }
     this.shown.set(id, { notice, at: t })
+    try {
+      this.deps.log?.(`Notification shown (${kind}, session ${sessionID})`)
+    } catch {
+      // logging never matters more than the notice
+    }
     await this.deps.notifier.show(notice)
+  }
+
+  private drop(kind: NoticeKind, sessionID: string, why: string): void {
+    try {
+      this.deps.log?.(`Notification dropped (${kind}, session ${sessionID}): ${why}`)
+    } catch {
+      // logging never matters more than the notice
+    }
   }
 
   /** The user picked an action (or closed the notice). Returns what the host should run. */

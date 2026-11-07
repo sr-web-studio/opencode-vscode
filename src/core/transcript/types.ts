@@ -32,8 +32,12 @@ export type StepView = {
 
 export type Outcome = "succeeded" | "failed" | "interrupted"
 
-/** A completed compaction: the summary that replaced everything before it. Shown as one muted, collapsible line. */
-export type CompactionView = { summary: string; reason?: string; created?: number }
+/**
+ * A compaction: the summary that replaced everything before it. Shown as one muted, collapsible line.
+ * `status` is unset once it completed. `running`: the summary is still being written (`summary` is the text so far).
+ * `failed` / `cancelled` (the user pressed Stop): `error` says why.
+ */
+export type CompactionView = { summary: string; reason?: string; created?: number; status?: "running" | "failed" | "cancelled"; error?: string }
 
 export type TurnView = {
   /** Message id of the user message, or a synthetic id when the turn has none. */

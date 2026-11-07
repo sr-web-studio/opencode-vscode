@@ -10,6 +10,9 @@ export function contentSignature(view: SessionView, extra = 0): string {
   let tail = ""
   if (last) {
     tail = `${last.id}:${last.outcome ?? "-"}:${last.steps.length}`
+    // A compaction line that appears or settles changes what is at the bottom. The summary being written is folded
+    // by default, so its growth is not new content.
+    for (const c of [last.compacted, last.compaction]) if (c) tail += `~${c.status ?? "done"}`
     const step = last.steps[last.steps.length - 1]
     if (step) {
       for (const i of step.items) tail += i.kind === "tool" ? `|${i.id}${i.status}${i.output.length}` : `|${i.key}${i.text.length}${i.streaming ? "s" : ""}`

@@ -147,12 +147,14 @@ export function viewFromMessages(messages: ReadonlyArray<SessionMessageInfo>): S
         current.error = errorText(m.error)
         current = undefined
       }
-    } else if (m.type === "compaction" && m.status === "completed") {
+    } else if (m.type === "compaction" && (m.status === "completed" || m.status === "running" || m.status === "failed")) {
+      // `running`: the panel opened mid-compaction. `failed`: it stays as a short error line, as it does live.
+      const view = compactionView(m.summary, m.reason, m.time?.created, historyStatus(m))
       if (current && !current.outcome) {
         // An auto compaction runs inside a turn (prompt, compaction, answer): it is a line of that turn.
-        current.compacted = compactionView(m.summary, m.reason, m.time?.created)
+        current.compacted = view
       } else {
-        turns.push(compactionTurn(m.id, m.summary, m.reason, m.time?.created))
+        turns.push(compactionTurn(`compaction:${m.id}`, view))
         current = undefined
       }
     }
@@ -160,19 +162,71 @@ export function viewFromMessages(messages: ReadonlyArray<SessionMessageInfo>): S
   return { turns, queued: [], loaded: true }
 }
 
-function compactionView(summary: unknown, reason: unknown, created: number | undefined): CompactionView {
-  return { summary: typeof summary === "string" ? summary : "", reason: typeof reason === "string" ? reason : undefined, created }
+/** What a compaction message of the history says about its state (`completed` has none). */
+function historyStatus(m: any): Pick<CompactionView, "status" | "error"> {
+  if (m.status === "running") return { status: "running" }
+  if (m.status !== "failed") return {}
+  return compactionFailure(m.error)
 }
 
-function compactionTurn(id: string, summary: unknown, reason: unknown, created: number | undefined): TurnView {
+/** `aborted` is the user pressing Stop: shown as cancelled, not as an error. */
+function compactionFailure(error: unknown): Pick<CompactionView, "status" | "error"> {
+  const e = record(error)
+  if (e.type === "aborted") return { status: "cancelled" }
+  return { status: "failed", error: typeof e.message === "string" && e.message ? e.message : undefined }
+}
+
+function compactionView(summary: unknown, reason: unknown, created: number | undefined, extra: Pick<CompactionView, "status" | "error"> = {}): CompactionView {
+  const view: CompactionView = { summary: typeof summary === "string" ? summary : "", reason: typeof reason === "string" ? reason : undefined, created }
+  if (extra.status) view.status = extra.status
+  if (extra.error) view.error = extra.error
+  return view
+}
+
+/** A marker turn for a compaction between turns. A running one stays open (no outcome) until it ends or fails. */
+function compactionTurn(id: string, view: CompactionView): TurnView {
+  const open = view.status === "running"
   return {
-    id: `compaction:${id}`,
-    compaction: compactionView(summary, reason, created),
+    id,
+    compaction: view,
     steps: [],
-    started: created,
-    ended: created,
-    outcome: "succeeded",
+    started: view.created,
+    ended: open ? undefined : view.created,
+    outcome: open ? undefined : "succeeded",
   }
+}
+
+/** The compaction that is being written right now: a line of the open turn, or the open marker turn. */
+function pendingCompaction(view: SessionView): { index: number; compaction: CompactionView; inTurn: boolean } | undefined {
+  const index = view.turns.length - 1
+  const last = view.turns[index]
+  if (!last || last.outcome) return undefined
+  if (last.compacted?.status === "running") return { index, compaction: last.compacted, inTurn: true }
+  if (last.compaction?.status === "running") return { index, compaction: last.compaction, inTurn: false }
+  return undefined
+}
+
+/** True while a compaction is being written (it holds the session busy, so there is no separate "Working…"). */
+export function isCompacting(view: SessionView): boolean {
+  return !!pendingCompaction(view)
+}
+
+/** Put a compaction state into the pending slot, or (nothing pending) into the open turn / a new marker turn. */
+function setCompaction(view: SessionView, next: CompactionView, id: string): SessionView {
+  const pending = pendingCompaction(view)
+  if (pending) {
+    const turn = view.turns[pending.index]!
+    const done: TurnView = pending.inTurn
+      ? { ...turn, compacted: next }
+      : { ...turn, compaction: next, ended: next.status === "running" ? undefined : next.created, outcome: next.status === "running" ? undefined : "succeeded" }
+    return { ...view, turns: replaceAt(view.turns, pending.index, done) }
+  }
+  // Inside a running turn (auto compaction) the line belongs to that turn, so the answer that follows keeps its prompt.
+  // Between turns it is a marker turn of its own.
+  const index = view.turns.length - 1
+  const last = view.turns[index]
+  if (last && !last.outcome) return { ...view, turns: replaceAt(view.turns, index, { ...last, compacted: next }) }
+  return { ...view, turns: [...view.turns, compactionTurn(`compaction:live:${id}`, next)] }
 }
 
 /**
@@ -256,7 +310,25 @@ function finishTurn(view: SessionView, outcome: Outcome, created: number | undef
     ...s,
     items: s.items.map((i) => (i.kind === "tool" || !i.streaming ? i : { ...i, streaming: false })),
   }))
-  return { ...view, turns: replaceAt(view.turns, idx, { ...turn, steps, outcome, ended: created, error }) }
+  return { ...view, turns: replaceAt(view.turns, idx, settledCompaction({ ...turn, steps, outcome, ended: created, error }, outcome, error)) }
+}
+
+/**
+ * A compaction line still pending when its turn ends (`ended` / `failed` was lost) must not spin forever:
+ * a stop shows it as cancelled, a failure as failed, and a success keeps the summary that was streamed.
+ */
+function settledCompaction(turn: TurnView, outcome: Outcome, error: string | undefined): TurnView {
+  const fix = (c: CompactionView): CompactionView => {
+    if (c.status !== "running") return c
+    if (outcome === "interrupted") return { ...c, status: "cancelled" }
+    if (outcome === "failed") return { ...c, status: "failed", error }
+    const { status: _status, ...rest } = c
+    return rest
+  }
+  const next = { ...turn }
+  if (turn.compaction) next.compaction = fix(turn.compaction)
+  if (turn.compacted) next.compacted = fix(turn.compacted)
+  return next
 }
 
 /**
@@ -293,7 +365,7 @@ export function applyEvent(view: SessionView, ev: EventEnvelope): SessionView {
         const done = settledTurn(last, { last: false, running: false })
         return { ...view, queued: rest, turns: [...replaceAt(view.turns, view.turns.length - 1, done), turn] }
       }
-      const turns = last && !last.outcome && !last.user && last.steps.length === 0 ? replaceAt(view.turns, view.turns.length - 1, turn) : [...view.turns, turn]
+      const turns = last && !last.outcome && !last.user && !last.compaction && last.steps.length === 0 ? replaceAt(view.turns, view.turns.length - 1, turn) : [...view.turns, turn]
       return { ...view, queued: rest, turns }
     }
     case "session.step.started":
@@ -347,13 +419,23 @@ export function applyEvent(view: SessionView, ev: EventEnvelope): SessionView {
           completed: t,
         })),
       )
-    case "session.compaction.ended": {
-      // Inside a running turn (auto compaction) the line belongs to that turn, so the answer that follows keeps its prompt.
-      // Between turns it is a marker turn of its own.
-      const idx = view.turns.length - 1
-      const last = view.turns[idx]
-      if (last && !last.outcome) return { ...view, turns: replaceAt(view.turns, idx, { ...last, compacted: compactionView(d.text, d.reason, t) }) }
-      return { ...view, turns: [...view.turns, compactionTurn(`live:${ev.id ?? view.turns.length}`, d.text, d.reason, t)] }
+    case "session.compaction.started":
+      // A pending line right away (the summary takes seconds to minutes). A repeated `started` keeps the one that is there.
+      if (pendingCompaction(view)) return view
+      return setCompaction(view, compactionView("", d.reason, t, { status: "running" }), String(ev.id ?? view.turns.length))
+    case "session.compaction.delta": {
+      const pending = pendingCompaction(view)
+      // A delta without a `started` (the panel opened mid-way) opens the pending line itself.
+      if (!pending) return setCompaction(view, compactionView(d.text, d.reason, t, { status: "running" }), String(ev.id ?? view.turns.length))
+      return setCompaction(view, { ...pending.compaction, summary: pending.compaction.summary + (d.text ?? "") }, "")
+    }
+    case "session.compaction.ended":
+      // The final text replaces what was streamed. The pending line becomes the usual "Context compacted" line.
+      return setCompaction(view, compactionView(d.text, d.reason, t), String(ev.id ?? view.turns.length))
+    case "session.compaction.failed": {
+      const pending = pendingCompaction(view)
+      const failure = compactionFailure(d.error)
+      return setCompaction(view, compactionView(pending?.compaction.summary, d.reason ?? pending?.compaction.reason, pending?.compaction.created ?? t, failure), String(ev.id ?? view.turns.length))
     }
     case "session.execution.succeeded":
       return finishTurn(view, "succeeded", t)
@@ -375,5 +457,5 @@ export { emptyView }
 /** True when the last turn is still in flight. */
 export function isRunning(view: SessionView): boolean {
   const last = view.turns[view.turns.length - 1]
-  return !!last && !last.outcome && (last.steps.length > 0 || !!last.user)
+  return !!last && !last.outcome && (last.steps.length > 0 || !!last.user || last.compaction?.status === "running")
 }

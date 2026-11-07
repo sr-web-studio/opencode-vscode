@@ -71,8 +71,23 @@ describe("VscodeNotifier window attention", () => {
     n.show(notice({ id: "n2" }))
     await flush()
     expect(calls.length).toBe(2)
-    expect(lines.length).toBe(1)
-    expect(lines[0]).toContain("not found")
+    const missing = lines.filter((l) => l.includes("did not take the request"))
+    expect(missing.length).toBe(1)
+    expect(missing[0]).toContain("not found")
+  })
+
+  test("the log says whether attention was requested or why it was skipped (kind and session id only)", () => {
+    const lines: string[] = []
+    new VscodeNotifier(() => undefined, { os: () => "auto", log: (l) => lines.push(l) }).show(notice({ kind: "completed", sessionID: "ses_1", title: "Secret", body: "Secret body" }))
+    state.focused = true
+    new VscodeNotifier(() => undefined, { os: () => "auto", log: (l) => lines.push(l) }).show(notice({ kind: "failed", sessionID: "ses_2" }))
+    state.focused = false
+    new VscodeNotifier(() => undefined, { os: () => "off", log: (l) => lines.push(l) }).show(notice({ kind: "question", sessionID: "ses_3" }))
+    expect(lines).toEqual([
+      "Window attention requested (completed, session ses_1)",
+      "Window attention skipped (failed, session ses_2): this window has the focus",
+      "Window attention skipped (question, session ses_3): opencode.notifications.os is off",
+    ])
   })
 
   test("a command that throws synchronously never reaches the caller", () => {

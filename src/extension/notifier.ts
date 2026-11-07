@@ -46,8 +46,14 @@ export class VscodeNotifier implements Notifier {
    */
   private askForAttention(notice: Notice): void {
     try {
-      const request = attentionFor(notice, { os: this.options.os?.() ?? "off", focused: vscode.window.state.focused })
-      if (!request) return
+      const os = this.options.os?.() ?? "off"
+      const focused = vscode.window.state.focused
+      const request = attentionFor(notice, { os, focused })
+      if (!request) {
+        this.options.log?.(`Window attention skipped (${notice.kind}, session ${notice.sessionID}): ${os !== "auto" ? "opencode.notifications.os is off" : "this window has the focus"}`)
+        return
+      }
+      this.options.log?.(`Window attention requested (${notice.kind}, session ${notice.sessionID})`)
       void Promise.resolve(vscode.commands.executeCommand(COMPANION.attention, request)).then(undefined, (e: unknown) => {
         if (this.askedMissing) return
         this.askedMissing = true
