@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test"
-import { DEFAULT_ENGINE, normalizeEngine } from "../../src/core/dictation"
-import { appendSegment, clampThreads, concatFloat32, heardText, int16ToFloat32, micLabel, micTitle, startArgs, voiceReady } from "../../src/core/local-voice"
-import { cycleLanguages } from "../../src/core/voice-catalog"
-import { envWithNative, libraryPathVar } from "../../src/companion/sherpa"
+import { DEFAULT_ENGINE, normalizeEngine } from "@occ/core/dictation"
+import { appendSegment, clampThreads, concatFloat32, heardText, int16ToFloat32, micLabel, micTitle, startArgs, voiceReady } from "@occ/core/local-voice"
+import { cycleLanguages } from "@occ/core/voice-catalog"
+import { envWithNative, libraryPathVar } from "../../apps/vscode/src/companion/sherpa"
 
 describe("audio conversion", () => {
   test("Int16 → Float32 in [-1, 1)", () => {

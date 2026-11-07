@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { codeCopyText, codeLanguage } from "../../src/core/code-block"
+import { codeCopyText, codeLanguage } from "@occ/core/code-block"
 
 describe("codeCopyText", () => {
   test("strips the single newline marked adds", () => {

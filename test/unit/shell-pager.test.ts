@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { ShellPager, type ShellPage, type ShellState } from "../../src/core/shell-pager"
+import { ShellPager, type ShellPage, type ShellState } from "@occ/core/shell-pager"
 
 /** A fake server shell: bytes grow over time, status flips to exited at a chosen tick. Mirrors the live behaviour. */
 function fakeShell(script: { chunks: string[]; exitAt: number; exit?: number; status?: ShellState["status"] }) {

@@ -1,0 +1,4 @@
+[install]
+# One flat node_modules at the repo root: the workspace packages (@occ/*) are symlinked there, so the root tests,
+# esbuild, Vite, svelte-check and `bun test` all resolve them (and every dependency) the same way.
+linker = "hoisted"

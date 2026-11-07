@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { SONIOX_TEMP_KEY_URL, checkSonioxKey, keyShapeProblem } from "../../src/core/voice"
+import { SONIOX_TEMP_KEY_URL, checkSonioxKey, keyShapeProblem } from "@occ/core/voice"
 
 const KEY = "0123456789abcdef0123456789abcdef"
 const answer = (status: number) => {

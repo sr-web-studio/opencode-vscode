@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { deniedMessage, micSettingsTarget, regValue, windowsMicPermission } from "../../src/companion/privacy"
+import { deniedMessage, micSettingsTarget, regValue, windowsMicPermission } from "../../apps/vscode/src/companion/privacy"
 
 const out = (v: string) => `\r\nHKEY_CURRENT_USER\\Software\\...\\microphone\r\n    Value    REG_SZ    ${v}\r\n\r\n`
 

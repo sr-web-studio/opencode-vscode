@@ -8,4 +8,8 @@ out/
 .env
 .env.*
 !.env.example
-companion/dist/
+apps/vscode/companion/dist/
+# Copies of the root README/CHANGELOG/LICENSE that `bun run package` makes for vsce (the root files are the source of truth)
+apps/vscode/README.md
+apps/vscode/CHANGELOG.md
+apps/vscode/LICENSE

@@ -13,7 +13,7 @@ import {
   scoreTitle,
   wmctrlAttentionArgs,
   type WindowCandidate,
-} from "../../src/core/attention"
+} from "@occ/core/attention"
 
 const APP = "Visual Studio Code"
 const win = (id: number, title: string): WindowCandidate => ({ id, title })

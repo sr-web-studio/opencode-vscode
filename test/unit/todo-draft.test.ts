@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test"
 import todoLive from "../fixtures/todowrite-live.json"
-import { latestTodos, parseTodos, summarizeTodos, todoBar, todosOf } from "../../src/core/todo"
-import { applyEvent, viewFromMessages } from "../../src/core/transcript/reducer"
-import { initialTarget, planNewSession, showEmptyState } from "../../src/core/draft"
-import { emptyView, type SessionView, type ToolItem } from "../../src/core/transcript/types"
-import { folderName, looksLikePath, relativeTo, shortenHome, splitLine } from "../../src/core/paths"
+import { latestTodos, parseTodos, summarizeTodos, todoBar, todosOf } from "@occ/core/todo"
+import { applyEvent, viewFromMessages } from "@occ/core/transcript/reducer"
+import { initialTarget, planNewSession, showEmptyState } from "@occ/core/draft"
+import { emptyView, type SessionView, type ToolItem } from "@occ/core/transcript/types"
+import { folderName, looksLikePath, relativeTo, shortenHome, splitLine } from "@occ/core/paths"
 
 const todoTool = (todos: unknown, status: ToolItem["status"] = "completed"): ToolItem => ({
   kind: "tool", id: Math.random().toString(), name: "todowrite", status, input: { todos } as any, metadata: {}, output: "",

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { applyEvent, viewFromMessages } from "../../src/core/transcript/reducer"
-import { boundaryMissing, canRevert, hiddenTurnCount, revertBarText, revertedPrompt, revertFromServer, visibleTurns } from "../../src/core/transcript/revert"
+import { applyEvent, viewFromMessages } from "@occ/core/transcript/reducer"
+import { boundaryMissing, canRevert, hiddenTurnCount, revertBarText, revertedPrompt, revertFromServer, visibleTurns } from "@occ/core/transcript/revert"
 
 const msgs = (): any[] => [
   { id: "u1", type: "user", text: "make a.txt", time: { created: 1 } },

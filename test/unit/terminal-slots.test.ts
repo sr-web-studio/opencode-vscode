@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { planTerminal, shouldReveal, terminalsToClose, type Slot } from "../../src/core/terminal-slots"
+import { planTerminal, shouldReveal, terminalsToClose, type Slot } from "@occ/core/terminal-slots"
 
 const slot = (id: string, sessionID: string, n: number, busy: boolean, lastUsed = 0): Slot => ({ id, sessionID, slot: n, busy, lastUsed })
 

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
-import { deriveWorkers, modelLabel, modelTitle, type ChildSession, type Worker } from "../../src/core/workers"
-import { HIDDEN_PER_PARENT, addHidden, clearable, forgetSession, normalizeHidden, pruneHidden, removeHidden, visibleWorkers } from "../../src/core/worker-hidden"
-import { emptyView, type SessionView, type ToolItem } from "../../src/core/transcript/types"
+import { deriveWorkers, modelLabel, modelTitle, type ChildSession, type Worker } from "@occ/core/workers"
+import { HIDDEN_PER_PARENT, addHidden, clearable, forgetSession, normalizeHidden, pruneHidden, removeHidden, visibleWorkers } from "@occ/core/worker-hidden"
+import { emptyView, type SessionView, type ToolItem } from "@occ/core/transcript/types"
 
 const models = [
   { id: "claude-sonnet-5-5", modelID: "claude-sonnet-5-5", providerID: "cli-proxy-api", name: "Claude Sonnet 5.5" },

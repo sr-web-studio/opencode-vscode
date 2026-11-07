@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
-import { SessionFeed } from "../../src/core/feed"
-import type { RawMessage } from "../../src/core/history"
-import { WorkerTab } from "../../src/core/worker-tab"
+import { SessionFeed } from "@occ/core/feed"
+import type { RawMessage } from "@occ/core/history"
+import { WorkerTab } from "@occ/core/worker-tab"
 import { messageListFake } from "../fakes/message-list"
 
 const msg = (n: number, type: string, extra: Record<string, unknown> = {}): RawMessage => ({ id: `m${n}`, type, time: { created: n * 1000 }, ...extra })

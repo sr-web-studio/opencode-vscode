@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { droppedFileUris, mimeFromName } from "../../src/core/attachments"
-import { atLeast, detectFeatures, isUnsupported, parseVersion } from "../../src/core/features"
+import { droppedFileUris, mimeFromName } from "@occ/core/attachments"
+import { atLeast, detectFeatures, isUnsupported, parseVersion } from "@occ/core/features"
 
 describe("server features", () => {
   const client = { session: { update() {}, revert: { stage() {} } } }

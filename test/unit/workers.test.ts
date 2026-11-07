@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
-import { backgroundSummary, deriveWorkers, matchChild, sessionIDFromOutput, toolChildID, type ChildSession } from "../../src/core/workers"
-import { applyEvent, viewFromMessages } from "../../src/core/transcript/reducer"
-import { emptyView, type SessionView, type ToolItem } from "../../src/core/transcript/types"
+import { backgroundSummary, deriveWorkers, matchChild, sessionIDFromOutput, toolChildID, type ChildSession } from "@occ/core/workers"
+import { applyEvent, viewFromMessages } from "@occ/core/transcript/reducer"
+import { emptyView, type SessionView, type ToolItem } from "@occ/core/transcript/types"
 import fixture from "../fixtures/grep-glob-subagent-question.json"
 import lead from "../fixtures/lead-continues-worker.json"
 
