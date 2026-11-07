@@ -314,6 +314,16 @@ export class Controller {
 
   private children = new Map<string, SessionInfo>()
 
+  /**
+   * This window lists the session: a root in the project's session list, or a worker of one. Such a session belongs
+   * here even when its recorded folder is spelled differently from the workspace folder.
+   */
+  listsSession(id: string): boolean {
+    if (this.sessions.some((s) => s.id === id) || this.archived.some((s) => s.id === id)) return true
+    const parent = this.children.get(id)?.parentID
+    return !!parent && (this.sessions.some((s) => s.id === parent) || this.archived.some((s) => s.id === parent))
+  }
+
   /** Fetch a session we do not list (child sessions) so notifications know their parent. */
   async lookupSession(id: string): Promise<{ title?: string; parentID?: string; directory?: string } | undefined> {
     const known = this.sessionMeta(id)
@@ -407,8 +417,13 @@ export class Controller {
     }
     const dir = ev.location?.directory
     if (dir && !this.isListed(dir)) return
-    await this.apply(ev)
-    this.opts.onEvent?.(ev)
+    try {
+      await this.apply(ev)
+    } finally {
+      // A failure while updating the view must not swallow the notification for this event (a turn end that never
+      // reaches the notifier). The error still reaches the stream loop.
+      this.opts.onEvent?.(ev)
+    }
     for (const o of this.observers) o.event?.(ev)
   }
 
