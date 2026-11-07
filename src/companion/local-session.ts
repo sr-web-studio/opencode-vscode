@@ -20,8 +20,8 @@ export interface LocalStream {
 /** The loaded engine: the streaming model (live text) and the offline model (better final text). */
 export interface LocalEngine {
   stream: LocalStream
-  /** Decode one finished segment (16 kHz mono Float32) with the offline model. May throw. */
-  offline(samples: Float32Array): string
+  /** Decode one finished segment (16 kHz mono Float32) with the offline model. May throw. Missing: the language has no offline model. */
+  offline?(samples: Float32Array): string
   /** Timings of loading, for the log. */
   loadMs?: Record<string, number>
 }
@@ -178,10 +178,12 @@ export class LocalDictationSession {
     let offlineText = ""
     let offlineError: string | undefined
     const t0 = this.clock()
-    try {
-      offlineText = engine.offline(audio).trim()
-    } catch (e) {
-      offlineError = errorText(e)
+    if (engine.offline) {
+      try {
+        offlineText = engine.offline(audio).trim()
+      } catch (e) {
+        offlineError = errorText(e)
+      }
     }
     const ms = this.clock() - t0
     this.offlineMs += ms
@@ -192,7 +194,9 @@ export class LocalDictationSession {
     this.lastHeard = this.now()
     engine.stream.reset()
     this.o.log?.(
-      `Segment ${this.segments}: ${(audio.length / SAMPLE_RATE).toFixed(1)} s audio\n  streaming: ${streamingText}\n  offline:   ${offlineError ? `FAILED (${offlineError}); used the streaming text` : offlineText || "(empty; used the streaming text)"}\n  offline decode ${ms.toFixed(0)} ms`,
+      engine.offline
+        ? `Segment ${this.segments}: ${(audio.length / SAMPLE_RATE).toFixed(1)} s audio\n  streaming: ${streamingText}\n  offline:   ${offlineError ? `FAILED (${offlineError}); used the streaming text` : offlineText || "(empty; used the streaming text)"}\n  offline decode ${ms.toFixed(0)} ms`
+        : `Segment ${this.segments}: ${(audio.length / SAMPLE_RATE).toFixed(1)} s audio\n  streaming: ${streamingText}\n  (this language has no offline model)`,
     )
     this.publish()
   }

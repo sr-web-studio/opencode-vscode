@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { DEFAULT_ENGINE, normalizeEngine } from "../../src/core/dictation"
-import { appendSegment, clampThreads, concatFloat32, heardText, int16ToFloat32, localUnderstands, micLabel, micTitle, startArgs, voiceReady } from "../../src/core/local-voice"
+import { appendSegment, clampThreads, concatFloat32, heardText, int16ToFloat32, micLabel, micTitle, startArgs, voiceReady } from "../../src/core/local-voice"
 import { envWithNative, libraryPathVar } from "../../src/companion/sherpa"
 
 describe("audio conversion", () => {
@@ -48,7 +48,7 @@ describe("engine selection", () => {
   })
   test("start arguments: local sends no key or model; soniox needs its key", () => {
     const l = startArgs({ id: "d1", engine: "local", languages: ["bn"], threads: 99 })
-    expect(l).toEqual({ id: "d1", engine: "local", languages: ["bn"], threads: 8 })
+    expect(l).toEqual({ id: "d1", engine: "local", languages: ["bn"], localLanguage: "en", threads: 8 })
     expect("key" in l || "model" in l).toBe(false)
     expect(startArgs({ id: "d2", engine: "soniox", languages: ["bn", "en"], soniox: { key: "k", model: "m" } })).toEqual({ id: "d2", engine: "soniox", key: "k", model: "m", languages: ["bn", "en"] })
     expect(() => startArgs({ id: "d3", engine: "soniox", languages: [] })).toThrow()
@@ -59,12 +59,14 @@ describe("engine selection", () => {
     expect(clampThreads(3.4)).toBe(3)
     expect(clampThreads(Number.NaN)).toBe(2)
   })
-  test("local understands Bangla only: warn when the languages do not include bn", () => {
-    expect(localUnderstands(["bn", "en"])).toBe(true)
-    expect(localUnderstands(["bn-BD"])).toBe(true)
-    expect(localUnderstands([])).toBe(true)
-    expect(localUnderstands(["en"])).toBe(false)
-    expect(localUnderstands(["hi", "en"])).toBe(false)
+  test("local start arguments carry the language pack; unknown or missing values mean English", () => {
+    expect(startArgs({ id: "d1", engine: "local", languages: ["bn"], localLanguage: "bn" }).localLanguage).toBe("bn")
+    expect(startArgs({ id: "d1", engine: "local", languages: [], localLanguage: " BN " }).localLanguage).toBe("bn")
+    expect(startArgs({ id: "d1", engine: "local", languages: [] }).localLanguage).toBe("en")
+    expect(startArgs({ id: "d1", engine: "local", languages: ["bn"], localLanguage: "klingon" }).localLanguage).toBe("en")
+    expect(startArgs({ id: "d1", engine: "local", languages: [], localLanguage: 42 }).localLanguage).toBe("en")
+    // Soniox never gets a local language.
+    expect("localLanguage" in startArgs({ id: "d2", engine: "soniox", languages: ["bn"], localLanguage: "bn", soniox: { key: "k", model: "m" } })).toBe(false)
   })
 })
 

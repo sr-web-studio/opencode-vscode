@@ -5,8 +5,9 @@ import { readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { gzipSync } from "node:zlib"
-import { IntegrityError, ensureLocal, integrityOf, isInstalled, layout, localState, matchesIntegrity, missingBytes, sha256Hex, type FetchLike } from "../../src/companion/local-install"
-import { OFFLINE_MODEL, SHERPA_PLATFORMS, STREAMING_MODEL, downloadBytes, modelBytes, modelUrl, sherpaTarget, type SherpaTarget } from "../../src/core/local-voice"
+import { IntegrityError, ensureLocal, installedLanguages, integrityOf, isInstalled, layout, localState, matchesIntegrity, missingBytes, removeLanguages, sha256Hex, type FetchLike } from "../../src/companion/local-install"
+import { SHERPA_PLATFORMS, sherpaTarget, type SherpaTarget } from "../../src/core/local-voice"
+import { LANGUAGE_PACKS, modelBytes, modelUrl, packById, type LanguagePack, type ModelFile, type ModelKind, type ModelRole, type ModelSpec } from "../../src/core/voice-catalog"
 
 const dirs: string[] = []
 const tmp = () => {
@@ -63,24 +64,40 @@ describe("pinned downloads", () => {
     expect(sherpaTarget("win32", "x64")!.pkg).toBe("sherpa-onnx-win-x64")
     expect(sherpaTarget("freebsd", "x64")).toBeUndefined()
   })
-  test("models are pinned to a commit, with full sha256 and the sizes from Hugging Face", () => {
-    for (const m of [STREAMING_MODEL, OFFLINE_MODEL]) {
-      expect(m.rev).toMatch(/^[0-9a-f]{40}$/)
-      for (const f of m.files) expect(f.sha256).toMatch(/^[0-9a-f]{64}$/)
-    }
-    expect(modelUrl(OFFLINE_MODEL, OFFLINE_MODEL.files[0]!)).toBe("https://huggingface.co/SayedShaun/bangla-zipformer-onnx/resolve/16bec01c5f554d3f0dc8f0139de3a00839a72efc/int8/encoder.onnx")
-    expect(modelBytes(STREAMING_MODEL)).toBe(94_119_939)
-    const total = downloadBytes(sherpaTarget("win32", "x64")!)
+  test("the Bangla models keep their ids, paths and sizes (existing downloads are reused)", () => {
+    const bn = packById("bn")!
+    expect(bn.streaming.id).toBe("streaming-bn-vosk-501097a")
+    expect(bn.offline!.id).toBe("offline-bn-sayed-16bec01")
+    expect(modelUrl(bn.offline!, bn.offline!.files[0]!)).toBe("https://huggingface.co/SayedShaun/bangla-zipformer-onnx/resolve/16bec01c5f554d3f0dc8f0139de3a00839a72efc/int8/encoder.onnx")
+    expect(modelBytes(bn.streaming)).toBe(94_119_939)
+    expect(modelBytes(bn.offline!)).toBe(73_635_073)
+    const total = sherpaTarget("win32", "x64")!.bytes + modelBytes(bn.streaming) + modelBytes(bn.offline!)
     expect(total / 1e6).toBeGreaterThan(150)
     expect(total / 1e6).toBeLessThan(200)
   })
 })
 
+/** A model whose files are the fake bodies (`file:<path>`), pinned with their real hashes, so downloads can be verified for real. */
+const body = (path: string) => enc.encode(`file:${path}`)
+function fakeModel(id: string, kind: ModelKind, repo: string, roles: Partial<Record<ModelRole, string>>): ModelSpec {
+  const files: ModelFile[] = Object.entries(roles).map(([role, path]) => ({ path: path!, name: path!.split("/").pop()!, role: role as ModelRole, size: body(path!).length, sha256: sha256Hex(body(path!)) }))
+  return { id, kind, title: id, author: "t", license: "MIT", licenseUrl: "x", source: `https://huggingface.co/${repo}`, repo, rev: "a".repeat(40), files }
+}
+const tdRoles = (dir: string) => ({ encoder: `${dir}/enc.onnx`, decoder: `${dir}/dec.onnx`, joiner: `${dir}/join.onnx`, tokens: `${dir}/tokens.txt` })
+const M_A = fakeModel("model-a", "transducer", "org/a", tdRoles("a"))
+const M_B = fakeModel("model-b", "transducer", "org/b", tdRoles("b"))
+const M_SHARED = fakeModel("model-shared", "transducer", "org/shared", tdRoles("s"))
+const M_MOON = fakeModel("model-moon", "moonshine", "org/moon", { preprocessor: "m/pre.onnx", encoder: "m/enc.onnx", uncachedDecoder: "m/u.onnx", cachedDecoder: "m/c.onnx", tokens: "m/tokens.txt" })
+const PACKS: LanguagePack[] = [
+  { id: "xa", name: "Xa", native: "Xa", streaming: M_A, offline: M_MOON },
+  { id: "xb", name: "Xb", native: "Xb", streaming: M_B, offline: M_SHARED },
+  { id: "xc", name: "Xc", native: "Xc", streaming: M_SHARED },
+]
+
 describe("ensureLocal", () => {
-  // A tiny fake world: one native package and two models whose pinned hashes are replaced by the fake files' hashes.
+  // A tiny fake world: one native package and fake language packs whose files are verified for real.
   const native = tgz(tarEntry("package/", ""), tarEntry("package/sherpa-onnx.node", "ADDON", 0o755), tarEntry("package/libx.so", "LIB"))
   const target: SherpaTarget = { pkg: "sherpa-onnx-linux-x64", url: "https://registry.npmjs.org/p.tgz", integrity: integrityOf(native), bytes: native.length }
-  const body = (path: string) => enc.encode(`file:${path}`)
 
   function world(opts: { corrupt?: string; status?: number } = {}) {
     const calls: string[] = []
@@ -95,30 +112,17 @@ describe("ensureLocal", () => {
     return { fetch, calls }
   }
 
-  // Use the real model specs but patch their hashes/sizes to the fake bodies for the duration of these tests.
-  function patchModels(): () => void {
-    const saved = [STREAMING_MODEL, OFFLINE_MODEL].map((m) => m.files.map((f) => ({ ...f })))
-    for (const m of [STREAMING_MODEL, OFFLINE_MODEL]) {
-      for (const f of m.files) {
-        const b = body(f.path)
-        f.size = b.length
-        f.sha256 = sha256Hex(b)
-      }
-    }
-    return () => [STREAMING_MODEL, OFFLINE_MODEL].forEach((m, i) => m.files.forEach((f, j) => Object.assign(f, saved[i]![j]!)))
-  }
+  const ls = (storage: string) => ({ storage, platform: "linux", arch: "x64", packs: PACKS })
 
-  const run = async (storage: string, w: ReturnType<typeof world>, signal?: AbortSignal) => {
+  const run = async (storage: string, w: ReturnType<typeof world>, signal?: AbortSignal, language = "xa") => {
     // sherpaTarget("linux","x64") is the real pinned one; swap its integrity for the fake tarball for this run.
     const real = sherpaTarget("linux", "x64")!
     const saved = { ...real }
     Object.assign(real, target)
-    const restore = patchModels()
     try {
-      return await ensureLocal({ storage, platform: "linux", arch: "x64", fetch: w.fetch, signal })
+      return await ensureLocal({ ...ls(storage), language, fetch: w.fetch, signal })
     } finally {
       Object.assign(real, saved)
-      restore()
     }
   }
 
@@ -127,12 +131,15 @@ describe("ensureLocal", () => {
     const w = world()
     const paths = await run(storage, w)
     expect(paths.nativeDir).toBe(layout(storage, target).nativeDir)
+    expect(paths.language).toBe("xa")
     expect(await readFile(join(paths.nativeDir, "sherpa-onnx.node"), "utf8")).toBe("ADDON")
     expect(await readFile(join(paths.nativeDir, "libx.so"), "utf8")).toBe("LIB")
-    expect(await readFile(paths.streaming.tokens, "utf8")).toBe("file:lang/tokens.txt")
-    expect(await readFile(paths.offline.encoder, "utf8")).toBe("file:int8/encoder.onnx")
+    expect(paths.streaming.kind).toBe("transducer")
+    expect(await readFile(paths.streaming.files.tokens!, "utf8")).toBe("file:a/tokens.txt")
+    expect(paths.offline!.kind).toBe("moonshine")
+    expect(await readFile(paths.offline!.files.uncachedDecoder!, "utf8")).toBe("file:m/u.onnx")
     expect(existsSync(join(paths.nativeDir, "ready.json"))).toBe(true)
-    expect(w.calls).toHaveLength(1 + 4 + 4)
+    expect(w.calls).toHaveLength(1 + 4 + 5)
     // No temp or partial leftovers anywhere.
     const all = (d: string): string[] => readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? all(join(d, e.name)) : [join(d, e.name)]))
     expect(all(storage).filter((f) => /\.part$|\.tmp-/.test(f))).toEqual([])
@@ -145,7 +152,7 @@ describe("ensureLocal", () => {
   test("a damaged npm tarball is rejected and leaves nothing behind", async () => {
     const storage = tmp()
     await expect(run(storage, world({ corrupt: "native" }))).rejects.toBeInstanceOf(IntegrityError)
-    const state = await localState({ storage, platform: "linux", arch: "x64" })
+    const state = await localState(ls(storage))
     expect(state.native).toBe(false)
     expect(readdirSync(join(storage, "local-voice/v1")).filter((n) => n !== "native" && n !== "models")).toEqual([])
     expect(existsSync(join(storage, "local-voice/v1/native")) ? readdirSync(join(storage, "local-voice/v1/native")) : []).toEqual([])
@@ -153,28 +160,61 @@ describe("ensureLocal", () => {
 
   test("a damaged model file is rejected; what was already verified is kept, the broken model is not", async () => {
     const storage = tmp()
-    await expect(run(storage, world({ corrupt: "SayedShaun" }))).rejects.toThrow(/failed verification/)
-    const state = await localState({ storage, platform: "linux", arch: "x64" })
-    expect(state).toMatchObject({ native: true, streaming: true, offline: false })
-    expect(isInstalled(state)).toBe(false)
+    await expect(run(storage, world({ corrupt: "org/moon" }))).rejects.toThrow(/failed verification/)
+    const state = await localState(ls(storage))
+    expect(state).toMatchObject({ native: true, models: ["model-a"] })
+    expect(isInstalled(state, PACKS[0]!)).toBe(false)
     // Repair: the next run fetches only what is missing.
     const w = world()
     await run(storage, w)
-    expect(w.calls).toHaveLength(4)
-    expect(isInstalled(await localState({ storage, platform: "linux", arch: "x64" }))).toBe(true)
+    expect(w.calls).toHaveLength(5)
+    expect(isInstalled(await localState(ls(storage)), PACKS[0]!)).toBe(true)
   })
 
   test("a folder is not used when a file has the wrong size (partial or tampered)", async () => {
     const storage = tmp()
     const paths = await run(storage, world())
-    await writeFile(paths.streaming.encoder, "short")
-    const state = await localState({ storage, platform: "linux", arch: "x64" })
-    expect(state.streaming).toBe(false)
-    expect(missingBytes({ ...state, target })).toBeGreaterThan(0)
+    await writeFile(paths.streaming.files.encoder!, "short")
+    const state = await localState(ls(storage))
+    expect(state.models).toEqual(["model-moon"])
+    expect(missingBytes({ ...state, target }, PACKS[0]!)).toBe(modelBytes(M_A))
     const w = world()
     await run(storage, w)
     expect(w.calls).toHaveLength(4) // the damaged model only
-    expect(await readFile(paths.streaming.encoder, "utf8")).toBe("file:am-onnx/encoder.onnx")
+    expect(await readFile(paths.streaming.files.encoder!, "utf8")).toBe("file:a/enc.onnx")
+  })
+
+  test("only the chosen language is downloaded; a model two languages share is downloaded once", async () => {
+    const storage = tmp()
+    const first = world()
+    await run(storage, first, undefined, "xb") // model-b + model-shared
+    expect(first.calls).toHaveLength(1 + 4 + 4)
+    expect(first.calls.some((u) => u.includes("org/a") || u.includes("org/moon"))).toBe(false)
+    const second = world()
+    const paths = await run(storage, second, undefined, "xc") // streaming = model-shared: already there
+    expect(second.calls).toEqual([])
+    expect(paths.offline).toBeUndefined()
+    expect(paths.streaming.files.tokens).toBe(join(storage, "local-voice/v1/models/model-shared/tokens.txt"))
+    const state = await localState(ls(storage))
+    expect(installedLanguages(state, PACKS)).toEqual(["xb", "xc"])
+    expect(missingBytes({ ...state, target }, PACKS[0]!)).toBe(modelBytes(M_A) + modelBytes(M_MOON))
+  })
+
+  test("an unknown language id installs the default pack (a catalog without `en` falls back to its first pack)", async () => {
+    const paths = await run(tmp(), world(), undefined, "zz")
+    expect(paths.language).toBe("xa")
+  })
+
+  test("removing a language deletes only models no other installed language uses", async () => {
+    const storage = tmp()
+    await run(storage, world(), undefined, "xb")
+    await run(storage, world(), undefined, "xc")
+    await run(storage, world(), undefined, "xa")
+    expect(await removeLanguages(ls(storage), ["xb"])).toEqual(["model-b"]) // model-shared stays: xc uses it
+    expect(installedLanguages(await localState(ls(storage)), PACKS)).toEqual(["xa", "xc"])
+    expect((await removeLanguages(ls(storage), ["xa", "xc"])).sort()).toEqual(["model-a", "model-moon", "model-shared"])
+    expect((await localState(ls(storage))).models).toEqual([])
+    expect(await removeLanguages(ls(storage), ["xa"])).toEqual([]) // nothing left: nothing deleted, no error
   })
 
   test("HTTP errors and cancellation fail cleanly", async () => {

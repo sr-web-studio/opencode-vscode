@@ -2,12 +2,13 @@
 
 ## Unreleased
 
-- **Workers show their model**, e.g. `Developer · Sonnet 5.5 high`, in the worker panel, the worker tab header and the transcript's worker rows.
+- **Workers show their model**, e.g. `Developer · Sonnet 5.5 High`, in the worker panel, the worker tab header and the transcript's worker rows.
 - **Remove finished workers from the panel:** an `x` on each done, failed or stopped worker, and **Clear done** to remove them all at once. This only hides them in the panel (remembered per session); nothing is deleted on the OpenCode server, and a worker that runs again shows up again.
 - **The window asks for attention** when OpenCode finishes or needs you and the window is not focused: the taskbar button flashes on Windows (like Copilot Chat), the window is marked urgent on Linux X11, and macOS shows a notification. Done by the OpenCode Voice companion on your computer; never steals focus. Turn off with `opencode.notifications.os: off`. Try it with **OpenCode Voice: Test Window Attention**.
 - **Tool rows: the whole row is the action.** File rows open the file (a Read at the line it read from, an Edit or Patch at the first changed line), link rows open in the browser, other rows show their details. The chevron at the end, or Alt-click, shows details.
 - **Code rows** (OpenCode's Code Mode, `execute`) show which MCP tools the script calls, e.g. `exa.web_search_exa, chrome.new_page`, and the script with its output in the details.
-- **Free on-device voice input (Bangla)**, now the default engine (`opencode.voice.engine`: `local`). Asks once to download about 190 MB (speech engine and models, checksum-verified), then works offline: live text while you speak, refined at each pause. Soniox with your own key stays available as the `soniox` engine.
+- **Free on-device voice input**, now the default engine (`opencode.voice.engine`: `local`). English by default; choose another language with **OpenCode: Choose Voice Language** (Bangla now, more to come). Only the chosen language is downloaded, once (about 180 to 210 MB with the speech engine, checksum-verified), then it works offline: live text while you speak, refined at each pause (English gets casing and punctuation). **OpenCode Voice: Remove Downloaded Languages** frees the space. Soniox with your own key stays available as the `soniox` engine. A built-in laptop microphone may be too faint for it; a headset works.
+- **OpenCode Voice is only ever upgraded**, never downgraded: two installed copies of the extension no longer keep reinstalling their own version and asking for a reload.
 - **Code blocks** in answers wrap long lines instead of scrolling sideways, and have a **Copy** button (shown on hover or focus, always on touch screens) plus the language label.
 - **Slash commands** in the prompt box: type `/` for a popup of OpenCode commands and skills. Built in: `/mcps`, `/compact`, `/undo`, `/redo`, `/fork`, `/skills`. The popup never takes focus.
 - **MCP servers panel** (`/mcps`, **OpenCode: MCP Servers**, or the chip in the footer): status of each server, turn it on or off for the running server, and sign in or out of OAuth servers.

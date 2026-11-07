@@ -8,17 +8,22 @@ VS Code webviews cannot use the microphone, and with Remote SSH the OpenCode ext
 microphone. This small extension runs on the computer in front of you (`extensionKind: ui`), records only while the mic
 button in the OpenCode prompt box is on and hands the text back to OpenCode. Two engines (setting `opencode.voice.engine`):
 
-- **`local` (default): free, offline, on this computer. Bangla only for now.** The first time, it asks to download about
-  190 MB once (the sherpa-onnx speech engine and two Bangla models) into this extension's storage folder; nothing is
-  uploaded. Details, licences and diagnostics: [docs/local-voice.md](https://github.com/sr-web-studio/opencode-vscode/blob/main/docs/local-voice.md).
+- **`local` (default): free, offline, on this computer. English by default; pick another language from the catalog.**
+  The first time, it asks to download the language you use (English: about 205 MB once, the sherpa-onnx speech engine
+  and two models) into this extension's storage folder; nothing is uploaded. Choose the language with **OpenCode:
+  Choose Voice Language** (or the setting `opencode.voice.localLanguage`); only that language is downloaded.
+  **OpenCode Voice: Remove Downloaded Languages** frees the space again. Details, licences and diagnostics:
+  [docs/local-voice.md](https://github.com/sr-web-studio/opencode-vscode/blob/main/docs/local-voice.md).
   Runs on Windows x64/arm64, macOS (Apple silicon and Intel) and Linux x64/arm64 (where a microphone can be used).
-- **`soniox`: cloud, with your own paid Soniox key.** Better accuracy, mixed Bangla/English, many languages. The audio
+- **`soniox`: cloud, with your own paid Soniox key.** Better accuracy, mixed languages, many languages. The audio
   is streamed to Soniox.
 
-The on-device models: [Vosk small streaming Bengali](https://huggingface.co/alphacep/vosk-model-small-streaming-bn)
-(Apache-2.0, live text) and [bangla-zipformer-onnx](https://huggingface.co/SayedShaun/bangla-zipformer-onnx) by
-**Sayed Shaun** ([CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/), the final text with punctuation).
-Every download is checked against a pinned checksum before it is used.
+The on-device models (each language downloads only its own; every download is checked against a pinned checksum before it is used):
+
+| Language | Live text | Final text at each pause |
+| --- | --- | --- |
+| English | [Streaming Zipformer English](https://huggingface.co/csukuangfj/sherpa-onnx-streaming-zipformer-en-2023-06-26) (icefall / k2-fsa, Apache-2.0) | [Moonshine Tiny English](https://github.com/moonshine-ai/moonshine) by Useful Sensors / Moonshine AI ([MIT](https://github.com/moonshine-ai/moonshine/blob/main/LICENSE)), cased and punctuated |
+| Bangla (বাংলা) | [Vosk small streaming Bengali](https://huggingface.co/alphacep/vosk-model-small-streaming-bn) (Apache-2.0) | [bangla-zipformer-onnx](https://huggingface.co/SayedShaun/bangla-zipformer-onnx) by **Sayed Shaun** ([CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)), with punctuation |
 
 - Your Soniox key stays in the OpenCode extension's secret storage. This extension only gets a key that expires after
   two minutes, one per recording.

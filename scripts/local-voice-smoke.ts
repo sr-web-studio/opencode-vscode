@@ -4,8 +4,11 @@
  * real-time pace.
  *
  *   bun run build:ext
- *   bun scripts/local-voice-smoke.ts [cache-dir] [file.wav ...]            # download (if needed) + recognize
- *   bun scripts/local-voice-smoke.ts --corrupt=native|model [cache-dir]   # prove that a damaged download is rejected
+ *   bun scripts/local-voice-smoke.ts [--lang=en|bn] [cache-dir] [file.wav ...]   # download (if needed) + recognize
+ *   bun scripts/local-voice-smoke.ts [--lang=en|bn] --corrupt=native|model [cache-dir]   # a damaged download is rejected
+ *
+ * `--lang` is a language pack id of the catalog (default: the catalog default, English). Default WAVs: Bangla
+ * /tmp/opencode/sherpa/{mixed,pure}.wav, English /tmp/opencode/sherpa/en/wavs/*.wav (16 kHz mono, 16-bit).
  *
  * The recorder runs under Node (`process.execPath` of the runner when it is node; otherwise `node`), with
  * ELECTRON_RUN_AS_NODE=1 and the native folder first in the library path, exactly as the companion does.
@@ -14,17 +17,27 @@ import { fork, execFileSync } from "node:child_process"
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join, resolve } from "node:path"
 import { IntegrityError, ensureLocal } from "../src/companion/local-install"
+import { DEFAULT_LANGUAGE, LANGUAGE_PACKS, packById } from "../src/core/voice-catalog"
 import { envWithNative } from "../src/companion/sherpa"
 import type { FetchLike } from "../src/companion/local-install"
 import type { SessionUpdate } from "../src/companion/session"
 
 const args = process.argv.slice(2)
 const corrupt = args.find((a) => a.startsWith("--corrupt="))?.slice(10)
+const langArg = args.find((a) => a.startsWith("--lang="))?.slice(7)
+if (langArg && !packById(langArg)) {
+  console.error(`unknown --lang=${langArg}; the catalog has: ${LANGUAGE_PACKS.map((p) => p.id).join(", ")}`)
+  process.exit(2)
+}
+const language = langArg ?? DEFAULT_LANGUAGE
 const rest = args.filter((a) => !a.startsWith("--"))
 const dirArg = rest.find((a) => !a.endsWith(".wav"))
 const cache = resolve(dirArg ?? "/tmp/opencode/voice-cache")
 const wavs = rest.filter((a) => a.endsWith(".wav")).map((a) => resolve(a))
-if (wavs.length === 0) wavs.push("/tmp/opencode/sherpa/mixed.wav", "/tmp/opencode/sherpa/pure.wav")
+if (wavs.length === 0) {
+  if (language === "bn") wavs.push("/tmp/opencode/sherpa/mixed.wav", "/tmp/opencode/sherpa/pure.wav")
+  else wavs.push(...["en-0.wav", "en-1.wav"].map((n) => `/tmp/opencode/sherpa/en/wavs/${n}`))
+}
 
 const repo = resolve(import.meta.dirname, "..")
 const recorder = join(repo, "companion", "dist", "recorder.js")
@@ -37,6 +50,7 @@ async function download(fetchImpl?: FetchLike) {
     storage: cache,
     platform: process.platform,
     arch: process.arch,
+    language,
     fetch: fetchImpl,
     log: (l) => console.log(`[install] ${l}`),
     onProgress: (p) => {
@@ -143,7 +157,7 @@ if (corrupt) {
   mkdirSync(dir, { recursive: true })
   const needle = corrupt === "native" ? "registry.npmjs.org" : "huggingface.co"
   try {
-    await ensureLocal({ storage: dir, platform: process.platform, arch: process.arch, fetch: damaged(needle), log: (l) => console.log(`[install] ${l}`) })
+    await ensureLocal({ storage: dir, platform: process.platform, arch: process.arch, language, fetch: damaged(needle), log: (l) => console.log(`[install] ${l}`) })
     console.log("UNEXPECTED: damaged download was accepted")
     process.exit(1)
   } catch (e) {

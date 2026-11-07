@@ -1,6 +1,7 @@
 import * as vscode from "vscode"
 import { COMPANION, DEFAULT_LANGUAGES, SONIOX_MODEL, isNewerVersion, normalizeEngine, spokenText, type CompanionInfo, type VoiceEngine, type VoiceFeed, type VoiceFix } from "../core/dictation"
 import { startArgs, voiceReady } from "../core/local-voice"
+import { languageItems, normalizeLanguage } from "../core/voice-catalog"
 import type { AppState, ToWebview } from "../core/protocol"
 import { checkSonioxKey, mintSonioxTempKey } from "../core/voice"
 
@@ -11,7 +12,8 @@ type VoiceState = AppState["voice"]
 
 /**
  * Voice input. Two engines (setting `opencode.voice.engine`):
- * - `local` (default): free, offline, Bangla, runs in the companion on the user's computer; nothing to configure here.
+ * - `local` (default): free, offline, runs in the companion on the user's computer. The language is a pack of the
+ *   catalog (`opencode.voice.localLanguage`, default English; command "Choose Voice Language"); only that pack is downloaded.
  * - `soniox`: cloud, bring-your-own-key.
  *
  * Soniox:
@@ -170,7 +172,7 @@ export class Voice implements vscode.Disposable {
     try {
       const ok = await vscode.commands.executeCommand<boolean>(
         COMPANION.start,
-        startArgs({ id, engine, languages: languages.length ? languages : DEFAULT_LANGUAGES, threads: cfg.get<number>("localThreads"), soniox }),
+        startArgs({ id, engine, languages: languages.length ? languages : DEFAULT_LANGUAGES, localLanguage: cfg.get<string>("localLanguage"), threads: cfg.get<number>("localThreads"), soniox }),
       )
       if (ok === false) this.failed(id, "The companion could not start recording.")
     } catch (e) {
@@ -276,6 +278,25 @@ export class Voice implements vscode.Disposable {
     await this.secrets.delete(KEY)
     await this.refresh()
     void vscode.window.showInformationMessage("Soniox key removed. Voice input is off.")
+  }
+
+  /**
+   * "OpenCode: Choose Voice Language": pick the on-device language from the catalog. Packs already on this computer are
+   * marked (the companion reports them; an older companion does not, then none is marked). Saves to the user settings.
+   */
+  async chooseLanguage(): Promise<void> {
+    const cfg = vscode.workspace.getConfiguration("opencode.voice")
+    const current = normalizeLanguage(cfg.get("localLanguage"))
+    const info = await this.companion()
+    const items = languageItems({ installed: info?.installedLanguages, current })
+    const pick = await vscode.window.showQuickPick(
+      items.map((i) => ({ label: i.label, description: i.description, detail: i.detail, id: i.id })),
+      { title: "OpenCode: voice language (on-device)", placeHolder: "Which language will you speak? Only this language is downloaded.", matchOnDescription: true },
+    )
+    if (!pick) return
+    await cfg.update("localLanguage", pick.id, vscode.ConfigurationTarget.Global)
+    const engineNote = this.readEngine() === "soniox" ? " The on-device engine is not selected now (setting opencode.voice.engine); Soniox uses opencode.voice.languages." : ""
+    void vscode.window.showInformationMessage(`Voice language: ${pick.label}.${engineNote}`)
   }
 
   /** Watch for the companion being installed or removed while this window is open. */

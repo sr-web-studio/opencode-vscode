@@ -24,7 +24,7 @@ I'm also working on an Android app with the same UI, for the same always-on setu
 - **Agent and model picker**, session switcher, pinned sessions, a floating task list, and background workers in a header chip. Click a worker to open it read-only.
 - **Slash commands** in the prompt box (`/compact`, `/undo`, `/fork`, `/skills`, your own commands) and an **MCP servers** panel (`/mcps`) to check status, switch servers on or off and sign in.
 - **Notifications** when OpenCode needs you or finishes work.
-- **Voice input**: speak into the prompt box. Free and offline on your own computer for Bangla, or Soniox with your own key for mixed Bangla/English and many other languages. See [Voice input](#voice-input).
+- **Voice input**: speak into the prompt box. Free and offline on your own computer (English by default, other languages to choose from), or Soniox with your own key for mixed languages and many more. See [Voice input](#voice-input).
 
 OpenCode stays in charge: models, providers, MCP servers, skills, agents and all configuration come from your OpenCode setup. The extension never changes OpenCode's configuration and never stops or restarts the OpenCode service.
 
@@ -40,8 +40,8 @@ The workspace folder you open is the OpenCode project.
 
 Click the mic in the prompt box, speak, and click again to stop. The text is added to the prompt; nothing is sent until you press Enter. Choose the engine with `opencode.voice.engine`:
 
-- **`local` (default): free and offline, Bangla only for now.** The first time, it asks to download about 190 MB once (the [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) speech engine and two Bangla models). Every download is checked against a fixed checksum. After that nothing leaves your computer.
-- **`soniox`: cloud, with your own [Soniox](https://soniox.com) API key.** Better accuracy, mixed Bangla and English, many languages. Soniox charges you directly; there is no paid tier here. Create a key in the [Soniox console](https://console.soniox.com), then run **OpenCode: Set Voice API Key (Soniox)**. The key is checked, then stored in VS Code's secret storage. With this engine the mic stays dimmed until a key is set.
+- **`local` (default): free and offline. English by default, other languages to choose from.** The first time, it asks to download the language you use once (for English about 205 MB: the [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) speech engine and two English models). Every download is checked against a fixed checksum. After that nothing leaves your computer. Run **OpenCode: Choose Voice Language** to pick another language (currently English and Bangla); it shows each language's size and which ones are already on your computer. Only the language you choose is downloaded.
+- **`soniox`: cloud, with your own [Soniox](https://soniox.com) API key.** Better accuracy, mixed languages, many languages. Soniox charges you directly; there is no paid tier here. Create a key in the [Soniox console](https://console.soniox.com), then run **OpenCode: Set Voice API Key (Soniox)**. The key is checked, then stored in VS Code's secret storage. With this engine the mic stays dimmed until a key is set.
 
 Recording is done by the small companion extension **OpenCode Voice (unofficial)**, which is installed automatically on the computer in front of you, also when you work over Remote SSH. On first use it checks the microphone permission and tells you how to fix it if it is blocked. Use **OpenCode Voice: Choose Microphone** to pick a device.
 
@@ -59,7 +59,8 @@ Open Settings and search for **OpenCode**:
 | `opencode.todo.defaultExpanded` | Show the task list expanded. |
 | `opencode.notifications.*` | Which events notify you, and whether to notify while the window is focused. With the OpenCode Voice companion, an unfocused window also flashes its taskbar button (`os`: `auto`/`off`). |
 | `opencode.terminal.*` | When to reveal terminals, one per session or per command, how many to keep open. |
-| `opencode.voice.engine` | `local` (free, offline, Bangla) or `soniox` (your own key). |
+| `opencode.voice.engine` | `local` (free, offline) or `soniox` (your own key). |
+| `opencode.voice.localLanguage` | Language of the on-device engine: `en` (default) or `bn`. Easier: **OpenCode: Choose Voice Language**. |
 | `opencode.voice.languages`, `opencode.voice.model` | Languages and model for the Soniox engine. |
 
 ## Privacy
