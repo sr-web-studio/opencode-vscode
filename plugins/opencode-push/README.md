@@ -53,7 +53,7 @@ The plugin is plain TypeScript; OpenCode (Bun) runs `src/index.ts` directly, the
    {
      "plugins": [
        {
-         "package": "/home/salim/src/opencode-vscode/plugins/opencode-push",
+         "package": "/home/salim/work/projects/opencode-vscode/plugins/opencode-push",
          "options": {
            "ntfy": {
              "url": "https://ntfy.sh",
