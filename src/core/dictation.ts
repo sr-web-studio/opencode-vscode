@@ -171,11 +171,8 @@ export type CompanionInfo = {
   version: string
   capture: boolean
   problem?: string
-  platform?: string
   local?: boolean
   localProblem?: string
-  /** The companion can ask the OS to draw attention to the window (`COMPANION.attention`). Missing in older versions. */
-  attention?: boolean
   /**
    * On-device language packs fully downloaded on this computer (ids from the catalog). Missing in older versions and
    * when unknown: then nothing is shown as downloaded.
@@ -195,7 +192,7 @@ export type VoiceStartArgs = {
   languages: string[]
   /** local only: threads per recognizer. */
   threads?: number
-  /** local only: language pack id (`opencode.voice.localLanguage`). Missing (older callers) means the default language. */
+  /** local only: the language to speak (a catalog id: the first of `opencode.voice.localLanguages`). Missing (older callers) means the default language. */
   localLanguage?: string
 }
 

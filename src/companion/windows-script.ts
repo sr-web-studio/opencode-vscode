@@ -12,9 +12,6 @@
  *   FLASHW_TRAY = 0x2, FLASHW_TIMERNOFG = 0xC: flash the taskbar button until the window comes to the foreground.
  */
 
-/** FLASHW_TRAY | FLASHW_TIMERNOFG. */
-export const FLASH_FLAGS = 0x2 | 0xc
-
 export const WINDOWS_HELPER_SCRIPT = String.raw`$ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 Add-Type -TypeDefinition @'

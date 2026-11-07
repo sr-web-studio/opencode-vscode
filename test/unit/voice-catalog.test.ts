@@ -4,7 +4,6 @@ import { join } from "node:path"
 import { featConfig, modelConfig } from "../../src/companion/sherpa"
 import {
   BANGLA_PACK,
-  CATALOG,
   DEFAULT_LANGUAGE,
   DEFAULT_MAX_LANGUAGES,
   LANGUAGES,

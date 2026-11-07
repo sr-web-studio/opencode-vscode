@@ -613,11 +613,6 @@ export class Controller {
     }
   }
 
-  /** A directory from the server is this window's folder, in either spelling. */
-  private isOurs(directory: string | undefined): boolean {
-    return sameDirectory(directory, this.dir) || sameDirectory(directory, this.opts.directory)
-  }
-
   /** A session belongs in this window's list: started in this folder or a folder inside it (any spelling). */
   private isListed(directory: string | undefined): boolean {
     return withinDirectory(directory, this.dir) || withinDirectory(directory, this.opts.directory)

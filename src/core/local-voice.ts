@@ -142,13 +142,13 @@ export function micLabel(v: MicView): string {
 
 /**
  * The arguments of `opencode.companion.voice.start` for the chosen engine. Local sends no key and no model name, only
- * the language pack id (`opencode.voice.localLanguage`, normalized: unknown → the default language).
+ * the language id (the current one of `opencode.voice.localLanguages`, normalized: unknown → the default language).
  */
 export function startArgs(o: {
   id: string
   engine: VoiceEngine
   languages: string[]
-  /** Local engine: the language pack. */
+  /** Local engine: the language to speak (a catalog id). */
   localLanguage?: unknown
   threads?: number
   soniox?: { key: string; model: string }

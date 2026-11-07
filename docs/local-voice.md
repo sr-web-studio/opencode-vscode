@@ -6,7 +6,7 @@ The default is **one multilingual model**: [NVIDIA Nemotron 3.5 ASR Streaming 0.
 
 Attribution: NVIDIA Nemotron 3.5 ASR Streaming 0.6B, OpenMDW-1.1; sherpa-onnx int8 export by csukuangfj. Licence: [OpenMDW-1.1](https://openmdw.ai/license/1-1/); the full text is in `companion/NOTICE`.
 
-> Status: test build. Whether the native addon loads inside VS Code's Electron on Windows was **not** verified when this was written; see [Diagnostics](#diagnostics).
+> Verified on Linux (the smoke script and the unit tests). Whether the native addon loads inside VS Code's Electron on Windows and macOS was **not** verified when this was written; see [Diagnostics](#diagnostics).
 
 ## Active languages and quick switching
 
@@ -14,7 +14,7 @@ Attribution: NVIDIA Nemotron 3.5 ASR Streaming 0.6B, OpenMDW-1.1; sherpa-onnx in
 - **OpenCode: Choose Voice Language** is a multi-select QuickPick grouped by download ("Multilingual model ≈682 MB, shared by all these languages" and "Bangla, separate download ≈168 MB"). Downloaded packs are marked, broad-coverage languages say "lower accuracy", Mandarin says "weak". Ticking more than the limit asks to keep the first N or choose again. Nothing is downloaded by the picker: the first recording in a language downloads its pack.
 - **OpenCode: Switch Voice Language** (and a click on the language label next to the mic, for example `EN`) makes the next active language current (the list rotates). With three or more languages the palette command asks which one; the label always cycles. With one active language the command offers to choose more. Switching is refused while recording.
 - The label shows only for the on-device engine. It is a real button: Tab reaches it, Enter or Space switch, the mouse press does not move focus out of the prompt box. The tooltip names the language and, with two or more, says "Click to switch to …".
-- **Migration of the old setting.** Earlier versions had one setting, `opencode.voice.localLanguage` (`en` or `bn`). While `localLanguages` is not set, that value is the list (so `bn` stays Bangla, `en` stays English; nothing to do by hand). The first time the user chooses or switches languages, `localLanguages` is written and the old setting is no longer read. The old setting is marked deprecated in `package.json`.
+- **Migration of the old setting.** Test builds before the language list had one setting, `opencode.voice.localLanguage` (`en` or `bn`). While `localLanguages` is not set, that value is the list (so `bn` stays Bangla, `en` stays English; nothing to do by hand). The first time the user chooses or switches languages, `localLanguages` is written and the old setting is no longer read. The old setting is marked deprecated in `package.json`; this is the only place that reads it (`normalizeLanguages(…, { legacy })` in `src/extension/voice.ts`).
 - Packs outside the active list are never deleted automatically. **OpenCode Voice: Remove Downloaded Languages** lists the downloaded packs and deletes the ones the user ticks.
 - Cost of `maxLanguages` (also in the setting's description): languages that share the multilingual model cost nothing extra; each extra separate pack (Bangla) costs its download on disk (≈168 MB); only one model is loaded while recording, so RAM and CPU do not grow; switching to a language of another pack reloads the model, measured about 1.6 to 1.7 s for the multilingual model.
 
@@ -51,12 +51,12 @@ Ryzen 5 5600 (6 cores, 12 threads, the machine was busy: load average about 12),
 mic (pvrecorder, 16 kHz Int16, 100 ms frames)
   → Float32
   → streaming recognizer (Nemotron: a transducer told the spoken language; Bangla: a streaming Zipformer)  → live partial text in the prompt box
-  → on a pause (endpoint) or at stop: Bangla only: the segment's audio is decoded again by the pack's offline model
+  → on a pause (endpoint) or at stop, only for a pack with an offline model (Bangla): the segment's audio is decoded again by that model
   → appended to the final text; if the offline model fails or is empty the streaming text is kept
 ```
 
 - Everything runs in the companion's recorder process (`companion/dist/recorder.js`, forked with `ELECTRON_RUN_AS_NODE=1`), never in the extension host, so a native crash cannot take VS Code down. The companion runs on the computer with the microphone, also under Remote SSH.
-- The main extension only reads the settings and sends `VoiceStartArgs { engine: "local", localLanguage }` (the current language id, normalized: unknown → `en`; the old values `en` and `bn` are valid ids); no key and no model name are sent. An older caller without `localLanguage` gets English. `AppState.voice = { engine, ready, capture, recording, languages }` (`languages`: the active list, first = current). For `local`, `ready` is true unless the companion reports that this platform has no engine (`CompanionInfo.local === false`). For `soniox`, `ready` means "a key is saved" (today's behaviour).
+- The main extension only reads the settings and sends `VoiceStartArgs { engine: "local", localLanguage }` (the current language id, normalized: unknown → `en`); no key and no model name are sent. An older caller without `localLanguage` gets English. `AppState.voice = { engine, ready, capture, recording, languages }` (`languages`: the active list, first = current). For `local`, `ready` is true unless the companion reports that this platform has no engine (`CompanionInfo.local === false`). For `soniox`, `ready` means "a key is saved" (today's behaviour).
 - Loading the model takes about 1.7 s at recording start (Nemotron; Bangla loads two smaller models). The microphone starts first and its frames are kept and fed once loaded, so the first words are not lost; `listening` is reported after loading.
 - After stop: silence is fed (0.8 s for Nemotron, 0.5 s by default; `ModelSpec.tailSeconds`), the stream is finished, the last segment is re-decoded if the pack has an offline model, then exactly one `done`.
 - Idle (60 s without new words) and maximum (10 min) caps, silent-microphone detection and abort are the same as for Soniox (shared in `src/companion/shared.ts`).
@@ -75,9 +75,9 @@ models/<model id>/                            one folder per model, shared by ev
   offline-bn-sayed-16bec01/                   Bangla final model (int8)                                      (74 MB)
 ```
 
-The Bangla ids and paths are unchanged from the Bangla-only version, so an existing Bangla download is reused without downloading it again. Each folder has a `ready.json` (file names and sizes). A folder is used only when it exists and every file has the recorded size. To reset, delete `local-voice/` (it is downloaded again), or run **OpenCode Voice: Remove Downloaded Languages** (multi-select; one entry per downloaded pack; deletes the pack's model folders unless another downloaded pack uses the same model; the speech engine stays). **OpenCode: Choose Voice Language** marks the downloaded packs; the companion reports them in its `ping` answer (`CompanionInfo.installedLanguages`, pack ids; an older companion omits it and nothing is marked).
+Model folder names are stable ids: a model that is already on disk is never downloaded again. Each folder has a `ready.json` (file names and sizes). A folder is used only when it exists and every file has the recorded size. To reset, delete `local-voice/` (it is downloaded again), or run **OpenCode Voice: Remove Downloaded Languages** (multi-select; one entry per downloaded pack; deletes the pack's model folders unless another downloaded pack uses the same model; the speech engine stays). **OpenCode: Choose Voice Language** marks the downloaded packs; the companion reports them in its `ping` answer (`CompanionInfo.installedLanguages`, pack ids; an older companion omits it and nothing is marked).
 
-**Cleanup of earlier models.** The English Zipformer and Moonshine models of earlier versions (about 200 MB, folders `streaming-en-zipformer-672fbf1` and `offline-en-moonshine-tiny-bf2b762`) are no longer in the catalog. Once per window, after a recording's engine is ready, the companion deletes model folders the catalog does not list (`removeUnknownModels` in `src/companion/local-install.ts`). It only looks at direct children of `local-voice/v1/models/` and removes a folder only when it is a real directory (not a symlink), its name looks like one we create (`[a-z0-9._-]`), it holds our `ready.json` marker (or is a `<model id>.tmp-<8 hex>` leftover of an interrupted download). Anything else is left alone, nothing outside `models/` is touched, and a failure only goes to the log.
+**Cleanup of earlier models.** The English Zipformer and Moonshine models of earlier test builds (about 200 MB, folders `streaming-en-zipformer-672fbf1` and `offline-en-moonshine-tiny-bf2b762`) are no longer in the catalog. Once per window, after a recording's engine is ready, the companion deletes model folders the catalog does not list (`removeUnknownModels` in `src/companion/local-install.ts`). It only looks at direct children of `local-voice/v1/models/` and removes a folder only when it is a real directory (not a symlink), its name looks like one we create (`[a-z0-9._-]`), it holds our `ready.json` marker (or is a `<model id>.tmp-<8 hex>` leftover of an interrupted download). Anything else is left alone, nothing outside `models/` is touched, and a failure only goes to the log.
 
 ## The language catalog (`src/core/voice-catalog.ts`)
 
@@ -95,7 +95,7 @@ Two lists. **Packs** (`LANGUAGE_PACKS`): `id`, name, a required streaming `Model
 
 Languages of the multilingual pack, by the model card's tiers: transcription-ready: English, Spanish, French, German, Italian, Portuguese, Dutch, Turkish, Russian, Ukrainian, Arabic, Hindi, Japanese, Korean, Vietnamese; broad coverage (lower accuracy, about 23% average word error rate at 560 ms on the model card): Polish, Swedish, Czech, Norwegian Bokmål, Danish, Bulgarian, Finnish, Croatian, Slovak, Hungarian, Romanian, Estonian; Mandarin Chinese (about 19.5% on the card, weak in our test); and automatic detection. The model's adaptation-ready languages (Greek, Lithuanian, Latvian, Maltese, Slovenian, Hebrew, Thai, Nynorsk) do not transcribe out of the box and are not offered.
 
-The old English pair (a streaming Zipformer for live text and Moonshine for final text) was replaced by Nemotron: one model, better text with casing and punctuation while speaking, many languages. The price is size (682 MB instead of about 200 MB) and memory (about 1 GB while recording instead of about 450 MB).
+Why one large model instead of small ones: Nemotron writes casing and punctuation while you speak and covers many languages, so no second "refine" model is needed. The price is size (682 MB) and memory (about 1 GB while recording).
 
 Download rules (`src/companion/local-install.ts`):
 
@@ -139,12 +139,12 @@ What could go wrong on Windows (untested): a missing Visual C++ runtime (`MSVCP1
 
 ## Known limits
 
-- One language at a time (`opencode.voice.localLanguage`), no mixing. Bangla: English words are written in Bangla script and are sometimes wrong (`রেফাক্টর`, `ইউনিট`); for mixed Bangla/English use the Soniox engine.
-- `opencode.voice.languages` (Soniox hints) is only for the Soniox engine. The old one-time "Bangla only" note is gone: it made no sense once the on-device language is chosen by its own setting, and comparing the two settings would warn people who deliberately keep several Soniox hints.
-- The streaming models give no punctuation (English: no casing either, shown in lower case); the offline re-decode adds punctuation (and casing for English), but only after a pause or at stop. Live text can differ from the final text (the final one replaces it). English technical words and names are the weak spot of the small English models (the training data is audiobooks).
-- The offline model works best on utterances of a few seconds up to ~20 s; very long monologues without a pause are decoded as one segment.
+- One language at a time (the first of `opencode.voice.localLanguages`), no mixing. Bangla: English words are written in Bangla script and are sometimes wrong (`রেফাক্টর`, `ইউনিট`); for mixed Bangla/English use the Soniox engine.
+- `opencode.voice.languages` (Soniox hints) is only for the Soniox engine; the on-device language is chosen by `opencode.voice.localLanguages`.
+- Bangla: the streaming model gives no punctuation; the offline re-decode adds it, but only after a pause or at stop, and then replaces the live text. The multilingual model writes casing and punctuation live.
+- The Bangla offline model works best on utterances of a few seconds up to ~20 s; very long monologues without a pause are decoded as one segment.
 - Built-in laptop microphone arrays: on one Windows laptop ("Microphone Array (AMD Audio Device)", input volume 80) the on-device engine heard no words (peak level ~1000/32767) while a headset worked at once and Soniox had worked on the same microphone. If nothing is heard on a built-in microphone, use a headset (**OpenCode Voice: Choose Microphone**) or the Soniox engine.
-- About 3 s to start (model load) and ~450 MB of memory in the recorder process while recording.
+- About 2 s to start (model load) and about 1 GB of memory in the recorder process while recording with the multilingual model (Bangla is smaller).
 - Platforms: the engine exists for Windows x64/arm64, macOS x64/arm64 and Linux x64/arm64; microphone capture exists for all of those except Linux arm64.
 - Not verified yet: Windows and macOS (see above). macOS may strip `DYLD_LIBRARY_PATH` for hardened apps; the addon is expected to find its libraries next to itself.
-- Settings: `opencode.voice.engine`, `opencode.voice.localLanguage` (default `en`), `opencode.voice.localThreads` (default 2 per model). Commands: **OpenCode: Choose Voice Language**, **OpenCode Voice: Remove Downloaded Languages**.
+- Settings: `opencode.voice.engine`, `opencode.voice.localLanguages` (default `["en"]`), `opencode.voice.maxLanguages` (default 2), `opencode.voice.localThreads` (default 2 per model). Commands: **OpenCode: Choose Voice Language**, **OpenCode: Switch Voice Language**, **OpenCode Voice: Remove Downloaded Languages**.

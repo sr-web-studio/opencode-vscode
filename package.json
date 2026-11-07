@@ -21,7 +21,7 @@
   "bugs": {
     "url": "https://github.com/sr-web-studio/opencode-vscode/issues"
   },
-  "version": "0.3.6",
+  "version": "0.3.7",
   "publisher": "sr-web-studio",
   "license": "MIT",
   "repository": {
@@ -405,7 +405,7 @@
           ],
           "default": "en",
           "deprecationMessage": "Use opencode.voice.localLanguages (a list; the first entry is the current language). This single value is still read while localLanguages is not set.",
-          "markdownDescription": "**Deprecated**: use `opencode.voice.localLanguages`. The single on-device language of earlier versions (`en` or `bn`). It is still honoured while `opencode.voice.localLanguages` is not set, and then becomes the first entry of the list. Choosing or switching a language writes `localLanguages` and this value is no longer used."
+          "markdownDescription": "**Deprecated**: use `opencode.voice.localLanguages`. The single on-device language of test builds before 0.3.7 (`en` or `bn`). It is still honoured while `opencode.voice.localLanguages` is not set, and then becomes the first entry of the list. Choosing or switching a language writes `localLanguages` and this value is no longer used."
         },
         "opencode.voice.localThreads": {
           "type": "number",
@@ -440,7 +440,6 @@
     "watch": "bun run watch:ext & bun run watch:webview & wait",
     "watch:ext": "bun esbuild.mjs --watch",
     "watch:webview": "vite build --watch",
-    "dev:webview": "vite --config vite.dev.config.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json && svelte-check --tsconfig tsconfig.webview.json",
     "test": "bun test test/unit",
     "test:host": "bun run build && bun test/host/run.mjs",

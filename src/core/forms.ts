@@ -110,12 +110,6 @@ export const choiceOf = (f: FormField | undefined): StringField | undefined =>
 /** True for single-choice string fields. Deliberately not a type guard: the `else` side still includes free-text strings. */
 export const isChoice = (f: FormField): boolean => choiceOf(f) !== undefined
 
-/** Whether the field must be completed before moving on. */
-export const isRequired = (f: FormField) => common(f).required === true || (f.type === "multiselect" && (f.minItems ?? 0) > 0)
-
-/** Whether the user may leave the field without answering. */
-export const isOptional = (f: FormField) => !isRequired(f) && f.type !== "external"
-
 export type FormErrors = Record<string, string>
 
 export function validateForm(fields: ReadonlyArray<FormField>, answers: Answers, other: OtherText): FormErrors {

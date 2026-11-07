@@ -96,7 +96,7 @@ const APACHE = "https://www.apache.org/licenses/LICENSE-2.0"
 const CC_BY_SA = "https://creativecommons.org/licenses/by-sa/4.0/"
 const OPENMDW = "https://openmdw.ai/license/1-1/"
 
-/* ------------------------------------------------------------ Bangla (unchanged ids and paths: existing downloads are reused) */
+/* ------------------------------------------------------------ Bangla (the ids are folder names on disk: keep them so existing downloads are reused) */
 
 const BN_STREAMING: ModelSpec = {
   id: "streaming-bn-vosk-501097a",
@@ -322,7 +322,7 @@ export const packBytes = (p: LanguagePack, have: { models?: Iterable<string> } =
 export const downloadBytes = (target: { bytes: number }, pack: LanguagePack, have: { native?: boolean; models?: Iterable<string> } = {}): number =>
   (have.native ? 0 : target.bytes) + packBytes(pack, have)
 
-/** Folder names of every model of the catalog: any other folder under `models/` is left over from an older version. */
+/** Folder names of every model of the catalog: any other folder under `models/` is left over from an older version (see `removeUnknownModels`). */
 export const knownModelIds = (cat: Catalog = CATALOG): string[] => cat.packs.flatMap((p) => packModels(p).map((m) => m.id)).filter((id, i, a) => a.indexOf(id) === i)
 
 /**
