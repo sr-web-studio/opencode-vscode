@@ -3,7 +3,8 @@ import { loadChunk, initialHistory, type FetchPage, type HistoryState, type RawM
 import { applyEvent, prependView, queuedFromInbox, viewFromMessages } from "./transcript/reducer"
 import { emptyView, type SessionView, type TurnView } from "./transcript/types"
 
-const isDelta = (type: string) => type === "session.text.delta" || type === "session.reasoning.delta" || type === "session.tool.input.delta"
+const isDelta = (type: string) =>
+  type === "session.text.delta" || type === "session.reasoning.delta" || type === "session.tool.input.delta" || type === "session.compaction.delta"
 const message = (e: unknown): string => (e instanceof Error ? e.message : typeof e === "string" ? e : "Request failed")
 
 /**
