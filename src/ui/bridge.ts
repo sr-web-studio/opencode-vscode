@@ -41,6 +41,8 @@ export interface HostBridge {
    * starts or stops recording where the host can record. The key never comes back to the UI.
    */
   voice(): void
+  /** The language label next to the mic (on-device engine): switch to the next active language. */
+  voiceLanguage(): void
   /** Show a transient message in the host's own UI. */
   notify(level: "info" | "warning" | "error", message: string): void
   storage: BridgeStorage

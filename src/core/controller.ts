@@ -66,7 +66,7 @@ export class Controller {
 
   private connection: ConnectionState = { status: "connecting" }
   private settings: ViewSettings = defaultViewSettings
-  private voice: AppState["voice"] = { engine: "local", ready: true, capture: false, recording: "off" }
+  private voice: AppState["voice"] = { engine: "local", ready: true, capture: false, recording: "off", languages: ["en"] }
   private target: ViewTarget = { kind: "draft" }
   private sessions: SessionInfo[] = []
   private archived: SessionInfo[] = []

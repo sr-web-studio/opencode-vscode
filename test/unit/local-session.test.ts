@@ -143,12 +143,37 @@ describe("LocalDictationSession", () => {
   })
 
   test("a segment without words (noise) adds nothing", async () => {
-    const { s, rec, updates, loadNow } = setup(["|"])
+    const { s, rec, stream, updates, loadNow } = setup(["|"])
     loadNow(); await wait()
     rec.frame([700]); await wait()
+    expect(stream.resets).toBe(1) // default: an endpoint without words resets the stream
     s.stop()
     expect(updates.at(-1)).toMatchObject({ kind: "done", final: "" })
     expect(updates.filter((u) => u.kind === "heard")).toHaveLength(0)
+  })
+
+  test("multilingual engine (`resetOnSilence: false`): an endpoint without words keeps the stream, one with words still resets", async () => {
+    const { s, rec, stream, updates, loadNow } = setup(["|", "hello", "|"], {}, { resetOnSilence: false })
+    loadNow(); await wait()
+    rec.frame([700]); await wait() // endpoint, no words: not reset
+    expect(stream.resets).toBe(0)
+    rec.frame([700]); await wait() // "hello"
+    rec.frame([700]); await wait() // endpoint with words: reset
+    expect(stream.resets).toBe(1)
+    s.stop()
+    expect(updates.at(-1)).toMatchObject({ kind: "done" })
+  })
+
+  test("the engine's own stop tail is used (Nemotron 0.8 s); an explicit option wins; the default is 0.5 s", async () => {
+    const a = setup(["x"], {}, { tailSeconds: 0.8 })
+    a.loadNow(); await wait(); a.rec.frame([700]); await wait(); a.s.stop()
+    expect(a.stream.accepts.at(-1)).toBe(12800)
+    const b = setup(["x"], { tailSeconds: 0.5 }, { tailSeconds: 0.8 })
+    b.loadNow(); await wait(); b.rec.frame([700]); await wait(); b.s.stop()
+    expect(b.stream.accepts.at(-1)).toBe(8000)
+    const c = setup(["x"])
+    c.loadNow(); await wait(); c.rec.frame([700]); await wait(); c.s.stop()
+    expect(c.stream.accepts.at(-1)).toBe(8000)
   })
 
   test("a failed load ends with one done, an error and the Show Log fix; the microphone is released", async () => {

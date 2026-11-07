@@ -1,13 +1,13 @@
 import { afterAll, describe, expect, test } from "bun:test"
 import { createHash } from "node:crypto"
-import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync } from "node:fs"
 import { readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { gzipSync } from "node:zlib"
-import { IntegrityError, ensureLocal, installedLanguages, integrityOf, isInstalled, layout, localState, matchesIntegrity, missingBytes, removeLanguages, sha256Hex, type FetchLike } from "../../src/companion/local-install"
+import { IntegrityError, ensureLocal, installedLanguages, integrityOf, isInstalled, layout, localState, matchesIntegrity, missingBytes, removeLanguages, removeUnknownModels, sha256Hex, type FetchLike } from "../../src/companion/local-install"
 import { SHERPA_PLATFORMS, sherpaTarget, type SherpaTarget } from "../../src/core/local-voice"
-import { LANGUAGE_PACKS, modelBytes, modelUrl, packById, type LanguagePack, type ModelFile, type ModelKind, type ModelRole, type ModelSpec } from "../../src/core/voice-catalog"
+import { modelBytes, modelUrl, packById, type Catalog, type LanguagePack, type ModelFile, type ModelKind, type ModelRole, type ModelSpec } from "../../src/core/voice-catalog"
 
 const dirs: string[] = []
 const tmp = () => {
@@ -81,18 +81,29 @@ describe("pinned downloads", () => {
 const body = (path: string) => enc.encode(`file:${path}`)
 function fakeModel(id: string, kind: ModelKind, repo: string, roles: Partial<Record<ModelRole, string>>): ModelSpec {
   const files: ModelFile[] = Object.entries(roles).map(([role, path]) => ({ path: path!, name: path!.split("/").pop()!, role: role as ModelRole, size: body(path!).length, sha256: sha256Hex(body(path!)) }))
-  return { id, kind, title: id, author: "t", license: "MIT", licenseUrl: "x", source: `https://huggingface.co/${repo}`, repo, rev: "a".repeat(40), files }
+  return { id, kind, title: id, author: "t", license: "MIT", licenseUrl: "x", source: `https://huggingface.co/${repo}`, repo, rev: "a".repeat(40), featureDim: 128, tailSeconds: 0.8, files }
 }
 const tdRoles = (dir: string) => ({ encoder: `${dir}/enc.onnx`, decoder: `${dir}/dec.onnx`, joiner: `${dir}/join.onnx`, tokens: `${dir}/tokens.txt` })
 const M_A = fakeModel("model-a", "transducer", "org/a", tdRoles("a"))
 const M_B = fakeModel("model-b", "transducer", "org/b", tdRoles("b"))
 const M_SHARED = fakeModel("model-shared", "transducer", "org/shared", tdRoles("s"))
-const M_MOON = fakeModel("model-moon", "moonshine", "org/moon", { preprocessor: "m/pre.onnx", encoder: "m/enc.onnx", uncachedDecoder: "m/u.onnx", cachedDecoder: "m/c.onnx", tokens: "m/tokens.txt" })
+const M_OFF = fakeModel("model-off", "transducer", "org/off", tdRoles("o"))
 const PACKS: LanguagePack[] = [
-  { id: "xa", name: "Xa", native: "Xa", streaming: M_A, offline: M_MOON },
-  { id: "xb", name: "Xb", native: "Xb", streaming: M_B, offline: M_SHARED },
-  { id: "xc", name: "Xc", native: "Xc", streaming: M_SHARED },
+  { id: "xa", name: "Xa", noun: "xa models", streaming: M_A, offline: M_OFF },
+  { id: "xb", name: "Xb", noun: "xb models", streaming: M_B, offline: M_SHARED },
+  { id: "xc", name: "Xc", noun: "multilingual model", streaming: M_SHARED },
 ]
+/** Two languages (`xc`, `xd`) share the pack `xc`; `xd` is told its locale. */
+const CAT: Catalog = {
+  packs: PACKS,
+  defaultLanguage: "xa",
+  languages: [
+    { id: "xa", name: "Xa", native: "Xa", pack: "xa", tier: "ready" },
+    { id: "xb", name: "Xb", native: "Xb", pack: "xb", tier: "ready" },
+    { id: "xc", name: "Xc", native: "Xc", pack: "xc", locale: "xc-XC", tier: "ready" },
+    { id: "xd", name: "Xd", native: "Xd", pack: "xc", locale: "xd-XD", tier: "broad" },
+  ],
+}
 
 describe("ensureLocal", () => {
   // A tiny fake world: one native package and fake language packs whose files are verified for real.
@@ -112,7 +123,7 @@ describe("ensureLocal", () => {
     return { fetch, calls }
   }
 
-  const ls = (storage: string) => ({ storage, platform: "linux", arch: "x64", packs: PACKS })
+  const ls = (storage: string) => ({ storage, platform: "linux", arch: "x64", catalog: CAT })
 
   const run = async (storage: string, w: ReturnType<typeof world>, signal?: AbortSignal, language = "xa") => {
     // sherpaTarget("linux","x64") is the real pinned one; swap its integrity for the fake tarball for this run.
@@ -136,10 +147,14 @@ describe("ensureLocal", () => {
     expect(await readFile(join(paths.nativeDir, "libx.so"), "utf8")).toBe("LIB")
     expect(paths.streaming.kind).toBe("transducer")
     expect(await readFile(paths.streaming.files.tokens!, "utf8")).toBe("file:a/tokens.txt")
-    expect(paths.offline!.kind).toBe("moonshine")
-    expect(await readFile(paths.offline!.files.uncachedDecoder!, "utf8")).toBe("file:m/u.onnx")
+    expect(paths.streaming.featureDim).toBe(128) // the model's own feature size travels with its paths
+    expect(paths.tailSeconds).toBe(0.8)
+    expect(paths.pack).toBe("xa")
+    expect(paths.locale).toBeUndefined()
+    expect(paths.offline!.kind).toBe("transducer")
+    expect(await readFile(paths.offline!.files.decoder!, "utf8")).toBe("file:o/dec.onnx")
     expect(existsSync(join(paths.nativeDir, "ready.json"))).toBe(true)
-    expect(w.calls).toHaveLength(1 + 4 + 5)
+    expect(w.calls).toHaveLength(1 + 4 + 4)
     // No temp or partial leftovers anywhere.
     const all = (d: string): string[] => readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? all(join(d, e.name)) : [join(d, e.name)]))
     expect(all(storage).filter((f) => /\.part$|\.tmp-/.test(f))).toEqual([])
@@ -160,14 +175,14 @@ describe("ensureLocal", () => {
 
   test("a damaged model file is rejected; what was already verified is kept, the broken model is not", async () => {
     const storage = tmp()
-    await expect(run(storage, world({ corrupt: "org/moon" }))).rejects.toThrow(/failed verification/)
+    await expect(run(storage, world({ corrupt: "org/off" }))).rejects.toThrow(/failed verification/)
     const state = await localState(ls(storage))
     expect(state).toMatchObject({ native: true, models: ["model-a"] })
     expect(isInstalled(state, PACKS[0]!)).toBe(false)
     // Repair: the next run fetches only what is missing.
     const w = world()
     await run(storage, w)
-    expect(w.calls).toHaveLength(5)
+    expect(w.calls).toHaveLength(4)
     expect(isInstalled(await localState(ls(storage)), PACKS[0]!)).toBe(true)
   })
 
@@ -176,7 +191,7 @@ describe("ensureLocal", () => {
     const paths = await run(storage, world())
     await writeFile(paths.streaming.files.encoder!, "short")
     const state = await localState(ls(storage))
-    expect(state.models).toEqual(["model-moon"])
+    expect(state.models).toEqual(["model-off"])
     expect(missingBytes({ ...state, target }, PACKS[0]!)).toBe(modelBytes(M_A))
     const w = world()
     await run(storage, w)
@@ -189,32 +204,81 @@ describe("ensureLocal", () => {
     const first = world()
     await run(storage, first, undefined, "xb") // model-b + model-shared
     expect(first.calls).toHaveLength(1 + 4 + 4)
-    expect(first.calls.some((u) => u.includes("org/a") || u.includes("org/moon"))).toBe(false)
+    expect(first.calls.some((u) => u.includes("org/a") || u.includes("org/off"))).toBe(false)
     const second = world()
     const paths = await run(storage, second, undefined, "xc") // streaming = model-shared: already there
     expect(second.calls).toEqual([])
     expect(paths.offline).toBeUndefined()
     expect(paths.streaming.files.tokens).toBe(join(storage, "local-voice/v1/models/model-shared/tokens.txt"))
+    expect(paths.locale).toBe("xc-XC")
     const state = await localState(ls(storage))
     expect(installedLanguages(state, PACKS)).toEqual(["xb", "xc"])
-    expect(missingBytes({ ...state, target }, PACKS[0]!)).toBe(modelBytes(M_A) + modelBytes(M_MOON))
+    expect(missingBytes({ ...state, target }, PACKS[0]!)).toBe(modelBytes(M_A) + modelBytes(M_OFF))
   })
 
-  test("an unknown language id installs the default pack (a catalog without `en` falls back to its first pack)", async () => {
+  test("two languages of one pack download once and differ only by locale", async () => {
+    const storage = tmp()
+    const first = world()
+    const c = await run(storage, first, undefined, "xc")
+    expect(first.calls).toHaveLength(1 + 4)
+    const second = world()
+    const d = await run(storage, second, undefined, "xd")
+    expect(second.calls).toEqual([]) // switching to another language of the same pack: no new download
+    expect(d.streaming).toEqual(c.streaming)
+    expect([c.locale, d.locale, c.pack, d.pack]).toEqual(["xc-XC", "xd-XD", "xc", "xc"])
+  })
+
+  test("an unknown language id installs the default language (a catalog without `en` falls back to its default)", async () => {
     const paths = await run(tmp(), world(), undefined, "zz")
     expect(paths.language).toBe("xa")
   })
 
-  test("removing a language deletes only models no other installed language uses", async () => {
+  test("removing a pack deletes only models no other installed pack uses", async () => {
     const storage = tmp()
     await run(storage, world(), undefined, "xb")
     await run(storage, world(), undefined, "xc")
     await run(storage, world(), undefined, "xa")
     expect(await removeLanguages(ls(storage), ["xb"])).toEqual(["model-b"]) // model-shared stays: xc uses it
     expect(installedLanguages(await localState(ls(storage)), PACKS)).toEqual(["xa", "xc"])
-    expect((await removeLanguages(ls(storage), ["xa", "xc"])).sort()).toEqual(["model-a", "model-moon", "model-shared"])
+    expect((await removeLanguages(ls(storage), ["xa", "xc"])).sort()).toEqual(["model-a", "model-off", "model-shared"])
     expect((await localState(ls(storage))).models).toEqual([])
     expect(await removeLanguages(ls(storage), ["xa"])).toEqual([]) // nothing left: nothing deleted, no error
+  })
+
+  test("cleanup deletes model folders the catalog no longer lists, only ours, only inside models/", async () => {
+    const storage = tmp()
+    await run(storage, world(), undefined, "xa")
+    const models = join(storage, "local-voice/v1/models")
+    // Left over by an older version: a folder we made (has ready.json) and an interrupted download.
+    for (const old of ["streaming-en-zipformer-672fbf1", "offline-en-moonshine-tiny-bf2b762"]) {
+      mkdirSync(join(models, old), { recursive: true })
+      await writeFile(join(models, old, "ready.json"), "{}")
+      await writeFile(join(models, old, "encoder.onnx"), "x")
+    }
+    mkdirSync(join(models, "model-a.tmp-0123abcd"), { recursive: true })
+    // Not ours: no ready.json, an odd name, a symlink to a folder outside, a file, and a sibling of models/.
+    mkdirSync(join(models, "somebody-elses-folder"), { recursive: true })
+    await writeFile(join(models, "somebody-elses-folder", "notes.txt"), "keep me")
+    mkdirSync(join(models, "Weird Name"), { recursive: true })
+    await writeFile(join(models, "Weird Name", "ready.json"), "{}")
+    const outside = tmp()
+    await writeFile(join(outside, "precious.txt"), "precious")
+    symlinkSync(outside, join(models, "linked-elsewhere"))
+    await writeFile(join(models, "stray-file"), "x")
+    await writeFile(join(storage, "local-voice/v1/keep.txt"), "keep")
+
+    const removed = await removeUnknownModels(ls(storage))
+    expect(removed.sort()).toEqual(["model-a.tmp-0123abcd", "offline-en-moonshine-tiny-bf2b762", "streaming-en-zipformer-672fbf1"])
+    expect(readdirSync(models).sort()).toEqual(["Weird Name", "linked-elsewhere", "model-a", "model-off", "somebody-elses-folder", "stray-file"])
+    expect(await readFile(join(outside, "precious.txt"), "utf8")).toBe("precious")
+    expect(await readFile(join(models, "somebody-elses-folder/notes.txt"), "utf8")).toBe("keep me")
+    expect(await readFile(join(storage, "local-voice/v1/keep.txt"), "utf8")).toBe("keep")
+    // The catalog's own models are untouched and still ready.
+    expect((await localState(ls(storage))).models.sort()).toEqual(["model-a", "model-off"])
+    // Nothing to do the second time; no models folder at all is fine.
+    expect(await removeUnknownModels(ls(storage))).toEqual([])
+    expect(await removeUnknownModels(ls(tmp()))).toEqual([])
+    expect(await removeUnknownModels({ storage: tmp(), platform: "freebsd", arch: "x64" })).toEqual([])
   })
 
   test("HTTP errors and cancellation fail cleanly", async () => {

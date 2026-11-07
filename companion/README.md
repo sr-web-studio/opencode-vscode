@@ -8,22 +8,26 @@ VS Code webviews cannot use the microphone, and with Remote SSH the OpenCode ext
 microphone. This small extension runs on the computer in front of you (`extensionKind: ui`), records only while the mic
 button in the OpenCode prompt box is on and hands the text back to OpenCode. Two engines (setting `opencode.voice.engine`):
 
-- **`local` (default): free, offline, on this computer. English by default; pick another language from the catalog.**
-  The first time, it asks to download the language you use (English: about 205 MB once, the sherpa-onnx speech engine
-  and two models) into this extension's storage folder; nothing is uploaded. Choose the language with **OpenCode:
-  Choose Voice Language** (or the setting `opencode.voice.localLanguage`); only that language is downloaded.
-  **OpenCode Voice: Remove Downloaded Languages** frees the space again. Details, licences and diagnostics:
+- **`local` (default): free, offline, on this computer. One multilingual model for English and about 28 other languages; Bangla is an optional extra pack.**
+  The first time, it asks to download once (about 693 MB: the sherpa-onnx speech engine and the multilingual model;
+  Bangla alone is about 179 MB) into this extension's storage folder; nothing is uploaded. Keep up to two active
+  languages (`opencode.voice.localLanguages`, limit `opencode.voice.maxLanguages`) with **OpenCode: Choose Voice
+  Language**; switch with **OpenCode: Switch Voice Language** or the language label next to the mic. Only the first
+  active language records, and only one model is loaded at a time. **OpenCode Voice: Remove Downloaded Languages**
+  frees the space again. Details, licences and diagnostics:
   [docs/local-voice.md](https://github.com/sr-web-studio/opencode-vscode/blob/main/docs/local-voice.md).
   Runs on Windows x64/arm64, macOS (Apple silicon and Intel) and Linux x64/arm64 (where a microphone can be used).
 - **`soniox`: cloud, with your own paid Soniox key.** Better accuracy, mixed languages, many languages. The audio
   is streamed to Soniox.
 
-The on-device models (each language downloads only its own; every download is checked against a pinned checksum before it is used):
+The on-device models (a pack downloads only when you first use a language of it; every download is checked against a pinned checksum before it is used):
 
-| Language | Live text | Final text at each pause |
+| Pack | Languages | Model |
 | --- | --- | --- |
-| English | [Streaming Zipformer English](https://huggingface.co/csukuangfj/sherpa-onnx-streaming-zipformer-en-2023-06-26) (icefall / k2-fsa, Apache-2.0) | [Moonshine Tiny English](https://github.com/moonshine-ai/moonshine) by Useful Sensors / Moonshine AI ([MIT](https://github.com/moonshine-ai/moonshine/blob/main/LICENSE)), cased and punctuated |
-| Bangla (বাংলা) | [Vosk small streaming Bengali](https://huggingface.co/alphacep/vosk-model-small-streaming-bn) (Apache-2.0) | [bangla-zipformer-onnx](https://huggingface.co/SayedShaun/bangla-zipformer-onnx) by **Sayed Shaun** ([CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)), with punctuation |
+| Multilingual (default, about 682 MB) | English, Spanish, French, German, Italian, Portuguese, Dutch, Turkish, Russian, Ukrainian, Arabic, Hindi, Japanese, Korean, Vietnamese (best accuracy); Polish, Swedish, Czech, Norwegian, Danish, Bulgarian, Finnish, Croatian, Slovak, Hungarian, Romanian, Estonian (lower accuracy); Mandarin (weak); automatic detection | [NVIDIA Nemotron 3.5 ASR Streaming 0.6B](https://huggingface.co/nvidia/nemotron-3.5-asr-streaming-0.6b), [OpenMDW-1.1](https://openmdw.ai/license/1-1/), sherpa-onnx int8 export by csukuangfj. Writes cased, punctuated text. |
+| Bangla (বাংলা) (optional, about 168 MB) | Bangla | Live text: [Vosk small streaming Bengali](https://huggingface.co/alphacep/vosk-model-small-streaming-bn) (Apache-2.0). Final text at each pause: [bangla-zipformer-onnx](https://huggingface.co/SayedShaun/bangla-zipformer-onnx) by **Sayed Shaun** ([CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)), with punctuation |
+
+Attribution: NVIDIA Nemotron 3.5 ASR Streaming 0.6B, OpenMDW-1.1; sherpa-onnx int8 export by csukuangfj. The licence text is in [NOTICE](NOTICE).
 
 - Your Soniox key stays in the OpenCode extension's secret storage. This extension only gets a key that expires after
   two minutes, one per recording.
