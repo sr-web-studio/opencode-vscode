@@ -14,6 +14,7 @@
   import PromptBox from "./components/PromptBox.svelte"
   import QuestionPrompt from "./components/QuestionPrompt.svelte"
   import SessionSwitcher from "./components/SessionSwitcher.svelte"
+  import StopWorkerButton from "./components/StopWorkerButton.svelte"
   import Setup from "./components/Setup.svelte"
   import TodoBar from "./components/TodoBar.svelte"
   import Transcript from "./components/Transcript.svelte"
@@ -60,6 +61,8 @@
     running: () => running || (!!app && app.target.kind === "session" && app.running.includes(app.target.id)),
   })
   const shownWorkers = $derived(app ? visibleWorkers(app.workers, app.hiddenWorkers).length : 0)
+  /** A worker tab whose session is executing: the header offers Stop. */
+  const workerRunning = $derived(!!app?.readOnly && (running || (app.target.kind === "session" && app.running.includes(app.target.id))))
   const workerModel = $derived(app?.readOnly ? modelLabel(app.model, app.models) : "")
   const todos = $derived(app ? todoBar(app.view, running || (app.target.kind === "session" && app.running.includes(app.target.id))) : undefined)
 
@@ -81,6 +84,7 @@
         <span class="wname">{app.workerTitle ?? "Worker"}</span>
         {#if workerModel}<span class="wmodel muted small" title={modelTitle(app.model)}>{workerModel}</span>{/if}
         <span class="muted small wro">Read-only</span>
+        {#if workerRunning && app.target.kind === "session"}<StopWorkerButton sessionID={app.target.id} running variant="label" />{/if}
       </header>
     {:else}
       <SessionSwitcher {app} hasDraftText={draft.trim().length > 0}>
@@ -129,4 +133,5 @@
   .wname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .wmodel { flex: none; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 400; }
   .wro { flex: none; margin-left: auto; font-weight: 400; }
+  .wtitle :global(.lbl) { margin-left: 0; }
 </style>

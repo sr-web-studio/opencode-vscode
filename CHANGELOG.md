@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Stop a worker:** a stop button on each running worker in the worker panel, on its row in the transcript, and in the worker tab header. Only that worker stops; the lead gets a "cancelled" result and keeps going. A running worker that has been quiet for over a minute shows `· quiet 5m`, so a stuck one is easy to spot.
 - **Workers show their model**, e.g. `Developer · Sonnet 5.5 High`, in the worker panel, the worker tab header and the transcript's worker rows.
 - **Remove finished workers from the panel:** an `x` on each done, failed or stopped worker, and **Clear done** to remove them all at once. This only hides them in the panel (remembered per session); nothing is deleted on the OpenCode server, and a worker that runs again shows up again.
 - **The window asks for attention** when OpenCode finishes or needs you and the window is not focused: the taskbar button flashes on Windows (like Copilot Chat), the window is marked urgent on Linux X11, and macOS shows a notification. Done by the OpenCode Voice companion on your computer; never steals focus. Turn off with `opencode.notifications.os: off`. Try it with **OpenCode Voice: Test Window Attention**.

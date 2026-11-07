@@ -116,6 +116,18 @@ export class WorkerTab {
         // Only this worker's own requests.
         if (action.sessionID === this.sessionID) await this.controller.dispatch(action)
         return
+      case "stopWorker": {
+        // Only this worker itself, never another session. The controller checks that it is a child of the open session.
+        if (action.sessionID !== this.sessionID) return
+        await this.controller.dispatch(action)
+        // The controller shows its own errors on its own state; this tab has its own error line.
+        const failed = this.controller.snapshot().error
+        if (failed) {
+          this.error = failed
+          this.emitNow()
+        }
+        return
+      }
       case "dismissError":
         this.error = undefined
         this.emitNow()
