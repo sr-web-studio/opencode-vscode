@@ -1,0 +1,24 @@
+{
+  "name": "opencode-push",
+  "version": "0.1.0",
+  "private": true,
+  "description": "OpenCode V2 server plugin: sends an ntfy push when a session needs you or finishes.",
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@opencode/plugin": "2.2.5",
+    "@types/bun": "latest",
+    "typescript": "^5.9.0"
+  }
+}
