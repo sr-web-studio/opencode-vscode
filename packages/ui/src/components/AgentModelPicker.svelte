@@ -133,6 +133,7 @@
   .foot button:hover { color: var(--oc-fg); }
   .pin { display: inline-flex; align-items: center; padding: 0.1em 0.25em; border-radius: 4px; color: var(--oc-muted); opacity: 0; }
   .row:hover .pin, .pin:focus-visible, .pin.on { opacity: 1; }
+  @media (hover: none) { .pin { opacity: 1; } }
   .pin:hover { color: var(--oc-fg); background: var(--oc-hover); }
   .pin.on { color: var(--oc-accent); }
   .pop { position: absolute; bottom: 100%; left: 0; z-index: 30; min-width: 18em; max-width: calc(100vw - 1.5em); margin-bottom: 0.3em; background: var(--oc-popover); border: 1px solid var(--oc-hairline); border-radius: 6px; box-shadow: 0 4px 16px var(--vscode-widget-shadow); max-height: 50vh; display: flex; flex-direction: column; overflow: hidden; outline: none; }

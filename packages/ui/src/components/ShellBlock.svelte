@@ -23,6 +23,7 @@
 
   const store = useStore()
   const view = useTranscript()
+  const outputView = store.bridge.capabilities?.shellView === "output"
   const LIMIT = 60
 
   let showAll = $state(false)
@@ -72,9 +73,9 @@
       class="act"
       disabled={!shellID}
       onclick={() => shellID && store.bridge.showTerminal(shellID, title)}
-      title={shellID ? "Show this command in a VS Code terminal" : "This command's terminal is no longer available"}
-      aria-label="Open in terminal"
-    ><Codicon name="terminal" /><span>Open in terminal</span></button>
+      title={shellID ? (outputView ? "Show the live output of this command" : "Show this command in a VS Code terminal") : "This command's terminal is no longer available"}
+      aria-label={outputView ? "Open output" : "Open in terminal"}
+    ><Codicon name="terminal" /><span>{outputView ? "Open output" : "Open in terminal"}</span></button>
   </div>
 
   <pre class="cmd"><span class="sign" aria-hidden="true">$ </span>{command}</pre>

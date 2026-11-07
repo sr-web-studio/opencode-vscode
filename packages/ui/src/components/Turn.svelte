@@ -110,6 +110,7 @@
   /* On the bubble's top-left corner, only on hover. */
   .revert { position: absolute; top: -10px; left: -10px; display: inline-flex; align-items: center; padding: 0.15em 0.3em; border-radius: 50%; color: var(--oc-muted); background: var(--oc-popover); border: 1px solid var(--oc-hairline); opacity: 0; }
   .user:hover .revert, .revert:focus-visible { opacity: 1; }
+  @media (hover: none) { .revert, .utime { opacity: 1; } }
   .revert:hover:not(:disabled) { color: var(--oc-fg); background: var(--oc-hover); }
   .foldrow { display: flex; flex-wrap: wrap; align-items: center; gap: 0.2em 1.2em; }
   .changes { display: inline-flex; align-items: center; gap: 0.35em; }

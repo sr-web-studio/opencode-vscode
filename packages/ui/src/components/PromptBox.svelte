@@ -41,6 +41,7 @@
 
   let { app, text = $bindable() }: { app: AppState; text: string } = $props()
   const store = useStore()
+  const caps = store.bridge.capabilities ?? {}
 
   const MIN_LINES = 2
   const MAX_LINES = 12
@@ -220,7 +221,7 @@
       return
     }
     if (e.key === "Escape" && app.mcp.open) { e.preventDefault(); store.dispatch({ type: "mcp", op: "close" }); return }
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send() }
+    if (e.key === "Enter" && !e.shiftKey && caps.enterSends !== false) { e.preventDefault(); send() }
     else if (e.key === "Tab" && !e.shiftKey && text === "" && app.agents.length > 1) {
       e.preventDefault()
       const next = cycleAgent(app.agents.map((a) => a.id), app.agent)
@@ -401,7 +402,7 @@
       <span class="grow"></span>
       <!-- On-device engine: the spoken language. A click switches to the next active language. `mousedown` is not allowed to
            move focus, so the caret stays in the prompt box; the keyboard reaches it with Tab (Enter/Space switch). -->
-      {#if app.voice.engine === "local"}
+      {#if caps.voice !== false && app.voice.engine === "local"}
         <button
           class="lang muted"
           class:off={recording !== "off"}
@@ -413,6 +414,7 @@
         >{languageCode(app.voice.languages[0] ?? "en")}</button>
       {/if}
       <!-- When it cannot start yet (no Soniox key) the mic only looks disabled: a click opens the key dialog, so it stays focusable and clickable. -->
+      {#if caps.voice !== false}
       <button
         class="mic muted"
         class:off={!app.voice.ready}
@@ -424,10 +426,11 @@
         title={micTitle({ engine: app.voice.engine, ready: app.voice.ready, recording })}
         aria-label={micLabel({ engine: app.voice.engine, ready: app.voice.ready, recording })}
       >{#if recording === "starting" || recording === "stopping"}<Codicon name="loading" spin />{:else if recording === "on"}<Codicon name="record" />{:else}<Codicon name="mic" />{/if}</button>
+      {/if}
       {#if running}
         <button class="stop" onclick={() => store.dispatch({ type: "stop" })} title="Stop (Esc)" aria-label="Stop"><span class="sq"></span></button>
       {/if}
-      <button class="send" onclick={send} disabled={!canSend} title="Send (Enter)" aria-label="Send"><Codicon name="arrow-up" /></button>
+      <button class="send" onclick={send} disabled={!canSend} title={caps.enterSends === false ? "Send" : "Send (Enter)"} aria-label="Send"><Codicon name="arrow-up" /></button>
     </div>
   </div>
   </div>

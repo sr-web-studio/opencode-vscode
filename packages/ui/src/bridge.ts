@@ -8,6 +8,23 @@ export interface BridgeStorage {
 }
 
 /**
+ * What a host can do beyond the basics. Every member is optional and a missing one means "yes, like VS Code", so a host
+ * that does not know about this (the VS Code webview) keeps the full UI. A shell without a feature says `false`.
+ */
+export interface HostCapabilities {
+  /** The mic button and the language label. Default true. */
+  voice?: boolean
+  /** "Edit config" in the `/mcps` panel (opens the global OpenCode config in an editor). Default true. */
+  editConfig?: boolean
+  /** "Sign in" for MCP servers (needs a browser on the machine that runs the client). Default true. */
+  mcpSignIn?: boolean
+  /** Plain Enter sends the prompt. False on a phone: Enter adds a new line and the send button sends. Default true. */
+  enterSends?: boolean
+  /** What a shell block offers: a terminal that mirrors the command (default), or a screen with its output. */
+  shellView?: "terminal" | "output"
+}
+
+/**
  * The only way UI components reach their host. The VS Code implementation lives in `src/webview/`;
  * a browser or mobile shell provides its own. Components never touch `vscode`, `window.parent` or the DOM
  * APIs of a particular shell directly.
@@ -48,6 +65,8 @@ export interface HostBridge {
   /** Show a transient message in the host's own UI. */
   notify(level: "info" | "warning" | "error", message: string): void
   storage: BridgeStorage
+  /** What this host cannot do. Omitted: everything. */
+  capabilities?: HostCapabilities
   /** Send a raw message to the host (actions, requests). */
   postToHost(message: ToHost): void
   /** Receive state and commands from the host. Returns an unsubscribe function. */

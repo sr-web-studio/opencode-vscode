@@ -161,7 +161,7 @@
   .del { display: inline-flex; align-items: center; padding: 0.15em 0.25em; border-radius: 4px; opacity: 0; }
   .row:hover .del, .row:focus-within .del, .row.sel .del, .del:focus-visible { opacity: 1; }
   .del:hover { color: var(--vscode-errorForeground, var(--oc-fg)); background: var(--oc-hover); }
-  @media (hover: none) { .del { opacity: 1; } }
+  @media (hover: none) { .del, .pencil, .ren { opacity: 1; } }
   .plus { display: inline-flex; align-items: center; padding: 0.2em 0.3em; border-radius: 4px; }
   .plus:hover { color: var(--oc-fg); background: var(--oc-hover); }
   .drop { position: absolute; z-index: 20; left: 0.6em; right: 0.6em; top: 100%; background: var(--oc-popover); border: 1px solid var(--oc-hairline); border-radius: 6px; box-shadow: 0 4px 16px var(--vscode-widget-shadow); display: flex; flex-direction: column; max-height: 70vh; }
