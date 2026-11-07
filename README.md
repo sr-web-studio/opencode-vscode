@@ -57,6 +57,7 @@ Open Settings and search for **OpenCode**:
 | --- | --- |
 | `opencode.serverUrl` | Address of an OpenCode server on another computer. Empty (default): use OpenCode on this computer. Examples: `http://192.168.1.10:4096`, `http://my-server.tail1234.ts.net:4096`, `https://opencode.example.com`. `http://` is added if you leave it out; `4096` is OpenCode's default port. |
 | `opencode.cliPath` | Path to `opencode`. Empty: `PATH`, then `~/.opencode/bin`. |
+| **OpenCode: Open Global Config** (command; gear in the view title, "Edit config" in the MCP panel) | Opens your global OpenCode config (`~/.config/opencode/opencode.jsonc` or `.json`, or under `XDG_CONFIG_HOME` / `OPENCODE_CONFIG_DIR`) in an editor so you can edit it yourself. If there is none it asks before creating one. If `opencode.serverUrl` points at another computer, it tells you the config lives there. The extension never edits it. |
 | `opencode.transcript.*` | Fold finished steps, expand tool details, reasoning display, font size. |
 | `opencode.todo.defaultExpanded` | Show the task list expanded. |
 | `opencode.notifications.*` | Which events notify you, and whether to notify while the window is focused. With the OpenCode Voice companion, an unfocused window also flashes its taskbar button (`os`: `auto`/`off`). |

@@ -99,6 +99,10 @@
       <li class="empty muted">{mcp.loading || !mcp.loaded ? "Loading…" : "No MCP servers are set up for this project. OpenCode reads them from its own config."}</li>
     {/each}
   </ul>
+  <div class="foot">
+    <!-- mousedown is cancelled so the click never moves focus off the prompt box; the editor that opens takes it. -->
+    <button class="link edit" onmousedown={(e) => e.preventDefault()} onclick={() => store.bridge.postToHost({ type: "host", request: { type: "openGlobalConfig" } })} title="Open your global OpenCode config file in the editor. This extension never edits it."><Codicon name="settings-gear" /> Edit config</button>
+  </div>
 </div>
 
 <style>
@@ -134,4 +138,6 @@
   .switch[aria-checked="true"] .knob { transform: translateX(14px); background: var(--vscode-button-foreground); }
   @media (prefers-reduced-motion: reduce) { .knob { transition: none; } .dot.pending { animation-duration: 3s; } }
   .empty { padding: 0.5em 0.8em; }
+  .foot { padding: 0.25em 0.8em 0.35em; border-top: 1px solid var(--oc-hairline); font-size: 0.95em; }
+  .edit { display: inline-flex; align-items: center; gap: 0.35em; padding: 0; background: none; border: 0; font: inherit; }
 </style>
