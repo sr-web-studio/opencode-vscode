@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.8 (preview)
 
 - **Open Global Config:** a gear in the OpenCode view's title bar, **Edit config** at the bottom of the MCP servers panel, or **OpenCode: Open Global Config** opens your global OpenCode config (`~/.config/opencode/opencode.json` or `.jsonc`) in the editor. The extension only opens it; if there is none yet it asks before creating one with just the schema line. When the server runs on another computer, it tells you the config is there instead of opening a file on this one.
 - **Delete a session:** a trash icon on each row of the session list (or the Delete key on the highlighted row), or **OpenCode: Delete Session…**. It always asks first, and deletes the session and its workers on the server for every client. Running sessions, sessions with a running worker and sessions waiting for your answer cannot be deleted. The extension never deletes anything on its own.
