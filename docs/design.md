@@ -422,6 +422,7 @@ The same UI as a phone app, without VS Code-specific actions. It is a client of 
 
 - `opencode pair` already prints one-time links (single use, expire in 5 minutes) and a QR code. The link is `<server-url>/auth/connect/<code>`. `GET` with `Accept: application/json` returns `{ token }`, which is then used as the password. Sessions last 30 days, and changing the server password signs every client out.
 - The app has a QR scanner, plus manual entry of a URL and password. It saves several connection profiles in secure storage.
+- **Built (2026-11-08):** `opencode.pairMobileDevice` ("OpenCode: Pair Mobile Device…", `apps/vscode/src/extension/pair-mobile.ts`; pure logic in `pairing.ts`, panel HTML in `pairing-html.ts`). `POST /api/pair` takes no body and returns `{ code, expires_in }` (300); the extension builds `<chosen base URL>/auth/connect/<code>` itself. The QR is generated locally (`qrcode-generator`, SVG) and the panel has a strict nonce CSP. Only the one-time code is in the link, never the token; the log says only "pairing code created for <host>".
 - The VS Code extension gets a command **"OpenCode: Pair mobile device"**. It calls `POST /api/pair`, lets the user pick a reachable URL from `server.info.urls` (LAN / Tailscale) or a custom public URL, and shows the QR code in a webview with a 5-minute countdown.
 - `opencode pair --remote` (OpenTunnel) exposes the server to the internet. The app and the extension never trigger it themselves.
 
