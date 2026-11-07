@@ -400,8 +400,8 @@ The extension host runs on the office server (Remote SSH). An OS notification se
 
 Notifications from the extension only exist while VS Code is open. Once the mobile app exists, push covers the rest.
 
-### Browser tool: not published yet (Salim, 2026-11-06)
-- The VS Code integrated-browser tool (agent drives VS Code's browser via `vscode.lm.invokeTool`) is an experiment. It must not ship in a Marketplace / Open VSX release until Salim tests it and says so. Build it on its own branch, or behind a setting that is off by default; share it only as a local vsix.
+### Browser tool: dropped (Salim, 2026-11-07)
+- The extension has no browser tool. Agents use OpenCode's own [browse](https://opencode.ai/product/browse) MCP server, which drives the user's real Chrome-family browser, logins included. A VS Code integrated-browser tool was prototyped and removed: browse covers the need in any editor.
 
 ## Mobile app (Salim's "Phase 2", added 2026-11-06)
 
