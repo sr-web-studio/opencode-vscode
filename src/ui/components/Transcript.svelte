@@ -3,7 +3,7 @@
   import type { PermissionRequest } from "../../core/api"
   import type { AppState } from "../../core/protocol"
   import { initialScroll, scrollTopAfterPrepend, showJump, stepScroll, type ScrollEvent, type ScrollState } from "../../core/scroll"
-  import { isRunning } from "../../core/transcript/reducer"
+  import { isCompacting, isRunning } from "../../core/transcript/reducer"
   import { hiddenTurnCount, revertBarText, visibleTurns } from "../../core/transcript/revert"
   import { contentSignature } from "../../core/transcript/signature"
   import { runningTool } from "../../core/transcript/turn"
@@ -32,7 +32,8 @@
   // Requests that do not map to a visible tool line still need an answer.
   const orphans = $derived<PermissionRequest[]>(app.permissions.filter((p) => !p.source?.id || !toolIDs.has(p.source.id)))
   const busy = $derived(isRunning(app.view))
-  const idleSpinner = $derived(busy && !runningTool(app.view.turns) && !app.view.turns.at(-1)?.steps.at(-1)?.items.some((i) => i.kind !== "tool" && i.streaming))
+  // A pending compaction line has its own spinner, so there is no separate "Working…".
+  const idleSpinner = $derived(busy && !isCompacting(app.view) && !runningTool(app.view.turns) && !app.view.turns.at(-1)?.steps.at(-1)?.items.some((i) => i.kind !== "tool" && i.streaming))
   const revert = $derived(app.view.revert)
 
   // The prompt time above a bubble is always visible for the first prompt of a day.
