@@ -3,12 +3,12 @@
  * Pure (no `vscode`, no `node:*`): the companion extension does the downloading and the recognizing.
  *
  * Engine: sherpa-onnx (Apache-2.0), npm `sherpa-onnx-<platform>-<arch>` 2.0.1 (the native addon + onnxruntime).
- * Models: one language pack per language (streaming model for live text, optional offline model that re-decodes each
- * segment at a pause), see `voice-catalog.ts`.
+ * Models: language packs (the multilingual Nemotron model for most languages; a Bangla pack with a streaming model for
+ * live text and an offline model that re-decodes each segment at a pause), see `voice-catalog.ts`.
  * Every file is pinned to a revision and verified by size and SHA-256 (npm tarballs: by the registry's SHA-512 integrity).
  */
 import type { VoiceEngine, VoiceStartArgs } from "./dictation"
-import { normalizeLanguage, type LanguagePack, type ModelKind, type ModelRole } from "./voice-catalog"
+import { normalizeLanguage, type ModelKind, type ModelRole } from "./voice-catalog"
 
 export const SHERPA_VERSION = "2.0.1"
 
@@ -47,19 +47,23 @@ export const SHERPA_PLATFORMS: readonly string[] = Object.keys(TARGETS)
 
 /* The models and the language catalog are in `voice-catalog.ts`. */
 
-/** Where one model lives on disk: its kind and the absolute path of each file by role (what the recognizers are configured with). */
-export type ModelPaths = { kind: ModelKind; files: Partial<Record<ModelRole, string>> }
+/** Where one model lives on disk: its kind, feature size and the absolute path of each file by role (what the recognizers are configured with). */
+export type ModelPaths = { kind: ModelKind; featureDim: number; files: Partial<Record<ModelRole, string>> }
 
 /** What the recorder process needs to run the local engine for one language. */
 export type LocalPaths = {
   nativeDir: string
-  /** Language pack id (for the log). */
+  /** Language id (for the log). */
   language: string
+  /** Pack id (for the log). */
+  pack: string
+  /** Multilingual model: the value of each stream's `language` option (`es-US`, `auto`). Missing: the model has one language. */
+  locale?: string
   streaming: ModelPaths
   /** Missing: the streaming text is final. */
   offline?: ModelPaths
-  /** See `LanguagePack.streamingText`. */
-  streamingText?: LanguagePack["streamingText"]
+  /** Seconds of silence fed when stopping (see `ModelSpec.tailSeconds`). */
+  tailSeconds?: number
 }
 
 /* ------------------------------------------------------------ audio */

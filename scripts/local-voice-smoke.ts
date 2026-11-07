@@ -4,11 +4,13 @@
  * real-time pace.
  *
  *   bun run build:ext
- *   bun scripts/local-voice-smoke.ts [--lang=en|bn] [cache-dir] [file.wav ...]   # download (if needed) + recognize
- *   bun scripts/local-voice-smoke.ts [--lang=en|bn] --corrupt=native|model [cache-dir]   # a damaged download is rejected
+ *   bun scripts/local-voice-smoke.ts [--lang=<id>] [--threads=N] [cache-dir] [file.wav ...]   # download (if needed) + recognize
+ *   bun scripts/local-voice-smoke.ts [--lang=<id>] --corrupt=native|model [cache-dir]   # a damaged download is rejected
  *
- * `--lang` is a language pack id of the catalog (default: the catalog default, English). Default WAVs: Bangla
- * /tmp/opencode/sherpa/{mixed,pure}.wav, English /tmp/opencode/sherpa/en/wavs/*.wav (16 kHz mono, 16-bit).
+ * `--lang` is a language id of the catalog (`en`, `de`, `bn`, `auto`, …; default: the catalog default, English); the
+ * pack that serves it is downloaded. Default WAVs: Bangla /tmp/opencode/sherpa/{mixed,pure}.wav, English
+ * /tmp/opencode/sherpa/en/wavs/*.wav, any other language /tmp/opencode/sherpa/nemotron/wavs16/<id>.wav (16 kHz mono,
+ * 16-bit: the fake microphone plays the samples as they are, another rate would play too fast).
  *
  * The recorder runs under Node (`process.execPath` of the runner when it is node; otherwise `node`), with
  * ELECTRON_RUN_AS_NODE=1 and the native folder first in the library path, exactly as the companion does.
@@ -17,7 +19,7 @@ import { fork, execFileSync } from "node:child_process"
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join, resolve } from "node:path"
 import { IntegrityError, ensureLocal } from "../src/companion/local-install"
-import { DEFAULT_LANGUAGE, LANGUAGE_PACKS, packById } from "../src/core/voice-catalog"
+import { DEFAULT_LANGUAGE, LANGUAGES, languageById } from "../src/core/voice-catalog"
 import { envWithNative } from "../src/companion/sherpa"
 import type { FetchLike } from "../src/companion/local-install"
 import type { SessionUpdate } from "../src/companion/session"
@@ -25,18 +27,20 @@ import type { SessionUpdate } from "../src/companion/session"
 const args = process.argv.slice(2)
 const corrupt = args.find((a) => a.startsWith("--corrupt="))?.slice(10)
 const langArg = args.find((a) => a.startsWith("--lang="))?.slice(7)
-if (langArg && !packById(langArg)) {
-  console.error(`unknown --lang=${langArg}; the catalog has: ${LANGUAGE_PACKS.map((p) => p.id).join(", ")}`)
+if (langArg && !languageById(langArg)) {
+  console.error(`unknown --lang=${langArg}; the catalog has: ${LANGUAGES.map((l) => l.id).join(", ")}`)
   process.exit(2)
 }
 const language = langArg ?? DEFAULT_LANGUAGE
+const threads = Number(args.find((a) => a.startsWith("--threads="))?.slice(10)) || 2
 const rest = args.filter((a) => !a.startsWith("--"))
 const dirArg = rest.find((a) => !a.endsWith(".wav"))
 const cache = resolve(dirArg ?? "/tmp/opencode/voice-cache")
 const wavs = rest.filter((a) => a.endsWith(".wav")).map((a) => resolve(a))
 if (wavs.length === 0) {
   if (language === "bn") wavs.push("/tmp/opencode/sherpa/mixed.wav", "/tmp/opencode/sherpa/pure.wav")
-  else wavs.push(...["en-0.wav", "en-1.wav"].map((n) => `/tmp/opencode/sherpa/en/wavs/${n}`))
+  else if (language === "en") wavs.push(...["en-0.wav", "en-1.wav"].map((n) => `/tmp/opencode/sherpa/en/wavs/${n}`))
+  else wavs.push(`/tmp/opencode/sherpa/nemotron/wavs16/${language}.wav`)
 }
 
 const repo = resolve(import.meta.dirname, "..")
@@ -142,7 +146,7 @@ async function recognize(paths: Awaited<ReturnType<typeof download>>, wav: strin
     })
     child.on("exit", (code) => res({ kind: "done", final: "", error: `recorder exited (${code}) without done` }))
   })
-  child.send({ type: "start", engine: "local", paths, threads: 2, deviceIndex: -1 })
+  child.send({ type: "start", engine: "local", paths, threads, deviceIndex: -1 })
   // Speak the whole file at real-time pace, then 1 s of silence, then the user clicks stop.
   setTimeout(() => child.send({ type: "stop" }), 1500 + (seconds + 1) * 1000 + 3000)
   const result = await done

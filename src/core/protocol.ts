@@ -111,8 +111,10 @@ export type AppState = {
    * Voice input. `engine`: the chosen speech engine. `ready`: a click on the mic can start dictation (local: this
    * computer has the engine; soniox: the user saved a working key, which itself never reaches the webview).
    * `capture`: the recording companion is reachable. `recording`: the state of the current dictation.
+   * `languages`: the active on-device languages (`opencode.voice.localLanguages`), the first one records; the label
+   * next to the mic shows it (only for the `local` engine, and a click switches when there are two or more).
    */
-  voice: { engine: VoiceEngine; ready: boolean; capture: boolean; recording: "off" | "starting" | "on" | "stopping" }
+  voice: { engine: VoiceEngine; ready: boolean; capture: boolean; recording: "off" | "starting" | "on" | "stopping"; languages: string[] }
   /** The server's slash commands (`command.list`), refreshed when the popup opens. */
   commands: CommandSummary[]
   /** The server's skills (`skill.list`), loaded when `/skills` is used. */
@@ -186,6 +188,8 @@ export type HostRequest =
   | { type: "openExternal"; url: string }
   | { type: "setCliPath" }
   | { type: "voice" }
+  /** The language label next to the mic: the next active on-device language becomes the current one. */
+  | { type: "voiceLanguage" }
   | { type: "reconnect" }
   | { type: "notify"; level: "info" | "warning" | "error"; message: string }
 

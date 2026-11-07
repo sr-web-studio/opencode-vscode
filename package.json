@@ -114,6 +114,11 @@
         "category": "OpenCode"
       },
       {
+        "command": "opencode.voice.switchLanguage",
+        "title": "Switch Voice Language",
+        "category": "OpenCode"
+      },
+      {
         "command": "opencode.voice.toggle",
         "title": "Voice Input",
         "category": "OpenCode",
@@ -265,11 +270,124 @@
             "soniox"
           ],
           "enumDescriptions": [
-            "On this computer: free and offline. English by default; choose another language with OpenCode: Choose Voice Language. Downloads the language you use, once.",
+            "On this computer: free and offline. One multilingual model (NVIDIA Nemotron 3.5, about 693 MB with the speech engine) covers English and about 28 other languages; Bangla is an optional extra pack. Downloaded once, the first time you use it. Choose languages with OpenCode: Choose Voice Language.",
             "Cloud, with your own paid Soniox key: better accuracy, mixed languages, many languages."
           ],
           "default": "local",
-          "markdownDescription": "Which speech engine voice input uses.\n\n- `local`: free, offline, runs on this computer. Speaks the language of `opencode.voice.localLanguage` (English by default). Downloads that language once (speech engine and models, roughly 180 to 210 MB), the first time you use it.\n- `soniox`: cloud, with your own paid key (**OpenCode: Set Voice API Key (Soniox)**). Better accuracy, mixed languages, many languages (`opencode.voice.languages`)."
+          "markdownDescription": "Which speech engine voice input uses.\n\n- `local`: free, offline, runs on this computer. Speaks the current language of `opencode.voice.localLanguages` (English by default). Downloads once, the first time you use it: the multilingual model (about 693 MB with the speech engine; one model for English and about 28 other languages) or, for Bangla, a separate pack (about 179 MB).\n- `soniox`: cloud, with your own paid key (**OpenCode: Set Voice API Key (Soniox)**). Better accuracy, mixed languages, many languages (`opencode.voice.languages`)."
+        },
+        "opencode.voice.localLanguages": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "en",
+              "es",
+              "fr",
+              "de",
+              "it",
+              "pt",
+              "nl",
+              "tr",
+              "ru",
+              "uk",
+              "ar",
+              "hi",
+              "ja",
+              "ko",
+              "vi",
+              "pl",
+              "sv",
+              "cs",
+              "nb",
+              "da",
+              "bg",
+              "fi",
+              "hr",
+              "sk",
+              "hu",
+              "ro",
+              "et",
+              "zh",
+              "bn"
+            ],
+            "enumItemLabels": [
+              "Detect automatically",
+              "English",
+              "Spanish (Español)",
+              "French (Français)",
+              "German (Deutsch)",
+              "Italian (Italiano)",
+              "Portuguese (Português)",
+              "Dutch (Nederlands)",
+              "Turkish (Türkçe)",
+              "Russian (Русский)",
+              "Ukrainian (Українська)",
+              "Arabic (العربية)",
+              "Hindi (हिन्दी)",
+              "Japanese (日本語)",
+              "Korean (한국어)",
+              "Vietnamese (Tiếng Việt)",
+              "Polish (Polski)",
+              "Swedish (Svenska)",
+              "Czech (Čeština)",
+              "Norwegian Bokmål (Norsk bokmål)",
+              "Danish (Dansk)",
+              "Bulgarian (Български)",
+              "Finnish (Suomi)",
+              "Croatian (Hrvatski)",
+              "Slovak (Slovenčina)",
+              "Hungarian (Magyar)",
+              "Romanian (Română)",
+              "Estonian (Eesti)",
+              "Mandarin Chinese (中文)",
+              "Bangla (বাংলা)"
+            ],
+            "enumDescriptions": [
+              "Multilingual model. The model guesses the language it hears; it can guess wrong on short phrases or after a long silence. Choose a language for best results.",
+              "Multilingual model (about 682 MB, shared by all languages except Bangla).",
+              "Multilingual model (about 682 MB, shared). Latin American Spanish; European Spanish is understood too.",
+              "Multilingual model (about 682 MB, shared).",
+              "Multilingual model (about 682 MB, shared).",
+              "Multilingual model (about 682 MB, shared).",
+              "Multilingual model (about 682 MB, shared). Brazilian Portuguese.",
+              "Multilingual model (about 682 MB, shared).",
+              "Multilingual model (about 682 MB, shared).",
+              "Multilingual model (about 682 MB, shared).",
+              "Multilingual model (about 682 MB, shared).",
+              "Multilingual model (about 682 MB, shared). Modern Standard Arabic; measured text had mistakes.",
+              "Multilingual model (about 682 MB, shared).",
+              "Multilingual model (about 682 MB, shared).",
+              "Multilingual model (about 682 MB, shared). Written without spaces between some words.",
+              "Multilingual model (about 682 MB, shared).",
+              "Multilingual model (about 682 MB, shared). Broad coverage: lower accuracy.",
+              "Multilingual model (about 682 MB, shared). Broad coverage: lower accuracy.",
+              "Multilingual model (about 682 MB, shared). Broad coverage: lower accuracy.",
+              "Multilingual model (about 682 MB, shared). Broad coverage: lower accuracy.",
+              "Multilingual model (about 682 MB, shared). Broad coverage: lower accuracy.",
+              "Multilingual model (about 682 MB, shared). Broad coverage: lower accuracy.",
+              "Multilingual model (about 682 MB, shared). Broad coverage: lower accuracy.",
+              "Multilingual model (about 682 MB, shared). Broad coverage: lower accuracy.",
+              "Multilingual model (about 682 MB, shared). Broad coverage: lower accuracy.",
+              "Multilingual model (about 682 MB, shared). Broad coverage: lower accuracy.",
+              "Multilingual model (about 682 MB, shared). Broad coverage: lower accuracy.",
+              "Multilingual model (about 682 MB, shared). Broad coverage: lower accuracy.",
+              "Multilingual model (about 682 MB, shared). Weak: expect many mistakes.",
+              "Separate optional pack: Vosk streaming model for live text, bangla-zipformer (CC BY-SA 4.0) for the final text. About 168 MB (179 MB with the speech engine)."
+            ]
+          },
+          "default": [
+            "en"
+          ],
+          "markdownDescription": "The languages you speak with the on-device engine (`opencode.voice.engine`: `local`), at most `opencode.voice.maxLanguages`. **The first one is the current language and the only one that records**; one model runs at a time. Switch with **OpenCode: Switch Voice Language** or by clicking the language label next to the mic in the prompt box. Easier than editing: run **OpenCode: Choose Voice Language**, which groups languages by download and marks what is already on this computer.\n\nWhen this setting is not set, the old single setting `opencode.voice.localLanguage` is used as the list. Choosing or switching languages writes this setting."
+        },
+        "opencode.voice.maxLanguages": {
+          "type": "number",
+          "default": 2,
+          "minimum": 1,
+          "maximum": 5,
+          "markdownDescription": "How many languages can be active at once in `opencode.voice.localLanguages` (default 2). What it costs:\n\n- Languages that share the multilingual model (every language except Bangla) cost nothing extra: one download (about 682 MB), one model.\n- Each extra separate pack costs its download on disk: Bangla is about 168 MB.\n- Only one model is loaded while you record, so RAM and CPU do not grow with this number (the multilingual model needs about 1 GB of RAM while you record).\n- Switching to a language from another pack reloads the model: about 2 seconds (measured 1.6 to 1.7 s to load the multilingual model; the Bangla models are smaller). Switching between languages of the same pack needs no reload of the files, only a new recording.\n\nPacks you no longer use are never deleted by themselves: **OpenCode Voice: Remove Downloaded Languages** deletes them."
         },
         "opencode.voice.localLanguage": {
           "type": "string",
@@ -282,18 +400,19 @@
             "Bangla (বাংলা)"
           ],
           "enumDescriptions": [
-            "Streaming Zipformer for live text, Moonshine Tiny for cased, punctuated final text. About 205 MB with the speech engine.",
-            "Vosk streaming Zipformer for live text, bangla-zipformer (CC BY-SA 4.0) for final text. About 180 MB with the speech engine."
+            "English (multilingual model).",
+            "Bangla (separate pack)."
           ],
           "default": "en",
-          "markdownDescription": "Language of the on-device engine (`opencode.voice.engine`: `local`). Only the language you choose is downloaded, the first time you use it. Easier: run **OpenCode: Choose Voice Language**, which shows what each language needs and which are already on this computer."
+          "deprecationMessage": "Use opencode.voice.localLanguages (a list; the first entry is the current language). This single value is still read while localLanguages is not set.",
+          "markdownDescription": "**Deprecated**: use `opencode.voice.localLanguages`. The single on-device language of earlier versions (`en` or `bn`). It is still honoured while `opencode.voice.localLanguages` is not set, and then becomes the first entry of the list. Choosing or switching a language writes `localLanguages` and this value is no longer used."
         },
         "opencode.voice.localThreads": {
           "type": "number",
           "default": 2,
           "minimum": 1,
           "maximum": 8,
-          "markdownDescription": "CPU threads the on-device engine uses for each of its two models. The default is fine; raise it only on a slow computer with many cores."
+          "markdownDescription": "CPU threads the on-device model uses. The default (2) is the fastest we measured with the multilingual model (real-time factor about 0.32; 1 thread about 0.45; 4 threads about 0.8, slower, because the threads fight over memory). Change it only when you measured a gain on your computer."
         },
         "opencode.voice.languages": {
           "type": "array",
@@ -304,7 +423,7 @@
             "bn",
             "en"
           ],
-          "markdownDescription": "Languages you speak, as ISO codes (for example `bn`, `en`, `hi`). Soniox uses them as hints; it still hears other languages. Only for the `soniox` engine: the on-device engine uses `opencode.voice.localLanguage`."
+          "markdownDescription": "Languages you speak, as ISO codes (for example `bn`, `en`, `hi`). Soniox uses them as hints; it still hears other languages. Only for the `soniox` engine: the on-device engine uses `opencode.voice.localLanguages`."
         },
         "opencode.voice.model": {
           "type": "string",

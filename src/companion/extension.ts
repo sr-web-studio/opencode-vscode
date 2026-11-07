@@ -3,8 +3,8 @@ import { execFile, fork, spawn, type ChildProcess } from "node:child_process"
 import { join } from "node:path"
 import { COMPANION, VOICE_FEED_COMMAND, type CompanionInfo, type VoiceFeed, type VoiceFix, type VoiceStartArgs } from "../core/dictation"
 import { SHERPA_PLATFORMS, clampThreads, sherpaTarget, type LocalPaths } from "../core/local-voice"
-import { downloadDetail, downloadWhat, languageItems, megabytes, packBytes, packFor, type LanguagePack } from "../core/voice-catalog"
-import { IntegrityError, ensureLocal, installedLanguages, isInstalled, localState, missingBytes, removeLanguages } from "./local-install"
+import { CATALOG, downloadDetail, downloadPrompt, languageFor, megabytes, packBytes, packFor, type LanguagePack } from "../core/voice-catalog"
+import { IntegrityError, ensureLocal, installedLanguages, isInstalled, localState, missingBytes, removeLanguages, removeUnknownModels } from "./local-install"
 import { envWithNative } from "./sherpa"
 import { WINDOWS_QUERIES, deniedMessage, micSettingsTarget, windowsMicPermission, type MicPermission } from "./privacy"
 import { SILENT_PEAK, type SessionUpdate } from "./session"
@@ -251,7 +251,7 @@ const storageOptions = (context: vscode.ExtensionContext) => ({ storage: context
 /** Ask once, in a notification, before the on-device download of a language. Returns what the user chose. */
 async function askDownload(pack: LanguagePack, bytes: number, engineMissing: boolean): Promise<"download" | "soniox" | "language" | "cancel"> {
   const pick = await vscode.window.showInformationMessage(
-    `On-device voice needs a one-time download of about ${megabytes(bytes)} MB (${downloadWhat(pack, engineMissing)}). Download now?`,
+    downloadPrompt(pack, bytes, engineMissing),
     { detail: downloadDetail(pack) },
     "Download",
     "Choose Language",
@@ -260,8 +260,27 @@ async function askDownload(pack: LanguagePack, bytes: number, engineMissing: boo
   return pick === "Download" ? "download" : pick === "Use Soniox instead" ? "soniox" : pick === "Choose Language" ? "language" : "cancel"
 }
 
+let cleaned = false
+
+/**
+ * Once per window, after the engine for the chosen language is ready: delete model folders the catalog no longer lists
+ * (the English Zipformer + Moonshine of earlier versions, ~200 MB). Only our own folders under `models/`; see
+ * `removeUnknownModels`. Never blocks or fails a recording.
+ */
+async function cleanOldModels(context: vscode.ExtensionContext): Promise<void> {
+  if (cleaned) return
+  cleaned = true
+  try {
+    const removed = await removeUnknownModels(storageOptions(context))
+    if (removed.length) log.info(`Removed model folders the catalog no longer uses: ${removed.join(", ")}`)
+  } catch (e) {
+    log.warn(`Could not remove old model folders: ${e instanceof Error ? e.message : e}`)
+  }
+}
+
 /** Download what the local engine needs for one language (with progress). Returns undefined when cancelled or failed (already reported). */
-async function prepareLocal(context: vscode.ExtensionContext, pack: LanguagePack): Promise<LocalPaths | undefined | "soniox"> {
+async function prepareLocal(context: vscode.ExtensionContext, language: string): Promise<LocalPaths | undefined | "soniox"> {
+  const pack = packFor(language)
   const opts = storageOptions(context)
   const state = await localState(opts)
   if (!state.target) {
@@ -280,14 +299,15 @@ async function prepareLocal(context: vscode.ExtensionContext, pack: LanguagePack
   }
   const ctl = new AbortController()
   try {
-    return await vscode.window.withProgress(
-      { location: vscode.ProgressLocation.Notification, title: `OpenCode Voice: downloading the on-device engine (${pack.name})`, cancellable: true },
+    const ready = isInstalled(state, pack)
+    const paths = await vscode.window.withProgress(
+      { location: vscode.ProgressLocation.Notification, title: ready ? "OpenCode Voice: loading the on-device engine" : `OpenCode Voice: downloading the on-device engine (${pack.name})`, cancellable: !ready },
       (progress, token) => {
         token.onCancellationRequested(() => ctl.abort())
         let last = 0
         return ensureLocal({
           ...opts,
-          language: pack.id,
+          language,
           signal: ctl.signal,
           log: (l) => log.info(l),
           onProgress: (p) => {
@@ -299,6 +319,8 @@ async function prepareLocal(context: vscode.ExtensionContext, pack: LanguagePack
         })
       },
     )
+    void cleanOldModels(context)
+    return paths
   } catch (e) {
     if (ctl.signal.aborted) {
       log.info("On-device engine download cancelled")
@@ -324,9 +346,9 @@ async function start(context: vscode.ExtensionContext, args: VoiceStartArgs): Pr
   }
   let paths: LocalPaths | undefined
   if (engine === "local") {
-    const pack = packFor(args.localLanguage)
-    log.info(`Voice engine: local, language ${pack.id} (${process.platform}/${process.arch}; Electron ${process.versions.electron ?? "-"}, Node ${process.versions.node}, v8 ${process.versions.v8}, modules ${process.versions.modules})`)
-    const prepared = await prepareLocal(context, pack)
+    const language = languageFor(args.localLanguage)
+    log.info(`Voice engine: local, language ${language.id} (pack ${language.pack}; ${process.platform}/${process.arch}; Electron ${process.versions.electron ?? "-"}, Node ${process.versions.node}, v8 ${process.versions.v8}, modules ${process.versions.modules})`)
+    const prepared = await prepareLocal(context, language.id)
     if (prepared === "soniox") {
       void vscode.workspace.getConfiguration("opencode.voice").update("engine", "soniox", vscode.ConfigurationTarget.Global)
       feed({ id: args.id, kind: "done", final: "", error: "Switched to the Soniox engine. Add your Soniox key with “OpenCode: Set Voice API Key (Soniox)”, then click the mic again." })
@@ -391,13 +413,17 @@ async function removeDownloadedLanguages(context: vscode.ExtensionContext): Prom
     void vscode.window.showInformationMessage("OpenCode Voice: no on-device language is downloaded on this computer.")
     return
   }
-  const items = languageItems({ installed: have, current: "" })
-    .filter((i) => have.includes(i.id))
-    .map((i) => ({ label: i.label, description: `${megabytes(packBytes(packFor(i.id)))} MB`, detail: i.detail, id: i.id }))
-  const picked = await vscode.window.showQuickPick(items, { title: "OpenCode Voice: remove downloaded languages", placeHolder: "Select the languages to delete from this computer", canPickMany: true })
+  // One entry per downloaded pack (a pack serves several languages), with the languages it serves.
+  const items = CATALOG.packs
+    .filter((p) => have.includes(p.id))
+    .map((p) => {
+      const names = CATALOG.languages.filter((l) => l.pack === p.id && l.id !== "auto").map((l) => l.name)
+      return { label: p.name, description: `${megabytes(packBytes(p))} MB`, detail: names.length > 6 ? `${names.slice(0, 6).join(", ")} and ${names.length - 6} more languages` : names.join(", "), id: p.id }
+    })
+  const picked = await vscode.window.showQuickPick(items, { title: "OpenCode Voice: remove downloaded models", placeHolder: "Select the models to delete from this computer", canPickMany: true })
   if (!picked || picked.length === 0) return
   const removed = await removeLanguages(opts, picked.map((p) => p.id))
-  log.info(`Removed languages ${picked.map((p) => p.id).join(", ")} (models deleted: ${removed.join(", ") || "none"})`)
+  log.info(`Removed packs ${picked.map((p) => p.id).join(", ")} (models deleted: ${removed.join(", ") || "none"})`)
   void vscode.window.showInformationMessage(`OpenCode Voice: removed ${picked.map((p) => p.label).join(", ")} from this computer. It is downloaded again if you use it.`)
 }
 

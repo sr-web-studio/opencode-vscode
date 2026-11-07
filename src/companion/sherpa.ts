@@ -5,7 +5,7 @@
  */
 import { join } from "node:path"
 import type { ModelPaths, LocalPaths } from "../core/local-voice"
-import { STREAMING_KINDS, applyTextStyle, type ModelRole } from "../core/voice-catalog"
+import { STREAMING_KINDS, type ModelRole } from "../core/voice-catalog"
 import { errorText } from "./shared"
 import type { LocalEngine, LocalStream } from "./local-session"
 
@@ -15,6 +15,8 @@ interface Addon {
   onnxruntimeVersion?: string
   createOnlineRecognizer(config: unknown): unknown
   createOnlineStream(recognizer: unknown): unknown
+  /** sherpa-onnx 2.0.1: per-stream options (`language` for multilingual Nemotron). */
+  onlineStreamSetOption?(stream: unknown, key: string, value: string): void
   acceptWaveformOnline(stream: unknown, wave: { samples: Float32Array; sampleRate: number }): void
   inputFinished(stream: unknown): void
   isOnlineStreamReady(recognizer: unknown, stream: unknown): boolean
@@ -71,12 +73,13 @@ export function modelConfig(m: ModelPaths, threads: number): Record<string, unkn
   switch (m.kind) {
     case "transducer":
       return { transducer: { encoder: f.encoder, decoder: f.decoder, joiner: f.joiner }, ...common }
-    case "moonshine":
-      return { moonshine: { preprocessor: f.preprocessor, encoder: f.encoder, uncachedDecoder: f.uncachedDecoder, cachedDecoder: f.cachedDecoder }, ...common }
     default:
       throw new Error(`model kind ${String((m as ModelPaths).kind)} is not supported by this build`)
   }
 }
+
+/** `featConfig` of one model: 16 kHz and the model's own filter-bank size (Nemotron 128, the others 80). */
+export const featConfig = (m: ModelPaths): { sampleRate: number; featureDim: number } => ({ sampleRate, featureDim: m.featureDim })
 
 /** Load the addon and the recognizers of one language. Timings go to `log`. */
 export function loadEngine(paths: LocalPaths, threads: number, log: (line: string) => void): LocalEngine {
@@ -88,19 +91,19 @@ export function loadEngine(paths: LocalPaths, threads: number, log: (line: strin
 
   const t1 = performance.now()
   const online = addon.createOnlineRecognizer({
-    featConfig: { sampleRate, featureDim: 80 },
+    featConfig: featConfig(paths.streaming),
     modelConfig: modelConfig(paths.streaming, threads),
     decodingMethod: "greedy_search",
     enableEndpoint: true,
   })
   loadMs.streaming = performance.now() - t1
-  log(`Language ${paths.language}: streaming model (${paths.streaming.kind}) loaded in ${loadMs.streaming.toFixed(0)} ms (${threads} threads)`)
+  log(`Language ${paths.language} (pack ${paths.pack}): streaming model (${paths.streaming.kind}, ${paths.streaming.featureDim} features) loaded in ${loadMs.streaming.toFixed(0)} ms (${threads} threads)`)
 
   let offline: unknown
   if (paths.offline) {
     const t2 = performance.now()
     offline = addon.createOfflineRecognizer({
-      featConfig: { sampleRate, featureDim: 80 },
+      featConfig: featConfig(paths.offline),
       modelConfig: modelConfig(paths.offline, threads),
       decodingMethod: "greedy_search",
     })
@@ -108,21 +111,31 @@ export function loadEngine(paths: LocalPaths, threads: number, log: (line: strin
     log(`Offline model (${paths.offline.kind}) loaded in ${loadMs.offline.toFixed(0)} ms (${threads} threads)`)
   }
 
-  const style = (text: string) => applyTextStyle(paths.streamingText, text)
   const handle = addon.createOnlineStream(online)
+  if (paths.locale) {
+    // Multilingual Nemotron: the language is a per-stream option, read on every decode call. It survives `reset()`.
+    // Source: sherpa-onnx v2.0.1 nodejs-addon-examples/test_asr_streaming_nemotron.js (`stream.setOption('language', …)`).
+    if (!addon.onlineStreamSetOption) throw new Error("this speech engine cannot select a language (it needs sherpa-onnx 2.0.1 or newer)")
+    addon.onlineStreamSetOption(handle, "language", paths.locale)
+    log(`Spoken language: ${paths.language} → model locale ${paths.locale}`)
+  }
   const stream: LocalStream = {
     accept: (samples) => addon.acceptWaveformOnline(handle, { samples, sampleRate }),
     inputFinished: () => addon.inputFinished(handle),
     decodeReady: () => {
       while (addon.isOnlineStreamReady(online, handle)) addon.decodeOnlineStream(online, handle)
     },
-    text: () => style((JSON.parse(addon.getOnlineStreamResultAsJson(online, handle)) as { text?: string }).text ?? ""),
+    text: () => (JSON.parse(addon.getOnlineStreamResultAsJson(online, handle)) as { text?: string }).text ?? "",
     endpoint: () => !!addon.isEndpoint(online, handle),
     reset: () => addon.reset(online, handle),
   }
 
   return {
     stream,
+    tailSeconds: paths.tailSeconds,
+    // A multilingual model reads the first words after a reset of an empty segment worse (measured: English came out
+    // in Devanagari), so an endpoint without words keeps the stream as it is.
+    resetOnSilence: !paths.locale,
     loadMs,
     offline: offline
       ? (samples) => {

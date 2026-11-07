@@ -10,13 +10,13 @@
  * No `vscode` import: the dev smoke script uses this module too.
  */
 import { createHash, randomBytes } from "node:crypto"
-import { createWriteStream } from "node:fs"
-import { chmod, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises"
+import { createWriteStream, type Dirent } from "node:fs"
+import { chmod, mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 import { gunzipSync } from "node:zlib"
 import { LOCAL_ROOT, SHERPA_VERSION, sherpaTarget, type LocalPaths, type ModelPaths, type SherpaTarget } from "../core/local-voice"
 import { parseTar, stripTopFolder } from "../core/tar"
-import { LANGUAGE_PACKS, REQUIRED_ROLES, modelBytes, modelUrl, packFor, packModels, modelsToRemove, type LanguagePack, type ModelSpec } from "../core/voice-catalog"
+import { CATALOG, REQUIRED_ROLES, knownModelIds, languageFor, modelBytes, modelUrl, packModels, modelsToRemove, packFor, type Catalog, type LanguagePack, type ModelSpec } from "../core/voice-catalog"
 
 export type FetchLike = (url: string, init?: { signal?: AbortSignal }) => Promise<{ ok: boolean; status: number; body: ReadableStream<Uint8Array> | null }>
 
@@ -34,7 +34,7 @@ export type InstallOptions = {
   /** Abort a download that receives nothing for this long. */
   stallMs?: number
   /** The language catalog (tests pass their own). */
-  packs?: readonly LanguagePack[]
+  catalog?: Catalog
 }
 
 /** The integrity or hash of a download did not match: the file is deleted and never used. */
@@ -66,7 +66,7 @@ export function modelPaths(m: ModelSpec, dir: string): ModelPaths {
   const files: ModelPaths["files"] = {}
   for (const f of m.files) files[f.role] = join(dir, f.name)
   for (const role of REQUIRED_ROLES[m.kind]) if (!files[role]) throw new Error(`model ${m.id} has no ${role} file`)
-  return { kind: m.kind, files }
+  return { kind: m.kind, featureDim: m.featureDim, files }
 }
 
 /* ------------------------------------------------------------ ready markers */
@@ -90,7 +90,7 @@ async function isReady(dir: string): Promise<boolean> {
 /** `models`: ids of the catalog's models that are fully on disk (whichever pack they belong to). */
 export type LocalState = { native: boolean; models: string[]; target?: SherpaTarget }
 
-type StateOptions = Pick<InstallOptions, "storage" | "platform" | "arch" | "packs">
+type StateOptions = Pick<InstallOptions, "storage" | "platform" | "arch" | "catalog">
 
 const allModels = (packs: readonly LanguagePack[]): ModelSpec[] => {
   const out: ModelSpec[] = []
@@ -103,7 +103,7 @@ export async function localState(o: StateOptions): Promise<LocalState> {
   const target = sherpaTarget(o.platform, o.arch)
   if (!target) return { native: false, models: [] }
   const l = layout(o.storage, target)
-  const models = allModels(o.packs ?? LANGUAGE_PACKS)
+  const models = allModels((o.catalog ?? CATALOG).packs)
   const [native, ready] = await Promise.all([isReady(l.nativeDir), Promise.all(models.map((m) => isReady(l.modelDir(m))))])
   return { native, models: models.filter((_, i) => ready[i]).map((m) => m.id), target }
 }
@@ -112,7 +112,7 @@ export async function localState(o: StateOptions): Promise<LocalState> {
 export const isInstalled = (s: LocalState, pack: LanguagePack): boolean => s.native && packModels(pack).every((m) => s.models.includes(m.id))
 
 /** Ids of the packs whose models are all on this computer (the engine is not counted: it is the same for all). */
-export const installedLanguages = (s: LocalState, packs: readonly LanguagePack[] = LANGUAGE_PACKS): string[] =>
+export const installedLanguages = (s: LocalState, packs: readonly LanguagePack[] = CATALOG.packs): string[] =>
   packs.filter((p) => packModels(p).every((m) => s.models.includes(m.id))).map((p) => p.id)
 
 /** Bytes still to download to use `pack`: what is missing of the engine and of its models. */
@@ -241,14 +241,16 @@ async function installNative(target: SherpaTarget, dir: string, o: InstallOption
 }
 
 /**
- * Make sure the engine and the models of one language pack are on disk (downloading what is missing; a model another
- * pack already downloaded is not fetched again) and return where they are. `language` is a catalog id (unknown → the
- * default). Throws `IntegrityError` for a download that does not match, `Error("cancelled")` when `signal` aborts.
+ * Make sure the engine and the models of the pack that serves one language are on disk (downloading what is missing; a
+ * model another pack already downloaded is not fetched again) and return where they are. `language` is a catalog
+ * language id (unknown → the default). Throws `IntegrityError` for a download that does not match, `Error("cancelled")`
+ * when `signal` aborts.
  */
 export async function ensureLocal(o: InstallOptions & { language?: string }): Promise<LocalPaths> {
   const target = sherpaTarget(o.platform, o.arch)
   if (!target) throw new Error(`The on-device engine is not available for ${o.platform}/${o.arch}.`)
-  const pack = packFor(o.language, o.packs)
+  const language = languageFor(o.language, o.catalog)
+  const pack = packFor(language.id, o.catalog)
   const l = layout(o.storage, target)
   await mkdir(l.root, { recursive: true })
   const state = await localState(o)
@@ -262,25 +264,60 @@ export async function ensureLocal(o: InstallOptions & { language?: string }): Pr
   for (const m of packModels(pack)) if (!state.models.includes(m.id)) await installModel(m, l.modelDir(m), o, report)
   return {
     nativeDir: l.nativeDir,
-    language: pack.id,
+    language: language.id,
+    pack: pack.id,
+    locale: language.locale,
     streaming: modelPaths(pack.streaming, l.modelDir(pack.streaming)),
     offline: pack.offline ? modelPaths(pack.offline, l.modelDir(pack.offline)) : undefined,
-    streamingText: pack.streamingText,
+    tailSeconds: pack.streaming.tailSeconds,
   }
 }
 
 /**
- * Delete the downloaded models of the given languages, except models another installed language still uses.
+ * Delete the downloaded models of the given packs (pack ids), except models another installed pack still uses.
  * Returns the ids of the deleted models. The speech engine stays (it is small and shared).
  */
-export async function removeLanguages(o: StateOptions, languages: readonly string[]): Promise<string[]> {
-  const packs = o.packs ?? LANGUAGE_PACKS
+export async function removeLanguages(o: StateOptions, packIds: readonly string[]): Promise<string[]> {
+  const cat = o.catalog ?? CATALOG
   const state = await localState(o)
   if (!state.target) return []
   const l = layout(o.storage, state.target)
-  const doomed = modelsToRemove(languages, installedLanguages(state, packs), packs).filter((m) => state.models.includes(m.id))
+  const doomed = modelsToRemove(packIds, installedLanguages(state, cat.packs), cat.packs).filter((m) => state.models.includes(m.id))
   for (const m of doomed) await rm(l.modelDir(m), { recursive: true, force: true })
   return doomed.map((m) => m.id)
+}
+
+/** A folder name we could have created: a catalog model id, a leftover `<id>.tmp-<hex>`, never anything else. */
+const OURS = /^[a-z0-9][a-z0-9._-]*$/
+
+/**
+ * Delete model folders under `<storage>/local-voice/v1/models/` that the catalog does not list any more (the English
+ * Zipformer and Moonshine models of earlier versions, interrupted downloads). Only direct children of that folder are
+ * looked at; a folder is removed only when its name looks like one we create, it is a real directory (symlinks are left
+ * alone) and it holds our `ready.json` marker or `.tmp-` leftovers. Returns the folder names removed.
+ */
+export async function removeUnknownModels(o: StateOptions): Promise<string[]> {
+  const target = sherpaTarget(o.platform, o.arch)
+  if (!target) return []
+  const models = join(layout(o.storage, target).root, "models")
+  const known = new Set(knownModelIds(o.catalog ?? CATALOG))
+  let names: Dirent[]
+  try {
+    names = await readdir(models, { withFileTypes: true })
+  } catch {
+    return []
+  }
+  const removed: string[] = []
+  for (const e of names) {
+    if (!e.isDirectory() || e.isSymbolicLink() || !OURS.test(e.name) || known.has(e.name)) continue
+    const dir = join(models, e.name)
+    const leftover = /\.tmp-[0-9a-f]{8}$/.test(e.name) && known.has(e.name.replace(/\.tmp-[0-9a-f]{8}$/, ""))
+    const ours = leftover || (await readFile(join(dir, "ready.json"), "utf8").then(() => true, () => false))
+    if (!ours) continue
+    await rm(dir, { recursive: true, force: true })
+    removed.push(e.name)
+  }
+  return removed
 }
 
 /** Remove everything the local engine downloaded (not used by the extension itself; for the dev script and support). */

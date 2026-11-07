@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { DEFAULT_ENGINE, normalizeEngine } from "../../src/core/dictation"
 import { appendSegment, clampThreads, concatFloat32, heardText, int16ToFloat32, micLabel, micTitle, startArgs, voiceReady } from "../../src/core/local-voice"
+import { cycleLanguages } from "../../src/core/voice-catalog"
 import { envWithNative, libraryPathVar } from "../../src/companion/sherpa"
 
 describe("audio conversion", () => {
@@ -59,7 +60,16 @@ describe("engine selection", () => {
     expect(clampThreads(3.4)).toBe(3)
     expect(clampThreads(Number.NaN)).toBe(2)
   })
-  test("local start arguments carry the language pack; unknown or missing values mean English", () => {
+  test("start args use the current language: the first entry of the active list; after a switch the other one", () => {
+    const active = ["en", "bn"]
+    expect(startArgs({ id: "d1", engine: "local", languages: [], localLanguage: active[0] }).localLanguage).toBe("en")
+    const switched = cycleLanguages(active)
+    expect(startArgs({ id: "d2", engine: "local", languages: [], localLanguage: switched[0] }).localLanguage).toBe("bn")
+    expect(startArgs({ id: "d3", engine: "local", languages: [], localLanguage: "ja" }).localLanguage).toBe("ja") // any catalog language, not only en/bn
+    expect(startArgs({ id: "d4", engine: "local", languages: [], localLanguage: "auto" }).localLanguage).toBe("auto")
+  })
+
+  test("local start arguments carry the language; unknown or missing values mean English", () => {
     expect(startArgs({ id: "d1", engine: "local", languages: ["bn"], localLanguage: "bn" }).localLanguage).toBe("bn")
     expect(startArgs({ id: "d1", engine: "local", languages: [], localLanguage: " BN " }).localLanguage).toBe("bn")
     expect(startArgs({ id: "d1", engine: "local", languages: [] }).localLanguage).toBe("en")

@@ -12,6 +12,7 @@
   } from "../../core/attachments"
   import { mergeDictation } from "../../core/dictation"
   import { micLabel, micTitle } from "../../core/local-voice"
+  import { languageCode, languageLabel, languageTitle } from "../../core/voice-catalog"
   import { shouldFocusPrompt } from "../../core/focus"
   import { cycleAgent, findModel } from "../../core/models"
   import { promptHeight } from "../../core/prompt-height"
@@ -398,6 +399,19 @@
     <div class="actions">
       <button class="clip muted" onclick={pick} title="Attach files" aria-label="Attach files"><Codicon name="attach" /></button>
       <span class="grow"></span>
+      <!-- On-device engine: the spoken language. A click switches to the next active language. `mousedown` is not allowed to
+           move focus, so the caret stays in the prompt box; the keyboard reaches it with Tab (Enter/Space switch). -->
+      {#if app.voice.engine === "local"}
+        <button
+          class="lang muted"
+          class:off={recording !== "off"}
+          aria-disabled={recording !== "off"}
+          onmousedown={(e) => e.preventDefault()}
+          onclick={() => recording === "off" && store.bridge.voiceLanguage()}
+          title={languageTitle(app.voice.languages)}
+          aria-label={languageLabel(app.voice.languages)}
+        >{languageCode(app.voice.languages[0] ?? "en")}</button>
+      {/if}
       <!-- When it cannot start yet (no Soniox key) the mic only looks disabled: a click opens the key dialog, so it stays focusable and clickable. -->
       <button
         class="mic muted"
@@ -436,6 +450,9 @@
   .grow { flex: 1; }
   .clip { display: inline-flex; align-items: center; padding: 0.2em 0.3em; border-radius: 4px; }
   .clip:hover { color: var(--oc-fg); background: var(--oc-hover); }
+  .lang { display: inline-flex; align-items: center; padding: 0.2em 0.35em; border-radius: 4px; font-size: 0.78em; font-weight: 600; letter-spacing: 0.04em; line-height: 1.6; }
+  .lang:hover { color: var(--oc-fg); background: var(--oc-hover); }
+  .lang.off { opacity: 0.45; }
   .mic { display: inline-flex; align-items: center; padding: 0.2em 0.3em; border-radius: 4px; }
   .mic:hover { color: var(--oc-fg); background: var(--oc-hover); }
   .mic.off { opacity: 0.45; }

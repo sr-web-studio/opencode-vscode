@@ -165,6 +165,8 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("opencode.voice.clearKey", () => voice.clearKey()),
     vscode.commands.registerCommand("opencode.voice.toggle", () => voice.click()),
     vscode.commands.registerCommand("opencode.voice.chooseLanguage", () => voice.chooseLanguage()),
+    // From the palette: pick among the active languages; from the label next to the mic ("next"): cycle.
+    vscode.commands.registerCommand("opencode.voice.switchLanguage", (how?: unknown) => voice.switchLanguage(how !== "next")),
     // The companion (laptop side) sends the heard text here.
     vscode.commands.registerCommand(VOICE_FEED_COMMAND, (u: VoiceFeed) => voice.feed(u)),
     voice.watchCompanion(),
@@ -202,6 +204,7 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration("opencode.voice.engine")) void voice.refresh()
+      if (e.affectsConfiguration("opencode.voice.localLanguages") || e.affectsConfiguration("opencode.voice.localLanguage") || e.affectsConfiguration("opencode.voice.maxLanguages")) voice.syncLanguages()
       if (affectsView(e)) controller.setSettings(readViewSettings())
       if (affectsConnection(e)) void start()
     }),

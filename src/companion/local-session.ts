@@ -24,6 +24,10 @@ export interface LocalEngine {
   offline?(samples: Float32Array): string
   /** Timings of loading, for the log. */
   loadMs?: Record<string, number>
+  /** Silence fed when stopping so the last word is decoded (default 0.5 s). */
+  tailSeconds?: number
+  /** An endpoint that carries no words resets the stream (default yes). Nemotron must not: it then misreads the next words. */
+  resetOnSilence?: boolean
 }
 
 export type LocalSessionOptions = {
@@ -172,7 +176,7 @@ export class LocalDictationSession {
     if (!streamingText) {
       // Silence, or noise the model did not turn into words: nothing to keep.
       this.partial = ""
-      engine.stream.reset()
+      if (engine.resetOnSilence !== false) engine.stream.reset()
       return
     }
     let offlineText = ""
@@ -212,7 +216,7 @@ export class LocalDictationSession {
     try {
       const engine = this.engine!
       const t0 = this.clock()
-      engine.stream.accept(new Float32Array(Math.round((this.o.tailSeconds ?? 0.5) * SAMPLE_RATE)))
+      engine.stream.accept(new Float32Array(Math.round((this.o.tailSeconds ?? engine.tailSeconds ?? 0.5) * SAMPLE_RATE)))
       engine.stream.inputFinished()
       engine.stream.decodeReady()
       this.streamMs += this.clock() - t0
