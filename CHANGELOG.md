@@ -3,6 +3,7 @@
 ## Unreleased
 
 - **Compaction shows while it runs.** `/compact` (and an automatic compaction when the context is full) now shows a "Compacting conversation…" line with a spinner and the time so far; the summary being written can be opened. When it is done the line becomes the usual "Context compacted" line. A failed compaction shows its error, and a stopped one shows "Compaction cancelled".
+- **Turn-finished notifications are more reliable.** A finished or failed turn of a session listed in this window now always counts as this project's, even when the server spells the folder differently, so its notification and taskbar flash are no longer dropped. Every notification decision (shown, dropped and why, attention requested or skipped) is logged at debug level in the OpenCode output channel.
 
 ## 0.3.8 (preview)
 
