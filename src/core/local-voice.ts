@@ -3,11 +3,12 @@
  * Pure (no `vscode`, no `node:*`): the companion extension does the downloading and the recognizing.
  *
  * Engine: sherpa-onnx (Apache-2.0), npm `sherpa-onnx-<platform>-<arch>` 2.0.1 (the native addon + onnxruntime).
- * Streaming model (live partial text): Vosk small streaming Bangla Zipformer, Apache-2.0.
- * Final re-decode model (better words, adds punctuation): SayedShaun/bangla-zipformer-onnx, CC-BY-SA-4.0.
+ * Models: one language pack per language (streaming model for live text, optional offline model that re-decodes each
+ * segment at a pause), see `voice-catalog.ts`.
  * Every file is pinned to a revision and verified by size and SHA-256 (npm tarballs: by the registry's SHA-512 integrity).
  */
 import type { VoiceEngine, VoiceStartArgs } from "./dictation"
+import { normalizeLanguage, type LanguagePack, type ModelKind, type ModelRole } from "./voice-catalog"
 
 export const SHERPA_VERSION = "2.0.1"
 
@@ -44,48 +45,22 @@ export const sherpaTarget = (platform: string, arch: string): SherpaTarget | und
 
 export const SHERPA_PLATFORMS: readonly string[] = Object.keys(TARGETS)
 
-export type ModelFile = { path: string; name: string; size: number; sha256: string }
-export type ModelSpec = { id: string; repo: string; rev: string; files: ModelFile[] }
+/* The models and the language catalog are in `voice-catalog.ts`. */
 
-export const STREAMING_MODEL: ModelSpec = {
-  id: "streaming-bn-vosk-501097a",
-  repo: "alphacep/vosk-model-small-streaming-bn",
-  rev: "501097ae5257e5859d7956b50e4ba53a3f2be106",
-  files: [
-    { path: "am-onnx/encoder.onnx", name: "encoder.onnx", size: 90_994_145, sha256: "779f2412d6fa56f76be9fe71349cdf3edd10434ae9b1fc5e49834fb904320516" },
-    { path: "am-onnx/decoder.onnx", name: "decoder.onnx", size: 2_093_080, sha256: "fc03e8ca154593b95748198a56de115d4e6048d97c41692f93dfefb05f3693b4" },
-    { path: "am-onnx/joiner.onnx", name: "joiner.onnx", size: 1_026_462, sha256: "1df7319f4f9c36d7130cacaf629e1d52e904070e7a14bca9d4f209edeb162da6" },
-    { path: "lang/tokens.txt", name: "tokens.txt", size: 6_252, sha256: "6f3a4d64d7da07e7dd7f3fd679e07607be3ec149d1b807726dbb8bbcc80a9fe1" },
-  ],
+/** Where one model lives on disk: its kind and the absolute path of each file by role (what the recognizers are configured with). */
+export type ModelPaths = { kind: ModelKind; files: Partial<Record<ModelRole, string>> }
+
+/** What the recorder process needs to run the local engine for one language. */
+export type LocalPaths = {
+  nativeDir: string
+  /** Language pack id (for the log). */
+  language: string
+  streaming: ModelPaths
+  /** Missing: the streaming text is final. */
+  offline?: ModelPaths
+  /** See `LanguagePack.streamingText`. */
+  streamingText?: LanguagePack["streamingText"]
 }
-
-/** CC-BY-SA-4.0, © Sayed Shaun: attribution is in `companion/NOTICE`, the README and docs/local-voice.md. */
-export const OFFLINE_MODEL: ModelSpec = {
-  id: "offline-bn-sayed-16bec01",
-  repo: "SayedShaun/bangla-zipformer-onnx",
-  rev: "16bec01c5f554d3f0dc8f0139de3a00839a72efc",
-  files: [
-    { path: "int8/encoder.onnx", name: "encoder.onnx", size: 72_828_389, sha256: "43d5bdfc8e956c8137b8652fca347a4deb8ae6742cc0a2840db47c02a5c4cd4a" },
-    { path: "int8/decoder.onnx", name: "decoder.onnx", size: 540_689, sha256: "a183a765346a050c8577dc947cb96e69beecb8a83a73ebef48ad0cdd387e18df" },
-    { path: "int8/joiner.onnx", name: "joiner.onnx", size: 259_417, sha256: "bd9d5b3a02b0550fc09e55f222dce6ac72d38396b5c5087c462d67d0cb840fb4" },
-    { path: "tokens.txt", name: "tokens.txt", size: 6_578, sha256: "8edb5b3ef2587207c86cc3966f3f729ec3845250d3b040e5ba916ce935fcae2b" },
-  ],
-}
-
-export const modelUrl = (m: ModelSpec, f: ModelFile): string => `https://huggingface.co/${m.repo}/resolve/${m.rev}/${f.path}`
-
-export const modelBytes = (m: ModelSpec): number => m.files.reduce((n, f) => n + f.size, 0)
-
-/** Everything one local install downloads for `target`, in bytes (shown to the user as MB). */
-export const downloadBytes = (target: SherpaTarget): number => target.bytes + modelBytes(STREAMING_MODEL) + modelBytes(OFFLINE_MODEL)
-
-export const megabytes = (bytes: number): string => (bytes / 1e6).toFixed(bytes < 10e6 ? 1 : 0)
-
-/** Where the models live on disk, as absolute file paths (what the recognizers are configured with). */
-export type ModelPaths = { encoder: string; decoder: string; joiner: string; tokens: string }
-
-/** What the recorder process needs to run the local engine. */
-export type LocalPaths = { nativeDir: string; streaming: ModelPaths; offline: ModelPaths }
 
 /* ------------------------------------------------------------ audio */
 
@@ -161,11 +136,16 @@ export function micLabel(v: MicView): string {
   return v.engine === "local" ? "Voice input (on-device)" : "Voice input"
 }
 
-/** The arguments of `opencode.companion.voice.start` for the chosen engine. Local sends no key and no model name. */
+/**
+ * The arguments of `opencode.companion.voice.start` for the chosen engine. Local sends no key and no model name, only
+ * the language pack id (`opencode.voice.localLanguage`, normalized: unknown → the default language).
+ */
 export function startArgs(o: {
   id: string
   engine: VoiceEngine
   languages: string[]
+  /** Local engine: the language pack. */
+  localLanguage?: unknown
   threads?: number
   soniox?: { key: string; model: string }
 }): VoiceStartArgs {
@@ -173,7 +153,7 @@ export function startArgs(o: {
     if (!o.soniox) throw new Error("The Soniox engine needs a key")
     return { id: o.id, engine: "soniox", key: o.soniox.key, model: o.soniox.model, languages: o.languages }
   }
-  return { id: o.id, engine: "local", languages: o.languages, threads: clampThreads(o.threads) }
+  return { id: o.id, engine: "local", languages: o.languages, localLanguage: normalizeLanguage(o.localLanguage), threads: clampThreads(o.threads) }
 }
 
 export const DEFAULT_THREADS = 2
@@ -182,5 +162,3 @@ export function clampThreads(n: unknown): number {
   return typeof n === "number" && Number.isFinite(n) ? Math.min(8, Math.max(1, Math.round(n))) : DEFAULT_THREADS
 }
 
-/** Local understands Bangla only (this build): true when the user's languages include it (or list nothing). */
-export const localUnderstands = (languages: string[]): boolean => languages.length === 0 || languages.some((l) => l.trim().toLowerCase().split(/[-_]/)[0] === "bn")

@@ -109,6 +109,11 @@
         "category": "OpenCode"
       },
       {
+        "command": "opencode.voice.chooseLanguage",
+        "title": "Choose Voice Language",
+        "category": "OpenCode"
+      },
+      {
         "command": "opencode.voice.toggle",
         "title": "Voice Input",
         "category": "OpenCode",
@@ -260,11 +265,28 @@
             "soniox"
           ],
           "enumDescriptions": [
-            "On this computer: free and offline. Bangla only for now. Downloads about 190 MB once.",
-            "Cloud, with your own paid Soniox key: better accuracy, mixed Bangla and English, many languages."
+            "On this computer: free and offline. English by default; choose another language with OpenCode: Choose Voice Language. Downloads the language you use, once.",
+            "Cloud, with your own paid Soniox key: better accuracy, mixed languages, many languages."
           ],
           "default": "local",
-          "markdownDescription": "Which speech engine voice input uses.\n\n- `local`: free, offline, runs on this computer. **Bangla only for now.** Downloads about 190 MB once (speech engine and models), the first time you use it.\n- `soniox`: cloud, with your own paid key (**OpenCode: Set Voice API Key (Soniox)**). Better accuracy, mixed Bangla and English, many languages."
+          "markdownDescription": "Which speech engine voice input uses.\n\n- `local`: free, offline, runs on this computer. Speaks the language of `opencode.voice.localLanguage` (English by default). Downloads that language once (speech engine and models, roughly 180 to 210 MB), the first time you use it.\n- `soniox`: cloud, with your own paid key (**OpenCode: Set Voice API Key (Soniox)**). Better accuracy, mixed languages, many languages (`opencode.voice.languages`)."
+        },
+        "opencode.voice.localLanguage": {
+          "type": "string",
+          "enum": [
+            "en",
+            "bn"
+          ],
+          "enumItemLabels": [
+            "English",
+            "Bangla (বাংলা)"
+          ],
+          "enumDescriptions": [
+            "Streaming Zipformer for live text, Moonshine Tiny for cased, punctuated final text. About 205 MB with the speech engine.",
+            "Vosk streaming Zipformer for live text, bangla-zipformer (CC BY-SA 4.0) for final text. About 180 MB with the speech engine."
+          ],
+          "default": "en",
+          "markdownDescription": "Language of the on-device engine (`opencode.voice.engine`: `local`). Only the language you choose is downloaded, the first time you use it. Easier: run **OpenCode: Choose Voice Language**, which shows what each language needs and which are already on this computer."
         },
         "opencode.voice.localThreads": {
           "type": "number",
@@ -282,7 +304,7 @@
             "bn",
             "en"
           ],
-          "markdownDescription": "Languages you speak, as ISO codes (for example `bn`, `en`, `hi`). Soniox uses them as hints; it still hears other languages. The on-device engine understands only Bangla (`bn`) for now."
+          "markdownDescription": "Languages you speak, as ISO codes (for example `bn`, `en`, `hi`). Soniox uses them as hints; it still hears other languages. Only for the `soniox` engine: the on-device engine uses `opencode.voice.localLanguage`."
         },
         "opencode.voice.model": {
           "type": "string",

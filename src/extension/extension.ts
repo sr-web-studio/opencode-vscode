@@ -164,6 +164,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("opencode.voice.setKey", () => voice.setKey()),
     vscode.commands.registerCommand("opencode.voice.clearKey", () => voice.clearKey()),
     vscode.commands.registerCommand("opencode.voice.toggle", () => voice.click()),
+    vscode.commands.registerCommand("opencode.voice.chooseLanguage", () => voice.chooseLanguage()),
     // The companion (laptop side) sends the heard text here.
     vscode.commands.registerCommand(VOICE_FEED_COMMAND, (u: VoiceFeed) => voice.feed(u)),
     voice.watchCompanion(),

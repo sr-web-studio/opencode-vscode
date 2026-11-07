@@ -5,6 +5,7 @@
  */
 import { join } from "node:path"
 import type { ModelPaths, LocalPaths } from "../core/local-voice"
+import { STREAMING_KINDS, applyTextStyle, type ModelRole } from "../core/voice-catalog"
 import { errorText } from "./shared"
 import type { LocalEngine, LocalStream } from "./local-session"
 
@@ -60,34 +61,54 @@ export function loadAddon(nativeDir: string, log: (line: string) => void): Addon
   }
 }
 
-const transducer = (m: ModelPaths) => ({ encoder: m.encoder, decoder: m.decoder, joiner: m.joiner })
+/**
+ * The `modelConfig` fields of one model, by kind. A new sherpa-onnx model family is one more case here (and one more
+ * `ModelKind` + its required roles in `src/core/voice-catalog.ts`).
+ */
+export function modelConfig(m: ModelPaths, threads: number): Record<string, unknown> {
+  const f = m.files as Record<ModelRole, string>
+  const common = { tokens: f.tokens, numThreads: threads, provider: "cpu", debug: 0 }
+  switch (m.kind) {
+    case "transducer":
+      return { transducer: { encoder: f.encoder, decoder: f.decoder, joiner: f.joiner }, ...common }
+    case "moonshine":
+      return { moonshine: { preprocessor: f.preprocessor, encoder: f.encoder, uncachedDecoder: f.uncachedDecoder, cachedDecoder: f.cachedDecoder }, ...common }
+    default:
+      throw new Error(`model kind ${String((m as ModelPaths).kind)} is not supported by this build`)
+  }
+}
 
-/** Load the addon and both recognizers. Timings go to `log`. */
+/** Load the addon and the recognizers of one language. Timings go to `log`. */
 export function loadEngine(paths: LocalPaths, threads: number, log: (line: string) => void): LocalEngine {
   const loadMs: Record<string, number> = {}
   const t0 = performance.now()
   const addon = loadAddon(paths.nativeDir, log)
   loadMs.addon = performance.now() - t0
+  if (!STREAMING_KINDS.includes(paths.streaming.kind)) throw new Error(`the live model of ${paths.language} (${paths.streaming.kind}) cannot stream`)
 
   const t1 = performance.now()
   const online = addon.createOnlineRecognizer({
     featConfig: { sampleRate, featureDim: 80 },
-    modelConfig: { transducer: transducer(paths.streaming), tokens: paths.streaming.tokens, numThreads: threads, provider: "cpu", debug: 0 },
+    modelConfig: modelConfig(paths.streaming, threads),
     decodingMethod: "greedy_search",
     enableEndpoint: true,
   })
   loadMs.streaming = performance.now() - t1
-  log(`Streaming model loaded in ${loadMs.streaming.toFixed(0)} ms (${threads} threads)`)
+  log(`Language ${paths.language}: streaming model (${paths.streaming.kind}) loaded in ${loadMs.streaming.toFixed(0)} ms (${threads} threads)`)
 
-  const t2 = performance.now()
-  const offline = addon.createOfflineRecognizer({
-    featConfig: { sampleRate, featureDim: 80 },
-    modelConfig: { transducer: transducer(paths.offline), tokens: paths.offline.tokens, numThreads: threads, provider: "cpu", debug: 0 },
-    decodingMethod: "greedy_search",
-  })
-  loadMs.offline = performance.now() - t2
-  log(`Offline model loaded in ${loadMs.offline.toFixed(0)} ms (${threads} threads)`)
+  let offline: unknown
+  if (paths.offline) {
+    const t2 = performance.now()
+    offline = addon.createOfflineRecognizer({
+      featConfig: { sampleRate, featureDim: 80 },
+      modelConfig: modelConfig(paths.offline, threads),
+      decodingMethod: "greedy_search",
+    })
+    loadMs.offline = performance.now() - t2
+    log(`Offline model (${paths.offline.kind}) loaded in ${loadMs.offline.toFixed(0)} ms (${threads} threads)`)
+  }
 
+  const style = (text: string) => applyTextStyle(paths.streamingText, text)
   const handle = addon.createOnlineStream(online)
   const stream: LocalStream = {
     accept: (samples) => addon.acceptWaveformOnline(handle, { samples, sampleRate }),
@@ -95,7 +116,7 @@ export function loadEngine(paths: LocalPaths, threads: number, log: (line: strin
     decodeReady: () => {
       while (addon.isOnlineStreamReady(online, handle)) addon.decodeOnlineStream(online, handle)
     },
-    text: () => (JSON.parse(addon.getOnlineStreamResultAsJson(online, handle)) as { text?: string }).text ?? "",
+    text: () => style((JSON.parse(addon.getOnlineStreamResultAsJson(online, handle)) as { text?: string }).text ?? ""),
     endpoint: () => !!addon.isEndpoint(online, handle),
     reset: () => addon.reset(online, handle),
   }
@@ -103,11 +124,13 @@ export function loadEngine(paths: LocalPaths, threads: number, log: (line: strin
   return {
     stream,
     loadMs,
-    offline(samples) {
-      const s = addon.createOfflineStream(offline)
-      addon.acceptWaveformOffline(s, { samples, sampleRate })
-      addon.decodeOfflineStream(offline, s)
-      return (JSON.parse(addon.getOfflineStreamResultAsJson(s)) as { text?: string }).text ?? ""
-    },
+    offline: offline
+      ? (samples) => {
+          const s = addon.createOfflineStream(offline)
+          addon.acceptWaveformOffline(s, { samples, sampleRate })
+          addon.decodeOfflineStream(offline, s)
+          return (JSON.parse(addon.getOfflineStreamResultAsJson(s)) as { text?: string }).text ?? ""
+        }
+      : undefined,
   }
 }

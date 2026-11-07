@@ -1,7 +1,7 @@
 {
   "name": "opencode-voice",
   "displayName": "OpenCode Voice (unofficial)",
-  "description": "Voice input for the OpenCode (unofficial) extension: records your microphone on this computer and types what you say into the prompt box: free on-device Bangla recognition, or Soniox (your own key) for Bangla, English and more. Unofficial — not affiliated with the OpenCode team.",
+  "description": "Voice input for the OpenCode (unofficial) extension: records your microphone on this computer and types what you say into the prompt box: free on-device recognition (English by default, other languages to choose from), or Soniox (your own key) for Bangla, English and more. Unofficial — not affiliated with the OpenCode team.",
   "icon": "media/icon.png",
   "galleryBanner": {
     "color": "#1e1e2e",
@@ -48,6 +48,11 @@
       {
         "command": "opencode.companion.voice.chooseMicrophone",
         "title": "Choose Microphone",
+        "category": "OpenCode Voice"
+      },
+      {
+        "command": "opencode.companion.voice.removeLanguages",
+        "title": "Remove Downloaded Languages",
         "category": "OpenCode Voice"
       },
       {
