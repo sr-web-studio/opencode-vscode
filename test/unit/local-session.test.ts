@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { LocalDictationSession, type LocalEngine, type LocalSessionOptions, type LocalStream } from "../../src/companion/local-session"
-import type { Recorder, SessionUpdate } from "../../src/companion/shared"
+import { LocalDictationSession, type LocalEngine, type LocalSessionOptions, type LocalStream } from "../../apps/vscode/src/companion/local-session"
+import type { Recorder, SessionUpdate } from "../../apps/vscode/src/companion/shared"
 
 const wait = (ms = 5) => new Promise((r) => setTimeout(r, ms))
 

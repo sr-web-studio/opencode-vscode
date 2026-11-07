@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test } from "bun:test"
-import { Controller } from "../../src/core/controller"
-import { COALESCE_MS, NotificationEngine } from "../../src/core/notifications/engine"
-import { defaultNotificationSettings, type Notice, type NotificationSettings, type SessionMeta, type UiState } from "../../src/core/notifications/types"
+import { Controller } from "@occ/core/controller"
+import { COALESCE_MS, NotificationEngine } from "@occ/core/notifications/engine"
+import { defaultNotificationSettings, type Notice, type NotificationSettings, type SessionMeta, type UiState } from "@occ/core/notifications/types"
 
 /**
  * Turn-end events (`session.execution.succeeded/failed`) carry no `location` on server 2.2.5 (live-checked), unlike

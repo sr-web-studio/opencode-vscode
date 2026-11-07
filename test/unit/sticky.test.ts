@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { currentPrompt, promptLabel, promptPosition, type PromptPosition } from "../../src/core/sticky"
+import { currentPrompt, promptLabel, promptPosition, type PromptPosition } from "@occ/core/sticky"
 
 const root = { top: 100, bottom: 600 }
 const pos = (entries: Array<[string, PromptPosition]>) => new Map(entries)

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { gzipSync, gunzipSync } from "node:zlib"
-import { parseTar, safeRelativePath, stripTopFolder } from "../../src/core/tar"
+import { parseTar, safeRelativePath, stripTopFolder } from "@occ/core/tar"
 
 const enc = new TextEncoder()
 

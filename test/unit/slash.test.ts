@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { CommandCatalog } from "../../src/core/commands"
+import { CommandCatalog } from "@occ/core/commands"
 import {
   applySuggestion,
   commandBlock,
@@ -11,8 +11,8 @@ import {
   suggestCommands,
   suggestSkills,
   undoTarget,
-} from "../../src/core/slash"
-import { applyEvent, viewFromMessages } from "../../src/core/transcript/reducer"
+} from "@occ/core/slash"
+import { applyEvent, viewFromMessages } from "@occ/core/transcript/reducer"
 
 describe("parseSlash", () => {
   test("name and arguments", () => {

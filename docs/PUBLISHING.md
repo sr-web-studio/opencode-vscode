@@ -18,24 +18,26 @@ How SR Web Studio ships this extension, `sr-web-studio.opencode-unofficial` (Mar
 cp .env.example .env    # then fill in VSCE_PAT and OVSX_PAT
 ```
 
-- `.env` is listed in `.gitignore` and `.vscodeignore`.
-- `tools/publish.ts` refuses to publish if the vsix contains a `.env` file, and it scrubs tokens from all output.
+- `.env` lives at the **repo root** (not in `apps/vscode`); `tools/publish.ts` reads it from there. It is listed in `.gitignore` and `apps/vscode/.vscodeignore`.
+- `apps/vscode/tools/publish.ts` refuses to publish if the vsix contains a `.env` file, and it scrubs tokens from all output.
 
 ## Release steps
 
-There are two extensions with the same version: the main one (`sr-web-studio.opencode-unofficial`) and the companion **OpenCode Voice** (`sr-web-studio.opencode-voice`, folder `companion/`). The main vsix carries the companion's vsix (`dist/opencode-voice.vsix`) and installs it on the user's computer, so both must be published.
+There are two extensions with the same version: the main one (`sr-web-studio.opencode-unofficial`) and the companion **OpenCode Voice** (`sr-web-studio.opencode-voice`, folder `apps/vscode/companion/`). The main vsix carries the companion's vsix (`dist/opencode-voice.vsix`) and installs it on the user's computer, so both must be published.
 
-1. Bump `version` in `package.json` and update `CHANGELOG.md`. (`bun run package` copies the version to `companion/package.json`.)
-2. `bun run typecheck && bun run test && bun run package`. This builds and writes **`opencode-vscode.vsix`** (main) and **`opencode-voice.vsix`** (companion) in the repo root.
+Everything below runs from the repo root. The extensions live in `apps/vscode/`; the root `README.md`, `CHANGELOG.md` and `LICENSE` are the source of truth, and `bun run package` copies them into `apps/vscode/` (git-ignored copies) because vsce packs them from the extension folder.
+
+1. Bump `version` in `apps/vscode/package.json` and update the root `CHANGELOG.md`. (`bun run package` copies the version to `apps/vscode/companion/package.json`.)
+2. `bun run typecheck && bun run test && bun run package`. This builds and writes **`apps/vscode/opencode-vscode.vsix`** (main) and **`apps/vscode/opencode-voice.vsix`** (companion).
 3. Check the contents of both vsix files (run `bun run package` first: the main vsix lists `dist/opencode-voice.vsix` only after that):
 
    ```bash
-   bunx @vscode/vsce ls --no-dependencies                       # main
-   (cd companion && bunx @vscode/vsce ls --no-dependencies)     # companion
+   (cd apps/vscode && bunx @vscode/vsce ls --no-dependencies)                     # main
+   (cd apps/vscode/companion && bunx @vscode/vsce ls --no-dependencies)           # companion
    ```
 
    Main: `dist/extension.js`, `dist/webview/main.{js,css,ttf}`, `dist/opencode-voice.vsix`, `media/`, `package.json`, `README.md`, `LICENSE`, `CHANGELOG.md`. Companion: `dist/extension.js`, `dist/recorder.js`, `dist/pvrecorder/**`, `media/icon.png`, `package.json`, `README.md`, `LICENSE`, `NOTICE`. No `.env`, no `.map`, no `.onnx` models (the voice models are downloaded by the user's computer, never shipped).
-4. Publish. `tools/publish.ts` publishes **the companion first, then the main extension**, to each store (the main extension installs the companion, so it must already be in the store when users update):
+4. Publish. `apps/vscode/tools/publish.ts` publishes **the companion first, then the main extension**, to each store (the main extension installs the companion, so it must already be in the store when users update):
 
    ```bash
    bun run publish:marketplace   # → https://marketplace.visualstudio.com/items?itemName=sr-web-studio.opencode-unofficial (and ...opencode-voice)
@@ -53,8 +55,8 @@ bun run package -- --test 11
 ```
 
 - It uses the **same extension ids** (`sr-web-studio.opencode-unofficial`, `sr-web-studio.opencode-voice`), so installing it replaces the installed extension instead of adding a second copy.
-- The version is the **next patch** with a prerelease suffix: with `0.3.6` in `package.json`, `0.3.7-test.11`. Names end with ` TEST 11` ("OpenCode (unofficial) TEST 11"). The companion gets the same version, and the main extension upgrades the companion from the bundled vsix (`0.3.7` ranks above `0.3.7-test.11`, `-test.12` above `-test.11`).
-- Files: `opencode-unofficial-0.3.7-test.11.vsix` and `opencode-voice-0.3.7-test.11.vsix` (install the main one with **Extensions: Install from VSIX…**; it installs the companion by itself). `package.json` and `companion/package.json` are restored afterwards, so the working tree stays clean.
+- The version is the **next patch** with a prerelease suffix: with `0.3.6` in `apps/vscode/package.json`, `0.3.7-test.11`. Names end with ` TEST 11` ("OpenCode (unofficial) TEST 11"). The companion gets the same version, and the main extension upgrades the companion from the bundled vsix (`0.3.7` ranks above `0.3.7-test.11`, `-test.12` above `-test.11`).
+- Files (in `apps/vscode/`): `opencode-unofficial-0.3.7-test.11.vsix` and `opencode-voice-0.3.7-test.11.vsix` (install the main one with **Extensions: Install from VSIX…**; it installs the companion by itself). `apps/vscode/package.json` and `apps/vscode/companion/package.json` are restored afterwards, so the working tree stays clean.
 - **Never publish a test build.** `bun run publish:*` only reads `opencode-vscode.vsix` and `opencode-voice.vsix`, which a test build does not write; do not pass a test vsix to `vsce publish` or `ovsx publish` by hand.
 
 ## Listing (done)

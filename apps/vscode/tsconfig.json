@@ -1,0 +1,8 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node", "vscode", "bun"]
+  },
+  "include": ["src/extension/**/*.ts", "src/companion/**/*.ts", "../../test/**/*.ts", "../../scripts/**/*.ts"],
+  "exclude": ["node_modules", "dist", "scratch"]
+}

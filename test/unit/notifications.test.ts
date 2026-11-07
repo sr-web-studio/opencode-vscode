@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from "bun:test"
-import { COALESCE_MS, NotificationEngine, noticeID } from "../../src/core/notifications/engine"
-import { defaultNotificationSettings, type Notice, type Notifier, type NotificationSettings, type SessionMeta, type UiState } from "../../src/core/notifications/types"
+import { COALESCE_MS, NotificationEngine, noticeID } from "@occ/core/notifications/engine"
+import { defaultNotificationSettings, type Notice, type Notifier, type NotificationSettings, type SessionMeta, type UiState } from "@occ/core/notifications/types"
 
 const DIR = "/proj"
 const loc = { directory: DIR }

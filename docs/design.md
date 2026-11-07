@@ -260,7 +260,7 @@ Decision (the Soniox engine; `opencode.voice.engine` = `soniox`):
 - Clicking the chip opens the same list as a floating panel under the header, over the transcript, up to 50vh tall with scrolling. Escape, a click outside, or opening a worker closes it.
 
 ### Voice capture (0.3.0, built 2026-11-06)
-- **Two extensions.** Webviews have no microphone, and with Remote SSH the main extension runs on the server. Recording lives in the companion **OpenCode Voice** (`sr-web-studio.opencode-voice`, folder `companion/`, `extensionKind: ["ui"]`), which runs on the machine with the microphone.
+- **Two extensions.** Webviews have no microphone, and with Remote SSH the main extension runs on the server. Recording lives in the companion **OpenCode Voice** (`sr-web-studio.opencode-voice`, folder `apps/vscode/companion/`, `extensionKind: ["ui"]`), which runs on the machine with the microphone.
 - **Flow:**
   1. The mic is clicked, and `Voice.click()` runs in the main extension.
   2. The main extension mints a 120 s Soniox temporary key (`mintSonioxTempKey`), so the long-lived key never leaves its SecretStorage.
@@ -357,7 +357,7 @@ Toggling a server (connect/disconnect) changes the running server only. It is no
 
 ### Open Global Config (added 2026-11-07)
 
-The extension only *opens* the user's global OpenCode config for them; it never edits it. Command `opencode.openGlobalConfig` (palette, gear in the view title, "Edit config" link at the bottom of the MCP panel via the host request `openGlobalConfig`). Logic is in `src/core/global-config.ts`, effects in `src/extension/global-config.ts`.
+The extension only *opens* the user's global OpenCode config for them; it never edits it. Command `opencode.openGlobalConfig` (palette, gear in the view title, "Edit config" link at the bottom of the MCP panel via the host request `openGlobalConfig`). Logic is in `packages/core/src/global-config.ts`, effects in `apps/vscode/src/extension/global-config.ts`.
 
 - Directory (OpenCode 2.2.5; binary and https://opencode.ai/v2/docs/config): `$OPENCODE_CONFIG_DIR`, else `$XDG_CONFIG_HOME/opencode`, else `<home>/.config/opencode` (Windows too: `%USERPROFILE%\.config\opencode`). Files: `opencode.json`, then `opencode.jsonc`; the later one overrides, so `opencode.jsonc` wins when both exist. `OPENCODE_CONFIG` (one extra file) is not the global config and is ignored.
 - Nothing exists: ask "Create <path>?" (modal, Create / Cancel); only on Create write `{ "$schema": "https://opencode.ai/config.json" }` (flag `wx`, never overwrites) at `opencode.jsonc`, then open it.
@@ -365,7 +365,7 @@ The extension only *opens* the user's global OpenCode config for them; it never 
 
 ### State and hooks
 
-`AppState` gains `commands`, `skills` and `mcp` (`open`, `loading`, `loaded`, `servers`, `busy`, `signIn`, `notice`, `error`). New actions: `compact`, `fork`, `loadCommands`, `loadSkills`, `mcp` (`open|close|refresh|cancelSignIn|toggle|signIn|signOut`), and `send` with `skills`. Errors use the existing `error` line. VS Code-only effects go through `ControllerOptions.mcp` (`openSignIn`, `askCode`, `confirm`), implemented in `src/extension/mcp.ts`. Logic lives in `src/core/{slash,commands,mcp,errors}.ts`.
+`AppState` gains `commands`, `skills` and `mcp` (`open`, `loading`, `loaded`, `servers`, `busy`, `signIn`, `notice`, `error`). New actions: `compact`, `fork`, `loadCommands`, `loadSkills`, `mcp` (`open|close|refresh|cancelSignIn|toggle|signIn|signOut`), and `send` with `skills`. Errors use the existing `error` line. VS Code-only effects go through `ControllerOptions.mcp` (`openSignIn`, `askCode`, `confirm`), implemented in `apps/vscode/src/extension/mcp.ts`. Logic lives in `packages/core/src/{slash,commands,mcp,errors}.ts`.
 
 ## Notifications (added 2026-11-06)
 
@@ -442,7 +442,7 @@ To verify before building: whether a server plugin can expose a route or RPC for
 
 - `core`: API/state layer on `@opencode/client` (root entry only, no `node:` imports), reducers, form logic, grouping. No `vscode` imports. It can run in a browser webview.
 - `ui`: Svelte components that talk to the host only through a `HostBridge` interface (`openFile`, `openDiff`, `showTerminal`, `openExternal`, `notify`, `storage`, `postToHost`). VS Code and mobile each implement the bridge.
-- Splitting into a `packages/core`, `packages/ui`, `apps/vscode`, `apps/mobile` workspace happens at mobile kickoff. M1 only keeps these boundaries clean.
+- The workspace split into `packages/core` (`@occ/core`), `packages/ui` (`@occ/ui`) and `apps/vscode` is done; `apps/mobile` is added at mobile kickoff. See [monorepo.md](monorepo.md).
 
 Existing community clients for reference: OpenCode Mobile (getopencode.app; uses `opencode pair` QR) and `doza62/opencode-mobile` (Expo; push plugin plus QR).
 

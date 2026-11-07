@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { DictationSession, type Recorder, type SessionUpdate, type Socket } from "../../src/companion/session"
+import { DictationSession, type Recorder, type SessionUpdate, type Socket } from "../../apps/vscode/src/companion/session"
 
 const wait = (ms = 5) => new Promise((r) => setTimeout(r, ms))
 

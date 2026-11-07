@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
-import { flattenGroups, groupName, groupSessions, toRows, upsertSession } from "../../src/core/sessions"
-import { relativeTime, formatDuration } from "../../src/core/format"
-import type { SessionInfo } from "../../src/core/api"
+import { flattenGroups, groupName, groupSessions, toRows, upsertSession } from "@occ/core/sessions"
+import { relativeTime, formatDuration } from "@occ/core/format"
+import type { SessionInfo } from "@occ/core/api"
 
 const now = new Date(2026, 10, 6, 15, 0, 0).getTime()
 const h = 3_600_000

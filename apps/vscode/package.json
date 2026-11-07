@@ -1,0 +1,494 @@
+{
+  "name": "opencode-unofficial",
+  "displayName": "OpenCode (unofficial)",
+  "description": "Chat with OpenCode in the VS Code sidebar. Sessions live on your OpenCode server and keep running when you close the editor. Native diffs, terminal, voice input. Unofficial — not affiliated with the OpenCode team.",
+  "icon": "media/icon.png",
+  "galleryBanner": {
+    "color": "#1e1e2e",
+    "theme": "dark"
+  },
+  "preview": true,
+  "keywords": [
+    "opencode",
+    "ai",
+    "agent",
+    "coding agent",
+    "chat",
+    "llm",
+    "voice"
+  ],
+  "homepage": "https://github.com/sr-web-studio/opencode-vscode#readme",
+  "bugs": {
+    "url": "https://github.com/sr-web-studio/opencode-vscode/issues"
+  },
+  "version": "0.3.9",
+  "publisher": "sr-web-studio",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sr-web-studio/opencode-vscode.git"
+  },
+  "engines": {
+    "vscode": "^1.144.0"
+  },
+  "categories": [
+    "AI",
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "extensionKind": [
+    "workspace"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "secondarySidebar": [
+        {
+          "id": "opencode",
+          "title": "OpenCode",
+          "icon": "media/opencode.svg"
+        }
+      ]
+    },
+    "views": {
+      "opencode": [
+        {
+          "type": "webview",
+          "id": "opencode.chat",
+          "name": "Chat"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "opencode.focus",
+        "title": "Focus Chat",
+        "category": "OpenCode"
+      },
+      {
+        "command": "opencode.newSession",
+        "title": "New Session",
+        "category": "OpenCode",
+        "icon": "$(add)"
+      },
+      {
+        "command": "opencode.deleteSession",
+        "title": "Delete Session…",
+        "category": "OpenCode"
+      },
+      {
+        "command": "opencode.mcps",
+        "title": "MCP Servers",
+        "category": "OpenCode"
+      },
+      {
+        "command": "opencode.openGlobalConfig",
+        "title": "Open Global Config",
+        "category": "OpenCode",
+        "icon": "$(settings-gear)"
+      },
+      {
+        "command": "opencode.reconnect",
+        "title": "Reconnect",
+        "category": "OpenCode"
+      },
+      {
+        "command": "opencode.setPassword",
+        "title": "Set Server Password",
+        "category": "OpenCode"
+      },
+      {
+        "command": "opencode.clearPassword",
+        "title": "Clear Server Password",
+        "category": "OpenCode"
+      },
+      {
+        "command": "opencode.setCliPath",
+        "title": "Set CLI Path",
+        "category": "OpenCode"
+      },
+      {
+        "command": "opencode.voice.setKey",
+        "title": "Set Voice API Key (Soniox)",
+        "category": "OpenCode"
+      },
+      {
+        "command": "opencode.voice.clearKey",
+        "title": "Clear Voice API Key",
+        "category": "OpenCode"
+      },
+      {
+        "command": "opencode.voice.chooseLanguage",
+        "title": "Choose Voice Language",
+        "category": "OpenCode"
+      },
+      {
+        "command": "opencode.voice.switchLanguage",
+        "title": "Switch Voice Language",
+        "category": "OpenCode"
+      },
+      {
+        "command": "opencode.voice.toggle",
+        "title": "Voice Input",
+        "category": "OpenCode",
+        "icon": "$(mic)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "opencode.openGlobalConfig",
+          "when": "view == opencode.chat",
+          "group": "navigation@90"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "OpenCode",
+      "properties": {
+        "opencode.serverUrl": {
+          "type": "string",
+          "default": "",
+          "scope": "machine-overridable",
+          "markdownDescription": "Address of an OpenCode server to connect to, for example one running on another computer. **Leave empty** to use OpenCode on this computer (the extension starts its shared service if needed; no password required).\n\nExamples:\n- `http://192.168.1.10:4096`: a computer on your network (`4096` is OpenCode's default port)\n- `http://my-server.tail1234.ts.net:4096`: over Tailscale\n- `https://opencode.example.com`: behind a domain with HTTPS (no port needed)\n\n`http://` is added when you leave it out. Without a port, `http` uses 80 and `https` uses 443. If the server has a password (`OPENCODE_SERVER_PASSWORD`), run **OpenCode: Set Server Password**."
+        },
+        "opencode.cliPath": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "markdownDescription": "Path to the `opencode` executable. Leave empty to look it up on `PATH`, then in `~/.opencode/bin`."
+        },
+        "opencode.transcript.collapseCompletedSteps": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "When a turn finishes, fold its steps under one `N steps completed` line above the final answer."
+        },
+        "opencode.transcript.expandToolDetails": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Show tool details (input, output, errors) expanded by default."
+        },
+        "opencode.transcript.showReasoning": {
+          "type": "string",
+          "enum": [
+            "collapsed",
+            "expanded",
+            "hidden"
+          ],
+          "default": "collapsed",
+          "markdownDescription": "How the model's reasoning is shown in the transcript."
+        },
+        "opencode.transcript.fontSize": {
+          "type": "number",
+          "default": 0,
+          "minimum": 0,
+          "maximum": 32,
+          "markdownDescription": "Transcript font size in px. `0` uses the larger of `#chat.editor.fontSize#` and 14."
+        },
+        "opencode.todo.defaultExpanded": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Show the task list panel expanded by default. It only appears when the agent uses the `todowrite` tool (OpenCode setting `experimental.todo`, which this extension never changes)."
+        },
+        "opencode.notifications.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Show VS Code notifications when OpenCode needs your attention or finishes work. Master switch for the settings below."
+        },
+        "opencode.notifications.attention": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Notify when a session asks for a permission or a question (`permission.asked`, `form.created`)."
+        },
+        "opencode.notifications.completed": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Notify when a turn finishes in a root session."
+        },
+        "opencode.notifications.failed": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Notify when a turn fails in a root session."
+        },
+        "opencode.notifications.workers": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Also notify when a worker (child session) finishes or fails."
+        },
+        "opencode.notifications.shells": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Also notify when a background shell of this project exits."
+        },
+        "opencode.notifications.whenFocused": {
+          "type": "string",
+          "enum": [
+            "never",
+            "always"
+          ],
+          "default": "never",
+          "enumDescriptions": [
+            "Stay quiet while this window is focused and the session is visible in the panel.",
+            "Notify even when the session is on screen."
+          ],
+          "markdownDescription": "Whether to notify while the VS Code window is focused and the session is visible in the OpenCode panel."
+        },
+        "opencode.notifications.os": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "off"
+          ],
+          "default": "auto",
+          "enumDescriptions": [
+            "Also ask the OS for attention through the OpenCode Voice companion when this window is not focused: the taskbar button flashes (Windows), the window is marked as needing attention (Linux X11), or an OS notification appears (macOS).",
+            "VS Code notifications only."
+          ],
+          "markdownDescription": "Delivery channel. A VS Code notification is always shown. `auto` also asks the operating system for attention through the OpenCode Voice companion when this window is not focused: the taskbar button flashes (Windows), the window is marked as needing attention (Linux X11) or an OS notification appears (macOS). `off` shows VS Code notifications only."
+        },
+        "opencode.terminal.reveal": {
+          "type": "string",
+          "enum": [
+            "onStart",
+            "never",
+            "off"
+          ],
+          "default": "onStart",
+          "enumDescriptions": [
+            "Open a terminal for each shell command when it starts, without taking keyboard focus.",
+            "Create the terminal but do not reveal it. Use Show terminal on the tool line.",
+            "Do not mirror shell commands into terminals."
+          ],
+          "markdownDescription": "Mirror OpenCode shell commands into read-only VS Code terminals. The command itself runs on the OpenCode server."
+        },
+        "opencode.terminal.mode": {
+          "type": "string",
+          "enum": [
+            "session",
+            "perCommand"
+          ],
+          "default": "session",
+          "enumDescriptions": [
+            "One terminal per session, named `OpenCode: <session title>`. Every command is appended as its own block. A command that starts while another one of the session is still running gets an extra terminal (`#2`), which later commands reuse.",
+            "A new terminal for every command, named `OpenCode: <command>`."
+          ],
+          "markdownDescription": "How shell commands are shown in terminals. Ctrl+C in a terminal stops only the command that is running, after asking."
+        },
+        "opencode.terminal.maxOpen": {
+          "type": "number",
+          "default": 5,
+          "minimum": 1,
+          "maximum": 50,
+          "markdownDescription": "Most OpenCode terminals kept open. When there are more, the least recently used idle one is closed. A terminal with a running command is never closed."
+        },
+        "opencode.voice.engine": {
+          "type": "string",
+          "enum": [
+            "local",
+            "soniox"
+          ],
+          "enumDescriptions": [
+            "On this computer: free and offline. One multilingual model (NVIDIA Nemotron 3.5, about 693 MB with the speech engine) covers English and about 28 other languages; Bangla is an optional extra pack. Downloaded once, the first time you use it. Choose languages with OpenCode: Choose Voice Language.",
+            "Cloud, with your own paid Soniox key: better accuracy, mixed languages, many languages."
+          ],
+          "default": "local",
+          "markdownDescription": "Which speech engine voice input uses.\n\n- `local`: free, offline, runs on this computer. Speaks the current language of `opencode.voice.localLanguages` (English by default). Downloads once, the first time you use it: the multilingual model (about 693 MB with the speech engine; one model for English and about 28 other languages) or, for Bangla, a separate pack (about 179 MB).\n- `soniox`: cloud, with your own paid key (**OpenCode: Set Voice API Key (Soniox)**). Better accuracy, mixed languages, many languages (`opencode.voice.languages`)."
+        },
+        "opencode.voice.localLanguages": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "en",
+              "es",
+              "fr",
+              "de",
+              "it",
+              "pt",
+              "nl",
+              "tr",
+              "ru",
+              "uk",
+              "ar",
+              "hi",
+              "ja",
+              "ko",
+              "vi",
+              "pl",
+              "sv",
+              "cs",
+              "nb",
+              "da",
+              "bg",
+              "fi",
+              "hr",
+              "sk",
+              "hu",
+              "ro",
+              "et",
+              "zh",
+              "bn"
+            ],
+            "enumItemLabels": [
+              "Detect automatically",
+              "English",
+              "Spanish (Español)",
+              "French (Français)",
+              "German (Deutsch)",
+              "Italian (Italiano)",
+              "Portuguese (Português)",
+              "Dutch (Nederlands)",
+              "Turkish (Türkçe)",
+              "Russian (Русский)",
+              "Ukrainian (Українська)",
+              "Arabic (العربية)",
+              "Hindi (हिन्दी)",
+              "Japanese (日本語)",
+              "Korean (한국어)",
+              "Vietnamese (Tiếng Việt)",
+              "Polish (Polski)",
+              "Swedish (Svenska)",
+              "Czech (Čeština)",
+              "Norwegian Bokmål (Norsk bokmål)",
+              "Danish (Dansk)",
+              "Bulgarian (Български)",
+              "Finnish (Suomi)",
+              "Croatian (Hrvatski)",
+              "Slovak (Slovenčina)",
+              "Hungarian (Magyar)",
+              "Romanian (Română)",
+              "Estonian (Eesti)",
+              "Mandarin Chinese (中文)",
+              "Bangla (বাংলা)"
+            ],
+            "enumDescriptions": [
+              "Multilingual model. The model guesses the language it hears; it can guess wrong on short phrases or after a long silence. Choose a language for best results.",
+              "Multilingual model (about 682 MB, shared by all languages except Bangla).",
+              "Multilingual model (about 682 MB, shared). Latin American Spanish; European Spanish is understood too.",
+              "Multilingual model (about 682 MB, shared).",
+              "Multilingual model (about 682 MB, shared).",
+              "Multilingual model (about 682 MB, shared).",
+              "Multilingual model (about 682 MB, shared). Brazilian Portuguese.",
+              "Multilingual model (about 682 MB, shared).",
+              "Multilingual model (about 682 MB, shared).",
+              "Multilingual model (about 682 MB, shared).",
+              "Multilingual model (about 682 MB, shared).",
+              "Multilingual model (about 682 MB, shared). Modern Standard Arabic; measured text had mistakes.",
+              "Multilingual model (about 682 MB, shared).",
+              "Multilingual model (about 682 MB, shared).",
+              "Multilingual model (about 682 MB, shared). Written without spaces between some words.",
+              "Multilingual model (about 682 MB, shared).",
+              "Multilingual model (about 682 MB, shared). Broad coverage: lower accuracy.",
+              "Multilingual model (about 682 MB, shared). Broad coverage: lower accuracy.",
+              "Multilingual model (about 682 MB, shared). Broad coverage: lower accuracy.",
+              "Multilingual model (about 682 MB, shared). Broad coverage: lower accuracy.",
+              "Multilingual model (about 682 MB, shared). Broad coverage: lower accuracy.",
+              "Multilingual model (about 682 MB, shared). Broad coverage: lower accuracy.",
+              "Multilingual model (about 682 MB, shared). Broad coverage: lower accuracy.",
+              "Multilingual model (about 682 MB, shared). Broad coverage: lower accuracy.",
+              "Multilingual model (about 682 MB, shared). Broad coverage: lower accuracy.",
+              "Multilingual model (about 682 MB, shared). Broad coverage: lower accuracy.",
+              "Multilingual model (about 682 MB, shared). Broad coverage: lower accuracy.",
+              "Multilingual model (about 682 MB, shared). Broad coverage: lower accuracy.",
+              "Multilingual model (about 682 MB, shared). Weak: expect many mistakes.",
+              "Separate optional pack: Vosk streaming model for live text, bangla-zipformer (CC BY-SA 4.0) for the final text. About 168 MB (179 MB with the speech engine)."
+            ]
+          },
+          "default": [
+            "en"
+          ],
+          "markdownDescription": "The languages you speak with the on-device engine (`opencode.voice.engine`: `local`), at most `opencode.voice.maxLanguages`. **The first one is the current language and the only one that records**; one model runs at a time. Switch with **OpenCode: Switch Voice Language** or by clicking the language label next to the mic in the prompt box. Easier than editing: run **OpenCode: Choose Voice Language**, which groups languages by download and marks what is already on this computer.\n\nWhen this setting is not set, the old single setting `opencode.voice.localLanguage` is used as the list. Choosing or switching languages writes this setting."
+        },
+        "opencode.voice.maxLanguages": {
+          "type": "number",
+          "default": 2,
+          "minimum": 1,
+          "maximum": 5,
+          "markdownDescription": "How many languages can be active at once in `opencode.voice.localLanguages` (default 2). What it costs:\n\n- Languages that share the multilingual model (every language except Bangla) cost nothing extra: one download (about 682 MB), one model.\n- Each extra separate pack costs its download on disk: Bangla is about 168 MB.\n- Only one model is loaded while you record, so RAM and CPU do not grow with this number (the multilingual model needs about 1 GB of RAM while you record).\n- Switching to a language from another pack reloads the model: about 2 seconds (measured 1.6 to 1.7 s to load the multilingual model; the Bangla models are smaller). Switching between languages of the same pack needs no reload of the files, only a new recording.\n\nPacks you no longer use are never deleted by themselves: **OpenCode Voice: Remove Downloaded Languages** deletes them."
+        },
+        "opencode.voice.localLanguage": {
+          "type": "string",
+          "enum": [
+            "en",
+            "bn"
+          ],
+          "enumItemLabels": [
+            "English",
+            "Bangla (বাংলা)"
+          ],
+          "enumDescriptions": [
+            "English (multilingual model).",
+            "Bangla (separate pack)."
+          ],
+          "default": "en",
+          "deprecationMessage": "Use opencode.voice.localLanguages (a list; the first entry is the current language). This single value is still read while localLanguages is not set.",
+          "markdownDescription": "**Deprecated**: use `opencode.voice.localLanguages`. The single on-device language of test builds before 0.3.7 (`en` or `bn`). It is still honoured while `opencode.voice.localLanguages` is not set, and then becomes the first entry of the list. Choosing or switching a language writes `localLanguages` and this value is no longer used."
+        },
+        "opencode.voice.localThreads": {
+          "type": "number",
+          "default": 2,
+          "minimum": 1,
+          "maximum": 8,
+          "markdownDescription": "CPU threads the on-device model uses. The default (2) is the fastest we measured with the multilingual model (real-time factor about 0.32; 1 thread about 0.45; 4 threads about 0.8, slower, because the threads fight over memory). Change it only when you measured a gain on your computer."
+        },
+        "opencode.voice.languages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "bn",
+            "en"
+          ],
+          "markdownDescription": "Languages you speak, as ISO codes (for example `bn`, `en`, `hi`). Soniox uses them as hints; it still hears other languages. Only for the `soniox` engine: the on-device engine uses `opencode.voice.localLanguages`."
+        },
+        "opencode.voice.model": {
+          "type": "string",
+          "default": "stt-rt-v6",
+          "markdownDescription": "Soniox real-time model for voice input (engine `soniox` only)."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "bun run build:ext && bun run build:webview",
+    "build:ext": "bun esbuild.mjs",
+    "build:webview": "vite build",
+    "watch": "bun run watch:ext & bun run watch:webview & wait",
+    "watch:ext": "bun esbuild.mjs --watch",
+    "watch:webview": "vite build --watch",
+    "typecheck": "tsc --noEmit -p tsconfig.json && svelte-check --tsconfig tsconfig.webview.json",
+    "test:host": "bun run build && bun test/host/run.mjs",
+    "package": "bun tools/package.ts",
+    "publish:marketplace": "bun tools/publish.ts marketplace",
+    "publish:openvsx": "bun tools/publish.ts openvsx"
+  },
+  "devDependencies": {
+    "@occ/core": "workspace:*",
+    "@occ/ui": "workspace:*",
+    "@picovoice/pvrecorder-node": "1.2.9",
+    "@sveltejs/vite-plugin-svelte": "7.3.1",
+    "@tailwindcss/vite": "4.3.4",
+    "@types/bun": "1.4.4",
+    "@types/node": "24.19.2",
+    "@types/vscode": "1.144.0",
+    "@vscode/codicons": "^0.0.46-24",
+    "@vscode/test-electron": "3.1.0",
+    "@vscode/vsce": "4.1.0",
+    "esbuild": "0.28.2",
+    "svelte": "5.57.3",
+    "svelte-check": "4.7.8",
+    "tailwindcss": "4.3.4",
+    "typescript": "6.0.3",
+    "vite": "8.3.6"
+  },
+  "dependencies": {
+    "@opencode/client": "2.2.5",
+    "dompurify": "3.4.17",
+    "effect": "4.0.6",
+    "marked": "18.1.3"
+  }
+}

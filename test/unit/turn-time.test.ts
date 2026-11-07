@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { compactTime, fullDateTime, startsDay, turnStamp, type TimeEnv } from "../../src/core/turn-time"
+import { compactTime, fullDateTime, startsDay, turnStamp, type TimeEnv } from "@occ/core/turn-time"
 
 // Fixed clock and zone: Friday 6 Nov 2026, 15:30 in Dhaka (UTC+6, no DST). Dhaka midnight is 18:00 UTC.
 const dhaka = (y: number, m: number, d: number, h: number, min = 0) => Date.UTC(y, m - 1, d, h - 6, min)

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
-import { sameDirectory } from "../../src/core/paths"
-import { Controller } from "../../src/core/controller"
-import type { AppState } from "../../src/core/protocol"
+import { sameDirectory } from "@occ/core/paths"
+import { Controller } from "@occ/core/controller"
+import type { AppState } from "@occ/core/protocol"
 
 describe("sameDirectory", () => {
   test("Windows: drive letter and folder case, separators and trailing slashes", () => {
@@ -141,7 +141,7 @@ describe("sessions are listed by project (2026-11-06: a Windows colleague saw 1 
 
 describe("withinDirectory", () => {
   test("the folder itself and folders inside it, never a sibling with a longer name", async () => {
-    const { withinDirectory } = await import("../../src/core/paths")
+    const { withinDirectory } = await import("@occ/core/paths")
     expect(withinDirectory("D:\\Work\\a\\apps\\web", "d:\\Work\\a")).toBe(true)
     expect(withinDirectory("d:/work/A", "D:\\Work\\a\\")).toBe(true)
     expect(withinDirectory("D:\\Work\\ab", "D:\\Work\\a")).toBe(false)

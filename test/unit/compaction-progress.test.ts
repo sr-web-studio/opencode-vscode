@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test"
-import { SessionFeed } from "../../src/core/feed"
-import { applyEvent, isCompacting, isRunning, viewFromMessages } from "../../src/core/transcript/reducer"
-import { contentSignature } from "../../src/core/transcript/signature"
-import { emptyView, type SessionView } from "../../src/core/transcript/types"
+import { SessionFeed } from "@occ/core/feed"
+import { applyEvent, isCompacting, isRunning, viewFromMessages } from "@occ/core/transcript/reducer"
+import { contentSignature } from "@occ/core/transcript/signature"
+import { emptyView, type SessionView } from "@occ/core/transcript/types"
 
 /** Event shapes as observed live on server 2.2.5: `started`/`failed` carry `reason`, `delta` only `text`, `ended` the full `text`. */
 let n = 0

@@ -9,7 +9,7 @@ import {
   remoteConfigNotice,
   resolveGlobalConfig,
   type ConfigHost,
-} from "../../src/core/global-config"
+} from "@occ/core/global-config"
 
 const linux = { env: {}, home: "/home/ann", platform: "linux" }
 
@@ -138,7 +138,7 @@ describe("new file content", () => {
 })
 
 describe("wiring", () => {
-  const pkg = JSON.parse(readFileSync("package.json", "utf8"))
+  const pkg = JSON.parse(readFileSync("apps/vscode/package.json", "utf8"))
   test("the command is contributed, in the palette, and a gear in the chat view's title bar", () => {
     const cmd = pkg.contributes.commands.find((c: { command: string }) => c.command === "opencode.openGlobalConfig")
     expect(cmd).toMatchObject({ title: "Open Global Config", category: "OpenCode", icon: "$(settings-gear)" })
@@ -147,14 +147,14 @@ describe("wiring", () => {
     expect(pkg.contributes.menus.commandPalette ?? []).not.toContainEqual(expect.objectContaining({ command: "opencode.openGlobalConfig", when: "false" }))
   })
   test("the MCP panel button posts the host request, and the host routes it to the command", () => {
-    expect(readFileSync("src/ui/components/McpPanel.svelte", "utf8")).toContain(`request: { type: "openGlobalConfig" }`)
-    expect(readFileSync("src/core/protocol.ts", "utf8")).toContain(`{ type: "openGlobalConfig" }`)
-    const host = readFileSync("src/extension/host.ts", "utf8")
+    expect(readFileSync("packages/ui/src/components/McpPanel.svelte", "utf8")).toContain(`request: { type: "openGlobalConfig" }`)
+    expect(readFileSync("packages/core/src/protocol.ts", "utf8")).toContain(`{ type: "openGlobalConfig" }`)
+    const host = readFileSync("apps/vscode/src/extension/host.ts", "utf8")
     expect(host).toMatch(/case "openGlobalConfig":\s+return void \(await vscode\.commands\.executeCommand\("opencode\.openGlobalConfig"\)\)/)
-    expect(readFileSync("src/extension/extension.ts", "utf8")).toContain(`registerCommand("opencode.openGlobalConfig"`)
+    expect(readFileSync("apps/vscode/src/extension/extension.ts", "utf8")).toContain(`registerCommand("opencode.openGlobalConfig"`)
   })
   test("the extension only opens the file: the sole write is the confirmed `wx` create of the schema line", () => {
-    const src = readFileSync("src/extension/global-config.ts", "utf8")
+    const src = readFileSync("apps/vscode/src/extension/global-config.ts", "utf8")
     expect(src.match(/writeFile\(/g)).toHaveLength(1)
     expect(src).toContain(`flag: "wx"`)
   })

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test"
-import type { Notice } from "../../src/core/notifications/types"
+import type { Notice } from "@occ/core/notifications/types"
 
 /** The notifier is the only code here that talks to VS Code: stand `vscode` in with just what it uses. */
 const state = { focused: false }
@@ -25,7 +25,7 @@ mock.module("vscode", () => ({
   },
 }))
 
-const { VscodeNotifier } = await import("../../src/extension/notifier")
+const { VscodeNotifier } = await import("../../apps/vscode/src/extension/notifier")
 
 const notice = (over: Partial<Notice> = {}): Notice => ({ id: "n1", kind: "completed", sessionID: "s", severity: "info", title: "OpenCode", body: "Done", actions: [], ...over })
 const flush = () => new Promise((r) => setTimeout(r, 0))

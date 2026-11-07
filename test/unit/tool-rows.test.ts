@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test"
-import { executeCalls, executeOutput, executeTarget } from "../../src/core/transcript/execute"
-import { firstChangedLine, patchedFiles } from "../../src/core/transcript/patch"
-import { readLine, rowAction, rowTitle, summarizeTool } from "../../src/core/transcript/tools"
-import type { ToolItem } from "../../src/core/transcript/types"
+import { executeCalls, executeOutput, executeTarget } from "@occ/core/transcript/execute"
+import { firstChangedLine, patchedFiles } from "@occ/core/transcript/patch"
+import { readLine, rowAction, rowTitle, summarizeTool } from "@occ/core/transcript/tools"
+import type { ToolItem } from "@occ/core/transcript/types"
 
 const cwd = "/w"
 const tool = (name: string, input: Record<string, unknown>, metadata: Record<string, unknown> = {}, status: ToolItem["status"] = "completed"): ToolItem => ({

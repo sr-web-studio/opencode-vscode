@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test"
 import { EventEmitter } from "node:events"
 import { PassThrough } from "node:stream"
-import { WindowsHelper, askForAttention, type SpawnFn } from "../../src/companion/attention"
-import { identityOf } from "../../src/core/attention"
-import { WINDOWS_HELPER_SCRIPT, helperArgs } from "../../src/companion/windows-script"
+import { WindowsHelper, askForAttention, type SpawnFn } from "../../apps/vscode/src/companion/attention"
+import { identityOf } from "@occ/core/attention"
+import { WINDOWS_HELPER_SCRIPT, helperArgs } from "../../apps/vscode/src/companion/windows-script"
 
 /** A stand-in for the PowerShell process: answers `reply(request)` per stdin line once it printed `ready`. */
 function fakePowerShell(reply: (req: any) => unknown | undefined, opts: { ready?: boolean } = {}) {

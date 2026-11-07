@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { copyText, cwdLabel, shellView } from "../../src/core/shell-view"
+import { copyText, cwdLabel, shellView } from "@occ/core/shell-view"
 
 const base = { command: "ls", output: "", directory: "/home/u/proj", displayPath: "~/proj", limit: 3, showAll: false }
 const lines = (n: number) => Array.from({ length: n }, (_, i) => `l${i + 1}`).join("\n")

@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test"
 import fixtureA from "../fixtures/simple-edit-shell.json"
 import fixtureB from "../fixtures/grep-glob-subagent-question.json"
-import { viewFromMessages } from "../../src/core/transcript/reducer"
-import { lastActivity, settledTurn } from "../../src/core/transcript/turn"
-import type { TurnView } from "../../src/core/transcript/types"
-import { moment, turnStamp, type TimeEnv } from "../../src/core/turn-time"
+import { viewFromMessages } from "@occ/core/transcript/reducer"
+import { lastActivity, settledTurn } from "@occ/core/transcript/turn"
+import type { TurnView } from "@occ/core/transcript/types"
+import { moment, turnStamp, type TimeEnv } from "@occ/core/turn-time"
 
 const env: TimeEnv = { now: Date.UTC(2026, 10, 6, 9, 30), locale: "en-US", timeZone: "Asia/Dhaka" }
 const at = (h: number, m = 0) => Date.UTC(2026, 10, 6, h - 6, m) // Dhaka is UTC+6

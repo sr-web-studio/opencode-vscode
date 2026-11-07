@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { applyEvent, viewFromMessages } from "../../src/core/transcript/reducer"
-import { contentSignature } from "../../src/core/transcript/signature"
+import { applyEvent, viewFromMessages } from "@occ/core/transcript/reducer"
+import { contentSignature } from "@occ/core/transcript/signature"
 
 const base = () => viewFromMessages([{ id: "u", type: "user", text: "x" }, { id: "a", type: "assistant", content: [{ type: "text", text: "hi" }] }] as any)
 const ev = (type: string, data: unknown): any => ({ id: "e", type, created: 1, data })

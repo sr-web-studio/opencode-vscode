@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { readdirSync, readFileSync, statSync } from "node:fs"
 import { join } from "node:path"
-import { canTakeFocus, shouldFocusPrompt, type FocusEnv } from "../../src/core/focus"
+import { canTakeFocus, shouldFocusPrompt, type FocusEnv } from "@occ/core/focus"
 
 const here: FocusEnv = { webviewFocused: true, otherEditableActive: false }
 const elsewhere: FocusEnv = { webviewFocused: false, otherEditableActive: false }
@@ -46,15 +46,15 @@ const walk = (dir: string): string[] =>
 
 /** Guards against the original bug coming back: the UI has exactly one place that calls `.focus()`. */
 describe("focus call sites", () => {
-  test("only src/ui/focus.ts calls .focus() in the UI", () => {
-    const offenders = walk("src/ui")
-      .filter((f) => /\.(ts|svelte)$/.test(f) && !f.endsWith(join("src", "ui", "focus.ts")))
+  test("only packages/ui/src/focus.ts calls .focus() in the UI", () => {
+    const offenders = walk("packages/ui/src")
+      .filter((f) => /\.(ts|svelte)$/.test(f) && !f.endsWith(join("packages", "ui", "src", "focus.ts")))
       .flatMap((f) => readFileSync(f, "utf8").split("\n").map((l, i) => ({ f, i: i + 1, l })).filter(({ l }) => /\.focus\(\)/.test(l)).map(({ f, i, l }) => `${f}:${i}: ${l.trim()}`))
     expect(offenders).toEqual([])
   })
 
   test("no effect reads the host's focus counters directly (the state object is replaced on every emit)", () => {
-    const offenders = walk("src/ui")
+    const offenders = walk("packages/ui/src")
       .filter((f) => f.endsWith(".svelte"))
       .flatMap((f) => readFileSync(f, "utf8").split("\n").map((l, i) => ({ f, i: i + 1, l })).filter(({ l }) => /\$effect\(.*(focusTick|draftEpoch)/.test(l)).map(({ f, i }) => `${f}:${i}`))
     expect(offenders).toEqual([])
@@ -62,18 +62,18 @@ describe("focus call sites", () => {
 
   test("the extension host never reveals or shows the chat view on its own", () => {
     // workers.ts reveals an already open worker tab, and only from a click on a worker row (a webview message), never from state.
-    const bad = walk("src/extension")
+    const bad = walk("apps/vscode/src/extension")
       .filter((f) => f.endsWith(".ts") && !f.endsWith(join("src", "extension", "workers.ts")))
       .flatMap((f) => readFileSync(f, "utf8").split("\n").map((l, i) => ({ f, i: i + 1, l })).filter(({ l }) => /\.reveal\(|webviewView\.show\(|\bview\??\.show\(/.test(l)).map(({ f, i, l }) => `${f}:${i}: ${l.trim()}`))
     expect(bad).toEqual([])
   })
 
   test("the view-focus command is only executed from explicit commands and notification actions", () => {
-    const hits = walk("src/extension")
+    const hits = walk("apps/vscode/src/extension")
       .filter((f) => f.endsWith(".ts"))
       .flatMap((f) => readFileSync(f, "utf8").split("\n").map((l, i) => ({ f, i: i + 1, l })).filter(({ l }) => /VIEW_ID\}\.focus/.test(l)).map(({ f, l }) => `${f}: ${l.trim()}`))
     // runNotice (user clicked "Open"), opencode.focus, opencode.newSession, opencode.mcps. Nothing in a state/event path.
     expect(hits.length).toBe(4)
-    expect(hits.every((h) => h.startsWith(join("src", "extension", "extension.ts")))).toBe(true)
+    expect(hits.every((h) => h.startsWith(join("apps", "vscode", "src", "extension", "extension.ts")))).toBe(true)
   })
 })

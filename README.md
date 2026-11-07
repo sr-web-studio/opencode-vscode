@@ -77,7 +77,7 @@ Open Settings and search for **OpenCode**:
 
 ## Development
 
-See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+The repo is a Bun workspace monorepo: shared logic in `packages/core`, the Svelte UI in `packages/ui`, the VS Code extension and the OpenCode Voice companion in `apps/vscode`. Run `bun install`, then `bun run build`, `bun run typecheck`, `bun run test` and `bun run package` from the repo root. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) and [docs/monorepo.md](docs/monorepo.md).
 
 ## License
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { normalizeServerUrl, serverUrlProblem } from "../../src/core/server-url"
+import { normalizeServerUrl, serverUrlProblem } from "@occ/core/server-url"
 
 describe("server URL setting", () => {
   test("adds http:// when missing, keeps the port as typed, drops trailing slashes", () => {

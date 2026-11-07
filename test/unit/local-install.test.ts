@@ -5,9 +5,9 @@ import { readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { gzipSync } from "node:zlib"
-import { IntegrityError, ensureLocal, installedLanguages, integrityOf, isInstalled, layout, localState, matchesIntegrity, missingBytes, removeLanguages, removeUnknownModels, sha256Hex, type FetchLike } from "../../src/companion/local-install"
-import { SHERPA_PLATFORMS, sherpaTarget, type SherpaTarget } from "../../src/core/local-voice"
-import { modelBytes, modelUrl, packById, type Catalog, type LanguagePack, type ModelFile, type ModelKind, type ModelRole, type ModelSpec } from "../../src/core/voice-catalog"
+import { IntegrityError, ensureLocal, installedLanguages, integrityOf, isInstalled, layout, localState, matchesIntegrity, missingBytes, removeLanguages, removeUnknownModels, sha256Hex, type FetchLike } from "../../apps/vscode/src/companion/local-install"
+import { SHERPA_PLATFORMS, sherpaTarget, type SherpaTarget } from "@occ/core/local-voice"
+import { modelBytes, modelUrl, packById, type Catalog, type LanguagePack, type ModelFile, type ModelKind, type ModelRole, type ModelSpec } from "@occ/core/voice-catalog"
 
 const dirs: string[] = []
 const tmp = () => {
