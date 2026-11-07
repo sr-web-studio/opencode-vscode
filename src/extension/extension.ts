@@ -37,7 +37,7 @@ export function activate(context: vscode.ExtensionContext): void {
       get: (key) => context.workspaceState.get(key),
       set: (key, value) => void context.workspaceState.update(key, value),
     },
-    onEvent: (ev) => void engine.handle(ev).catch(() => undefined),
+    onEvent: (ev) => void engine.handle(ev).catch((e: unknown) => output.debug(`Notification engine failed on ${ev.type}: ${e instanceof Error ? e.message : String(e)}`)),
     // Pins follow the user across windows and machines (Settings Sync keys), and never touch OpenCode config.
     pins: {
       get: () => context.globalState.get<string[]>(PINS_KEY, []),
@@ -87,6 +87,8 @@ export function activate(context: vscode.ExtensionContext): void {
     notifier,
     session: (id) => controller.lookupSession(id),
     shellSession: (id) => controller.shellSessionID(id),
+    owns: (id) => controller.listsSession(id),
+    log: (line) => output.debug(line),
   })
   notifier.bind(engine)
 
