@@ -146,6 +146,8 @@ export type Action =
   | { type: "loadEarlier" }
   | { type: "trimCompacted" }
   | { type: "stop" }
+  /** Stop one worker (a child session of the current session). The lead keeps running. Refused for any other session id. */
+  | { type: "stopWorker"; sessionID: string }
   /** A queued prompt: `steer` hands it to the agent at its next step ("Send now"); `cancel` removes it. */
   | { type: "queued"; inboxID: string; op: "steer" | "cancel" }
   | { type: "pickAgent"; id: string }

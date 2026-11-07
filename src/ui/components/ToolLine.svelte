@@ -15,6 +15,7 @@
   import DiffView from "./DiffView.svelte"
   import PermissionPrompt from "./PermissionPrompt.svelte"
   import ShellBlock from "./ShellBlock.svelte"
+  import StopWorkerButton from "./StopWorkerButton.svelte"
 
   let { tool, cwd, permission, defaultOpen, settings }: { tool: ToolItem; cwd: string; permission?: PermissionRequest; defaultOpen: boolean; settings: ViewSettings } = $props()
   const store = useStore()
@@ -112,6 +113,7 @@
     {#if !opensWorker}
       <button class="chev muted" onclick={toggle} aria-expanded={open} aria-label={open ? "Collapse details" : "Expand details"} title={open ? "Hide details" : "Show details"}><Codicon name={open ? "chevron-down" : "chevron-right"} /></button>
     {/if}
+    {#if isWorker && childID && workerStatus === "running" && !view.readOnly()}<StopWorkerButton sessionID={childID} running />{/if}
     {#if permission}<PermissionPrompt request={permission} />{/if}
   </div>
 

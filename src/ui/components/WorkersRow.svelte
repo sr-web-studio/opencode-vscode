@@ -1,13 +1,14 @@
 <script lang="ts">
   import { tick } from "svelte"
   import type { SlimModel } from "../../core/api"
-  import { backgroundSummary, modelLabel, modelTitle, type Worker } from "../../core/workers"
+  import { backgroundSummary, modelLabel, modelTitle, quietLabel, type Worker } from "../../core/workers"
   import { clearable, visibleWorkers } from "../../core/worker-hidden"
   import { displayName } from "../../core/names"
   import { plural } from "../../core/format"
   import { focusOpened } from "../focus"
   import { useStore } from "../context"
   import Codicon from "./Codicon.svelte"
+  import StopWorkerButton from "./StopWorkerButton.svelte"
 
   /**
    * Background work as a small chip in the header. The list opens as a floating panel over the transcript, so any
@@ -32,6 +33,15 @@
   )
   const tip = $derived(`Background: ${parts}${summary.running ? `, ${summary.running} running` : ""}`)
   const label = (s: Worker["status"]) => (s === "running" ? "Running" : s === "done" ? "Done" : s === "failed" ? "Failed" : "Stopped")
+
+  /** The clock for "quiet 3m": it only ticks while the panel is open. */
+  let now = $state(Date.now())
+  $effect(() => {
+    if (!open) return
+    now = Date.now()
+    const t = setInterval(() => (now = Date.now()), 15_000)
+    return () => clearInterval(t)
+  })
 
   function outside(e: PointerEvent) {
     const t = e.target as Node | null
@@ -82,6 +92,7 @@
     <ul class="scroll">
       {#each workers as w, i (w.key)}
         {@const model = modelLabel(w.model, models, { short: true })}
+        {@const quiet = quietLabel(w, now)}
         <li class="row" data-key={w.key}>
           <button class="w" disabled={!w.sessionID} title={w.sessionID ? `Open this worker in a tab${w.model ? ` · ${modelTitle(w.model)}` : ""}` : "Waiting for the worker session"} onclick={() => { if (w.sessionID) { open = false; store.bridge.openSession(w.sessionID, { readOnly: true }) } }}>
             <Codicon name="robot" />
@@ -90,9 +101,12 @@
             <span class="d muted">{w.description}</span>
             {#if w.calls > 1}<span class="n muted" title="{w.calls} calls to this worker">×{w.calls}</span>{/if}
             <span class="s" class:ok={w.status === "done"} class:bad={w.status === "failed"} class:muted={w.status === "running" || w.status === "stopped"}>{label(w.status)}</span>
+            {#if quiet}<span class="q muted" title="No activity from this worker for {quiet.slice(6)}">· {quiet}</span>{/if}
           </button>
           {#if w.status !== "running"}
             <button class="x muted" onclick={() => remove([w.key], i)} aria-label="Remove from list" title="Remove from list (the session stays in OpenCode)"><Codicon name="close" /></button>
+          {:else if w.sessionID}
+            <StopWorkerButton sessionID={w.sessionID} running reveal />
           {:else}
             <span class="x spacer" aria-hidden="true"></span>
           {/if}
@@ -123,7 +137,8 @@
   .m { flex: 0 1 auto; min-width: 0; max-width: 11em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.9em; margin-left: -0.2em; }
   .d { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .n { font-size: 0.9em; white-space: nowrap; }
-  .s { font-size: 0.9em; white-space: nowrap; }
+  .s, .q { font-size: 0.9em; white-space: nowrap; }
+  .q { margin-left: -0.25em; }
   .x { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 24px; min-height: 24px; border-radius: 4px; opacity: 0; }
   .x.spacer { pointer-events: none; }
   .row:hover .x, .row:focus-within .x { opacity: 1; }

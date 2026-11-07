@@ -1,4 +1,5 @@
 import type { SlimModel } from "./api"
+import { relativeTime } from "./format"
 import { variantName } from "./names"
 import type { SessionView, ToolItem } from "./transcript/types"
 
@@ -57,6 +58,27 @@ export type Worker = {
   description: string
   status: WorkerStatus
   started?: number
+  /** When the child session last showed activity (`time.updated`), once the child is known. */
+  updated?: number
+}
+
+/** A running worker with no activity for this long shows "quiet …" in the list. */
+export const QUIET_AFTER_MS = 60_000
+
+/**
+ * How long a running worker has been silent, or undefined when it is not running, has no known activity time, or was
+ * active within `QUIET_AFTER_MS`. Pure: the caller passes `now`.
+ */
+export function quietFor(w: Pick<Worker, "status" | "updated">, now: number): number | undefined {
+  if (w.status !== "running" || !w.updated) return undefined
+  const idle = now - w.updated
+  return idle > QUIET_AFTER_MS ? idle : undefined
+}
+
+/** `quiet 3m`, `quiet 2h`: compact, for a one-line row. Empty when the worker is not quiet. */
+export function quietLabel(w: Pick<Worker, "status" | "updated">, now: number): string {
+  const idle = quietFor(w, now)
+  return idle === undefined ? "" : `quiet ${relativeTime(now - idle, now)}`
 }
 
 const str = (v: unknown): string => (typeof v === "string" ? v : "")
@@ -168,6 +190,7 @@ export function deriveWorkers({ view, children, running }: WorkerInput): Worker[
       // The latest call is the one that decides while the child is unknown; the child decides once it is known.
       status: statusOf(tool, child, running),
       started: minTime(earlier?.started, startedHere),
+      updated: child?.time.updated ?? earlier?.updated,
     })
   }
   const workers = order.map((k) => rows.get(k)!)
@@ -183,6 +206,7 @@ export function deriveWorkers({ view, children, running }: WorkerInput): Worker[
       description: child.title ?? "",
       status: statusOf(undefined, child, running),
       started: child.time.created,
+      updated: child.time.updated,
     })
   }
   return workers.sort((a, b) => (a.started ?? 0) - (b.started ?? 0))

@@ -414,6 +414,7 @@ export class Controller {
   private async apply(ev: EventEnvelope): Promise<void> {
     const d = ev.data ?? {}
     const sessionID: string | undefined = d.sessionID ?? d.form?.sessionID
+    if (sessionID && ev.type.startsWith("session.")) this.touchChild(sessionID, ev.created)
     switch (ev.type) {
       case "session.created":
       case "session.forked": {
@@ -506,6 +507,13 @@ export class Controller {
     }
     if (sessionID && sessionID === this.currentSessionID && ev.type.startsWith("session.")) this.feed.apply(ev)
     this.emit()
+  }
+
+  /** Any event of a worker is a sign of life: the Background row's "quiet for …" counts from the last one. */
+  private touchChild(id: string, at: number | undefined) {
+    const child = this.children.get(id)
+    const when = at || Date.now()
+    if (child && when > child.time.updated) this.children.set(id, { ...child, time: { ...child.time, updated: when } })
   }
 
   private touch(id: string, at: number | undefined) {
@@ -722,6 +730,8 @@ export class Controller {
           return await this.send(action.text, action.files, action.skills)
         case "stop":
           return await this.stop()
+        case "stopWorker":
+          return await this.stopWorker(action.sessionID)
         case "queued":
           return await this.queuedAction(action.inboxID, action.op)
         case "rename":
@@ -1003,6 +1013,21 @@ export class Controller {
   private async stop(): Promise<void> {
     const id = this.currentSessionID
     if (id) await this.need().session.interrupt({ sessionID: id })
+  }
+
+  /**
+   * Stop one worker. Only a known child of the current session is interrupted, never an arbitrary session id. The
+   * server then publishes `session.execution.interrupted` for the child: the row turns "Stopped" through `apply`.
+   */
+  private async stopWorker(sessionID: string): Promise<void> {
+    const parent = this.currentSessionID
+    const child = this.children.get(sessionID)
+    if (!parent || !child || child.parentID !== parent) {
+      this.error = "This worker belongs to a session that is not open here, so it cannot be stopped from this view."
+      this.emitNow()
+      return
+    }
+    await this.need().session.interrupt({ sessionID })
   }
 
   private async pickAgent(agent: string): Promise<void> {
