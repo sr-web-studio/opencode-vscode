@@ -63,6 +63,15 @@ describe("isNewerVersion", () => {
     expect(isNewerVersion("1.0.0", "0.99.99")).toBe(true)
     expect(isNewerVersion("0.3.6-test5", "0.3.6")).toBe(false)
   })
+  test("test builds (prerelease) order among themselves and below the release", () => {
+    expect(isNewerVersion("0.3.7-test.12", "0.3.7-test.11")).toBe(true)
+    expect(isNewerVersion("0.3.7-test.11", "0.3.7-test.12")).toBe(false)
+    expect(isNewerVersion("0.3.7-test.11", "0.3.7-test.11")).toBe(false)
+    expect(isNewerVersion("0.3.7-test.11", "0.3.6")).toBe(true)
+    expect(isNewerVersion("0.3.7", "0.3.7-test.11")).toBe(true)
+    expect(isNewerVersion("0.3.7-test.11", "0.3.7")).toBe(false)
+    expect(isNewerVersion("0.3.7-test.10", "0.3.7-test.9")).toBe(true)
+  })
   test("unreadable versions", () => {
     expect(isNewerVersion("0.3.6", "")).toBe(true)
     expect(isNewerVersion("", "0.3.6")).toBe(false)

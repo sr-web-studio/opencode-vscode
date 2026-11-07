@@ -132,20 +132,38 @@ export const VOICE_FEED_COMMAND = "opencode.voice.feed"
  * own companion over each other.
  */
 export function isNewerVersion(a: string, b: string): boolean {
-  const parse = (v: string): number[] | undefined => {
-    const m = /^\s*v?(\d+)\.(\d+)\.(\d+)/.exec(v)
-    return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : undefined
+  const parse = (v: string): { core: number[]; pre: string[] } | undefined => {
+    const m = /^\s*v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+.*)?\s*$/.exec(v)
+    return m ? { core: [Number(m[1]), Number(m[2]), Number(m[3])], pre: m[4] ? m[4].split(".") : [] } : undefined
   }
   const x = parse(a)
   if (!x) return false
   const y = parse(b)
   if (!y) return true
   for (let i = 0; i < 3; i++) {
-    const p = x[i] ?? 0
-    const q = y[i] ?? 0
+    const p = x.core[i] ?? 0
+    const q = y.core[i] ?? 0
     if (p !== q) return p > q
   }
-  return false
+  return comparePrerelease(x.pre, y.pre) > 0
+}
+
+/** Semver precedence of prerelease parts: none ranks above any (`0.3.7` > `0.3.7-test.11`), numbers compare as numbers. */
+function comparePrerelease(a: string[], b: string[]): number {
+  if (!a.length || !b.length) return a.length === b.length ? 0 : a.length ? -1 : 1
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const p = a[i]
+    const q = b[i]
+    if (p === undefined) return -1
+    if (q === undefined) return 1
+    if (p === q) continue
+    const pn = /^\d+$/.test(p)
+    const qn = /^\d+$/.test(q)
+    if (pn && qn) return Number(p) - Number(q)
+    if (pn !== qn) return pn ? -1 : 1
+    return p < q ? -1 : 1
+  }
+  return 0
 }
 
 /** `local`: this computer has a build of the on-device engine (the microphone may work without it). */
