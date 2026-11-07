@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Compaction shows while it runs.** `/compact` (and an automatic compaction when the context is full) now shows a "Compacting conversation…" line with a spinner and the time so far; the summary being written can be opened. When it is done the line becomes the usual "Context compacted" line. A failed compaction shows its error, and a stopped one shows "Compaction cancelled".
+
 ## 0.3.8 (preview)
 
 - **Open Global Config:** a gear in the OpenCode view's title bar, **Edit config** at the bottom of the MCP servers panel, or **OpenCode: Open Global Config** opens your global OpenCode config (`~/.config/opencode/opencode.json` or `.jsonc`) in the editor. The extension only opens it; if there is none yet it asks before creating one with just the schema line. When the server runs on another computer, it tells you the config is there instead of opening a file on this one.
