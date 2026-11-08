@@ -33,6 +33,30 @@
 
         </activity>
 
+        <!--
+          Keeps one event stream per saved server, so the phone can tell you when a session needs you.
+          Type specialUse: the other types do not fit (dataSync is cut off after 6 h a day on Android 15+ and may not
+          start at boot; remoteMessaging is for relaying messages between devices). specialUse has no time limit and may
+          start from BOOT_COMPLETED.
+        -->
+        <service
+            android:name=".notify.WatchService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps a connection to the user's own OpenCode server open so that it can notify the user when an agent session needs input or has finished. No polling; the server pushes events over one open connection." />
+        </service>
+
+        <receiver
+            android:name=".notify.BootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
         <!-- The QR scanner (Google code scanner UI) is downloaded by Google Play services when needed. -->
         <meta-data android:name="com.google.mlkit.vision.DEPENDENCIES" android:value="barcode_ui" />
 
@@ -52,4 +76,12 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Only for scanning the pairing QR code. No microphone permission: voice comes in a later version. -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Background notifications: a foreground service (type specialUse), the notification permission (Android 13+),
+         a restart after boot, and the one-time "do not optimise battery" prompt. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 </manifest>
