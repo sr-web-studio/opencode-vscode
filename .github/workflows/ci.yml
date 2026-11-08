@@ -50,6 +50,9 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+      # Caches the Gradle distribution and dependencies between runs.
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
         with:
