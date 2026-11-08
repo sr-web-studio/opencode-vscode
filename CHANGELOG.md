@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Pair Mobile Device is clearer.** The address picker now says these are the OpenCode server's addresses, never the phone's; it labels Wi-Fi/LAN, Tailscale, public and container addresses and puts the one this window uses first. The QR panel shows the address, the three steps and a "Phone can't connect?" hint. A new guide, [Connect the Android app](https://github.com/sr-web-studio/opencode-vscode/blob/main/docs/mobile-setup.md), covers the server setup end to end (listen on `0.0.0.0`, port, password, firewall, Tailscale).
 - **A worker keeps streaming after it moves to its own folder.** A worker that moves its session into a worktree (or any other folder) went on working, but its tab, its row in the conversation and its notifications stopped updating until the tab was reopened. Live events now follow the session, not the folder it runs in.
 - **The transcript no longer gives two turns the same list key.** After a compaction dropped earlier turns from the view, a new turn could reuse the key of the one still shown, which froze the conversation until it was reopened.
 
