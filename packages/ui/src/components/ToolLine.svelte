@@ -6,6 +6,7 @@
   import { executeOutput } from "@occ/core/transcript/execute"
   import { firstChangedLine } from "@occ/core/transcript/patch"
   import { askedQuestions, editStats, rowAction, rowTitle, summarizeTool } from "@occ/core/transcript/tools"
+  import { isStoppedCommand } from "@occ/core/transcript/tool-error"
   import type { ToolItem } from "@occ/core/transcript/types"
   import { displayName } from "@occ/core/names"
   import { modelLabel, modelTitle, toolChildID } from "@occ/core/workers"
@@ -30,6 +31,7 @@
   const edits = $derived(tool.name === "edit" || tool.name === "write" || tool.name === "patch" ? editStats(tool) : undefined)
   const shellID = $derived(typeof tool.metadata.shellID === "string" ? tool.metadata.shellID : undefined)
   const isShell = $derived(tool.name === "shell")
+  const stoppedCommand = $derived(isStoppedCommand(tool.error))
   const exit = $derived(typeof tool.metadata.exit === "number" ? tool.metadata.exit : tool.status === "completed" ? 0 : undefined)
   const command = $derived(typeof tool.input.command === "string" ? tool.input.command : "")
   const workdir = $derived(typeof tool.input.workdir === "string" ? tool.input.workdir : undefined)
@@ -155,7 +157,7 @@
         {#if Object.keys(tool.input).length}<pre class="out mono muted">{headLines(JSON.stringify(tool.input, null, 1), 12)}</pre>{/if}
         {#if tool.output}<pre class="out mono">{headLines(tool.output, 12)}</pre>{/if}
       {/if}
-      {#if tool.error}<div class="err">{tool.error}</div>{/if}
+      {#if tool.error}<div class={stoppedCommand ? "muted" : "err"}>{tool.error}</div>{/if}
     </div>
   {/if}
 </div>

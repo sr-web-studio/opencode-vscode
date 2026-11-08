@@ -4,7 +4,7 @@
  */
 import { OpenCode } from "@opencode/client"
 import type { OpenCodeClient } from "@occ/core/api"
-import { classifyConnectError, type ConnectProblem } from "./connect-error"
+import { diagnoseConnectError, type ConnectProblem } from "./connect-error"
 import type { PairingLink } from "./pairing-link"
 
 /** `Authorization` value of the server's basic auth (user `opencode`). UTF-8 safe, no Node `Buffer`. */
@@ -29,7 +29,7 @@ export async function testConnection(target: { url: string; password: string }):
     const info = await makeClient(target).server.info()
     return { ok: true, version: info.version, hostname: info.hostname ?? undefined }
   } catch (e) {
-    return { ok: false, ...classifyConnectError(e, target.url, origin()) }
+    return { ok: false, ...(await diagnoseConnectError(e, target.url, origin())) }
   }
 }
 
@@ -42,7 +42,7 @@ export async function redeemPairing(link: PairingLink): Promise<PairResult> {
     if (!res.token) return { ok: false, kind: "other", message: "The server did not give a token. Create a new pairing code and try again." }
     return { ok: true, token: res.token }
   } catch (e) {
-    const problem = classifyConnectError(e, link.baseUrl, origin())
+    const problem = await diagnoseConnectError(e, link.baseUrl, origin())
     // For a code, “rejected” means used, expired or wrong, not a wrong password.
     if (problem.kind === "unauthorized") return { ok: false, kind: "unauthorized", message: "This pairing code is not valid any more. It works once and only for five minutes. Create a new one on the computer." }
     return { ok: false, ...problem }

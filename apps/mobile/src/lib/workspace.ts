@@ -9,7 +9,7 @@ export type ProjectInfo = { directory: string; folderName: string; displayPath: 
 export type Lifecycle = {
   attach(client: OpenCodeClient): void
   detach(): void
-  reconnect(): void
+  reconnect(opts?: { quiet?: boolean }): void
 }
 
 export class Workspace<C extends Lifecycle> {
@@ -53,9 +53,13 @@ export class Workspace<C extends Lifecycle> {
     return closed
   }
 
-  /** The app is in the foreground again: every open project reconnects its event stream and resyncs. */
+  /**
+   * The app is in the foreground again: every open project reconnects its event stream and resyncs. Quietly: the
+   * stream was suspended in the background, so the drop is expected and the screens keep showing the last state for a
+   * few seconds instead of "Connection lost".
+   */
   resume(): void {
-    for (const c of this.open.values()) c.reconnect()
+    for (const c of this.open.values()) c.reconnect({ quiet: true })
   }
 
   dispose(): void {

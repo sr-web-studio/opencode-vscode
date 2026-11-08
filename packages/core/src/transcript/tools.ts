@@ -2,6 +2,7 @@ import { clip, firstLine } from "../format"
 import { relativeTo } from "../paths"
 import { executeTarget } from "./execute"
 import { firstChangedLine, patchedFiles } from "./patch"
+import { isStoppedCommand } from "./tool-error"
 import type { ToolItem } from "./types"
 
 export type ToolLine = {
@@ -137,6 +138,11 @@ export function summarizeTool(tool: ToolItem, cwd: string): ToolLine {
   if (tool.status === "streaming" || tool.status === "running") return line
 
   if (tool.status === "error") {
+    // A command the user stopped is not a failure: a muted "stopped", no red cross.
+    if (isStoppedCommand(tool.error)) {
+      line.result = "stopped"
+      return line
+    }
     line.result = `✗ ${clip(firstLine(tool.error ?? "failed"), 60)}`
     line.tone = "error"
     return line

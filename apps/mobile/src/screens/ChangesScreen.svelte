@@ -8,13 +8,19 @@
   /** "Changes (3 files)" of a turn: the list of files, each opening its diff. */
   let { directory, title, files }: { directory: string; title: string; files: Array<{ file: string; patches: string[] }> } = $props()
 
+  // The session that was open when Changes was tapped (not reactive on purpose: this list belongs to that session even if
+  // another one is opened underneath later). Shown under the title so it is clear whose changes these are.
+  // svelte-ignore state_referenced_locally
+  const ctl = model.controller(directory)
+  const sessionTitle = ctl.sessionMeta(ctl.currentSessionID ?? "")?.title?.trim() || undefined
+
   const icon = (patches: string[]) => {
     const k = patchKind(patches.flatMap((p) => parsePatch(p)))
     return k === "added" ? "diff-added" : k === "deleted" ? "diff-removed" : "diff-modified"
   }
 </script>
 
-<Bar {title} />
+<Bar {title} sub={sessionTitle} />
 
 <div class="body">
   {#each files as f (f.file)}

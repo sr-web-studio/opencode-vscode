@@ -51,6 +51,8 @@ export type Observer = {
 
 const EMIT_MS = 30
 const LAST_SESSION_KEY = "lastSession"
+/** How long a deliberate (quiet) reconnect may keep the last connection state on screen. */
+export const RESUME_QUIET_MS = 5000
 const HIDDEN_WORKERS_KEY = "hiddenWorkers"
 const CHILD_PAGE = 200
 
@@ -150,7 +152,7 @@ export class Controller {
     const current = id ? this.sessions.find((s) => s.id === id) ?? this.archived.find((s) => s.id === id) : undefined
     const waiting = new Set([...this.permissions.entries(), ...this.forms.entries()].filter(([, v]) => v.length > 0).map(([k]) => k))
     return {
-      connection: this.connection,
+      connection: this.shownConnection(),
       settings: this.settings,
       directory: this.dir,
       folderName: this.opts.folderName,
@@ -287,6 +289,7 @@ export class Controller {
 
   setConnection(c: ConnectionState) {
     this.connection = c
+    if (c.status !== "disconnected") this.clearQuiet()
     this.emitNow()
   }
 
@@ -365,11 +368,39 @@ export class Controller {
    * phone suspends sockets while the app is in the background; the stream can look alive but be dead. Keeps the
    * attached client and the open session. Does nothing while detached.
    */
-  reconnect() {
-    if (this.client) this.restartStream(this.client)
+  reconnect(opts: { quiet?: boolean } = {}) {
+    if (!this.client) return
+    // A deliberate refresh (the app came back to the foreground): the stream is dropped on purpose and is back in a
+    // moment, so the drop is not shown for `RESUME_QUIET_MS`. Only when the connection was fine before; a real outage
+    // that is still there after the window shows as before.
+    if (opts.quiet && this.connection.status === "connected") {
+      this.clearQuiet()
+      this.quietUntil = Date.now() + RESUME_QUIET_MS
+      this.quietTimer = setTimeout(() => {
+        this.clearQuiet()
+        this.emitNow()
+      }, RESUME_QUIET_MS)
+    }
+    this.restartStream(this.client)
+  }
+
+  private quietUntil = 0
+  private quietTimer?: ReturnType<typeof setTimeout>
+
+  private clearQuiet() {
+    this.quietUntil = 0
+    if (this.quietTimer) clearTimeout(this.quietTimer)
+    this.quietTimer = undefined
+  }
+
+  /** What the UI is told: the last good state while a quiet reconnect is under way, otherwise the real one. */
+  private shownConnection(): ConnectionState {
+    const c = this.connection
+    return c.status === "disconnected" && Date.now() < this.quietUntil ? { ...c, status: "connected", message: undefined } : c
   }
 
   detach() {
+    this.clearQuiet()
     this.abort?.abort()
     this.abort = undefined
     this.client = undefined
@@ -507,6 +538,9 @@ export class Controller {
           const outcome = ev.type === "session.execution.succeeded" ? "succeeded" : ev.type === "session.execution.failed" ? "failed" : "interrupted"
           this.children.set(child.id, { ...child, outcome })
         }
+        // A turn ended: the server's shell list is the truth. A lost `shell.exited`/`shell.deleted` (a stalled stream)
+        // must not leave the terminal badge counting a command that is gone.
+        if (d.sessionID === this.currentSessionID) this.refreshShells()
         break
       }
       case "permission.asked":
@@ -602,6 +636,12 @@ export class Controller {
     } catch {
       this.shells = new Map()
     }
+  }
+
+  private refreshShells(): void {
+    const client = this.client
+    if (!client) return
+    void this.loadShells(client).then(() => this.emit())
   }
 
   /** Children of a session: `session.list({ parentID })`. Live `session.created` events keep the map current afterwards. */

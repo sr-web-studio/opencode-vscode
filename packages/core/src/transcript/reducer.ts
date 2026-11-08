@@ -3,6 +3,7 @@ import { baseName, isFileUri, isImageMime, mimeFromName } from "../attachments"
 import { attachmentSource } from "../images"
 import { settledTurn } from "./turn"
 import { applyRevertEvent } from "./revert"
+import { toolErrorText } from "./tool-error"
 import {
   emptyView,
   type CompactionView,
@@ -82,7 +83,7 @@ function toolFromHistory(c: any): ToolItem {
     inputText: typeof st.input === "string" ? st.input : undefined,
     metadata: record(st.metadata),
     output: contentText(st.content),
-    error: status === "error" ? errorText(st.error) : undefined,
+    error: status === "error" ? toolErrorText(errorText(st.error)) : undefined,
     created: c.time?.created,
     completed: c.time?.completed,
   }
@@ -413,7 +414,7 @@ export function applyEvent(view: SessionView, ev: EventEnvelope): SessionView {
         patchTool(s, d.id, t, (x) => ({
           ...x,
           status: "error",
-          error: errorText(d.error) ?? "Failed",
+          error: toolErrorText(errorText(d.error)) ?? "Failed",
           output: d.content ? contentText(d.content) : x.output,
           metadata: { ...x.metadata, ...record(d.metadata) },
           completed: t,
