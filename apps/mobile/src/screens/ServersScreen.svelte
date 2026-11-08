@@ -1,6 +1,8 @@
 <script lang="ts">
   import Codicon from "@occ/ui/components/Codicon.svelte"
   import Bar from "../components/Bar.svelte"
+  import { openInBrowser } from "../lib/platform"
+  import { EMPTY_SERVERS_HELP, SETUP_GUIDE_LABEL, SETUP_GUIDE_URL } from "../lib/texts"
   import { model } from "../model.svelte"
   import { IS_PREVIEW, PREVIEW_TAG } from "../lib/version"
 </script>
@@ -17,10 +19,9 @@
     <div class="center">
       <Codicon name="server-environment" />
       <strong>No server yet</strong>
-      <p class="muted">
-        Add the OpenCode server that runs on your computer. The easiest way is to scan the QR code from “OpenCode: Pair Mobile Device” in VS Code. You can also type the address and password yourself.
-      </p>
+      <p class="muted">{EMPTY_SERVERS_HELP}</p>
       <button class="btn" onclick={() => model.push({ kind: "server-form" })}><Codicon name="add" /> Add server</button>
+      <button class="helplink" onclick={() => void openInBrowser(SETUP_GUIDE_URL)}>{SETUP_GUIDE_LABEL}</button>
     </div>
   {:else}
     {#each model.profiles as p (p.id)}
@@ -42,6 +43,16 @@
 </div>
 
 <style>
+  .helplink {
+    font: inherit;
+    font-size: 0.9em;
+    color: var(--vscode-textLink-foreground, #3794ff);
+    background: none;
+    border: 0;
+    padding: 4px;
+    text-decoration: underline;
+    cursor: pointer;
+  }
   .entry {
     display: flex;
     align-items: center;

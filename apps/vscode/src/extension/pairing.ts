@@ -6,9 +6,14 @@
  * session token is only handed out when the phone redeems it, so it never passes through the extension.
  */
 
-export type AddressKind = "lan" | "tailscale" | "loopback" | "custom"
+export type AddressKind = "lan" | "tailscale" | "custom" | "container" | "linklocal" | "loopback"
 
-export type Candidate = { url: string; kind: AddressKind }
+export type Candidate = {
+  url: string
+  kind: AddressKind
+  /** First item of the sorted list: the address the picker offers first. */
+  recommended: boolean
+}
 
 export type Candidates = {
   candidates: Candidate[]
@@ -20,10 +25,31 @@ export type Candidates = {
 export const DEFAULT_EXPIRY_SECONDS = 300
 
 export const KIND_LABEL: Record<AddressKind, string> = {
-  lan: "LAN",
-  tailscale: "Tailscale",
+  lan: "Wi-Fi / local network — phone must be on the same network",
+  tailscale: "Tailscale — works anywhere when the phone has Tailscale on",
+  custom: "Public address — works anywhere with internet",
+  container: "Probably a container network — usually not reachable from a phone",
+  linklocal: "Link-local — not reachable from a phone",
   loopback: "This computer only",
-  custom: "Custom",
+}
+
+/** The `detail` line under each address in the picker: what the choice means for the phone. */
+export const KIND_DETAIL: Record<AddressKind, string> = {
+  lan: "The phone and this computer must be on the same Wi-Fi or cable network.",
+  tailscale: "The phone must be signed in to the same Tailscale network.",
+  custom: "The phone needs internet access to this address.",
+  container: "Docker and similar container networks use 172.17–31.x; these addresses exist only inside this computer.",
+  linklocal: "169.254.x.x is assigned when no network handed out an address; a phone cannot use it.",
+  loopback: "Only this computer can reach it.",
+}
+
+/** Most to least useful for a phone. Container and link-local addresses stay selectable but go last. */
+const PREFERENCE: Record<Exclude<AddressKind, "loopback">, AddressKind[]> = {
+  lan: ["lan", "tailscale", "custom", "container", "linklocal"],
+  tailscale: ["tailscale", "lan", "custom", "container", "linklocal"],
+  custom: ["custom", "lan", "tailscale", "container", "linklocal"],
+  container: ["lan", "tailscale", "custom", "container", "linklocal"],
+  linklocal: ["lan", "tailscale", "custom", "container", "linklocal"],
 }
 
 function parseUrl(raw: string): URL | undefined {
@@ -50,13 +76,18 @@ export function classifyHost(hostname: string): AddressKind {
   if (v4) {
     const [a, b] = v4 as [number, number, number, number]
     if (a === 127 || a === 0) return "loopback"
+    if (a === 169 && b === 254) return "linklocal" // APIPA: no network gave the computer an address
     if (a === 100 && b >= 64 && b <= 127) return "tailscale" // 100.64.0.0/10 (CGNAT, used by Tailscale)
-    if (a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)) return "lan"
+    // Docker's default bridge is 172.17.0.0/16 and compose networks continue into 172.18–31. A real
+    // 172.17–31/16 LAN exists too, so these stay selectable; they are labelled and sorted last instead.
+    if (a === 172 && b >= 17 && b <= 31) return "container"
+    if (a === 10 || (a === 172 && b === 16) || (a === 192 && b === 168)) return "lan"
     return "custom"
   }
   if (host.startsWith("[")) {
     const v6 = host.slice(1, -1)
     if (v6 === "::1" || v6 === "::") return "loopback"
+    if (/^fe[89ab][0-9a-f]:/.test(v6)) return "linklocal" // fe80::/10
     if (v6.startsWith("fd7a:115c:a1e0:")) return "tailscale"
     if (/^f[cd][0-9a-f]{2}:/.test(v6)) return "lan" // fc00::/7 unique local
     return "custom"
@@ -75,11 +106,15 @@ export function canonicalUrl(raw: string): string | undefined {
 
 /**
  * Addresses to offer: those the server reports plus the one this window uses, de-duplicated, with addresses a phone
- * cannot reach (loopback, `0.0.0.0`) removed.
+ * cannot reach (loopback, `0.0.0.0`) removed and the rest sorted by how likely a phone can use them.
+ *
+ * The window's own address decides the order: a window on Wi-Fi gets the LAN address first, a window on Tailscale
+ * gets the Tailscale address first. Container and link-local addresses are kept (they cannot be told apart from a
+ * real LAN by IP alone) but come last with a warning label.
  */
 export function candidateUrls(serverUrls: readonly string[], windowUrl: string | undefined): Candidates {
   const seen = new Set<string>()
-  const candidates: Candidate[] = []
+  const found: Candidate[] = []
   let droppedLoopback = false
   for (const raw of [...serverUrls, ...(windowUrl ? [windowUrl] : [])]) {
     const url = canonicalUrl(raw)
@@ -90,8 +125,18 @@ export function candidateUrls(serverUrls: readonly string[], windowUrl: string |
       droppedLoopback = true
       continue
     }
-    candidates.push({ url, kind })
+    found.push({ url, kind, recommended: false })
   }
+  const windowCanonical = windowUrl ? canonicalUrl(windowUrl) : undefined
+  const windowKind = windowCanonical ? classifyHost(new URL(windowCanonical).hostname) : undefined
+  const order = PREFERENCE[windowKind === "loopback" || windowKind === undefined ? "lan" : windowKind]
+  const rank = (c: Candidate) => order.indexOf(c.kind)
+  const candidates = found
+    .map((c, i) => ({ c, i }))
+    .sort((a, b) => rank(a.c) - rank(b.c) || a.i - b.i)
+    .map(({ c }) => c)
+  const first = candidates[0]
+  if (first && first.kind !== "container" && first.kind !== "linklocal") first.recommended = true
   return { candidates, droppedLoopback }
 }
 
@@ -101,7 +146,9 @@ export function customUrlProblem(raw: string): string | undefined {
   if (!text) return "Enter an address, for example http://192.168.1.10:4096"
   const u = parseUrl(text)
   if (!u) return "Use a full address starting with http:// or https://"
-  if (classifyHost(u.hostname) === "loopback") return "This address only works on this computer. Use an address your phone can reach."
+  const kind = classifyHost(u.hostname)
+  if (kind === "loopback") return "This address only works on this computer. Use an address your phone can reach."
+  if (kind === "linklocal") return "169.254.x.x is a link-local address a phone cannot reach. Use the computer's Wi-Fi or Tailscale address."
   return undefined
 }
 
