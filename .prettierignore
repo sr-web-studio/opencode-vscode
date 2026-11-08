@@ -15,9 +15,8 @@ apps/vscode/README.md
 apps/vscode/CHANGELOG.md
 apps/vscode/LICENSE
 
-# Real API captures and design mockups: data, not source
+# Real API captures: data, not source
 test/fixtures/
-docs/mockups/
 
 # Documentation is hand-wrapped and reviewed as text; Prettier would reflow every paragraph
 *.md
