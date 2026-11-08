@@ -2,10 +2,10 @@ import { describe, expect, test } from "bun:test"
 import fixtureA from "../fixtures/simple-edit-shell.json"
 import fixtureB from "../fixtures/grep-glob-subagent-question.json"
 import fixtureC from "../fixtures/shell-exit-and-error.json"
-import { applyEvent, isRunning, queuedFromInbox, viewFromMessages } from "../../src/core/transcript/reducer"
-import { emptyView, type SessionView, type ToolItem } from "../../src/core/transcript/types"
-import { splitTurn, foldLabel, countSteps } from "../../src/core/transcript/turn"
-import { summarizeTool } from "../../src/core/transcript/tools"
+import { applyEvent, isRunning, queuedFromInbox, viewFromMessages } from "@occ/core/transcript/reducer"
+import { emptyView, type SessionView, type ToolItem } from "@occ/core/transcript/types"
+import { splitTurn, foldLabel, countSteps } from "@occ/core/transcript/turn"
+import { summarizeTool } from "@occ/core/transcript/tools"
 
 type Fixture = { events: any[]; messages: any[] }
 

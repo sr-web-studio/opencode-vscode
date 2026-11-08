@@ -8,8 +8,8 @@ import {
   signInAdvice,
   type McpDeps,
   type McpHost,
-} from "../../src/core/mcp"
-import { isLocalServer } from "../../src/core/server-url"
+} from "@occ/core/mcp"
+import { isLocalServer } from "@occ/core/server-url"
 
 describe("mcpActions", () => {
   test("connected: turn off, and sign out only with a stored credential", () => {

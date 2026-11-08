@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
-import { featConfig, modelConfig } from "../../src/companion/sherpa"
+import { featConfig, modelConfig } from "../../apps/vscode/src/companion/sherpa"
 import {
   BANGLA_PACK,
   DEFAULT_LANGUAGE,
@@ -42,9 +42,10 @@ import {
   type Catalog,
   type LanguagePack,
   type ModelSpec,
-} from "../../src/core/voice-catalog"
+} from "@occ/core/voice-catalog"
 
 const root = join(import.meta.dir, "..", "..")
+const COMPANION_DIR = "apps/vscode/companion"
 const read = (p: string) => readFileSync(join(root, p), "utf8")
 const allModels = (): ModelSpec[] => LANGUAGE_PACKS.flatMap((p) => packModels(p)).filter((m, i, a) => a.findIndex((x) => x.id === m.id) === i)
 
@@ -157,19 +158,19 @@ describe("catalog validity", () => {
   })
 
   test("every catalog model's source and license are listed in companion/NOTICE, the companion README and docs/local-voice.md", () => {
-    const docs = [read("companion/NOTICE"), read("companion/README.md"), read("docs/local-voice.md")].map((d) => d.replace(/\s+/g, " "))
+    const docs = [read(`${COMPANION_DIR}/NOTICE`), read(`${COMPANION_DIR}/README.md`), read("docs/local-voice.md")].map((d) => d.replace(/\s+/g, " "))
     const spelled = (license: string): string[] => (license === "Apache-2.0" ? ["Apache-2.0", "Apache License 2.0"] : [license])
     for (const m of allModels()) {
       for (const doc of docs) {
         expect(doc).toContain(m.source)
         expect(spelled(m.license).some((s) => doc.includes(s))).toBe(true)
       }
-      expect(read("companion/NOTICE")).toContain(m.rev) // the notice names the pinned revision
+      expect(read(`${COMPANION_DIR}/NOTICE`)).toContain(m.rev) // the notice names the pinned revision
     }
   })
 
   test("the docs name the default model, its license text link, the attribution line and no removed models", () => {
-    const docs = { notice: read("companion/NOTICE"), readme: read("README.md"), companion: read("companion/README.md"), local: read("docs/local-voice.md") }
+    const docs = { notice: read(`${COMPANION_DIR}/NOTICE`), readme: read("README.md"), companion: read(`${COMPANION_DIR}/README.md`), local: read("docs/local-voice.md") }
     const line = "NVIDIA Nemotron 3.5 ASR Streaming 0.6B, OpenMDW-1.1; sherpa-onnx int8 export by csukuangfj."
     for (const [name, text] of Object.entries(docs)) {
       const flat = text.replace(/\s+/g, " ")
@@ -183,7 +184,7 @@ describe("catalog validity", () => {
 
   test("package.json: the engine is local/soniox, localLanguages and maxLanguages exist, the commands are there", () => {
     type Prop = { type?: string; enum?: string[]; enumItemLabels?: string[]; enumDescriptions?: string[]; default?: unknown; minimum?: number; maximum?: number; items?: { enum?: string[]; enumItemLabels?: string[]; enumDescriptions?: string[] }; markdownDescription?: string }
-    const pkg = JSON.parse(read("package.json")) as { contributes: { configuration: { properties: Record<string, Prop> }; commands: Array<{ command: string; title: string }> } }
+    const pkg = JSON.parse(read("apps/vscode/package.json")) as { contributes: { configuration: { properties: Record<string, Prop> }; commands: Array<{ command: string; title: string }> } }
     const props = pkg.contributes.configuration.properties
     const list = props["opencode.voice.localLanguages"]!
     expect(list.type).toBe("array")

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { clockText, commandBlockText, endText, noticeText, ruleText, sessionTerminalName, shortDuration, terminalName, toCrlf, wrapLine } from "../../src/core/terminal-text"
+import { clockText, commandBlockText, endText, noticeText, ruleText, sessionTerminalName, shortDuration, terminalName, toCrlf, wrapLine } from "@occ/core/terminal-text"
 
 const E = "\x1b["
 const dim = (t: string) => `${E}2m${t}${E}0m`

@@ -1,0 +1,75 @@
+{
+  "name": "opencode-voice",
+  "displayName": "OpenCode Voice (unofficial)",
+  "description": "Voice input for the OpenCode (unofficial) extension: records your microphone on this computer and types what you say into the prompt box: free on-device recognition (one multilingual model for English and about 28 other languages, Bangla as an optional extra pack), or Soniox (your own key) for Bangla, English and more. Unofficial — not affiliated with the OpenCode team.",
+  "icon": "media/icon.png",
+  "galleryBanner": {
+    "color": "#1e1e2e",
+    "theme": "dark"
+  },
+  "preview": true,
+  "keywords": [
+    "opencode",
+    "voice",
+    "dictation",
+    "speech to text",
+    "bangla"
+  ],
+  "homepage": "https://github.com/sr-web-studio/opencode-vscode#readme",
+  "bugs": {
+    "url": "https://github.com/sr-web-studio/opencode-vscode/issues"
+  },
+  "version": "0.3.10",
+  "publisher": "sr-web-studio",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sr-web-studio/opencode-vscode.git"
+  },
+  "engines": {
+    "vscode": "^1.144.0"
+  },
+  "categories": [
+    "AI",
+    "Other"
+  ],
+  "extensionKind": [
+    "ui"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onCommand:opencode.companion.ping",
+    "onCommand:opencode.companion.voice.start",
+    "onCommand:opencode.companion.voice.stop",
+    "onCommand:opencode.companion.attention"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "opencode.companion.voice.chooseMicrophone",
+        "title": "Choose Microphone",
+        "category": "OpenCode Voice"
+      },
+      {
+        "command": "opencode.companion.voice.removeLanguages",
+        "title": "Remove Downloaded Languages",
+        "category": "OpenCode Voice"
+      },
+      {
+        "command": "opencode.companion.voice.showLog",
+        "title": "Show Log",
+        "category": "OpenCode Voice"
+      },
+      {
+        "command": "opencode.companion.voice.micSettings",
+        "title": "Open Microphone Settings",
+        "category": "OpenCode Voice"
+      },
+      {
+        "command": "opencode.companion.testAttention",
+        "title": "Test Window Attention",
+        "category": "OpenCode Voice"
+      }
+    ]
+  }
+}

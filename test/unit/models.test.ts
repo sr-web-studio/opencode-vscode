@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { cycleAgent, cycleVariant, footerLabel, groupModels, primaryAgents } from "../../src/core/models"
-import type { SlimModel } from "../../src/core/api"
+import { cycleAgent, cycleVariant, footerLabel, groupModels, primaryAgents } from "@occ/core/models"
+import type { SlimModel } from "@occ/core/api"
 
 const m = (id: string, providerID: string, name: string, extra: Partial<SlimModel> = {}): SlimModel => ({
   id, modelID: id, providerID, name, enabled: true, variants: [{ id: "low" }, { id: "high" }], ...extra,

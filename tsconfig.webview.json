@@ -1,9 +1,0 @@
-{
-  "extends": "./tsconfig.json",
-  "compilerOptions": {
-    "lib": ["ES2023", "DOM", "DOM.Iterable"],
-    "types": ["svelte", "vite/client"]
-  },
-  "include": ["src/core/**/*.ts", "src/ui/**/*.ts", "src/ui/**/*.svelte", "src/webview/**/*.ts", "src/webview/**/*.svelte"],
-  "exclude": ["node_modules", "dist", "scratch"]
-}

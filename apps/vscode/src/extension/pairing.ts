@@ -1,0 +1,136 @@
+/**
+ * Pure logic of "OpenCode: Pair Mobile Device" (no `vscode` import, so `bun test` covers it).
+ *
+ * The server's `POST /api/pair` takes no body and returns `{ code, expires_in }`. The link the phone opens is
+ * `<base URL the phone can reach>/auth/connect/<code>`, built here. The code is one-time and short-lived; the
+ * session token is only handed out when the phone redeems it, so it never passes through the extension.
+ */
+
+export type AddressKind = "lan" | "tailscale" | "loopback" | "custom"
+
+export type Candidate = { url: string; kind: AddressKind }
+
+export type Candidates = {
+  candidates: Candidate[]
+  /** Loopback / wildcard addresses that were left out because a phone cannot reach them. */
+  droppedLoopback: boolean
+}
+
+/** Pairing codes live five minutes; the server also reports it (`expires_in`), which wins when sane. */
+export const DEFAULT_EXPIRY_SECONDS = 300
+
+export const KIND_LABEL: Record<AddressKind, string> = {
+  lan: "LAN",
+  tailscale: "Tailscale",
+  loopback: "This computer only",
+  custom: "Custom",
+}
+
+function parseUrl(raw: string): URL | undefined {
+  try {
+    const u = new URL(raw.trim())
+    return u.protocol === "http:" || u.protocol === "https:" ? u : undefined
+  } catch {
+    return undefined
+  }
+}
+
+function ipv4(host: string): number[] | undefined {
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host)
+  if (!m) return undefined
+  const parts = m.slice(1).map(Number)
+  return parts.every((n) => n <= 255) ? parts : undefined
+}
+
+/** Classify a host name or IP (as in `URL.hostname`, IPv6 with brackets). */
+export function classifyHost(hostname: string): AddressKind {
+  const host = hostname.toLowerCase().replace(/\.$/, "")
+  if (host === "localhost" || host.endsWith(".localhost")) return "loopback"
+  const v4 = ipv4(host)
+  if (v4) {
+    const [a, b] = v4 as [number, number, number, number]
+    if (a === 127 || a === 0) return "loopback"
+    if (a === 100 && b >= 64 && b <= 127) return "tailscale" // 100.64.0.0/10 (CGNAT, used by Tailscale)
+    if (a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)) return "lan"
+    return "custom"
+  }
+  if (host.startsWith("[")) {
+    const v6 = host.slice(1, -1)
+    if (v6 === "::1" || v6 === "::") return "loopback"
+    if (v6.startsWith("fd7a:115c:a1e0:")) return "tailscale"
+    if (/^f[cd][0-9a-f]{2}:/.test(v6)) return "lan" // fc00::/7 unique local
+    return "custom"
+  }
+  if (host.endsWith(".ts.net")) return "tailscale"
+  if (host.endsWith(".local") || host.endsWith(".lan")) return "lan"
+  return "custom"
+}
+
+/** `http://Host:4096/` -> `http://host:4096`; undefined when it is not an http(s) URL. Path and query are dropped. */
+export function canonicalUrl(raw: string): string | undefined {
+  const u = parseUrl(raw)
+  if (!u) return undefined
+  return u.origin
+}
+
+/**
+ * Addresses to offer: those the server reports plus the one this window uses, de-duplicated, with addresses a phone
+ * cannot reach (loopback, `0.0.0.0`) removed.
+ */
+export function candidateUrls(serverUrls: readonly string[], windowUrl: string | undefined): Candidates {
+  const seen = new Set<string>()
+  const candidates: Candidate[] = []
+  let droppedLoopback = false
+  for (const raw of [...serverUrls, ...(windowUrl ? [windowUrl] : [])]) {
+    const url = canonicalUrl(raw)
+    if (!url || seen.has(url)) continue
+    seen.add(url)
+    const kind = classifyHost(new URL(url).hostname)
+    if (kind === "loopback") {
+      droppedLoopback = true
+      continue
+    }
+    candidates.push({ url, kind })
+  }
+  return { candidates, droppedLoopback }
+}
+
+/** Reason a typed address cannot be used for pairing, or undefined when it is fine. */
+export function customUrlProblem(raw: string): string | undefined {
+  const text = raw.trim()
+  if (!text) return "Enter an address, for example http://192.168.1.10:4096"
+  const u = parseUrl(text)
+  if (!u) return "Use a full address starting with http:// or https://"
+  if (classifyHost(u.hostname) === "loopback") return "This address only works on this computer. Use an address your phone can reach."
+  return undefined
+}
+
+/** The one-time link for a base URL and a pairing code. Only the code is in it, never a token. */
+export function pairLink(baseUrl: string, code: string): string {
+  const base = canonicalUrl(baseUrl)
+  if (!base) throw new Error(`Not an http(s) address: ${baseUrl}`)
+  return `${base}/auth/connect/${encodeURIComponent(code)}`
+}
+
+/** Epoch ms at which a code created at `now` stops working. Falls back to five minutes for a nonsense `expires_in`. */
+export function expiresAt(now: number, expiresIn: number | undefined): number {
+  const seconds = typeof expiresIn === "number" && Number.isFinite(expiresIn) && expiresIn > 0 ? Math.min(expiresIn, 3600) : DEFAULT_EXPIRY_SECONDS
+  return now + seconds * 1000
+}
+
+/** Whole seconds left, rounded up so the display shows 0:00 only once the code is really expired. */
+export function secondsLeft(expires: number, now: number): number {
+  return Math.max(0, Math.ceil((expires - now) / 1000))
+}
+
+/** `5:00`, `0:07`. */
+export function formatCountdown(seconds: number): string {
+  const s = Math.max(0, Math.floor(seconds))
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`
+}
+
+/** What goes in the log: the host only, never the code or the link. */
+export function logHost(baseUrl: string): string {
+  const u = parseUrl(baseUrl)
+  return u ? u.host : "unknown host"
+}

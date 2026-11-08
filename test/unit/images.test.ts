@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test"
-import { parseDataUri } from "../../src/core/attachments"
-import { ImageCache } from "../../src/core/image-cache"
-import { attachmentSource, previewName, safeImageMime, stalePreviews, thumbSize } from "../../src/core/images"
-import { applyEvent, fileChips, viewFromMessages } from "../../src/core/transcript/reducer"
+import { parseDataUri } from "@occ/core/attachments"
+import { ImageCache } from "@occ/core/image-cache"
+import { attachmentSource, previewName, safeImageMime, stalePreviews, thumbSize } from "@occ/core/images"
+import { applyEvent, fileChips, viewFromMessages } from "@occ/core/transcript/reducer"
 
 /** A real 1x1 transparent PNG: the only image data in the tests. */
 const PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="

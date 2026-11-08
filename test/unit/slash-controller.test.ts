@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { Controller } from "../../src/core/controller"
+import { Controller } from "@occ/core/controller"
 
 const session = (id: string, extra: Record<string, unknown> = {}) => ({
   id, title: id, projectID: "prj", time: { created: 1, updated: 1 }, location: { directory: "/w" }, ...extra,

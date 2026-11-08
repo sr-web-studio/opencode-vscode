@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test"
-import { attachmentFromUri, base64Bytes, baseName, checkBlob, dataUri, fileUri, isImageMime, MAX_ATTACHMENT_BYTES, modelTakesImages, toPromptFiles } from "../../src/core/attachments"
-import { displayName, variantName } from "../../src/core/names"
-import { normalizePins, pinKey, togglePin } from "../../src/core/pins"
-import { groupModels, pinnedModels } from "../../src/core/models"
-import type { SlimModel } from "../../src/core/api"
+import { attachmentFromUri, base64Bytes, baseName, checkBlob, dataUri, fileUri, isImageMime, MAX_ATTACHMENT_BYTES, modelTakesImages, toPromptFiles } from "@occ/core/attachments"
+import { displayName, variantName } from "@occ/core/names"
+import { normalizePins, pinKey, togglePin } from "@occ/core/pins"
+import { groupModels, pinnedModels } from "@occ/core/models"
+import type { SlimModel } from "@occ/core/api"
 
 describe("displayName", () => {
   test("capitalizes ids for display only", () => {
@@ -105,7 +105,7 @@ describe("variantName", () => {
 
 describe("askedQuestions", () => {
   test("question tool calls read as questions, options and the answer", async () => {
-    const { askedQuestions } = await import("../../src/core/transcript/tools")
+    const { askedQuestions } = await import("@occ/core/transcript/tools")
     const input = { questions: [{ question: "Which one?", header: "Pick", options: [{ label: "A", description: "a long description that must not be cut" }, { label: "B" }] }] }
     expect(askedQuestions({ input, metadata: { answers: [["A"]] } })).toEqual([
       { question: "Which one?", header: "Pick", options: [{ label: "A", description: "a long description that must not be cut" }, { label: "B", description: undefined }], answer: "A" },

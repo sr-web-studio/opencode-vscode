@@ -18,11 +18,11 @@
 import { fork, execFileSync } from "node:child_process"
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join, resolve } from "node:path"
-import { IntegrityError, ensureLocal } from "../src/companion/local-install"
-import { DEFAULT_LANGUAGE, LANGUAGES, languageById } from "../src/core/voice-catalog"
-import { envWithNative } from "../src/companion/sherpa"
-import type { FetchLike } from "../src/companion/local-install"
-import type { SessionUpdate } from "../src/companion/session"
+import { IntegrityError, ensureLocal } from "../apps/vscode/src/companion/local-install"
+import { DEFAULT_LANGUAGE, LANGUAGES, languageById } from "@occ/core/voice-catalog"
+import { envWithNative } from "../apps/vscode/src/companion/sherpa"
+import type { FetchLike } from "../apps/vscode/src/companion/local-install"
+import type { SessionUpdate } from "../apps/vscode/src/companion/session"
 
 const args = process.argv.slice(2)
 const corrupt = args.find((a) => a.startsWith("--corrupt="))?.slice(10)
@@ -44,7 +44,7 @@ if (wavs.length === 0) {
 }
 
 const repo = resolve(import.meta.dirname, "..")
-const recorder = join(repo, "companion", "dist", "recorder.js")
+const recorder = join(repo, "apps", "vscode", "companion", "dist", "recorder.js")
 const ms = (t: number) => `${(performance.now() - t).toFixed(0)} ms`
 
 async function download(fetchImpl?: FetchLike) {

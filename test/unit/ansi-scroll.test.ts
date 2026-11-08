@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { ansiToSpans, cssColor, stripAnsi } from "../../src/core/ansi"
-import { anchoredScrollTop, initialScroll, isNearBottom, scrollTopAfterPrepend, showJump, stepScroll, type Metrics } from "../../src/core/scroll"
+import { ansiToSpans, cssColor, stripAnsi } from "@occ/core/ansi"
+import { anchoredScrollTop, initialScroll, isNearBottom, scrollTopAfterPrepend, showJump, stepScroll, type Metrics } from "@occ/core/scroll"
 
 describe("ansiToSpans", () => {
   test("plain text is one span", () => {

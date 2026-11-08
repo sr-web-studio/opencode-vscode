@@ -10,7 +10,7 @@ I'm a big OpenCode fan. I run OpenCode as a service on a machine that is on 24/7
 
 What I badly missed was the VS Code editor around it: opening files, native diffs, the terminal, all next to the chat. So I built this extension for myself, and it now helps me every day. Maybe it helps you too.
 
-I'm also working on an Android app with the same UI, for the same always-on setup.
+I'm also working on an Android app with the same UI, for the same always-on setup. It is **not part of this extension**: it is a separate APK, available as a **beta** from [GitHub Releases](https://github.com/sr-web-studio/opencode-vscode/releases) (see [Android app (beta)](#android-app-beta)).
 
 **Preview:** this is an early release. Please report problems in [Issues](https://github.com/sr-web-studio/opencode-vscode/issues).
 
@@ -24,6 +24,7 @@ I'm also working on an Android app with the same UI, for the same always-on setu
 - **Agent and model picker**, session switcher, pinned sessions, a floating task list, and background workers in a header chip. Click a worker to open it read-only.
 - **Slash commands** in the prompt box (`/compact`, `/undo`, `/fork`, `/skills`, your own commands) and an **MCP servers** panel (`/mcps`) to check status, switch servers on or off and sign in.
 - **Delete a session** you no longer need (trash icon in the session switcher, or **OpenCode: Delete Session…**): only stopped sessions, only after you confirm. It is deleted on the server for every client, with its workers. The extension never deletes anything on its own.
+- **Pair your phone** with **OpenCode: Pair Mobile Device…**: pick an address your phone can reach (LAN or Tailscale), scan the QR code in the new panel with the [Android app (beta)](#android-app-beta). The code is one-time and expires after 5 minutes; nothing is sent to the internet.
 - **Notifications** when OpenCode needs you or finishes work.
 - **Voice input**: speak into the prompt box. Free and offline on your own computer (one multilingual model for English and about 28 other languages, Bangla as an optional pack), or Soniox with your own key for mixed languages and many more. See [Voice input](#voice-input).
 
@@ -69,6 +70,15 @@ Open Settings and search for **OpenCode**:
 | `opencode.voice.localLanguage` | Deprecated single language (`en` or `bn`); still used while `localLanguages` is not set. |
 | `opencode.voice.languages`, `opencode.voice.model` | Languages and model for the Soniox engine. |
 
+## Android app (beta)
+
+A separate Android app, **OpenCode (unofficial)** for phones, lists all your projects and their sessions on the same OpenCode server, with chat, diffs, command output and notifications when a session needs you or finishes.
+
+- **Not shipped with this extension.** Installing the extension never installs anything on your phone. The app is a separate APK.
+- **Beta.** Download the APK from the latest `mobile-v…-beta` pre-release on [GitHub Releases](https://github.com/sr-web-studio/opencode-vscode/releases) and install it on your phone (Android asks you to allow installing apps from your browser or file manager). It is not in the Play Store yet.
+- **Connect:** run **OpenCode: Pair Mobile Device…** in VS Code and scan the QR code in the app, or enter the server address and password by hand.
+- Like the extension, it is not affiliated with the OpenCode team.
+
 ## Privacy
 
 - The extension talks only to your OpenCode server. For voice input it also downloads the on-device engine once (npm registry and Hugging Face), or talks to Soniox when you choose that engine.
@@ -77,7 +87,7 @@ Open Settings and search for **OpenCode**:
 
 ## Development
 
-See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+The repo is a Bun workspace monorepo: shared logic in `packages/core`, the Svelte UI in `packages/ui`, the VS Code extension and the OpenCode Voice companion in `apps/vscode`. Run `bun install`, then `bun run build`, `bun run typecheck`, `bun run test` and `bun run package` from the repo root. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) and [docs/monorepo.md](docs/monorepo.md).
 
 ## License
 

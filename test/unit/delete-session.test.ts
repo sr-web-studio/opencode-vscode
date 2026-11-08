@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test"
-import { Controller } from "../../src/core/controller"
-import { confirmDelete, deletableSessions, DELETE_DETAIL, deleteQuestion } from "../../src/core/delete-session"
-import { WorkerTab } from "../../src/core/worker-tab"
-import { isGone } from "../../src/core/errors"
+import { Controller } from "@occ/core/controller"
+import { confirmDelete, deletableSessions, DELETE_DETAIL, deleteQuestion } from "@occ/core/delete-session"
+import { WorkerTab } from "@occ/core/worker-tab"
+import { isGone } from "@occ/core/errors"
 
 const session = (id: string, extra: Record<string, unknown> = {}) => ({
   id, title: `Title ${id}`, projectID: "prj", time: { created: 1, updated: 1 }, location: { directory: "/w" }, ...extra,

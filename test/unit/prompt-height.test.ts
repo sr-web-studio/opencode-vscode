@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { promptHeight, TOLERANCE_PX } from "../../src/core/prompt-height"
+import { promptHeight, TOLERANCE_PX } from "@occ/core/prompt-height"
 
 const at = (scrollHeight: number, lineHeight = 22.4) => promptHeight({ scrollHeight, lineHeight, minLines: 2, maxLines: 12 })
 

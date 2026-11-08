@@ -1,0 +1,151 @@
+/*
+ * The shared UI (packages/ui) is written against VS Code's theme variables (`--vscode-*`). VS Code injects them into
+ * its webviews; on a phone nothing does, so this file defines the ones the UI reads. Dark follows "Dark Modern", light
+ * follows "Light Modern". The phone's setting (`prefers-color-scheme`) picks one.
+ *
+ * If the UI starts reading a new `--vscode-*` variable, add it here (test/unit/mobile-theme.test.ts checks this).
+ */
+:root {
+  color-scheme: dark;
+
+  --vscode-font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Noto Sans Bengali", sans-serif;
+  --vscode-editor-font-family: ui-monospace, "Roboto Mono", "DejaVu Sans Mono", Menlo, Consolas, monospace;
+  --vscode-editor-font-size: 13px;
+
+  --vscode-foreground: #cccccc;
+  --vscode-descriptionForeground: #9d9d9d;
+  --vscode-errorForeground: #f85149;
+  --vscode-editorWarning-foreground: #cca700;
+  --vscode-testing-iconPassed: #73c991;
+  --vscode-charts-green: #89d185;
+  --vscode-textLink-foreground: #4daafc;
+  --vscode-focusBorder: #0078d4;
+  --vscode-contrastBorder: transparent;
+
+  --vscode-editor-background: #1f1f1f;
+  --vscode-sideBar-background: #181818;
+  --vscode-editorWidget-background: #202020;
+  --vscode-editorWidget-border: #454545;
+  --vscode-widget-border: #313131;
+  --vscode-widget-shadow: rgba(0, 0, 0, 0.36);
+  --vscode-panel-border: #2b2b2b;
+  --vscode-textCodeBlock-background: #2b2b2b;
+  --vscode-textBlockQuote-background: #2b2b2b;
+  --vscode-editorLineNumber-foreground: #6e7681;
+
+  --vscode-input-background: #313131;
+  --vscode-input-foreground: #cccccc;
+  --vscode-input-border: #3c3c3c;
+  --vscode-input-placeholderForeground: #989898;
+
+  --vscode-button-background: #0078d4;
+  --vscode-button-foreground: #ffffff;
+  --vscode-button-hoverBackground: #026ec1;
+
+  --vscode-list-hoverBackground: #2a2d2e;
+  --vscode-list-activeSelectionBackground: #04395e;
+  --vscode-list-activeSelectionForeground: #ffffff;
+  --vscode-quickInputList-focusForeground: #ffffff;
+  --vscode-quickInputList-focusBackground: #04395e;
+
+  --vscode-editorSuggestWidget-background: #202020;
+  --vscode-editorSuggestWidget-foreground: #cccccc;
+  --vscode-editorSuggestWidget-border: #454545;
+  --vscode-editorSuggestWidget-selectedBackground: #04395e;
+  --vscode-editorSuggestWidget-selectedForeground: #ffffff;
+
+  --vscode-diffEditor-insertedLineBackground: rgba(155, 185, 85, 0.2);
+  --vscode-diffEditor-removedLineBackground: rgba(255, 0, 0, 0.2);
+  --vscode-diffEditor-insertedTextBackground: rgba(156, 204, 44, 0.25);
+  --vscode-diffEditor-removedTextBackground: rgba(255, 0, 0, 0.3);
+
+  --vscode-terminal-background: #181818;
+  --vscode-terminal-foreground: #cccccc;
+  --vscode-terminal-ansiBlack: #000000;
+  --vscode-terminal-ansiRed: #cd3131;
+  --vscode-terminal-ansiGreen: #0dbc79;
+  --vscode-terminal-ansiYellow: #e5e510;
+  --vscode-terminal-ansiBlue: #2472c8;
+  --vscode-terminal-ansiMagenta: #bc3fbc;
+  --vscode-terminal-ansiCyan: #11a8cd;
+  --vscode-terminal-ansiWhite: #e5e5e5;
+  --vscode-terminal-ansiBrightBlack: #666666;
+  --vscode-terminal-ansiBrightRed: #f14c4c;
+  --vscode-terminal-ansiBrightGreen: #23d18b;
+  --vscode-terminal-ansiBrightYellow: #f5f543;
+  --vscode-terminal-ansiBrightBlue: #3b8eea;
+  --vscode-terminal-ansiBrightMagenta: #d670d6;
+  --vscode-terminal-ansiBrightCyan: #29b8db;
+  --vscode-terminal-ansiBrightWhite: #e5e5e5;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+
+    --vscode-foreground: #3b3b3b;
+    --vscode-descriptionForeground: #717171;
+    --vscode-errorForeground: #e51400;
+    --vscode-editorWarning-foreground: #bf8803;
+    --vscode-testing-iconPassed: #388a34;
+    --vscode-charts-green: #388a34;
+    --vscode-textLink-foreground: #005fb8;
+    --vscode-focusBorder: #005fb8;
+
+    --vscode-editor-background: #ffffff;
+    --vscode-sideBar-background: #f8f8f8;
+    --vscode-editorWidget-background: #f8f8f8;
+    --vscode-editorWidget-border: #c8c8c8;
+    --vscode-widget-border: #e5e5e5;
+    --vscode-widget-shadow: rgba(0, 0, 0, 0.16);
+    --vscode-panel-border: #e5e5e5;
+    --vscode-textCodeBlock-background: #ececec;
+    --vscode-textBlockQuote-background: #f0f0f0;
+    --vscode-editorLineNumber-foreground: #6e7681;
+
+    --vscode-input-background: #ffffff;
+    --vscode-input-foreground: #3b3b3b;
+    --vscode-input-border: #cecece;
+    --vscode-input-placeholderForeground: #767676;
+
+    --vscode-button-background: #005fb8;
+    --vscode-button-foreground: #ffffff;
+    --vscode-button-hoverBackground: #0258a8;
+
+    --vscode-list-hoverBackground: #f2f2f2;
+    --vscode-list-activeSelectionBackground: #e4e6f1;
+    --vscode-list-activeSelectionForeground: #000000;
+    --vscode-quickInputList-focusForeground: #000000;
+    --vscode-quickInputList-focusBackground: #e4e6f1;
+
+    --vscode-editorSuggestWidget-background: #f8f8f8;
+    --vscode-editorSuggestWidget-foreground: #3b3b3b;
+    --vscode-editorSuggestWidget-border: #c8c8c8;
+    --vscode-editorSuggestWidget-selectedBackground: #e4e6f1;
+    --vscode-editorSuggestWidget-selectedForeground: #000000;
+
+    --vscode-diffEditor-insertedLineBackground: rgba(155, 185, 85, 0.2);
+    --vscode-diffEditor-removedLineBackground: rgba(255, 0, 0, 0.2);
+    --vscode-diffEditor-insertedTextBackground: rgba(156, 204, 44, 0.25);
+    --vscode-diffEditor-removedTextBackground: rgba(255, 0, 0, 0.2);
+
+    --vscode-terminal-background: #ffffff;
+    --vscode-terminal-foreground: #3b3b3b;
+    --vscode-terminal-ansiBlack: #000000;
+    --vscode-terminal-ansiRed: #cd3131;
+    --vscode-terminal-ansiGreen: #107c10;
+    --vscode-terminal-ansiYellow: #949800;
+    --vscode-terminal-ansiBlue: #0451a5;
+    --vscode-terminal-ansiMagenta: #bc05bc;
+    --vscode-terminal-ansiCyan: #0598bc;
+    --vscode-terminal-ansiWhite: #555555;
+    --vscode-terminal-ansiBrightBlack: #666666;
+    --vscode-terminal-ansiBrightRed: #cd3131;
+    --vscode-terminal-ansiBrightGreen: #14ce14;
+    --vscode-terminal-ansiBrightYellow: #b5ba00;
+    --vscode-terminal-ansiBrightBlue: #0451a5;
+    --vscode-terminal-ansiBrightMagenta: #bc05bc;
+    --vscode-terminal-ansiBrightCyan: #0598bc;
+    --vscode-terminal-ansiBrightWhite: #a5a5a5;
+  }
+}

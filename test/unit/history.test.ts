@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { initialHistory, loadChunk, type FetchPage, type RawMessage } from "../../src/core/history"
+import { initialHistory, loadChunk, type FetchPage, type RawMessage } from "@occ/core/history"
 
 const msg = (n: number, type = "assistant", extra: Record<string, unknown> = {}): RawMessage => ({ id: `m${n}`, type, ...extra })
 const compaction = (n: number, status = "completed"): RawMessage => msg(n, "compaction", { status, summary: `summary ${n}` })

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { applySonioxMessage, isNewerVersion, mergeDictation, nothingHeard, pcmBytes, sonioxProtocols, sonioxStartMessage, spokenText } from "../../src/core/dictation"
+import { applySonioxMessage, isNewerVersion, mergeDictation, nothingHeard, pcmBytes, sonioxProtocols, sonioxStartMessage, spokenText } from "@occ/core/dictation"
 
 describe("sonioxStartMessage", () => {
   test("raw 16 kHz mono PCM, Bangla and English by default, no key in the message", () => {

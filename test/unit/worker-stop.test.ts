@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
-import { Controller } from "../../src/core/controller"
-import { WorkerTab } from "../../src/core/worker-tab"
-import { QUIET_AFTER_MS, quietFor, quietLabel, type Worker } from "../../src/core/workers"
+import { Controller } from "@occ/core/controller"
+import { WorkerTab } from "@occ/core/worker-tab"
+import { QUIET_AFTER_MS, quietFor, quietLabel, type Worker } from "@occ/core/workers"
 
 const session = (id: string, extra: Record<string, unknown> = {}) => ({
   id, title: id, projectID: "prj", time: { created: 1, updated: 1 }, location: { directory: "/w" }, ...extra,

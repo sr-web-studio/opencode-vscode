@@ -1,4 +1,4 @@
-import type { RawMessage } from "../../src/core/history"
+import type { RawMessage } from "@occ/core/history"
 
 export type ListInput = { sessionID?: string; limit?: number; order?: "asc" | "desc"; cursor?: string }
 

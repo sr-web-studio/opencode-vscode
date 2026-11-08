@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import questionForm from "../fixtures/question-form.json"
-import type { FormField } from "../../src/core/api"
-import { OTHER, buildAnswer, choiceOf, clampStep, defaultAnswers, isChoice, tabsFor, validateField, validateForm, visibleFields } from "../../src/core/forms"
+import type { FormField } from "@occ/core/api"
+import { OTHER, buildAnswer, choiceOf, clampStep, defaultAnswers, isChoice, tabsFor, validateField, validateForm, visibleFields } from "@occ/core/forms"
 
 const f = (x: unknown) => x as FormField
 

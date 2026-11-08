@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { withoutTurnError } from "../../src/core/transcript/turn"
-import type { StepView } from "../../src/core/transcript/types"
+import { withoutTurnError } from "@occ/core/transcript/turn"
+import type { StepView } from "@occ/core/transcript/types"
 
 const denied = "Model 'claude-opus-5-5' is not allowed for this key"
 const step = (id: string, error?: string): StepView => ({ id, items: [], error })

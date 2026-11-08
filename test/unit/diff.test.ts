@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { changedFiles, changesLabel, gutterDigits, hunksOnly, parsePatch, patchKind, patchRows, reconstructBefore, reverseApply, segments, wordMarks } from "../../src/core/diff"
+import { changedFiles, changesLabel, gutterDigits, hunksOnly, parsePatch, patchKind, patchRows, reconstructBefore, reverseApply, segments, wordMarks } from "@occ/core/diff"
 import fixture from "../fixtures/edit-patch.json"
 
 const patch = fixture.patch
