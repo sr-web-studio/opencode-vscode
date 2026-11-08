@@ -229,10 +229,15 @@ export function prependView(view: SessionView, older: SessionView): SessionView 
 
 /* -------------------------------------------------------------------- events */
 
-function ensureTurn(view: SessionView, created: number | undefined): { view: SessionView; index: number } {
+/**
+ * The turn a new step belongs to: the open one, or a new one named after the step's message. The id is the one the
+ * history view gives the same turn (`turn:<message id>`), so a reload keeps the keyed list stable — and two live
+ * turns can never share an id, even after a compaction dropped turns from the view.
+ */
+function ensureTurn(view: SessionView, created: number | undefined, stepID: string): { view: SessionView; index: number } {
   const last = view.turns[view.turns.length - 1]
   if (last && !last.outcome) return { view, index: view.turns.length - 1 }
-  const turn: TurnView = { id: `turn:live:${view.turns.length}`, steps: [], started: created }
+  const turn: TurnView = { id: `turn:${stepID}`, steps: [], started: created }
   return { view: { ...view, turns: [...view.turns, turn] }, index: view.turns.length }
 }
 
@@ -249,7 +254,7 @@ function updateStep(view: SessionView, id: string, created: number | undefined, 
   let v = view
   let at = locateStep(v, id)
   if (!at) {
-    const ensured = ensureTurn(v, created)
+    const ensured = ensureTurn(v, created, id)
     v = ensured.view
     const turn = v.turns[ensured.index]!
     const step: StepView = { id, started: created, items: [] }

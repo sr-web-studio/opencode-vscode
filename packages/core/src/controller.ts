@@ -447,8 +447,7 @@ export class Controller {
       await this.sync()
       return
     }
-    const dir = ev.location?.directory
-    if (dir && !this.isListed(dir)) return
+    if (!this.belongs(ev)) return
     try {
       await this.apply(ev)
     } finally {
@@ -457,6 +456,21 @@ export class Controller {
       this.opts.onEvent?.(ev)
     }
     for (const o of this.observers) o.event?.(ev)
+  }
+
+  /**
+   * Whether an event is this window's business. Events of another project are ignored, but a session is ours through
+   * its place in the window, not its folder: a worker can move to its own worktree (another folder) and keeps
+   * streaming there, and its folder may be spelled differently than the workspace's.
+   */
+  private belongs(ev: EventEnvelope): boolean {
+    const d = ev.data ?? {}
+    const id = d.sessionID ?? d.form?.sessionID
+    if (id && this.listsSession(id)) return true
+    // A worker this window has not listed yet: its `session.created` names the parent it belongs to.
+    if ((ev.type === "session.created" || ev.type === "session.forked") && typeof d.parentID === "string" && this.listsSession(d.parentID)) return true
+    const dir = ev.location?.directory
+    return !dir || this.isListed(dir)
   }
 
   private async apply(ev: EventEnvelope): Promise<void> {
@@ -468,9 +482,13 @@ export class Controller {
       case "session.forked": {
         if (!this.client) return
         const s = await this.client.session.get({ sessionID: d.sessionID }).catch(() => undefined)
-        if (!s || !this.isListed(s.location?.directory)) return
-        if (isRoot(s)) this.sessions = this.sort(upsertSession(this.sessions, s))
-        else this.children.set(s.id, s)
+        if (!s) return
+        if (isRoot(s)) {
+          if (this.isListed(s.location?.directory)) this.sessions = this.sort(upsertSession(this.sessions, s))
+        } else if (s.parentID && this.listsSession(s.parentID)) {
+          // A worker belongs here through its parent, wherever it runs: it can move to its own worktree.
+          this.children.set(s.id, s)
+        }
         break
       }
       case "session.renamed":
