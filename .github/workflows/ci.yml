@@ -36,11 +36,8 @@ jobs:
         run: bun run build
       - name: Build mobile web app
         run: bun run mobile:build
-      # Advisory until the one-time reformat has landed; then remove
-      # continue-on-error so a badly formatted file fails the run.
       - name: Format check
         run: bun run format:check
-        continue-on-error: true
 
   android:
     name: Android unit tests
