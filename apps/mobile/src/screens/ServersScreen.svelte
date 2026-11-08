@@ -6,6 +6,7 @@
 
 <Bar title="Servers" back={false}>
   {#snippet actions()}
+    <button class="iconbtn" onclick={() => model.openSettings()} aria-label="Settings"><Codicon name="settings-gear" /></button>
     <button class="iconbtn" onclick={() => model.push({ kind: "server-form" })} aria-label="Add server"><Codicon name="add" /></button>
   {/snippet}
 </Bar>
