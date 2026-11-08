@@ -14,6 +14,18 @@ import { normalizeServerUrl } from "@occ/core/server-url"
 import { makeClient, redeemPairing, testConnection } from "./lib/client"
 import { parseDeepLink, routeDeepLink } from "./lib/deep-link"
 import { canPop, directoriesInUse, pop, popKey, push, stackForSession, type Entry, type Screen } from "./lib/nav"
+import { DEFAULT_NOTIFY, NO_STATUS, nativeServers, parseNotifySettings, visibleSessionOf, type NotifySettings, type NotifyStatus } from "./lib/notify"
+import {
+  askBatteryExemption,
+  askNotificationPermission,
+  canWatchInBackground,
+  clearSessionNotification,
+  configureService,
+  openBatterySettings,
+  openNotificationSettings,
+  serviceStatus,
+  setVisibleSession,
+} from "./lib/notify-native"
 import { parsePairingLink } from "./lib/pairing-link"
 import { pickFiles } from "./lib/picker"
 import { launchUrl, onHardwareBack, onResume, onUrlOpen, openInBrowser } from "./lib/platform"
@@ -50,6 +62,11 @@ function writeJSON(key: string, value: unknown): void {
 }
 
 const LINK_DEDUPE_MS = 2500
+const NOTIFY_KEY = "occ.notify"
+/** Set once the owner has seen the notification-permission explanation (whatever the answer). */
+const NOTIFY_ASKED_KEY = "occ.notify.asked"
+/** Set once the owner has seen the battery explanation. */
+const BATTERY_ASKED_KEY = "occ.notify.battery"
 
 class AppModel {
   profiles = $state.raw<Profile[]>([])
@@ -64,6 +81,12 @@ class AppModel {
   connecting = $state<string | undefined>()
   problem = $state.raw<Problem | undefined>()
   ready = $state(false)
+  /** The Settings layer is open above the screen stack. */
+  settingsOpen = $state(false)
+  /** Background notifications: the owner's switches (not secret; the service gets them too). */
+  notifySettings = $state.raw<NotifySettings>(DEFAULT_NOTIFY)
+  /** What the watching service reports (refreshed while the Settings screen is open). */
+  notifyStatus = $state.raw<NotifyStatus>(NO_STATUS)
 
   /** The home folder seen in the project list, for `~` in paths. */
   home: string | undefined
@@ -76,6 +99,9 @@ class AppModel {
   private toastTimer: ReturnType<typeof setTimeout> | undefined
   private lastLink = { url: "", at: 0 }
   private started = false
+  /** The session each open project's controller shows (a chat opens "the newest one" without saying which). */
+  private readonly viewing = new Map<string, string | undefined>()
+  private shownSession = ""
 
   /* ----------------------------------------------------------- start */
 
@@ -83,10 +109,18 @@ class AppModel {
     if (this.started) return
     this.started = true
     onHardwareBack(() => this.back())
-    onResume(() => this.workspace?.resume())
+    onResume(() => {
+      this.workspace?.resume()
+      // Back in front: the session on screen counts as seen again, so its notification goes.
+      this.shownSession = ""
+      this.syncVisible()
+      void this.syncNotify()
+    })
     onUrlOpen((url) => void this.openLink(url))
     this.profiles = await this.store.list()
     this.activeID = await this.store.activeID()
+    this.notifySettings = parseNotifySettings(readJSON(NOTIFY_KEY))
+    void this.syncNotify()
     const launch = await launchUrl()
     this.ready = true
     if (launch && parseDeepLink(launch)) {
@@ -105,7 +139,9 @@ class AppModel {
 
   private setStack(next: Entry[]) {
     this.stack = next
+    this.settingsOpen = false
     this.settle()
+    this.syncVisible()
   }
 
   push(screen: Screen) {
@@ -113,7 +149,17 @@ class AppModel {
   }
 
   pop() {
+    // Settings is a layer over the stack, not an entry of it (nav.ts is not ours): back closes it first.
+    if (this.settingsOpen) {
+      this.settingsOpen = false
+      return
+    }
     this.setStack(pop(this.stack))
+  }
+
+  openSettings() {
+    this.settingsOpen = true
+    void this.refreshNotifyStatus()
   }
 
   /** Close the screen with this key, unless something else has been opened above it since. */
@@ -125,6 +171,10 @@ class AppModel {
   back(): boolean {
     if (this.modal) {
       this.answer(false)
+      return true
+    }
+    if (this.settingsOpen) {
+      this.settingsOpen = false
       return true
     }
     if (!canPop(this.stack)) return false
@@ -144,6 +194,7 @@ class AppModel {
   }
 
   private drop(dir: string) {
+    this.viewing.delete(dir)
     this.synced = new Set([...this.synced].filter((d) => d !== dir))
     this.caches.get(dir)?.clear()
     this.caches.delete(dir)
@@ -154,6 +205,7 @@ class AppModel {
     this.workspace?.dispose()
     this.workspace = undefined
     this.profile = undefined
+    this.viewing.clear()
   }
 
   /* ---------------------------------------------------------- servers */
@@ -161,6 +213,7 @@ class AppModel {
   async saveProfile(input: ProfileInput): Promise<Profile> {
     const saved = await this.store.save(input)
     this.profiles = await this.store.list()
+    void this.syncNotify()
     return saved
   }
 
@@ -169,6 +222,7 @@ class AppModel {
     this.profiles = await this.store.list()
     if (this.activeID === id) this.activeID = undefined
     if (this.profile?.id === id) this.closeWorkspace()
+    void this.syncNotify()
   }
 
   /**
@@ -192,6 +246,7 @@ class AppModel {
     await this.store.setActive(profile.id)
     this.profiles = await this.store.list()
     this.activeID = profile.id
+    void this.offerNotifications()
     const fresh = this.profiles.find((p) => p.id === profile.id) ?? profile
     this.closeWorkspace()
     this.profile = fresh
@@ -264,6 +319,13 @@ class AppModel {
       file: async () => undefined,
     })
     this.caches.set(project.directory, cache)
+    // Which session this project's chat shows now: the notification of that session is not needed while it is on screen.
+    ctl.subscribe((s) => {
+      const id = s.target.kind === "session" ? s.target.id : undefined
+      if (this.viewing.get(project.directory) === id && this.viewing.has(project.directory)) return
+      this.viewing.set(project.directory, id)
+      this.syncVisible()
+    })
     ctl.observe({
       resync: () => {
         if (!this.synced.has(project.directory)) this.synced = new Set([...this.synced, project.directory])
@@ -281,6 +343,89 @@ class AppModel {
   async imageUri(directory: string, sessionID: string, ref: ImageRef): Promise<string | undefined> {
     const bytes = await this.caches.get(directory)?.get(sessionID, ref)
     return bytes && safeImageMime(bytes.mime) ? dataUri(bytes.mime, bytes.base64) : undefined
+  }
+
+  /* ---------------------------------------------- background notifications */
+
+  /** Hand the saved servers and the switches to the watching service (it keeps them encrypted and starts or stops). */
+  async syncNotify(): Promise<void> {
+    this.notifyStatus = await configureService(nativeServers(this.profiles), this.notifySettings)
+  }
+
+  async refreshNotifyStatus(): Promise<void> {
+    this.notifyStatus = await serviceStatus()
+  }
+
+  async setNotify(patch: Partial<NotifySettings>): Promise<void> {
+    this.notifySettings = { ...this.notifySettings, ...patch }
+    writeJSON(NOTIFY_KEY, this.notifySettings)
+    // Turning notifications on is the moment to ask Android for permission.
+    if (patch.enabled === true) await askNotificationPermission()
+    await this.syncNotify()
+  }
+
+  /**
+   * After the first server that works: say in two sentences what the notifications are for, then ask Android. Asked once;
+   * the Settings screen has the same switch for anyone who said no.
+   */
+  private async offerNotifications(): Promise<void> {
+    if (!canWatchInBackground() || !this.notifySettings.enabled) return
+    if (readJSON(NOTIFY_ASKED_KEY) === true) return
+    writeJSON(NOTIFY_ASKED_KEY, true)
+    const ok = await this.confirm({
+      title: "Tell me when a session needs me?",
+      detail:
+        "The app can keep a quiet connection to your server and send a notification when a session asks for permission, has a question, or finishes, even when the app is closed. Each notification names the session and the project. You can change this in Settings.",
+      confirm: "Turn on",
+    })
+    if (!ok) {
+      this.notifySettings = { ...this.notifySettings, enabled: false }
+      writeJSON(NOTIFY_KEY, this.notifySettings)
+      await this.syncNotify()
+      return
+    }
+    await askNotificationPermission()
+    await this.syncNotify()
+    await this.offerBatteryExemption()
+  }
+
+  /** One time: the dialog that lets Android keep the connection alive while the screen is off. */
+  private async offerBatteryExemption(): Promise<void> {
+    if (readJSON(BATTERY_ASKED_KEY) === true) return
+    await this.refreshNotifyStatus()
+    if (this.notifyStatus.batteryUnrestricted) return
+    writeJSON(BATTERY_ASKED_KEY, true)
+    const ok = await this.confirm({
+      title: "Keep notifications reliable?",
+      detail: "Phones put idle apps to sleep and then miss events. The next screen asks Android to let this app run in the background. On Samsung phones you can also add it to “Never sleeping apps” (see Settings).",
+      confirm: "Continue",
+    })
+    if (ok) await askBatteryExemption()
+  }
+
+  async askBattery(): Promise<void> {
+    await askBatteryExemption()
+    await this.refreshNotifyStatus()
+  }
+
+  openBatterySettings(): void {
+    void openBatterySettings()
+  }
+
+  openNotificationSettings(): void {
+    void openNotificationSettings()
+  }
+
+  /** Tell the service which session is on screen (no notification for it) and clear that session's notification. */
+  private syncVisible(): void {
+    const top = this.top.screen as { kind: string; directory?: string; sessionID?: string }
+    const sessionID = visibleSessionOf(top, Object.fromEntries(this.viewing))
+    const serverId = this.profile?.serverId
+    const key = serverId && sessionID ? `${serverId}|${sessionID}` : ""
+    if (key === this.shownSession) return
+    this.shownSession = key
+    void setVisibleSession(serverId, sessionID)
+    if (serverId && sessionID) void clearSessionNotification(serverId, sessionID)
   }
 
   /* -------------------------------------------------------- deep link */

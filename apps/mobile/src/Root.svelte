@@ -10,6 +10,7 @@
   import ProjectsScreen from "./screens/ProjectsScreen.svelte"
   import ServerFormScreen from "./screens/ServerFormScreen.svelte"
   import ServersScreen from "./screens/ServersScreen.svelte"
+  import SettingsScreen from "./screens/SettingsScreen.svelte"
   import SessionsScreen from "./screens/SessionsScreen.svelte"
   import ShellScreen from "./screens/ShellScreen.svelte"
   import WorkerScreen from "./screens/WorkerScreen.svelte"
@@ -38,6 +39,10 @@
       {/if}
     </div>
   {/each}
+  <!-- Settings is a layer over the stack (it is not an entry of nav.ts): back and any new screen close it. -->
+  {#if model.settingsOpen}
+    <div class="screen"><SettingsScreen /></div>
+  {/if}
 {/if}
 
 <Overlays />
