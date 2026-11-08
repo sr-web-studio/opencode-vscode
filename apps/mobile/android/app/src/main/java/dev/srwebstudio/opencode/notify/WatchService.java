@@ -79,6 +79,25 @@ public final class WatchService extends Service {
               }
 
               @Override
+              public String lastAnswer(ServerRef server, String sessionID) throws Exception {
+                return SessionApi.lastAnswer(server, sessionID);
+              }
+
+              @Override
+              public void pause(long ms) {
+                try {
+                  Thread.sleep(ms);
+                } catch (InterruptedException e) {
+                  Thread.currentThread().interrupt();
+                }
+              }
+
+              @Override
+              public int profileCount() {
+                return WatchState.serverCount();
+              }
+
+              @Override
               public void show(Notice notice) {
                 notifier.show(notice);
                 Log.i(TAG, "notified " + notice.kind + " session " + notice.sessionID);

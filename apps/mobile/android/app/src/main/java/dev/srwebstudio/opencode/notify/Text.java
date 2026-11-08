@@ -32,6 +32,11 @@ public final class Text {
     return "";
   }
 
+  /** All whitespace runs (and line breaks) turned into single spaces, trimmed. */
+  public static String squash(String text) {
+    return text == null ? "" : text.replaceAll("\\s+", " ").trim();
+  }
+
   /** Blank out anything that looks like a credential. */
   public static String redact(String text) {
     if (text == null) return "";

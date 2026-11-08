@@ -15,7 +15,7 @@ import dev.srwebstudio.opencode.R;
 
 /**
  * Channels and notifications. One notification per session (tag = server + session, so a new one replaces the old
- * one), grouped per server, with the server's name as sub-text. A tap opens
+ * one), grouped per server. Sub-text: "worker of ..." and, only with more than one saved server, the profile name. A tap opens
  * {@code opencode-mobile://session/<id>?server=<serverId>} in the app.
  */
 public final class Notifier {
@@ -72,8 +72,8 @@ public final class Notifier {
             .setSmallIcon(R.drawable.ic_stat_opencode)
             .setContentTitle(n.title)
             .setContentText(n.body)
-            .setSubText(n.server.name)
-            .setStyle(new NotificationCompat.BigTextStyle().bigText(n.body))
+            .setSubText(n.subText)
+            .setStyle(new NotificationCompat.BigTextStyle().bigText(n.expanded))
             .setContentIntent(open(n.deepLink(), tag.hashCode()))
             .setAutoCancel(true)
             .setShowWhen(true)
@@ -97,7 +97,7 @@ public final class Notifier {
     return new NotificationCompat.Builder(ctx, channelFor(n.kind))
         .setSmallIcon(R.drawable.ic_stat_opencode)
         .setContentTitle("A session " + what)
-        .setSubText(n.server.name)
+        .setSubText(n.profileName)
         .build();
   }
 

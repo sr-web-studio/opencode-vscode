@@ -2,6 +2,7 @@ package dev.srwebstudio.opencode.notify;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
@@ -42,62 +43,77 @@ public class TextAndWordingTest {
     assertEquals("", Text.folderName(null));
   }
 
-  @Test
-  public void permissionWording() {
-    Notice n = Wording.build(SERVER, "ses_1", Kind.PERMISSION, new SessionMeta("Fix the bug", null, "/home/a/proj"), null, "bash", "/home/a/proj", false);
-    assertEquals("Fix the bug needs permission", n.title);
-    assertEquals("bash \u00b7 proj", n.body);
+  private static Notice build(Kind kind, SessionMeta meta, SessionMeta parent, Detail d, String dir, boolean multi, boolean failed) {
+    return Wording.build(SERVER, "s", kind, meta, parent, d, dir, multi, failed);
   }
 
   @Test
-  public void questionWordingUsesFirstFieldAndClips() {
-    String long140 = "why ".repeat(100);
-    Notice n = Wording.build(SERVER, "ses_1", Kind.QUESTION, new SessionMeta("Plan", null, "/x/occ-test"), null, long140 + "\nsecond line", "/x/occ-test", false);
-    assertEquals("Plan has a question", n.title);
-    assertEquals(140 + " \u00b7 occ-test".length(), n.body.length());
-    assertTrue(n.body.endsWith("\u2026 \u00b7 occ-test"));
+  public void titleIsMarkPlusSessionTitleOnly() {
+    SessionMeta m = new SessionMeta("Contra Full Setup", null, "/p/app");
+    assertEquals("\u2705 Contra Full Setup", build(Kind.FINISHED, m, null, null, "/p/app", false, false).title);
+    assertEquals("\u274c Contra Full Setup", build(Kind.FAILED, m, null, null, "/p/app", false, true).title);
+    assertEquals("\u2753 Contra Full Setup", build(Kind.QUESTION, m, null, null, "/p/app", false, false).title);
+    assertEquals("\uD83D\uDD10 Contra Full Setup", build(Kind.PERMISSION, m, null, null, "/p/app", false, false).title);
   }
 
   @Test
-  public void finishedAndFailed() {
-    SessionMeta m = new SessionMeta("Refactor", null, "/p/app");
-    assertEquals("Refactor finished", Wording.build(SERVER, "s", Kind.FINISHED, m, null, null, "/p/app", false).title);
-    assertEquals("Turn finished \u00b7 app", Wording.build(SERVER, "s", Kind.FINISHED, m, null, null, "/p/app", false).body);
-    Notice f = Wording.build(SERVER, "s", Kind.FAILED, m, null, "Provider error: 429\nstack line", "/p/app", true);
-    assertEquals("Refactor failed", f.title);
-    assertEquals("Provider error: 429 \u00b7 app", f.body);
+  public void fallbacksWhenThereIsNoDetail() {
+    assertEquals("Finished \u00b7 app", build(Kind.FINISHED, null, null, null, "/p/app", false, false).body);
+    assertEquals("The turn failed \u00b7 app", build(Kind.FAILED, null, null, null, "/p/app", false, true).body);
+    assertEquals("Needs your input \u00b7 app", build(Kind.QUESTION, null, null, null, "/p/app", false, false).body);
+    assertEquals("Permission requested \u00b7 app", build(Kind.PERMISSION, null, null, null, "/p/app", false, false).body);
+  }
+
+  @Test
+  public void bodyAndExpandedEndWithTheFolder() {
+    Detail d = Detail.answer("First line.\n\nSecond line.\n\nThird line.");
+    Notice n = build(Kind.FINISHED, new SessionMeta("Refactor", null, "/p/app"), null, d, "/p/app", false, false);
+    assertEquals("First line. \u00b7 app", n.body);
+    assertEquals("First line.\nSecond line.\nThird line.\napp", n.expanded);
+    Notice noFolder = build(Kind.FINISHED, new SessionMeta("Refactor", null, null), null, d, null, false, false);
+    assertEquals("First line.", noFolder.body);
+    assertEquals("First line.\nSecond line.\nThird line.", noFolder.expanded);
+  }
+
+  @Test
+  public void workerGetsWorkerOfInSubText() {
+    SessionMeta worker = new SessionMeta("Explore the tests", "ses_parent", "/p/app");
+    SessionMeta parent = new SessionMeta("Main task", null, "/p/app");
+    Notice n = build(Kind.WORKER, worker, parent, Detail.answer("Tests live in test/."), "/p/app", false, false);
+    assertEquals("\u2705 Explore the tests", n.title);
+    assertEquals("worker of Main task", n.subText);
+    assertEquals("Tests live in test/. \u00b7 app", n.body);
+    Notice multi = build(Kind.WORKER, worker, parent, null, "/p/app", true, true);
+    assertEquals("\u274c Explore the tests", multi.title);
+    assertEquals("worker of Main task \u00b7 Office", multi.subText);
+    assertEquals("worker of an unknown session", "worker of OpenCode", build(Kind.WORKER, worker, null, null, "/p/app", false, false).subText);
+  }
+
+  @Test
+  public void profileNameOnlyWithMultipleServers() {
+    SessionMeta m = new SessionMeta("T", null, "/p/app");
+    assertNull(build(Kind.FINISHED, m, null, null, "/p/app", false, false).subText);
+    assertEquals("Office", build(Kind.FINISHED, m, null, null, "/p/app", true, false).subText);
   }
 
   @Test
   public void failedMessageIsRedacted() {
     SessionMeta m = new SessionMeta("T", null, "/p/app");
-    Notice f = Wording.build(SERVER, "s", Kind.FAILED, m, null, "401 with Bearer abcdefghijklmnopqrstuv", "/p/app", true);
+    Notice f = build(Kind.FAILED, m, null, Detail.error("401 with Bearer abcdefghijklmnopqrstuv"), "/p/app", false, true);
     assertFalse(f.body.contains("abcdefghijklmnopqrstuv"));
     assertTrue(f.body.contains("Bearer [redacted]"));
   }
 
   @Test
-  public void workerWording() {
-    SessionMeta worker = new SessionMeta("Explore the tests", "ses_parent", "/p/app");
-    SessionMeta parent = new SessionMeta("Main task", null, "/p/app");
-    Notice n = Wording.build(SERVER, "w", Kind.WORKER, worker, parent, null, "/p/app", false);
-    assertEquals("Explore the tests finished (worker of Main task)", n.title);
-    assertEquals("Turn finished \u00b7 app", n.body);
-    Notice bad = Wording.build(SERVER, "w", Kind.WORKER, worker, parent, "boom", "/p/app", true);
-    assertEquals("Explore the tests failed (worker of Main task)", bad.title);
-    assertEquals("boom \u00b7 app", bad.body);
-  }
-
-  @Test
-  public void unknownSessionFallsBack() {
-    Notice n = Wording.build(SERVER, "s", Kind.FINISHED, null, null, null, null, false);
-    assertEquals("OpenCode finished", n.title);
-    assertEquals("Turn finished", n.body);
+  public void titleIsRedactedAndClipped() {
+    Notice n = build(Kind.FINISHED, new SessionMeta("deploy with password=hunter2hunter2 " + "x".repeat(200), null, null), null, null, null, false, false);
+    assertFalse(n.title.contains("hunter2"));
+    assertTrue(n.title.length() <= 2 + Text.TITLE_MAX + 1);
   }
 
   @Test
   public void deepLinkNamesSessionAndServer() {
-    Notice n = Wording.build(SERVER, "ses_e4656bc8effeSAD316NuA1L1Cj", Kind.FINISHED, null, null, null, null, false);
+    Notice n = Wording.build(SERVER, "ses_e4656bc8effeSAD316NuA1L1Cj", Kind.FINISHED, null, null, null, null, false, false);
     assertEquals("opencode-mobile://session/ses_e4656bc8effeSAD316NuA1L1Cj?server=office-box", n.deepLink());
     assertEquals("opencode-mobile://session/a%20b?server=x%26y", Notice.deepLink("x&y", "a b"));
   }
