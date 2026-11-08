@@ -1,8 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.3.10 (preview)
 
-- **Pair Mobile Device:** **OpenCode: Pair Mobile Device…** shows a QR code (LAN or Tailscale address, one-time code valid for 5 minutes) that the upcoming phone app scans to connect. It never exposes the server to the internet.
+- **Pair Mobile Device:** **OpenCode: Pair Mobile Device…** shows a QR code (LAN or Tailscale address, one-time code valid for 5 minutes) that the Android app scans to connect. It never exposes the server to the internet.
+- **Android app (beta), a separate download.** The phone app is not part of this extension; its APK is published as a beta pre-release on [GitHub Releases](https://github.com/sr-web-studio/opencode-vscode/releases). See the README.
 - **A stopped command reads calmly.** Stopping a running shell command from its terminal made the tool row show the raw `Shell.NotFoundError`; it now says "The command was stopped."
 - **The terminal badge stays correct.** When a turn of the open session ends, the list of running commands is refreshed from the server, so a stopped command no longer keeps counting.
 
