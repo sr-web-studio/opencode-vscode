@@ -89,7 +89,7 @@ The same UI as a phone app, Android first. It connects to the same OpenCode serv
   - editor → a read-only file and diff viewer
   - terminal panel → a read-only shell output view with Stop
   - status bar → a connection indicator in the header
-- **Pairing:** scan a QR code shown by the extension's "Pair mobile device" command, or by `opencode pair`. Manual URL and password entry also works. Several servers can be saved.
+- **Pairing:** scan a QR code shown by the extension's "Pair mobile device" command. Manual URL and password entry also works. Several servers can be saved.
 - **Push notifications** when a session needs me or a task finishes, even with the app closed. They are sent by a small OpenCode server plugin (`opencode-push`) through ntfy, which I install on the server myself.
 - **Voice input**, the same as the extension: see below.
 - **Stack** (re-checked at kickoff): Capacitor wrapping the same Svelte UI, with a shared `core` and `ui` and a `HostBridge` per platform.
