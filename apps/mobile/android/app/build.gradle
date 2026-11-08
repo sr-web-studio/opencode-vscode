@@ -1,5 +1,22 @@
 apply plugin: 'com.android.application'
 
+// Test builds install next to the released app instead of replacing it:
+//   ./gradlew assembleRelease -PtestBuild=19
+// gives the id dev.srwebstudio.opencode.test, the name "OpenCode TEST 19" and the version 0.2.2-beta-test.19, signed with
+// the release key like the normal build. The number is the build counter, as in the VS Code test builds
+// (`bun run package -- --test 11`). Without the property the build keeps its released identity.
+def versionNameBase = "0.2.2-beta"
+def testNumber = project.findProperty("testBuild")?.toString()?.trim()
+if (testNumber != null && testNumber.isEmpty()) {
+    testNumber = null
+}
+if (testNumber != null && !(testNumber ==~ /\d+/)) {
+    throw new GradleException("-PtestBuild needs a build number, for example -PtestBuild=19")
+}
+def appName = testNumber == null ? "OpenCode (unofficial)" : "OpenCode TEST ${testNumber}"
+// The ongoing "watching your servers" notification: the released app says "OpenCode", the test build says so too.
+def ongoingTitle = testNumber == null ? "OpenCode" : "OpenCode TEST ${testNumber}"
+
 android {
     namespace = "dev.srwebstudio.opencode"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -8,7 +25,12 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 3
-        versionName "0.2.2-beta"
+        versionName versionNameBase
+        // The launcher label and the activity title live here, not in res/values/strings.xml, so a test build can say
+        // which one it is. `cap sync` leaves strings.xml alone, so nothing writes them back.
+        resValue "string", "app_name", appName
+        resValue "string", "title_activity_main", appName
+        resValue "string", "ongoing_title", ongoingTitle
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -38,6 +60,26 @@ android {
             }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+    // A test build gets its own id (and so its own data, service and notifications) and a version that ranks below the
+    // release it is based on, so installing it never replaces the released app. Applied to every build type: a debug
+    // build with the property is just as much a test build.
+    buildTypes.all { type ->
+        if (testNumber != null) {
+            type.applicationIdSuffix = ".test"
+            type.versionNameSuffix = "-test.${testNumber}"
+        }
+    }
+}
+
+// The test APK's file name says which build it is: opencode-mobile-0.2.2-beta-test.19.apk. The normal release keeps
+// its default app-release.apk.
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        if (testNumber == null) return
+        variant.outputs.each { output ->
+            output.outputFileName.set("opencode-mobile-${versionNameBase}-test.${testNumber}.apk")
         }
     }
 }
