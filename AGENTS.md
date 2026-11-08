@@ -32,8 +32,12 @@ See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) and [docs/monorepo.md](docs/monor
 ```sh
 bun run typecheck
 bun run test                                        # not plain `bun test`
+bun run test:plugin                                 # plugins/opencode-push
+bun run format:check                                # Prettier; `bun run format` fixes it
 cd apps/mobile/android && ./gradlew testDebugUnitTest   # when apps/mobile/android changed
 ```
+
+CI (`.github/workflows/ci.yml`) runs the same checks on every push to `main`/`dev` and on pull requests. Never add secrets, signing or publishing to CI.
 
 A change to `packages/*` affects both the extension and the app: say so in the commit message and add a `CHANGELOG.md` line when users of the extension will notice it.
 
