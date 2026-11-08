@@ -44,7 +44,16 @@ Everything below runs from the repo root. The extensions live in `apps/vscode/`;
    bun run publish:openvsx       # → https://open-vsx.org/extension/sr-web-studio/opencode-unofficial (and .../opencode-voice)
    ```
 
-5. Commit, then tag `vX.Y.Z` and push the tag.
+5. On `dev`: commit (`Release X.Y.Z`), tag `vX.Y.Z`. Then merge `dev` into `main` with `--no-ff` (`Merge dev: release X.Y.Z`) and push `main`, `dev` and the tag. `main` only ever receives these release merges (see [AGENTS.md](../AGENTS.md)).
+
+## Android app (beta pre-release)
+
+The Android app (`apps/mobile`) is never part of the vsix; it is published as an APK on GitHub Releases, marked as a pre-release.
+
+1. Bump `version` in `apps/mobile/package.json` and `versionName`/`versionCode` in `apps/mobile/android/app/build.gradle` (versions end in `-beta` while the app is a preview).
+2. Load the signing password: `set -a; . ./.env; set +a` (`ANDROID_KEYSTORE_PASSWORD`). The release keystore lives outside the repo (default `~/.config/occ-android/release.jks`, override with `ANDROID_KEYSTORE_PATH`; key alias `opencode-mobile`). Without the password the release build is unsigned.
+3. `cd apps/mobile && bun run android:sync && cd android && ./gradlew assembleRelease`, then check the APK: `apksigner verify --print-certs` shows the release certificate, `aapt dump badging` shows the version.
+4. Tag `mobile-vX.Y.Z-beta` on `dev`, push it, and create the release with `gh release create mobile-vX.Y.Z-beta <apk> --prerelease --latest=false`. The notes say beta, unofficial and not affiliated, how to install and pair, and list the APK's SHA-256 and the certificate fingerprint.
 
 ## Test builds (never published)
 

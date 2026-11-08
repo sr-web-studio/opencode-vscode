@@ -8,6 +8,15 @@ out/
 .env
 .env.*
 !.env.example
+# Signing material and store credentials never live in the repo
+*.jks
+*.keystore
+*service-account*.json
+*.apk
+*.aab
+# Local editor settings and agent scratch output
+.vscode/settings.json
+agent-reports/
 apps/vscode/companion/dist/
 # Copies of the root README/CHANGELOG/LICENSE that `bun run package` makes for vsce (the root files are the source of truth)
 apps/vscode/README.md

@@ -522,7 +522,7 @@ Options:
 
 ## Extension milestones (M1–M5)
 
-These are milestones of the VS Code extension. They are not the same as Salim's "Phase 2", which is the mobile app. Branch `phase-1` = M1.
+These are milestones of the VS Code extension. They are not the same as Salim's "Phase 2", which is the mobile app.
 
 1. M1: scaffold, connection, status bar, session switcher, transcript, controls, todo bar, drafts and empty state, VS Code notifications. Keep the core/UI/bridge boundaries.
 2. M2: native diffs, file links polish.
