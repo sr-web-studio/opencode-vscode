@@ -1,0 +1,30 @@
+# Editor defaults for the whole repository. Prettier owns the formatting of
+# TypeScript, Svelte, JSON, CSS, YAML and HTML; this file covers everything
+# Prettier does not handle and gives editors the same basics.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+[*.md]
+# Markdown line breaks are meaningful in some dialects; keep the text as written.
+trim_trailing_whitespace = false
+
+[*.java]
+# The Android sources are written with two-space indentation.
+indent_size = 2
+
+[*.xml]
+# Android resources follow the Android Studio template.
+indent_size = 4
+
+[*.gradle]
+indent_size = 4
+
+[Makefile]
+indent_style = tab
