@@ -7,7 +7,7 @@
     },
     "apps/mobile": {
       "name": "@occ/mobile",
-      "version": "0.1.0",
+      "version": "0.2.2-beta",
       "dependencies": {
         "@aparajita/capacitor-secure-storage": "8.0.1",
         "@capacitor-mlkit/barcode-scanning": "8.2.2",
@@ -37,7 +37,7 @@
     },
     "apps/vscode": {
       "name": "opencode-unofficial",
-      "version": "0.3.9",
+      "version": "0.3.10",
       "dependencies": {
         "@opencode/client": "2.2.5",
         "dompurify": "3.4.17",

@@ -16,8 +16,26 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // Release signing: the keystore lives outside the repo (default ~/.config/occ-android/release.jks, backup in
+    // Salim's Drive "Personal/Recovery"). The password comes from the environment (ANDROID_KEYSTORE_PASSWORD, kept in
+    // the git-ignored root .env). Without it a release build stays unsigned; debug builds are unaffected.
+    def releaseStore = file(System.getenv("ANDROID_KEYSTORE_PATH") ?: "${System.getProperty('user.home')}/.config/occ-android/release.jks")
+    def releasePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+    signingConfigs {
+        release {
+            if (releaseStore.exists() && releasePassword) {
+                storeFile releaseStore
+                storePassword releasePassword
+                keyAlias "opencode-mobile"
+                keyPassword releasePassword
+            }
+        }
+    }
     buildTypes {
         release {
+            if (releaseStore.exists() && releasePassword) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
