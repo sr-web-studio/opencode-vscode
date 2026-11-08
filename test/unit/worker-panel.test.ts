@@ -33,7 +33,16 @@ describe("modelLabel", () => {
   })
 })
 
-const tool = (id: string, over: Partial<ToolItem> = {}): ToolItem => ({ kind: "tool", id, name: "subagent", status: "completed", input: { agent: "developer", description: id }, metadata: {}, output: "", ...over })
+const tool = (id: string, over: Partial<ToolItem> = {}): ToolItem => ({
+  kind: "tool",
+  id,
+  name: "subagent",
+  status: "completed",
+  input: { agent: "developer", description: id },
+  metadata: {},
+  output: "",
+  ...over,
+})
 const viewOf = (...tools: ToolItem[]): SessionView => ({ ...emptyView(), loaded: true, turns: [{ id: "t1", steps: [{ id: "s1", items: tools }] }] })
 const child = (id: string, over: Partial<ChildSession> = {}): ChildSession => ({ id, time: { created: 1000, updated: 1000 }, ...over })
 
@@ -47,7 +56,11 @@ describe("deriveWorkers carries the model", () => {
     expect(w[0]!.model).toEqual(sonnet)
   })
   test("a continued worker keeps one model; none known gives undefined", () => {
-    const w = deriveWorkers({ view: viewOf(tool("a", { metadata: { sessionID: "ses_1" } }), tool("b", { metadata: { sessionID: "ses_1" } })), children: [child("ses_1", { model: sonnet })], running: new Set() })
+    const w = deriveWorkers({
+      view: viewOf(tool("a", { metadata: { sessionID: "ses_1" } }), tool("b", { metadata: { sessionID: "ses_1" } })),
+      children: [child("ses_1", { model: sonnet })],
+      running: new Set(),
+    })
     expect(w).toHaveLength(1)
     expect(w[0]!.model).toEqual(sonnet)
     expect(deriveWorkers({ view: viewOf(tool("a")), children: [], running: new Set() })[0]!.model).toBeUndefined()
@@ -73,7 +86,12 @@ describe("hiding workers", () => {
   })
   test("everything hidden leaves an empty list", () => {
     const done = [worker("a", "done"), worker("b", "failed")]
-    expect(visibleWorkers(done, clearable(done).map((w) => w.key))).toEqual([])
+    expect(
+      visibleWorkers(
+        done,
+        clearable(done).map((w) => w.key),
+      ),
+    ).toEqual([])
   })
 })
 

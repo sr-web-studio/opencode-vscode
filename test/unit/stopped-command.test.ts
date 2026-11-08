@@ -29,7 +29,19 @@ describe("a command the user stopped", () => {
   test("the same from history", () => {
     const v = viewFromMessages([
       { id: "u1", type: "user", text: "run it", time: { created: 1 } },
-      { id: "a1", type: "assistant", content: [{ type: "tool", id: "t1", name: "shell", time: { created: 1, completed: 2 }, state: { status: "error", input: { command: "sleep 120" }, error: { type: "unknown", message: "Shell.NotFoundError" } } }] },
+      {
+        id: "a1",
+        type: "assistant",
+        content: [
+          {
+            type: "tool",
+            id: "t1",
+            name: "shell",
+            time: { created: 1, completed: 2 },
+            state: { status: "error", input: { command: "sleep 120" }, error: { type: "unknown", message: "Shell.NotFoundError" } },
+          },
+        ],
+      },
     ] as any)
     const t = tools(v).find((x) => x.name === "shell")
     expect(t?.error).toBe(STOPPED_COMMAND)

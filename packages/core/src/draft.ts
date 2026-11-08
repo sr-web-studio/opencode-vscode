@@ -23,8 +23,7 @@ export function initialTarget(rootIDs: ReadonlyArray<string>, remembered?: strin
 }
 
 /** The empty/welcome view shows for a draft, or when the project has no sessions at all. */
-export const showEmptyState = (target: ViewTarget | undefined, sessionCount: number) =>
-  target?.kind === "draft" || sessionCount === 0
+export const showEmptyState = (target: ViewTarget | undefined, sessionCount: number) => target?.kind === "draft" || sessionCount === 0
 
 export const SUGGESTIONS = ["Explain this codebase", "Find and fix a bug", "Write tests for the current file"] as const
 export const EMPTY_NOTE = "Sessions keep running on the OpenCode server after you close VS Code"

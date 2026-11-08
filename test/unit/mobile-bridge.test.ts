@@ -185,7 +185,10 @@ describe("in-process bridge", () => {
     await settle()
     expect(log.map((l) => l[0])).toEqual(["openFile", "openWorker", "showTerminal", "reconnect", "confirmRevert", "confirmDeleteSession"])
     expect(log[2]).toEqual(["showTerminal", "s1", undefined, "ses_a"])
-    expect(dispatched).toEqual([{ type: "revert", messageID: "m" }, { type: "deleteSession", sessionID: "ses_b" }])
+    expect(dispatched).toEqual([
+      { type: "revert", messageID: "m" },
+      { type: "deleteSession", sessionID: "ses_b" },
+    ])
   })
 
   test("the mic says the voice feature comes later; nothing is dispatched", () => {
@@ -194,7 +197,11 @@ describe("in-process bridge", () => {
     b.voice()
     b.voiceLanguage()
     b.postToHost({ type: "host", request: { type: "voice" } })
-    expect(log).toEqual([["notify", "info", VOICE_LATER], ["notify", "info", VOICE_LATER], ["notify", "info", VOICE_LATER]])
+    expect(log).toEqual([
+      ["notify", "info", VOICE_LATER],
+      ["notify", "info", VOICE_LATER],
+      ["notify", "info", VOICE_LATER],
+    ])
   })
 
   test("without a session nothing opens an image and nothing throws", async () => {

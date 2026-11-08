@@ -13,9 +13,20 @@ describe("sonioxStartMessage", () => {
 describe("applySonioxMessage", () => {
   test("final tokens accumulate, non-final ones are replaced, markers are dropped", () => {
     let h = nothingHeard()
-    h = applySonioxMessage(h, { tokens: [{ text: "আমি", is_final: true }, { text: " ভা", is_final: false }] })
+    h = applySonioxMessage(h, {
+      tokens: [
+        { text: "আমি", is_final: true },
+        { text: " ভা", is_final: false },
+      ],
+    })
     expect(h).toMatchObject({ final: "আমি", partial: " ভা" })
-    h = applySonioxMessage(h, { tokens: [{ text: " ভালো", is_final: true }, { text: "<end>", is_final: true }, { text: " আছি", is_final: false }] })
+    h = applySonioxMessage(h, {
+      tokens: [
+        { text: " ভালো", is_final: true },
+        { text: "<end>", is_final: true },
+        { text: " আছি", is_final: false },
+      ],
+    })
     expect(h).toMatchObject({ final: "আমি ভালো", partial: " আছি" })
     expect(spokenText(h)).toBe("আমি ভালো আছি")
     h = applySonioxMessage(h, { tokens: [], finished: true })

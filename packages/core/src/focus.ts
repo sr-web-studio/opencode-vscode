@@ -19,5 +19,4 @@ export const canTakeFocus = (env: FocusEnv): boolean => env.webviewFocused && !e
  * `prev`/`next` are the values of a request counter (it only grows when something explicitly asks for focus).
  * An unchanged counter, or the very first value we see (`prev` undefined), never focuses.
  */
-export const shouldFocusPrompt = (prev: number | undefined, next: number, env: FocusEnv): boolean =>
-  prev !== undefined && next !== prev && canTakeFocus(env)
+export const shouldFocusPrompt = (prev: number | undefined, next: number, env: FocusEnv): boolean => prev !== undefined && next !== prev && canTakeFocus(env)

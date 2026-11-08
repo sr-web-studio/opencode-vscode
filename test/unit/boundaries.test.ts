@@ -18,18 +18,30 @@ describe("code boundaries", () => {
   for (const dir of ["packages/core/src", "packages/ui/src"]) {
     const files = walk(dir).filter((f) => /\.(ts|svelte)$/.test(f))
     test(`${dir} has no vscode, node:* or service imports (${files.length} files)`, () => {
-      const bad = files.flatMap((f) => imports(f).filter((i) => i === "vscode" || usesNode(i) || i.startsWith("@opencode/client/service") || i.includes("/extension/") || i.includes("apps/")).map((i) => `${f}: ${i}`))
+      const bad = files.flatMap((f) =>
+        imports(f)
+          .filter((i) => i === "vscode" || usesNode(i) || i.startsWith("@opencode/client/service") || i.includes("/extension/") || i.includes("apps/"))
+          .map((i) => `${f}: ${i}`),
+      )
       expect(bad).toEqual([])
     })
   }
   test("packages/core imports no other workspace package and no host code", () => {
     const files = walk("packages/core/src").filter((f) => /\.(ts|svelte)$/.test(f))
-    const bad = files.flatMap((f) => imports(f).filter((i) => i.startsWith("@occ/") || i.startsWith("$ui") || i.includes("/ui/")).map((i) => `${f}: ${i}`))
+    const bad = files.flatMap((f) =>
+      imports(f)
+        .filter((i) => i.startsWith("@occ/") || i.startsWith("$ui") || i.includes("/ui/"))
+        .map((i) => `${f}: ${i}`),
+    )
     expect(bad).toEqual([])
   })
   test("packages/ui imports only @occ/core from the workspace", () => {
     const files = walk("packages/ui/src").filter((f) => /\.(ts|svelte)$/.test(f))
-    const bad = files.flatMap((f) => imports(f).filter((i) => i.startsWith("@occ/") && !i.startsWith("@occ/core/")).map((i) => `${f}: ${i}`))
+    const bad = files.flatMap((f) =>
+      imports(f)
+        .filter((i) => i.startsWith("@occ/") && !i.startsWith("@occ/core/"))
+        .map((i) => `${f}: ${i}`),
+    )
     expect(bad).toEqual([])
   })
   test("packages/core and packages/ui declare no vscode or node type dependency", () => {
@@ -40,7 +52,11 @@ describe("code boundaries", () => {
     }
   })
   test("webview entry uses only the root client entry", () => {
-    const bad = walk("apps/vscode/src/webview").flatMap((f) => imports(f).filter((i) => i === "vscode" || usesNode(i) || i.startsWith("@opencode/client/")).map((i) => `${f}: ${i}`))
+    const bad = walk("apps/vscode/src/webview").flatMap((f) =>
+      imports(f)
+        .filter((i) => i === "vscode" || usesNode(i) || i.startsWith("@opencode/client/"))
+        .map((i) => `${f}: ${i}`),
+    )
     expect(bad).toEqual([])
   })
   test("only types are imported from @opencode/client in core/ui (nothing pulled into the webview bundle)", () => {

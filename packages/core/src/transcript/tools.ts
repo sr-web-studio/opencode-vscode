@@ -22,9 +22,21 @@ export type ToolLine = {
 }
 
 const LABELS: Record<string, string> = {
-  read: "Read", write: "Write", edit: "Edit", patch: "Patch", shell: "Shell", grep: "Grep", glob: "Glob",
-  subagent: "Agent", question: "Question", webfetch: "Fetch", websearch: "Search", skill: "Skill",
-  execute: "Code", todowrite: "Todo", experimental_image_generate: "Image",
+  read: "Read",
+  write: "Write",
+  edit: "Edit",
+  patch: "Patch",
+  shell: "Shell",
+  grep: "Grep",
+  glob: "Glob",
+  subagent: "Agent",
+  question: "Question",
+  webfetch: "Fetch",
+  websearch: "Search",
+  skill: "Skill",
+  execute: "Code",
+  todowrite: "Todo",
+  experimental_image_generate: "Image",
 }
 
 const str = (v: unknown): string => (typeof v === "string" ? v : "")
@@ -194,11 +206,7 @@ function changedLineIn(tool: ToolItem, path: string): number | undefined {
 }
 
 /** What a click on the row does. */
-export type RowAction =
-  | { kind: "file"; path: string; line?: number }
-  | { kind: "url"; url: string }
-  | { kind: "worker" }
-  | { kind: "toggle" }
+export type RowAction = { kind: "file"; path: string; line?: number } | { kind: "url"; url: string } | { kind: "worker" } | { kind: "toggle" }
 
 /**
  * The primary action of a tool row: open the file (at the read offset / first changed line), open the URL, open the

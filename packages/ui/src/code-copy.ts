@@ -23,5 +23,8 @@ export async function copyCodeBlock(btn: HTMLElement): Promise<void> {
   }
   show(btn, ok ? "done" : "failed")
   clearTimeout(timers.get(btn))
-  timers.set(btn, setTimeout(() => show(btn, "idle"), RESET_MS))
+  timers.set(
+    btn,
+    setTimeout(() => show(btn, "idle"), RESET_MS),
+  )
 }

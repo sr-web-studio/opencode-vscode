@@ -5,7 +5,12 @@ import { WorkerTab } from "@occ/core/worker-tab"
 import { isGone } from "@occ/core/errors"
 
 const session = (id: string, extra: Record<string, unknown> = {}) => ({
-  id, title: `Title ${id}`, projectID: "prj", time: { created: 1, updated: 1 }, location: { directory: "/w" }, ...extra,
+  id,
+  title: `Title ${id}`,
+  projectID: "prj",
+  time: { created: 1, updated: 1 },
+  location: { directory: "/w" },
+  ...extra,
 })
 
 type Opts = { active?: Record<string, boolean>; kids?: Record<string, string[]>; remove?: (i: { sessionID: string }) => Promise<unknown> }
@@ -20,7 +25,9 @@ function server(o: Opts = {}) {
     location: { get: unsupported },
     session: {
       list: async (q?: { parentID?: string | null }) => ({
-        data: q?.parentID ? (kids[q.parentID] ?? []).map((id) => session(id, { parentID: q.parentID })) : [session("ses_a", { time: { created: 1, updated: 3 } }), session("ses_b", { time: { created: 1, updated: 2 } }), session("ses_c")],
+        data: q?.parentID
+          ? (kids[q.parentID] ?? []).map((id) => session(id, { parentID: q.parentID }))
+          : [session("ses_a", { time: { created: 1, updated: 3 } }), session("ses_b", { time: { created: 1, updated: 2 } }), session("ses_c")],
       }),
       active: async () => o.active ?? {},
       get: async ({ sessionID }: { sessionID: string }) => session(sessionID),
@@ -107,7 +114,11 @@ describe("deleteSession in the controller", () => {
   })
 
   test("404 means already gone: no error, local state cleaned", async () => {
-    const { ctl, calls } = await ready({ remove: async () => { throw Object.assign(new Error("Session not found"), { _tag: "SessionNotFoundError" }) } })
+    const { ctl, calls } = await ready({
+      remove: async () => {
+        throw Object.assign(new Error("Session not found"), { _tag: "SessionNotFoundError" })
+      },
+    })
     await ctl.dispatch({ type: "deleteSession", sessionID: "ses_c" })
     expect(calls.length).toBe(1)
     expect(ids(ctl)).toEqual(["ses_a", "ses_b"])
@@ -115,7 +126,11 @@ describe("deleteSession in the controller", () => {
   })
 
   test("another failure shows on the error line and the session stays", async () => {
-    const { ctl } = await ready({ remove: async () => { throw new Error("server said no") } })
+    const { ctl } = await ready({
+      remove: async () => {
+        throw new Error("server said no")
+      },
+    })
     await ctl.dispatch({ type: "deleteSession", sessionID: "ses_c" })
     expect(ctl.snapshot().error).toBe("server said no")
     expect(ids(ctl)).toEqual(["ses_a", "ses_b", "ses_c"])

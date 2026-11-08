@@ -1,17 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { CommandCatalog } from "@occ/core/commands"
-import {
-  applySuggestion,
-  commandBlock,
-  isEmptySession,
-  parseSlash,
-  rankByQuery,
-  skillsFilter,
-  slashQuery,
-  suggestCommands,
-  suggestSkills,
-  undoTarget,
-} from "@occ/core/slash"
+import { applySuggestion, commandBlock, isEmptySession, parseSlash, rankByQuery, skillsFilter, slashQuery, suggestCommands, suggestSkills, undoTarget } from "@occ/core/slash"
 import { applyEvent, viewFromMessages } from "@occ/core/transcript/reducer"
 
 describe("parseSlash", () => {
@@ -71,12 +60,7 @@ describe("ranking", () => {
 })
 
 describe("suggestCommands", () => {
-  const server = [
-    { name: "init", description: "guided AGENTS.md setup" },
-    { name: "compact", description: "server's own" },
-    { name: "skills", description: "server's own" },
-    { name: "review" },
-  ]
+  const server = [{ name: "init", description: "guided AGENTS.md setup" }, { name: "compact", description: "server's own" }, { name: "skills", description: "server's own" }, { name: "review" }]
   test("client commands come first and win over a server command of the same name", () => {
     const all = suggestCommands("", server)
     expect(all.map((s) => s.name)).toEqual(["mcps", "compact", "undo", "redo", "fork", "skills", "init", "review"])
@@ -93,7 +77,10 @@ describe("suggestCommands", () => {
 })
 
 describe("suggestSkills", () => {
-  const skills = [{ id: "browser", name: "Browser" }, { id: "fal", name: "fal media", description: "x" }]
+  const skills = [
+    { id: "browser", name: "Browser" },
+    { id: "fal", name: "fal media", description: "x" },
+  ]
   test("matches name or id", () => {
     expect(suggestSkills("br", skills).map((s) => s.id)).toEqual(["browser"])
     expect(suggestSkills("media", skills).map((s) => s.id)).toEqual(["fal"])
@@ -118,8 +105,7 @@ const msgs = (): any[] => [
   { id: "u3", type: "user", text: "three", time: { created: 5 } },
   { id: "i3", type: "idle", outcome: "succeeded", time: { created: 6 } },
 ]
-const staged = (v: ReturnType<typeof viewFromMessages>, messageID: string) =>
-  applyEvent(v, { id: "e", type: "session.revert.staged", created: 7, data: { revert: { messageID } } })
+const staged = (v: ReturnType<typeof viewFromMessages>, messageID: string) => applyEvent(v, { id: "e", type: "session.revert.staged", created: 7, data: { revert: { messageID } } })
 
 describe("undoTarget", () => {
   test("the newest user turn", () => {
@@ -198,7 +184,13 @@ describe("CommandCatalog", () => {
   test("a server without the endpoint keeps the list empty and logs", async () => {
     const c = new CommandCatalog()
     const lines: string[] = []
-    const client: any = { command: { list: async () => { throw new Error("404 not found") } } }
+    const client: any = {
+      command: {
+        list: async () => {
+          throw new Error("404 not found")
+        },
+      },
+    }
     expect(await c.loadCommands(client, "/d", (l) => lines.push(l))).toBe(false)
     expect(c.commands).toEqual([])
     expect(lines[0]).toMatch(/command.list failed/)

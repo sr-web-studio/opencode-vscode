@@ -97,7 +97,9 @@ export function loadEngine(paths: LocalPaths, threads: number, log: (line: strin
     enableEndpoint: true,
   })
   loadMs.streaming = performance.now() - t1
-  log(`Language ${paths.language} (pack ${paths.pack}): streaming model (${paths.streaming.kind}, ${paths.streaming.featureDim} features) loaded in ${loadMs.streaming.toFixed(0)} ms (${threads} threads)`)
+  log(
+    `Language ${paths.language} (pack ${paths.pack}): streaming model (${paths.streaming.kind}, ${paths.streaming.featureDim} features) loaded in ${loadMs.streaming.toFixed(0)} ms (${threads} threads)`,
+  )
 
   let offline: unknown
   if (paths.offline) {

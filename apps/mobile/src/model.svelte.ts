@@ -264,7 +264,11 @@ class AppModel {
     this.closeWorkspace()
     this.profile = fresh
     this.workspace = new Workspace(makeClient(fresh), (project) => this.makeController(fresh, project))
-    if (navigate) this.setStack([{ key: nextKey(), screen: { kind: "servers" } }, { key: nextKey(), screen: { kind: "projects" } }])
+    if (navigate)
+      this.setStack([
+        { key: nextKey(), screen: { kind: "servers" } },
+        { key: nextKey(), screen: { kind: "projects" } },
+      ])
     return true
   }
 
@@ -410,7 +414,8 @@ class AppModel {
     writeJSON(BATTERY_ASKED_KEY, true)
     const ok = await this.confirm({
       title: "Keep notifications reliable?",
-      detail: "Phones put idle apps to sleep and then miss events. The next screen asks Android to let this app run in the background. On Samsung phones you can also add it to “Never sleeping apps” (see Settings).",
+      detail:
+        "Phones put idle apps to sleep and then miss events. The next screen asks Android to let this app run in the background. On Samsung phones you can also add it to “Never sleeping apps” (see Settings).",
       confirm: "Continue",
     })
     if (ok) await askBatteryExemption()

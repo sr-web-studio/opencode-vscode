@@ -90,7 +90,37 @@ describe("catalog validity", () => {
   })
 
   test("every locale is a tag the Nemotron tokens file knows (the model card's languages)", () => {
-    const known = new Set(["en-US", "es-US", "fr-FR", "de-DE", "it-IT", "pt-BR", "nl-NL", "tr-TR", "ru-RU", "uk-UA", "ar-AR", "hi-IN", "ja-JP", "ko-KR", "vi-VN", "pl-PL", "sv-SE", "cs-CZ", "nb-NO", "da-DK", "bg-BG", "fi-FI", "hr-HR", "sk-SK", "hu-HU", "ro-RO", "et-EE", "zh-CN", "auto"])
+    const known = new Set([
+      "en-US",
+      "es-US",
+      "fr-FR",
+      "de-DE",
+      "it-IT",
+      "pt-BR",
+      "nl-NL",
+      "tr-TR",
+      "ru-RU",
+      "uk-UA",
+      "ar-AR",
+      "hi-IN",
+      "ja-JP",
+      "ko-KR",
+      "vi-VN",
+      "pl-PL",
+      "sv-SE",
+      "cs-CZ",
+      "nb-NO",
+      "da-DK",
+      "bg-BG",
+      "fi-FI",
+      "hr-HR",
+      "sk-SK",
+      "hu-HU",
+      "ro-RO",
+      "et-EE",
+      "zh-CN",
+      "auto",
+    ])
     for (const l of LANGUAGES.filter((x) => x.pack === MULTILINGUAL_PACK)) expect(known.has(l.locale!)).toBe(true)
   })
 
@@ -183,7 +213,17 @@ describe("catalog validity", () => {
   })
 
   test("package.json: the engine is local/soniox, localLanguages and maxLanguages exist, the commands are there", () => {
-    type Prop = { type?: string; enum?: string[]; enumItemLabels?: string[]; enumDescriptions?: string[]; default?: unknown; minimum?: number; maximum?: number; items?: { enum?: string[]; enumItemLabels?: string[]; enumDescriptions?: string[] }; markdownDescription?: string }
+    type Prop = {
+      type?: string
+      enum?: string[]
+      enumItemLabels?: string[]
+      enumDescriptions?: string[]
+      default?: unknown
+      minimum?: number
+      maximum?: number
+      items?: { enum?: string[]; enumItemLabels?: string[]; enumDescriptions?: string[] }
+      markdownDescription?: string
+    }
     const pkg = JSON.parse(read("apps/vscode/package.json")) as { contributes: { configuration: { properties: Record<string, Prop> }; commands: Array<{ command: string; title: string }> } }
     const props = pkg.contributes.configuration.properties
     const list = props["opencode.voice.localLanguages"]!
@@ -234,7 +274,19 @@ describe("catalog validity", () => {
 
 /* ------------------------------------------------------------ adding a language is data only */
 
-const MOCK_A: ModelSpec = { id: "m-a", kind: "transducer", title: "A", author: "x", license: "Apache-2.0", licenseUrl: "https://x", source: "https://x", repo: "o/a", rev: "1".repeat(40), featureDim: 80, files: [{ path: "a", name: "a", role: "encoder", size: 100, sha256: "0".repeat(64) }] }
+const MOCK_A: ModelSpec = {
+  id: "m-a",
+  kind: "transducer",
+  title: "A",
+  author: "x",
+  license: "Apache-2.0",
+  licenseUrl: "https://x",
+  source: "https://x",
+  repo: "o/a",
+  rev: "1".repeat(40),
+  featureDim: 80,
+  files: [{ path: "a", name: "a", role: "encoder", size: 100, sha256: "0".repeat(64) }],
+}
 const MOCK_B: ModelSpec = { ...MOCK_A, id: "m-b", files: [{ path: "b", name: "b", role: "encoder", size: 40, sha256: "0".repeat(64) }] }
 const MOCK_S: ModelSpec = { ...MOCK_A, id: "m-shared", files: [{ path: "s", name: "s", role: "encoder", size: 1000, sha256: "0".repeat(64) }] }
 const pack = (id: string, streaming: ModelSpec, offline?: ModelSpec): LanguagePack => ({ id, name: id.toUpperCase(), noun: `${id} models`, streaming, offline })
@@ -387,7 +439,12 @@ describe("QuickPick items", () => {
   })
 
   test("ticks the active languages; the first is marked current; downloaded packs are marked", () => {
-    expect(items.filter((i) => i.picked).map((i) => i.id).sort()).toEqual(["bn", "en"])
+    expect(
+      items
+        .filter((i) => i.picked)
+        .map((i) => i.id)
+        .sort(),
+    ).toEqual(["bn", "en"])
     expect(by("en").description).toBe("current") // multilingual pack not downloaded: no mark
     expect(by("bn").description).toBe("downloaded")
     expect(by("bn").label).toBe("Bangla (বাংলা)")

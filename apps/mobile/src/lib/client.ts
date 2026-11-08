@@ -44,7 +44,8 @@ export async function redeemPairing(link: PairingLink): Promise<PairResult> {
   } catch (e) {
     const problem = await diagnoseConnectError(e, link.baseUrl, origin())
     // For a code, “rejected” means used, expired or wrong, not a wrong password.
-    if (problem.kind === "unauthorized") return { ok: false, kind: "unauthorized", message: "This pairing code is not valid any more. It works once and only for five minutes. Create a new one on the computer." }
+    if (problem.kind === "unauthorized")
+      return { ok: false, kind: "unauthorized", message: "This pairing code is not valid any more. It works once and only for five minutes. Create a new one on the computer." }
     return { ok: false, ...problem }
   }
 }

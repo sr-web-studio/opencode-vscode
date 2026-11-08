@@ -17,7 +17,9 @@
     <div class="center">
       <Codicon name="server-environment" />
       <strong>No server yet</strong>
-      <p class="muted">Add the OpenCode server that runs on your computer. The easiest way is to scan the QR code from “OpenCode: Pair Mobile Device” in VS Code. You can also type the address and password yourself.</p>
+      <p class="muted">
+        Add the OpenCode server that runs on your computer. The easiest way is to scan the QR code from “OpenCode: Pair Mobile Device” in VS Code. You can also type the address and password yourself.
+      </p>
       <button class="btn" onclick={() => model.push({ kind: "server-form" })}><Codicon name="add" /> Add server</button>
     </div>
   {:else}
@@ -40,7 +42,20 @@
 </div>
 
 <style>
-  .entry { display: flex; align-items: center; border-bottom: 1px solid var(--oc-hairline); padding-right: 8px; }
-  .entry .row { border-bottom: none; }
-  .bad { display: block; margin-top: 2px; font-size: 0.85em; color: var(--oc-error); white-space: normal; }
+  .entry {
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid var(--oc-hairline);
+    padding-right: 8px;
+  }
+  .entry .row {
+    border-bottom: none;
+  }
+  .bad {
+    display: block;
+    margin-top: 2px;
+    font-size: 0.85em;
+    color: var(--oc-error);
+    white-space: normal;
+  }
 </style>

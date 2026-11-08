@@ -43,17 +43,37 @@ describe("loadChunk with a compaction inside a turn", () => {
     expect(ids(rest)).toEqual(["a", "b", "c"])
   })
   test("a compaction with no user message before it (an older chunk) takes everything older", async () => {
-    const { list } = messageListFake([{ id: "x", type: "assistant" }, { id: "y", type: "compaction", status: "completed" }, { id: "z", type: "assistant" }], 10)
+    const { list } = messageListFake(
+      [
+        { id: "x", type: "assistant" },
+        { id: "y", type: "compaction", status: "completed" },
+        { id: "z", type: "assistant" },
+      ],
+      10,
+    )
     const chunk = await loadChunk((i) => list({ sessionID: "s", ...i }) as never)
     expect(ids(chunk)).toEqual(["x", "y", "z"])
     expect(chunk.hasMore).toBe(false)
   })
   test("a running compaction does not start the search for a prompt", async () => {
-    const { list } = messageListFake([{ id: "a", type: "user" }, { id: "b", type: "compaction", status: "running" }, { id: "c", type: "assistant" }], 10)
+    const { list } = messageListFake(
+      [
+        { id: "a", type: "user" },
+        { id: "b", type: "compaction", status: "running" },
+        { id: "c", type: "assistant" },
+      ],
+      10,
+    )
     expect(ids(await loadChunk((i) => list({ sessionID: "s", ...i }) as never))).toEqual(["a", "b", "c"])
   })
   test("initial state is untouched by the new rule for plain sessions", async () => {
-    const { list } = messageListFake([{ id: "a", type: "user" }, { id: "b", type: "assistant" }], 10)
+    const { list } = messageListFake(
+      [
+        { id: "a", type: "user" },
+        { id: "b", type: "assistant" },
+      ],
+      10,
+    )
     const chunk = await loadChunk((i) => list({ sessionID: "s", ...i }) as never, initialHistory)
     expect(ids(chunk)).toEqual(["a", "b"])
   })
@@ -89,8 +109,12 @@ describe("the view renders the compaction as a step of the turn", () => {
 
 /** Old turns, then a turn that compacts live. */
 const live = [
-  text("m1", "user", 1, "one"), text("m2", "assistant", 2, "a"), { id: "m3", type: "idle", outcome: "succeeded", time: { created: 3 } } as RawMessage,
-  text("m4", "user", 4, "two"), text("m5", "assistant", 5, "b"), { id: "m6", type: "idle", outcome: "succeeded", time: { created: 6 } } as RawMessage,
+  text("m1", "user", 1, "one"),
+  text("m2", "assistant", 2, "a"),
+  { id: "m3", type: "idle", outcome: "succeeded", time: { created: 3 } } as RawMessage,
+  text("m4", "user", 4, "two"),
+  text("m5", "assistant", 5, "b"),
+  { id: "m6", type: "idle", outcome: "succeeded", time: { created: 6 } } as RawMessage,
   text("m7", "user", 7, "three"),
 ]
 const compactionEnded = { id: "ev", type: "session.compaction.ended", created: 8, data: { sessionID: "s", text: "sum", reason: "auto" } } as never
@@ -98,7 +122,10 @@ const compactionEnded = { id: "ev", type: "session.compaction.ended", created: 8
 describe("live compaction trims the view, history stays reachable", () => {
   async function loaded() {
     const fake = messageListFake(live, 100)
-    const feed = new SessionFeed(() => {}, () => {})
+    const feed = new SessionFeed(
+      () => {},
+      () => {},
+    )
     await feed.load({ message: { list: fake.list } } as never, "s")
     return { feed, client: { message: { list: fake.list } } as never }
   }

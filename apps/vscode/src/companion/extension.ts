@@ -56,7 +56,9 @@ export function activate(context: vscode.ExtensionContext): void {
         problem: capture ? undefined : `Voice recording is not available on ${platform}.`,
         local,
         installedLanguages: installed,
-        localProblem: local ? undefined : `The on-device engine is not available on ${platform}${capture ? " (the microphone works: use the Soniox engine)" : ""}. It runs on: ${SHERPA_PLATFORMS.join(", ")}.`,
+        localProblem: local
+          ? undefined
+          : `The on-device engine is not available on ${platform}${capture ? " (the microphone works: use the Soniox engine)" : ""}. It runs on: ${SHERPA_PLATFORMS.join(", ")}.`,
       }
     }),
     vscode.commands.registerCommand(REMOVE_LANGUAGES_COMMAND, () => removeDownloadedLanguages(context)),
@@ -143,9 +145,7 @@ function feed(update: VoiceFeed): void {
 function micPermission(): Promise<MicPermission> {
   if (process.platform !== "win32") return Promise.resolve({ state: "unknown" })
   const query = (hive: string, key: string) =>
-    new Promise<string | undefined>((resolve) =>
-      execFile("reg.exe", ["query", `${hive}\\${key}`, "/v", "Value"], { timeout: 5000, windowsHide: true }, (err, out) => resolve(err ? undefined : out)),
-    )
+    new Promise<string | undefined>((resolve) => execFile("reg.exe", ["query", `${hive}\\${key}`, "/v", "Value"], { timeout: 5000, windowsHide: true }, (err, out) => resolve(err ? undefined : out)))
   return Promise.all(WINDOWS_QUERIES.map((q) => query(q.hive, q.key))).then(windowsMicPermission)
 }
 
@@ -248,13 +248,7 @@ const storageOptions = (context: vscode.ExtensionContext) => ({ storage: context
 
 /** Ask once, in a notification, before the on-device download of a language. Returns what the user chose. */
 async function askDownload(pack: LanguagePack, bytes: number, engineMissing: boolean): Promise<"download" | "soniox" | "language" | "cancel"> {
-  const pick = await vscode.window.showInformationMessage(
-    downloadPrompt(pack, bytes, engineMissing),
-    { detail: downloadDetail(pack) },
-    "Download",
-    "Choose Language",
-    "Use Soniox instead",
-  )
+  const pick = await vscode.window.showInformationMessage(downloadPrompt(pack, bytes, engineMissing), { detail: downloadDetail(pack) }, "Download", "Choose Language", "Use Soniox instead")
   return pick === "Download" ? "download" : pick === "Use Soniox instead" ? "soniox" : pick === "Choose Language" ? "language" : "cancel"
 }
 
@@ -299,7 +293,11 @@ async function prepareLocal(context: vscode.ExtensionContext, language: string):
   try {
     const ready = isInstalled(state, pack)
     const paths = await vscode.window.withProgress(
-      { location: vscode.ProgressLocation.Notification, title: ready ? "OpenCode Voice: loading the on-device engine" : `OpenCode Voice: downloading the on-device engine (${pack.name})`, cancellable: !ready },
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: ready ? "OpenCode Voice: loading the on-device engine" : `OpenCode Voice: downloading the on-device engine (${pack.name})`,
+        cancellable: !ready,
+      },
       (progress, token) => {
         token.onCancellationRequested(() => ctl.abort())
         let last = 0
@@ -345,7 +343,9 @@ async function start(context: vscode.ExtensionContext, args: VoiceStartArgs): Pr
   let paths: LocalPaths | undefined
   if (engine === "local") {
     const language = languageFor(args.localLanguage)
-    log.info(`Voice engine: local, language ${language.id} (pack ${language.pack}; ${process.platform}/${process.arch}; Electron ${process.versions.electron ?? "-"}, Node ${process.versions.node}, v8 ${process.versions.v8}, modules ${process.versions.modules})`)
+    log.info(
+      `Voice engine: local, language ${language.id} (pack ${language.pack}; ${process.platform}/${process.arch}; Electron ${process.versions.electron ?? "-"}, Node ${process.versions.node}, v8 ${process.versions.v8}, modules ${process.versions.modules})`,
+    )
     const prepared = await prepareLocal(context, language.id)
     if (prepared === "soniox") {
       void vscode.workspace.getConfiguration("opencode.voice").update("engine", "soniox", vscode.ConfigurationTarget.Global)
@@ -381,7 +381,10 @@ async function start(context: vscode.ExtensionContext, args: VoiceStartArgs): Pr
     if (u.kind === "listening") log.info(`Listening${u.device ? ` on ${u.device}` : ""}`)
     if (u.kind === "done") {
       const st = u.stats
-      if (st) log.info(`Recording ended: ${st.frames} frames (${(st.frames / 10).toFixed(1)} s), peak level ${st.peak}/32767, ${st.answers} ${engine === "local" ? "segments" : "answers from Soniox"}, ${u.final.length} characters heard`)
+      if (st)
+        log.info(
+          `Recording ended: ${st.frames} frames (${(st.frames / 10).toFixed(1)} s), peak level ${st.peak}/32767, ${st.answers} ${engine === "local" ? "segments" : "answers from Soniox"}, ${u.final.length} characters heard`,
+        )
       if (u.error) log.warn(u.error)
     }
     feed({ id: run.id, ...u, ...(u.kind === "done" ? { fix: fixFor(u) } : {}) } as VoiceFeed)
@@ -416,11 +419,19 @@ async function removeDownloadedLanguages(context: vscode.ExtensionContext): Prom
     .filter((p) => have.includes(p.id))
     .map((p) => {
       const names = CATALOG.languages.filter((l) => l.pack === p.id && l.id !== "auto").map((l) => l.name)
-      return { label: p.name, description: `${megabytes(packBytes(p))} MB`, detail: names.length > 6 ? `${names.slice(0, 6).join(", ")} and ${names.length - 6} more languages` : names.join(", "), id: p.id }
+      return {
+        label: p.name,
+        description: `${megabytes(packBytes(p))} MB`,
+        detail: names.length > 6 ? `${names.slice(0, 6).join(", ")} and ${names.length - 6} more languages` : names.join(", "),
+        id: p.id,
+      }
     })
   const picked = await vscode.window.showQuickPick(items, { title: "OpenCode Voice: remove downloaded models", placeHolder: "Select the models to delete from this computer", canPickMany: true })
   if (!picked || picked.length === 0) return
-  const removed = await removeLanguages(opts, picked.map((p) => p.id))
+  const removed = await removeLanguages(
+    opts,
+    picked.map((p) => p.id),
+  )
   log.info(`Removed packs ${picked.map((p) => p.id).join(", ")} (models deleted: ${removed.join(", ") || "none"})`)
   void vscode.window.showInformationMessage(`OpenCode Voice: removed ${picked.map((p) => p.label).join(", ")} from this computer. It is downloaded again if you use it.`)
 }

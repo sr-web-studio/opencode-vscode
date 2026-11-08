@@ -28,7 +28,19 @@ describe("pairing link (the QR of “OpenCode: Pair Mobile Device”)", () => {
     expect(parsePairingLink(`https://x.example.com/oc/auth/connect/${CODE}?utm=1#frag`)).toEqual({ ok: true, link: { baseUrl: "https://x.example.com/oc", code: CODE } })
   })
   test("refuses anything else, with a reason", () => {
-    const bad = ["", "   ", "hello", "192.168.1.10:4096/auth/connect/abc", "ftp://h/auth/connect/abc", "http://h:4096", "http://h:4096/auth/connect/", "http://h:4096/auth/connect", "http://h:4096/other/abc", "opencode-mobile://session/ses_1", "http://h/auth/connect/%E0%A4%A"]
+    const bad = [
+      "",
+      "   ",
+      "hello",
+      "192.168.1.10:4096/auth/connect/abc",
+      "ftp://h/auth/connect/abc",
+      "http://h:4096",
+      "http://h:4096/auth/connect/",
+      "http://h:4096/auth/connect",
+      "http://h:4096/other/abc",
+      "opencode-mobile://session/ses_1",
+      "http://h/auth/connect/%E0%A4%A",
+    ]
     for (const raw of bad) {
       const r = parsePairingLink(raw)
       expect(r.ok).toBe(false)

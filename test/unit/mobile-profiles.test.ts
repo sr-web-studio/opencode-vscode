@@ -40,7 +40,10 @@ describe("profile store", () => {
     expect(edited).toMatchObject({ id: a.id, url: "http://a2:4096", name: "A two", password: "secret-a", serverId: "a2" })
     const again = await store.save({ id: a.id, url: "http://a2:4096", password: "new" })
     expect(again.password).toBe("new")
-    expect((await store.list()).map((p) => [p.id, p.password])).toEqual([[a.id, "new"], [b.id, "secret-b"]])
+    expect((await store.list()).map((p) => [p.id, p.password])).toEqual([
+      [a.id, "new"],
+      [b.id, "secret-b"],
+    ])
   })
 
   test("an unusable address is refused with a message", async () => {

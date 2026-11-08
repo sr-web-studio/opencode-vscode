@@ -34,9 +34,7 @@ export interface Notifier {
 }
 
 /** What the host should do when the user picks an action. */
-export type NoticeCommand =
-  | { type: "open"; sessionID: string }
-  | { type: "permission.reply"; sessionID: string; requestID: string; decision: "once" | "reject" }
+export type NoticeCommand = { type: "open"; sessionID: string } | { type: "permission.reply"; sessionID: string; requestID: string; decision: "once" | "reject" }
 
 export type NotificationSettings = {
   enabled: boolean

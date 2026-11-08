@@ -28,9 +28,7 @@
   const workers = $derived(visibleWorkers(all, hidden))
   const finished = $derived(clearable(workers))
   const summary = $derived(backgroundSummary(workers, shells))
-  const parts = $derived(
-    [summary.workers ? plural(summary.workers, "worker") : "", summary.shells ? plural(summary.shells, "shell") : ""].filter(Boolean).join(", "),
-  )
+  const parts = $derived([summary.workers ? plural(summary.workers, "worker") : "", summary.shells ? plural(summary.shells, "shell") : ""].filter(Boolean).join(", "))
   const tip = $derived(`Background: ${parts}${summary.running ? `, ${summary.running} running` : ""}`)
   const label = (s: Worker["status"]) => (s === "running" ? "Running" : s === "done" ? "Done" : s === "failed" ? "Failed" : "Stopped")
 
@@ -48,7 +46,10 @@
     if (open && t && !root?.contains(t) && !panel?.contains(t)) open = false
   }
   function key(e: KeyboardEvent) {
-    if (open && e.key === "Escape") { open = false; e.preventDefault() }
+    if (open && e.key === "Escape") {
+      open = false
+      e.preventDefault()
+    }
   }
 
   /** Remove rows. Focus moves to the next row (else the previous one, else the panel head) when the new list arrives. */
@@ -84,9 +85,19 @@
 {#if open}
   <div class="panel" bind:this={panel} role="dialog" aria-label="Background work">
     <div class="headrow">
-      <div class="head muted small" bind:this={head} tabindex="-1">Background · {parts}{#if summary.running > 0}<span class="run">&nbsp;· {summary.running} running</span>{/if}</div>
+      <div class="head muted small" bind:this={head} tabindex="-1">
+        Background · {parts}{#if summary.running > 0}<span class="run">&nbsp;· {summary.running} running</span>{/if}
+      </div>
       {#if finished.length > 0}
-        <button class="clear muted small" onclick={() => remove(finished.map((w) => w.key), 0)} title="Remove finished workers from this list. The sessions stay in OpenCode.">Clear done</button>
+        <button
+          class="clear muted small"
+          onclick={() =>
+            remove(
+              finished.map((w) => w.key),
+              0,
+            )}
+          title="Remove finished workers from this list. The sessions stay in OpenCode.">Clear done</button
+        >
       {/if}
     </div>
     <ul class="scroll">
@@ -94,7 +105,17 @@
         {@const model = modelLabel(w.model, models, { short: true })}
         {@const quiet = quietLabel(w, now)}
         <li class="row" data-key={w.key}>
-          <button class="w" disabled={!w.sessionID} title={w.sessionID ? `Open this worker in a tab${w.model ? ` · ${modelTitle(w.model)}` : ""}` : "Waiting for the worker session"} onclick={() => { if (w.sessionID) { open = false; store.bridge.openSession(w.sessionID, { readOnly: true }) } }}>
+          <button
+            class="w"
+            disabled={!w.sessionID}
+            title={w.sessionID ? `Open this worker in a tab${w.model ? ` · ${modelTitle(w.model)}` : ""}` : "Waiting for the worker session"}
+            onclick={() => {
+              if (w.sessionID) {
+                open = false
+                store.bridge.openSession(w.sessionID, { readOnly: true })
+              }
+            }}
+          >
             <Codicon name="robot" />
             <span class="a">{displayName(w.agent)}</span>
             {#if model}<span class="m muted">· {model}</span>{/if}
@@ -118,33 +139,166 @@
 {/if}
 
 <style>
-  .chipwrap { display: inline-flex; flex: none; }
-  .chip { display: inline-flex; align-items: center; gap: 0.3em; padding: 0.15em 0.4em; border-radius: 10px; border: 1px solid var(--oc-hairline); font-size: 0.9em; font-variant-numeric: tabular-nums; }
-  .chip:hover, .chip.on { color: var(--oc-fg); background: var(--oc-hover); }
-  .chip.live { color: var(--oc-accent); border-color: color-mix(in srgb, var(--oc-accent) 45%, transparent); }
-  .panel { position: absolute; z-index: 20; left: 0.6em; right: 0.6em; top: 100%; background: var(--oc-popover); border: 1px solid var(--oc-hairline); border-radius: 6px; box-shadow: 0 4px 16px var(--vscode-widget-shadow); display: flex; flex-direction: column; max-height: 50vh; }
-  .headrow { display: flex; align-items: center; justify-content: space-between; gap: 0.5em; padding-right: 0.4em; }
-  .head { padding: 0.45em var(--oc-side) 0.2em; min-width: 0; }
-  .head:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
-  .clear { flex: none; padding: 0.15em 0.5em; margin-top: 0.25em; border-radius: 4px; }
-  .clear:hover { color: var(--oc-fg); background: var(--oc-hover); }
-  .run { color: var(--oc-accent); }
-  ul { list-style: none; margin: 0; padding: 0 0.3em 0.35em; overflow-y: auto; min-height: 0; }
-  .row { display: flex; align-items: center; border-radius: 4px; }
-  .row:hover:has(.w:not(:disabled)) { background: var(--oc-hover); }
-  .w { display: flex; align-items: center; gap: 0.5em; flex: 1 1 0; min-width: 0; min-height: 28px; padding: 0 0.4em; border-radius: 4px; text-align: left; }
-  .a { font-weight: 600; white-space: nowrap; }
-  .m { flex: 0 1 auto; min-width: 0; max-width: 11em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.9em; margin-left: -0.2em; }
-  .d { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .n { font-size: 0.9em; white-space: nowrap; }
-  .s, .q { font-size: 0.9em; white-space: nowrap; }
-  .q { margin-left: -0.25em; }
-  .x { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 24px; min-height: 24px; border-radius: 4px; opacity: 0; }
-  .x.spacer { pointer-events: none; }
-  .row:hover .x, .row:focus-within .x { opacity: 1; }
-  .x:hover:not(.spacer) { color: var(--oc-fg); background: var(--oc-hover); }
-  @media (hover: none) { .x { opacity: 1; } .x.spacer { opacity: 0; } }
-  .ok { color: var(--oc-ok); }
-  .bad { color: var(--oc-error); }
-  .pad { padding: 0.3em 0.4em; }
+  .chipwrap {
+    display: inline-flex;
+    flex: none;
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3em;
+    padding: 0.15em 0.4em;
+    border-radius: 10px;
+    border: 1px solid var(--oc-hairline);
+    font-size: 0.9em;
+    font-variant-numeric: tabular-nums;
+  }
+  .chip:hover,
+  .chip.on {
+    color: var(--oc-fg);
+    background: var(--oc-hover);
+  }
+  .chip.live {
+    color: var(--oc-accent);
+    border-color: color-mix(in srgb, var(--oc-accent) 45%, transparent);
+  }
+  .panel {
+    position: absolute;
+    z-index: 20;
+    left: 0.6em;
+    right: 0.6em;
+    top: 100%;
+    background: var(--oc-popover);
+    border: 1px solid var(--oc-hairline);
+    border-radius: 6px;
+    box-shadow: 0 4px 16px var(--vscode-widget-shadow);
+    display: flex;
+    flex-direction: column;
+    max-height: 50vh;
+  }
+  .headrow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    padding-right: 0.4em;
+  }
+  .head {
+    padding: 0.45em var(--oc-side) 0.2em;
+    min-width: 0;
+  }
+  .head:focus-visible {
+    outline: 1px solid var(--vscode-focusBorder);
+    outline-offset: -1px;
+  }
+  .clear {
+    flex: none;
+    padding: 0.15em 0.5em;
+    margin-top: 0.25em;
+    border-radius: 4px;
+  }
+  .clear:hover {
+    color: var(--oc-fg);
+    background: var(--oc-hover);
+  }
+  .run {
+    color: var(--oc-accent);
+  }
+  ul {
+    list-style: none;
+    margin: 0;
+    padding: 0 0.3em 0.35em;
+    overflow-y: auto;
+    min-height: 0;
+  }
+  .row {
+    display: flex;
+    align-items: center;
+    border-radius: 4px;
+  }
+  .row:hover:has(.w:not(:disabled)) {
+    background: var(--oc-hover);
+  }
+  .w {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 28px;
+    padding: 0 0.4em;
+    border-radius: 4px;
+    text-align: left;
+  }
+  .a {
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .m {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 11em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.9em;
+    margin-left: -0.2em;
+  }
+  .d {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .n {
+    font-size: 0.9em;
+    white-space: nowrap;
+  }
+  .s,
+  .q {
+    font-size: 0.9em;
+    white-space: nowrap;
+  }
+  .q {
+    margin-left: -0.25em;
+  }
+  .x {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    min-height: 24px;
+    border-radius: 4px;
+    opacity: 0;
+  }
+  .x.spacer {
+    pointer-events: none;
+  }
+  .row:hover .x,
+  .row:focus-within .x {
+    opacity: 1;
+  }
+  .x:hover:not(.spacer) {
+    color: var(--oc-fg);
+    background: var(--oc-hover);
+  }
+  @media (hover: none) {
+    .x {
+      opacity: 1;
+    }
+    .x.spacer {
+      opacity: 0;
+    }
+  }
+  .ok {
+    color: var(--oc-ok);
+  }
+  .bad {
+    color: var(--oc-error);
+  }
+  .pad {
+    padding: 0.3em 0.4em;
+  }
 </style>

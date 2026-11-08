@@ -21,11 +21,7 @@ export type ChildSession = {
  * else the model id; the variant follows (`Claude Sonnet 5.5 · high`). `short` drops the vendor word and joins the
  * variant with a space (`Sonnet 5.5 high`) for tight rows. Empty when the session has no model.
  */
-export function modelLabel(
-  model: WorkerModel | null | undefined,
-  models: ReadonlyArray<Pick<SlimModel, "id" | "modelID" | "providerID" | "name">>,
-  opts: { short?: boolean } = {},
-): string {
+export function modelLabel(model: WorkerModel | null | undefined, models: ReadonlyArray<Pick<SlimModel, "id" | "modelID" | "providerID" | "name">>, opts: { short?: boolean } = {}): string {
   if (!model?.id) return ""
   const found = models.find((m) => m.providerID === model.providerID && (m.id === model.id || m.modelID === model.id))
   let name = found?.name?.trim() || model.id
@@ -35,8 +31,7 @@ export function modelLabel(
 }
 
 /** The full, unabbreviated model for a tooltip: `provider/model` and the variant. */
-export const modelTitle = (model: WorkerModel | null | undefined): string =>
-  model?.id ? `${model.providerID}/${model.id}${model.variant ? ` (${model.variant})` : ""}` : ""
+export const modelTitle = (model: WorkerModel | null | undefined): string => (model?.id ? `${model.providerID}/${model.id}${model.variant ? ` (${model.variant})` : ""}` : "")
 
 export type WorkerStatus = "running" | "done" | "failed" | "stopped"
 
@@ -109,9 +104,7 @@ export function matchChild(tool: ToolItem, children: readonly ChildSession[], cl
   if (byTitle) return byTitle
   if (tool.created === undefined) return undefined
   const at = tool.created
-  const near = free
-    .filter((c) => c.time.created >= at - 1_000)
-    .sort((a, b) => a.time.created - b.time.created)[0]
+  const near = free.filter((c) => c.time.created >= at - 1_000).sort((a, b) => a.time.created - b.time.created)[0]
   return near
 }
 

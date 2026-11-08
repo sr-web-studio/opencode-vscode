@@ -118,12 +118,7 @@ export class PushEngine {
     }
   }
 
-  private async consider(
-    ev: EventLike,
-    sessionID: string,
-    kind: Kind,
-    extra: { meta?: SessionMeta; requestID?: string; detail?: string; action?: string },
-  ): Promise<void> {
+  private async consider(ev: EventLike, sessionID: string, kind: Kind, extra: { meta?: SessionMeta; requestID?: string; detail?: string; action?: string }): Promise<void> {
     const { options } = this.deps
     if (!options.kinds[kind]) return this.drop(kind, sessionID, `kinds.${kind} is off`)
 

@@ -22,7 +22,17 @@
 </span>
 
 <style>
-  .perm { display: inline-flex; gap: 0.4em; align-items: baseline; font-size: 0.92em; }
-  .perm button:hover:not(:disabled) { text-decoration: underline; color: var(--oc-fg); }
-  .perm .allow:hover:not(:disabled) { color: var(--oc-accent); }
+  .perm {
+    display: inline-flex;
+    gap: 0.4em;
+    align-items: baseline;
+    font-size: 0.92em;
+  }
+  .perm button:hover:not(:disabled) {
+    text-decoration: underline;
+    color: var(--oc-fg);
+  }
+  .perm .allow:hover:not(:disabled) {
+    color: var(--oc-accent);
+  }
 </style>

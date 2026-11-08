@@ -28,6 +28,15 @@
 
 <style>
   /* Left connector chaining the steps of a turn; each tool line puts a dot on it. */
-  .steps { border-left: 1px solid var(--oc-hairline); margin-left: 0.55em; padding-left: 14px; display: flex; flex-direction: column; gap: 2px; }
-  .text { margin: 0.3em 0; }
+  .steps {
+    border-left: 1px solid var(--oc-hairline);
+    margin-left: 0.55em;
+    padding-left: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .text {
+    margin: 0.3em 0;
+  }
 </style>

@@ -1,15 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
-import {
-  CONFIG_SCHEMA,
-  NEW_CONFIG_TEXT,
-  configPlace,
-  globalConfigDir,
-  openGlobalConfig,
-  remoteConfigNotice,
-  resolveGlobalConfig,
-  type ConfigHost,
-} from "@occ/core/global-config"
+import { CONFIG_SCHEMA, NEW_CONFIG_TEXT, configPlace, globalConfigDir, openGlobalConfig, remoteConfigNotice, resolveGlobalConfig, type ConfigHost } from "@occ/core/global-config"
 
 const linux = { env: {}, home: "/home/ann", platform: "linux" }
 

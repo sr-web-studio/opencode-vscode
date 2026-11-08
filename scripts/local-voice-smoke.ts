@@ -68,24 +68,26 @@ async function download(fetchImpl?: FetchLike) {
 }
 
 /** A fetch that flips one byte of the first chunk of the first URL containing `needle`. */
-const damaged = (needle: string): FetchLike => async (url, init) => {
-  const res = await fetch(url, init)
-  if (!url.includes(needle) || !res.body) return res
-  let flipped = false
-  const body = res.body.pipeThrough(
-    new TransformStream<Uint8Array, Uint8Array>({
-      transform(chunk, ctl) {
-        if (!flipped) {
-          flipped = true
-          chunk = chunk.slice()
-          chunk[chunk.length >> 1] = ~chunk[chunk.length >> 1]! & 0xff
-        }
-        ctl.enqueue(chunk)
-      },
-    }),
-  )
-  return { ok: res.ok, status: res.status, body }
-}
+const damaged =
+  (needle: string): FetchLike =>
+  async (url, init) => {
+    const res = await fetch(url, init)
+    if (!url.includes(needle) || !res.body) return res
+    let flipped = false
+    const body = res.body.pipeThrough(
+      new TransformStream<Uint8Array, Uint8Array>({
+        transform(chunk, ctl) {
+          if (!flipped) {
+            flipped = true
+            chunk = chunk.slice()
+            chunk[chunk.length >> 1] = ~chunk[chunk.length >> 1]! & 0xff
+          }
+          ctl.enqueue(chunk)
+        },
+      }),
+    )
+    return { ok: res.ok, status: res.status, body }
+  }
 
 /** Preloaded into the recorder process: replaces the native microphone library with a WAV player. */
 const FAKE = (wav: string) => `

@@ -76,7 +76,12 @@ export class Voice implements vscode.Disposable {
   private async saveLanguages(list: string[]): Promise<void> {
     const cfg = vscode.workspace.getConfiguration("opencode.voice")
     const set = cfg.inspect<string[]>("localLanguages")
-    const target = set?.workspaceFolderValue !== undefined ? vscode.ConfigurationTarget.WorkspaceFolder : set?.workspaceValue !== undefined ? vscode.ConfigurationTarget.Workspace : vscode.ConfigurationTarget.Global
+    const target =
+      set?.workspaceFolderValue !== undefined
+        ? vscode.ConfigurationTarget.WorkspaceFolder
+        : set?.workspaceValue !== undefined
+          ? vscode.ConfigurationTarget.Workspace
+          : vscode.ConfigurationTarget.Global
     await cfg.update("localLanguages", list, target)
     this.languages = list
     this.emit()
@@ -243,7 +248,10 @@ export class Voice implements vscode.Disposable {
       return this.emit()
     }
     const st = u.stats
-    if (st) this.log(`Voice: ended after ${(st.frames / 10).toFixed(1)} s on ${st.device ?? "the default microphone"}, peak level ${st.peak}/32767, ${st.answers} ${this.engine === "local" ? "segments" : "answers from Soniox"}, ${u.final.length} characters`)
+    if (st)
+      this.log(
+        `Voice: ended after ${(st.frames / 10).toFixed(1)} s on ${st.device ?? "the default microphone"}, peak level ${st.peak}/32767, ${st.answers} ${this.engine === "local" ? "segments" : "answers from Soniox"}, ${u.final.length} characters`,
+      )
     this.post({ type: "dictation", id: u.id, text: spokenText({ final: u.final, partial: "", finished: true }), done: true })
     if (u.error) return this.failed(u.id, u.error, u.fix)
     this.finish(u.id)
@@ -252,11 +260,7 @@ export class Voice implements vscode.Disposable {
   private failed(id: string, reason: string, fix?: VoiceFix): void {
     this.log(`Voice: ${reason}`)
     this.finish(id)
-    const actions =
-      fix === "micSettings" ? ["Open Microphone Settings", "Choose Microphone"]
-      : fix === "chooseMicrophone" ? ["Choose Microphone"]
-      : fix === "showLog" ? ["Show Log"]
-      : []
+    const actions = fix === "micSettings" ? ["Open Microphone Settings", "Choose Microphone"] : fix === "chooseMicrophone" ? ["Choose Microphone"] : fix === "showLog" ? ["Show Log"] : []
     void vscode.window.showErrorMessage(`Voice input: ${reason}`, ...actions).then((pick) => {
       if (pick === "Open Microphone Settings") void vscode.commands.executeCommand(COMPANION.micSettings)
       if (pick === "Choose Microphone") void vscode.commands.executeCommand(COMPANION.chooseMicrophone)
@@ -285,10 +289,7 @@ export class Voice implements vscode.Disposable {
     this.checking = true
     let result
     try {
-      result = await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: "Checking the Soniox key…" },
-        () => checkSonioxKey((url, init) => fetch(url, init), value),
-      )
+      result = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: "Checking the Soniox key…" }, () => checkSonioxKey((url, init) => fetch(url, init), value))
       if (result.ok) {
         await this.secrets.store(KEY, value.trim())
         await this.refresh()
@@ -347,12 +348,18 @@ export class Voice implements vscode.Disposable {
       const { list, dropped } = applyPick(active, ids, max)
       if (dropped.length) {
         const names = dropped.map((id) => displayName(languageById(id) ?? { name: id, native: id })).join(", ")
-        const pick = await vscode.window.showWarningMessage(`You can have ${max} active voice language${max === 1 ? "" : "s"}. Keeping ${list.map((id) => languageById(id)?.name ?? id).join(", ")}; not added: ${names}.`, "Keep This", "Choose Again")
+        const pick = await vscode.window.showWarningMessage(
+          `You can have ${max} active voice language${max === 1 ? "" : "s"}. Keeping ${list.map((id) => languageById(id)?.name ?? id).join(", ")}; not added: ${names}.`,
+          "Keep This",
+          "Choose Again",
+        )
         if (pick !== "Keep This") continue
       }
       await this.saveLanguages(list)
       const engineNote = this.readEngine() === "soniox" ? " The on-device engine is not selected now (setting opencode.voice.engine); Soniox uses opencode.voice.languages." : ""
-      void vscode.window.showInformationMessage(`Voice language${list.length > 1 ? "s" : ""}: ${list.map((id) => languageById(id)?.name ?? id).join(", ")}. Now speaking: ${languageById(list[0]!)?.name ?? list[0]}.${engineNote}`)
+      void vscode.window.showInformationMessage(
+        `Voice language${list.length > 1 ? "s" : ""}: ${list.map((id) => languageById(id)?.name ?? id).join(", ")}. Now speaking: ${languageById(list[0]!)?.name ?? list[0]}.${engineNote}`,
+      )
       return
     }
   }

@@ -15,7 +15,11 @@ export type Push = {
 
 export const clip = (text: string, max: number): string => (text.length <= max ? text : `${text.slice(0, Math.max(0, max - 1)).trimEnd()}…`)
 
-export const firstLine = (text: string): string => text.split(/\r?\n/).find((l) => l.trim() !== "")?.trim() ?? ""
+export const firstLine = (text: string): string =>
+  text
+    .split(/\r?\n/)
+    .find((l) => l.trim() !== "")
+    ?.trim() ?? ""
 
 /**
  * Last line of defence for text that ends up on a phone (and on the ntfy server): blank out things that look like

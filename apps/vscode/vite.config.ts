@@ -21,7 +21,6 @@ export default defineConfig({
         format: "iife",
         entryFileNames: "main.js",
         assetFileNames: "main[extname]",
-        
       },
     },
   },

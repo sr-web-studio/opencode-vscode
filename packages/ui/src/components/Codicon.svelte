@@ -6,6 +6,12 @@
 <span class="codicon codicon-{name}" class:spin role={label ? "img" : undefined} aria-label={label} aria-hidden={label ? undefined : "true"}></span>
 
 <style>
-  .spin { animation: oc-spin 1s linear infinite; }
-  @media (prefers-reduced-motion: reduce) { .spin { animation-duration: 3s; } }
+  .spin {
+    animation: oc-spin 1s linear infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .spin {
+      animation-duration: 3s;
+    }
+  }
 </style>

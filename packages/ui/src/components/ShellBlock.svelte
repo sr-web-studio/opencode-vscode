@@ -74,8 +74,8 @@
       disabled={!shellID}
       onclick={() => shellID && store.bridge.showTerminal(shellID, title)}
       title={shellID ? (outputView ? "Show the live output of this command" : "Show this command in a VS Code terminal") : "This command's terminal is no longer available"}
-      aria-label={outputView ? "Open output" : "Open in terminal"}
-    ><Codicon name="terminal" /><span>{outputView ? "Open output" : "Open in terminal"}</span></button>
+      aria-label={outputView ? "Open output" : "Open in terminal"}><Codicon name="terminal" /><span>{outputView ? "Open output" : "Open in terminal"}</span></button
+    >
   </div>
 
   <pre class="cmd"><span class="sign" aria-hidden="true">$ </span>{command}</pre>
@@ -102,21 +102,96 @@
     background: var(--vscode-terminal-background, var(--vscode-editor-background));
     color: var(--vscode-terminal-foreground, var(--oc-fg));
   }
-  .bar { display: flex; align-items: center; gap: 0.5em; padding: 4px 8px; background: var(--vscode-editorWidget-background, var(--oc-code-bg)); border-bottom: 1px solid var(--oc-hairline); font-size: 0.9em; min-width: 0; }
-  .cwd { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .grow { flex: 1; }
-  .badge { border: 1px solid currentColor; border-radius: 999px; padding: 0 0.5em; line-height: 1.5; white-space: nowrap; }
-  .ok { color: var(--oc-ok); }
-  .bad { color: var(--oc-error); }
-  .dur { white-space: nowrap; }
-  .act { display: inline-flex; align-items: center; gap: 0.3em; padding: 0.1em 0.45em; border-radius: 4px; color: var(--oc-muted); white-space: nowrap; }
-  .act:hover:not(:disabled) { color: var(--oc-fg); background: var(--oc-hover); }
-  .act:disabled { opacity: 0.45; cursor: default; }
-  pre { margin: 0; white-space: pre-wrap; word-break: break-all; }
-  .cmd { padding: 8px 10px 4px; font-family: var(--vscode-editor-font-family, monospace); font-size: 0.95em; color: var(--oc-fg); line-height: 1.45; }
-  .sign { color: var(--oc-muted); user-select: none; }
-  .out { padding: 4px 10px 8px; max-height: 18em; overflow: auto; line-height: 1.45; font-size: 0.95em; background: var(--vscode-terminal-background, var(--vscode-editor-background)); }
-  .empty { padding: 4px 10px 8px; font-size: 0.9em; }
-  .more { display: block; width: 100%; padding: 4px 10px; text-align: left; font-size: 0.9em; color: var(--vscode-textLink-foreground); border-top: 1px solid var(--oc-hairline); }
-  .more:hover { text-decoration: underline; }
+  .bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    padding: 4px 8px;
+    background: var(--vscode-editorWidget-background, var(--oc-code-bg));
+    border-bottom: 1px solid var(--oc-hairline);
+    font-size: 0.9em;
+    min-width: 0;
+  }
+  .cwd {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .grow {
+    flex: 1;
+  }
+  .badge {
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    padding: 0 0.5em;
+    line-height: 1.5;
+    white-space: nowrap;
+  }
+  .ok {
+    color: var(--oc-ok);
+  }
+  .bad {
+    color: var(--oc-error);
+  }
+  .dur {
+    white-space: nowrap;
+  }
+  .act {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3em;
+    padding: 0.1em 0.45em;
+    border-radius: 4px;
+    color: var(--oc-muted);
+    white-space: nowrap;
+  }
+  .act:hover:not(:disabled) {
+    color: var(--oc-fg);
+    background: var(--oc-hover);
+  }
+  .act:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+  pre {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  .cmd {
+    padding: 8px 10px 4px;
+    font-family: var(--vscode-editor-font-family, monospace);
+    font-size: 0.95em;
+    color: var(--oc-fg);
+    line-height: 1.45;
+  }
+  .sign {
+    color: var(--oc-muted);
+    user-select: none;
+  }
+  .out {
+    padding: 4px 10px 8px;
+    max-height: 18em;
+    overflow: auto;
+    line-height: 1.45;
+    font-size: 0.95em;
+    background: var(--vscode-terminal-background, var(--vscode-editor-background));
+  }
+  .empty {
+    padding: 4px 10px 8px;
+    font-size: 0.9em;
+  }
+  .more {
+    display: block;
+    width: 100%;
+    padding: 4px 10px;
+    text-align: left;
+    font-size: 0.9em;
+    color: var(--vscode-textLink-foreground);
+    border-top: 1px solid var(--oc-hairline);
+  }
+  .more:hover {
+    text-decoration: underline;
+  }
 </style>

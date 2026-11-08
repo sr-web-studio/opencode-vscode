@@ -2,7 +2,12 @@ import { describe, expect, test } from "bun:test"
 import { Controller } from "@occ/core/controller"
 
 const session = (id: string, extra: Record<string, unknown> = {}) => ({
-  id, title: id, projectID: "prj", time: { created: 1, updated: 1 }, location: { directory: "/w" }, ...extra,
+  id,
+  title: id,
+  projectID: "prj",
+  time: { created: 1, updated: 1 },
+  location: { directory: "/w" },
+  ...extra,
 })
 
 /** A fake server that records what the Controller calls. `forkError` makes `session.fork` reject like an empty session. */
@@ -28,7 +33,12 @@ function server(opts: { forkError?: unknown; commands?: Array<{ name: string; de
       },
       revert: { stage: rec("session.revert.stage", { messageID: "u2", files: [] }), clear: rec("session.revert.clear") },
     },
-    command: { list: async () => (calls.push(["command.list", undefined]), { data: opts.commands ?? [{ name: "review", description: "review changes" }, { name: "compact", description: "server one" }, { name: "goal" }] }) },
+    command: {
+      list: async () => (
+        calls.push(["command.list", undefined]),
+        { data: opts.commands ?? [{ name: "review", description: "review changes" }, { name: "compact", description: "server one" }, { name: "goal" }] }
+      ),
+    },
     skill: { list: async () => (calls.push(["skill.list", undefined]), { data: [{ id: "browser", name: "Browser", description: "d", path: "/p", content: "x" }] }) },
     mcp: { list: async () => ({ data: [{ name: "exa", status: { status: "connected" } }] }) },
     permission: { request: { list: async () => empty } },
@@ -92,7 +102,9 @@ describe("server commands", () => {
   })
   test("a failing command shows up on the error line", async () => {
     const { ctl, client } = await ready()
-    client.session.command = async () => { throw { _tag: "CommandNotFoundError", message: "Command review not found" } }
+    client.session.command = async () => {
+      throw { _tag: "CommandNotFoundError", message: "Command review not found" }
+    }
     await ctl.dispatch({ type: "send", text: "/review" })
     expect(ctl.snapshot().error).toBe("Command review not found")
   })

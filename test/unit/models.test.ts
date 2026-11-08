@@ -3,9 +3,18 @@ import { cycleAgent, cycleVariant, footerLabel, groupModels, primaryAgents } fro
 import type { SlimModel } from "@occ/core/api"
 
 const m = (id: string, providerID: string, name: string, extra: Partial<SlimModel> = {}): SlimModel => ({
-  id, modelID: id, providerID, name, enabled: true, variants: [{ id: "low" }, { id: "high" }], ...extra,
+  id,
+  modelID: id,
+  providerID,
+  name,
+  enabled: true,
+  variants: [{ id: "low" }, { id: "high" }],
+  ...extra,
 })
-const providers = [{ id: "anthropic", name: "Anthropic" }, { id: "cli", name: "CLI Proxy API" }]
+const providers = [
+  { id: "anthropic", name: "Anthropic" },
+  { id: "cli", name: "CLI Proxy API" },
+]
 
 describe("agents", () => {
   test("primary and visible only", () => {
@@ -26,7 +35,13 @@ describe("agents", () => {
 })
 
 describe("model groups", () => {
-  const models = [m("s", "anthropic", "Sonnet"), m("o", "anthropic", "Opus"), m("d", "cli", "DeepSeek"), m("off", "cli", "Disabled", { enabled: false }), m("old", "cli", "Old", { status: "deprecated" })]
+  const models = [
+    m("s", "anthropic", "Sonnet"),
+    m("o", "anthropic", "Opus"),
+    m("d", "cli", "DeepSeek"),
+    m("off", "cli", "Disabled", { enabled: false }),
+    m("old", "cli", "Old", { status: "deprecated" }),
+  ]
 
   test("grouped by provider name, sorted, disabled/deprecated hidden", () => {
     const g = groupModels({ models, providers, query: "" })

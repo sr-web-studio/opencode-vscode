@@ -55,7 +55,5 @@ export function projectRows(projects: ReadonlyArray<ProjectLike>, query = ""): P
     if (name && row.title === folderName(directory)) row.title = name
   }
   const q = query.trim().toLowerCase()
-  return [...byDir.values()]
-    .filter((r) => !q || r.title.toLowerCase().includes(q) || r.path.toLowerCase().includes(q))
-    .sort((a, b) => b.last - a.last || a.directory.localeCompare(b.directory))
+  return [...byDir.values()].filter((r) => !q || r.title.toLowerCase().includes(q) || r.path.toLowerCase().includes(q)).sort((a, b) => b.last - a.last || a.directory.localeCompare(b.directory))
 }

@@ -6,10 +6,18 @@ import { openGlobalConfig, type ConfigHost, type OpenConfigResult } from "@occ/c
 import { readConnectionSettings } from "./settings"
 
 const host: ConfigHost = {
-  exists: (path) => access(path).then(() => true, () => false),
+  exists: (path) =>
+    access(path).then(
+      () => true,
+      () => false,
+    ),
   async confirmCreate(path) {
     const create = "Create"
-    const pick = await vscode.window.showInformationMessage(`Create ${path}?`, { modal: true, detail: "OpenCode has no global config file yet. The new file only contains the schema line; you add the rest." }, create)
+    const pick = await vscode.window.showInformationMessage(
+      `Create ${path}?`,
+      { modal: true, detail: "OpenCode has no global config file yet. The new file only contains the schema line; you add the rest." },
+      create,
+    )
     return pick === create
   },
   async create(path, text) {
@@ -27,10 +35,7 @@ const host: ConfigHost = {
 /** The command: open the user's global OpenCode config in an editor. Never edits it. */
 export async function openGlobalConfigCommand(serverHostname: string | undefined): Promise<OpenConfigResult | undefined> {
   try {
-    return await openGlobalConfig(
-      { env: process.env, home: homedir(), platform: process.platform, serverUrl: readConnectionSettings().serverUrl, serverHostname, localHostname: hostname() },
-      host,
-    )
+    return await openGlobalConfig({ env: process.env, home: homedir(), platform: process.platform, serverUrl: readConnectionSettings().serverUrl, serverHostname, localHostname: hostname() }, host)
   } catch (e) {
     void vscode.window.showErrorMessage(`Could not open the OpenCode config: ${e instanceof Error ? e.message : "unknown error"}`)
     return undefined

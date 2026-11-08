@@ -13,7 +13,9 @@
 </script>
 
 {#if images.length > 0}
-  <div class="row">{#each images as { f, i } (i)}<SentImage imageRef={f.ref!} name={f.name} />{/each}</div>
+  <div class="row">
+    {#each images as { f, i } (i)}<SentImage imageRef={f.ref!} name={f.name} />{/each}
+  </div>
 {/if}
 {#if others.length > 0}
   <div class="row">
@@ -28,7 +30,18 @@
 {/if}
 
 <style>
-  .row { display: flex; flex-wrap: wrap; gap: 0.4em; margin-top: 0.5em; }
-  .open { display: inline-flex; max-width: 100%; text-align: left; }
-  .open:hover :global(.chip) { border-color: var(--oc-accent); }
+  .row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4em;
+    margin-top: 0.5em;
+  }
+  .open {
+    display: inline-flex;
+    max-width: 100%;
+    text-align: left;
+  }
+  .open:hover :global(.chip) {
+    border-color: var(--oc-accent);
+  }
 </style>

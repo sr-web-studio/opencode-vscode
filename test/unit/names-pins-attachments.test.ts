@@ -92,7 +92,10 @@ describe("pasted and dropped blobs", () => {
     expect(a.thumb).toBe("data:image/png;base64,AAAA")
     expect(f.thumb).toBeUndefined()
     expect(f.name).toBe("y.ts")
-    expect(toPromptFiles([a, f])).toEqual([{ uri: "data:image/png;base64,AAAA", name: "shot.png" }, { uri: "file:///x/y.ts", name: "y.ts" }])
+    expect(toPromptFiles([a, f])).toEqual([
+      { uri: "data:image/png;base64,AAAA", name: "shot.png" },
+      { uri: "file:///x/y.ts", name: "y.ts" },
+    ])
   })
 })
 
@@ -108,7 +111,15 @@ describe("askedQuestions", () => {
     const { askedQuestions } = await import("@occ/core/transcript/tools")
     const input = { questions: [{ question: "Which one?", header: "Pick", options: [{ label: "A", description: "a long description that must not be cut" }, { label: "B" }] }] }
     expect(askedQuestions({ input, metadata: { answers: [["A"]] } })).toEqual([
-      { question: "Which one?", header: "Pick", options: [{ label: "A", description: "a long description that must not be cut" }, { label: "B", description: undefined }], answer: "A" },
+      {
+        question: "Which one?",
+        header: "Pick",
+        options: [
+          { label: "A", description: "a long description that must not be cut" },
+          { label: "B", description: undefined },
+        ],
+        answer: "A",
+      },
     ])
     expect(askedQuestions({ input, metadata: {} })[0]!.answer).toBeUndefined()
     expect(askedQuestions({ input: {}, metadata: {} })).toEqual([])

@@ -4,7 +4,12 @@ import { WorkerTab } from "@occ/core/worker-tab"
 import { QUIET_AFTER_MS, quietFor, quietLabel, type Worker } from "@occ/core/workers"
 
 const session = (id: string, extra: Record<string, unknown> = {}) => ({
-  id, title: id, projectID: "prj", time: { created: 1, updated: 1 }, location: { directory: "/w" }, ...extra,
+  id,
+  title: id,
+  projectID: "prj",
+  time: { created: 1, updated: 1 },
+  location: { directory: "/w" },
+  ...extra,
 })
 
 /** A fake server with one root session (`ses_a`) that has one child (`ses_kid`) and an unrelated session of another parent. */
@@ -74,7 +79,9 @@ describe("stopWorker in the controller", () => {
 
   test("a failing interrupt shows on the error line", async () => {
     const { ctl, client } = await ready()
-    client.session.interrupt = async () => { throw new Error("server said no") }
+    client.session.interrupt = async () => {
+      throw new Error("server said no")
+    }
     await ctl.dispatch({ type: "stopWorker", sessionID: "ses_kid" })
     expect(ctl.snapshot().error).toBe("server said no")
   })

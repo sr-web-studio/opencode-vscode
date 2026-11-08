@@ -40,7 +40,9 @@ describe("checkSonioxKey", () => {
     const r500 = await checkSonioxKey(answer(500).fetch, KEY)
     expect(r500.ok).toBe(false)
     if (!r500.ok) expect(r500.reason).toContain("HTTP 500")
-    const down = await checkSonioxKey(async () => { throw new Error("ENOTFOUND") }, KEY)
+    const down = await checkSonioxKey(async () => {
+      throw new Error("ENOTFOUND")
+    }, KEY)
     expect(down.ok).toBe(false)
     if (!down.ok) expect(down.reason).toContain("Could not reach Soniox")
   })
@@ -50,7 +52,9 @@ describe("checkSonioxKey", () => {
     expect(calls).toHaveLength(0)
   })
   test("the error text never contains the key", async () => {
-    const r = await checkSonioxKey(async () => { throw new Error("boom") }, KEY)
+    const r = await checkSonioxKey(async () => {
+      throw new Error("boom")
+    }, KEY)
     expect(JSON.stringify(r)).not.toContain(KEY)
   })
 })

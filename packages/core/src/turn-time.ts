@@ -46,8 +46,7 @@ export function compactTime(at: number, env: TimeEnv): string {
 }
 
 /** Full date and time for the hover title. */
-export const fullDateTime = (at: number, env: Pick<TimeEnv, "locale" | "timeZone">): string =>
-  fmt(env, { dateStyle: "full", timeStyle: "medium" }).format(at)
+export const fullDateTime = (at: number, env: Pick<TimeEnv, "locale" | "timeZone">): string => fmt(env, { dateStyle: "full", timeStyle: "medium" }).format(at)
 
 /** A moment as the compact text plus the full date and time for the hover title. Used for the prompt time in a card header. */
 export const moment = (at: number | undefined, env: TimeEnv): { text: string; title: string } | undefined =>

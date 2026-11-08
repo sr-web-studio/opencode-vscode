@@ -26,12 +26,15 @@
       void load()
       return
     }
-    const io = new IntersectionObserver((entries) => {
-      if (entries.some((e) => e.isIntersecting)) {
-        void load()
-        io.disconnect()
-      }
-    }, { rootMargin: "200px" })
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          void load()
+          io.disconnect()
+        }
+      },
+      { rootMargin: "200px" },
+    )
     io.observe(el)
     return () => io.disconnect()
   })
@@ -68,10 +71,40 @@
 </button>
 
 <style>
-  .thumb { display: inline-flex; align-items: stretch; max-width: 100%; border: 1px solid var(--oc-hairline); border-radius: 6px; overflow: hidden; background: var(--oc-popover); }
-  .thumb:hover { border-color: var(--oc-accent); }
-  img { display: block; width: auto; max-width: 220px; object-fit: cover; }
-  .ph { display: inline-flex; align-items: center; gap: 0.4em; padding: 0 0.8em; min-width: 64px; font-size: 0.9em; }
-  .skeleton { width: 64px; background: var(--oc-hover); }
-  .n { max-width: 12em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .thumb {
+    display: inline-flex;
+    align-items: stretch;
+    max-width: 100%;
+    border: 1px solid var(--oc-hairline);
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--oc-popover);
+  }
+  .thumb:hover {
+    border-color: var(--oc-accent);
+  }
+  img {
+    display: block;
+    width: auto;
+    max-width: 220px;
+    object-fit: cover;
+  }
+  .ph {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+    padding: 0 0.8em;
+    min-width: 64px;
+    font-size: 0.9em;
+  }
+  .skeleton {
+    width: 64px;
+    background: var(--oc-hover);
+  }
+  .n {
+    max-width: 12em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 </style>

@@ -9,13 +9,25 @@ class FakeRecorder implements Recorder {
   stopped = false
   released = false
   private waiting: Array<(f: Int16Array) => void> = []
-  start() { this.started = true }
-  stop() { this.stopped = true }
-  release() { this.released = true }
-  getSelectedDevice() { return "Fake mic" }
-  read(): Promise<Int16Array> { return new Promise((r) => this.waiting.push(r)) }
+  start() {
+    this.started = true
+  }
+  stop() {
+    this.stopped = true
+  }
+  release() {
+    this.released = true
+  }
+  getSelectedDevice() {
+    return "Fake mic"
+  }
+  read(): Promise<Int16Array> {
+    return new Promise((r) => this.waiting.push(r))
+  }
   /** Deliver one frame to the pending read. */
-  frame(samples = [1, 2]) { this.waiting.shift()?.(new Int16Array(samples)) }
+  frame(samples = [1, 2]) {
+    this.waiting.shift()?.(new Int16Array(samples))
+  }
 }
 
 class FakeSocket implements Socket {
@@ -27,11 +39,23 @@ class FakeSocket implements Socket {
   onmessage: Socket["onmessage"] = null
   onerror: Socket["onerror"] = null
   onclose: Socket["onclose"] = null
-  constructor(readonly url: string, readonly protocols: string[]) {}
-  send(d: string | Uint8Array) { this.sent.push(d) }
-  close() { this.closed = true }
-  open() { this.readyState = 1; this.onopen?.({}) }
-  answer(m: unknown) { this.onmessage?.({ data: JSON.stringify(m) }) }
+  constructor(
+    readonly url: string,
+    readonly protocols: string[],
+  ) {}
+  send(d: string | Uint8Array) {
+    this.sent.push(d)
+  }
+  close() {
+    this.closed = true
+  }
+  open() {
+    this.readyState = 1
+    this.onopen?.({})
+  }
+  answer(m: unknown) {
+    this.onmessage?.({ data: JSON.stringify(m) })
+  }
 }
 
 function setup(extra: Partial<ConstructorParameters<typeof DictationSession>[0]> = {}) {
@@ -71,7 +95,12 @@ describe("DictationSession", () => {
   test("heard text is emitted; stop ends the stream and waits for finished", async () => {
     const { s, rec, sock, updates } = setup()
     sock.open()
-    sock.answer({ tokens: [{ text: "hello", is_final: true }, { text: " wor", is_final: false }] })
+    sock.answer({
+      tokens: [
+        { text: "hello", is_final: true },
+        { text: " wor", is_final: false },
+      ],
+    })
     expect(updates.at(-1)).toEqual({ kind: "heard", final: "hello", partial: " wor" })
     s.stop()
     expect(rec.stopped).toBe(true)
@@ -118,9 +147,15 @@ describe("DictationSession", () => {
 
     const updates: SessionUpdate[] = []
     new DictationSession({
-      key: "k", model: "m", languages: [],
-      recorder: () => { throw new Error("no device") },
-      socket: () => { throw new Error("unused") },
+      key: "k",
+      model: "m",
+      languages: [],
+      recorder: () => {
+        throw new Error("no device")
+      },
+      socket: () => {
+        throw new Error("unused")
+      },
       emit: (u) => updates.push(u),
     }).start()
     expect(updates).toHaveLength(1)
@@ -143,7 +178,10 @@ describe("DictationSession", () => {
   test("a microphone that sends only zeros is reported within 2 s with a mute hint", async () => {
     const { rec, sock, updates } = setup()
     sock.open()
-    for (let i = 0; i < 20; i++) { rec.frame([0, 0, 1]); await wait(1) }
+    for (let i = 0; i < 20; i++) {
+      rec.frame([0, 0, 1])
+      await wait(1)
+    }
     const done = updates.at(-1)
     expect(done).toMatchObject({ kind: "done", final: "" })
     expect(done && "error" in done && done.error).toContain("not muted")
@@ -154,7 +192,10 @@ describe("DictationSession", () => {
     let t = 0
     const { s, rec, sock, updates } = setup({ now: () => t })
     sock.open()
-    for (let i = 0; i < 25; i++) { rec.frame([900, -700]); await wait(1) }
+    for (let i = 0; i < 25; i++) {
+      rec.frame([900, -700])
+      await wait(1)
+    }
     sock.answer({ tokens: [] })
     t = 3000
     s.stop()

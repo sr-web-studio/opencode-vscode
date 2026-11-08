@@ -5,7 +5,21 @@ import { readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { gzipSync } from "node:zlib"
-import { IntegrityError, ensureLocal, installedLanguages, integrityOf, isInstalled, layout, localState, matchesIntegrity, missingBytes, removeLanguages, removeUnknownModels, sha256Hex, type FetchLike } from "../../apps/vscode/src/companion/local-install"
+import {
+  IntegrityError,
+  ensureLocal,
+  installedLanguages,
+  integrityOf,
+  isInstalled,
+  layout,
+  localState,
+  matchesIntegrity,
+  missingBytes,
+  removeLanguages,
+  removeUnknownModels,
+  sha256Hex,
+  type FetchLike,
+} from "../../apps/vscode/src/companion/local-install"
 import { SHERPA_PLATFORMS, sherpaTarget, type SherpaTarget } from "@occ/core/local-voice"
 import { modelBytes, modelUrl, packById, type Catalog, type LanguagePack, type ModelFile, type ModelKind, type ModelRole, type ModelSpec } from "@occ/core/voice-catalog"
 
@@ -80,7 +94,13 @@ describe("pinned downloads", () => {
 /** A model whose files are the fake bodies (`file:<path>`), pinned with their real hashes, so downloads can be verified for real. */
 const body = (path: string) => enc.encode(`file:${path}`)
 function fakeModel(id: string, kind: ModelKind, repo: string, roles: Partial<Record<ModelRole, string>>): ModelSpec {
-  const files: ModelFile[] = Object.entries(roles).map(([role, path]) => ({ path: path!, name: path!.split("/").pop()!, role: role as ModelRole, size: body(path!).length, sha256: sha256Hex(body(path!)) }))
+  const files: ModelFile[] = Object.entries(roles).map(([role, path]) => ({
+    path: path!,
+    name: path!.split("/").pop()!,
+    role: role as ModelRole,
+    size: body(path!).length,
+    sha256: sha256Hex(body(path!)),
+  }))
   return { id, kind, title: id, author: "t", license: "MIT", licenseUrl: "x", source: `https://huggingface.co/${repo}`, repo, rev: "a".repeat(40), featureDim: 128, tailSeconds: 0.8, files }
 }
 const tdRoles = (dir: string) => ({ encoder: `${dir}/enc.onnx`, decoder: `${dir}/dec.onnx`, joiner: `${dir}/join.onnx`, tokens: `${dir}/tokens.txt` })

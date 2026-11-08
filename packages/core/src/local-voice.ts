@@ -165,4 +165,3 @@ export const DEFAULT_THREADS = 2
 export function clampThreads(n: unknown): number {
   return typeof n === "number" && Number.isFinite(n) ? Math.min(8, Math.max(1, Math.round(n))) : DEFAULT_THREADS
 }
-

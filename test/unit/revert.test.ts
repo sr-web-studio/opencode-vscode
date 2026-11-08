@@ -101,7 +101,15 @@ describe("feature detection", () => {
 describe("attachments on user turns", () => {
   test("history and live prompts carry chips (names only, never the data)", () => {
     const v = viewFromMessages([
-      { id: "u", type: "user", text: "look", files: [{ data: "AAAA", mime: "image/png", source: { type: "uri", uri: "file:///c%3A/Users/me/shot%201.png" }, name: "shot 1.png" }, { data: "x", mime: "text/plain", source: { type: "inline" } }] },
+      {
+        id: "u",
+        type: "user",
+        text: "look",
+        files: [
+          { data: "AAAA", mime: "image/png", source: { type: "uri", uri: "file:///c%3A/Users/me/shot%201.png" }, name: "shot 1.png" },
+          { data: "x", mime: "text/plain", source: { type: "inline" } },
+        ],
+      },
     ] as any)
     expect(v.turns[0]!.user!.files).toEqual([
       { name: "shot 1.png", mime: "image/png", uri: "file:///c%3A/Users/me/shot%201.png", ref: { messageID: "u", index: 0 } },
@@ -110,7 +118,12 @@ describe("attachments on user turns", () => {
     expect(JSON.stringify(v)).not.toContain("AAAA")
     const live = applyEvent(
       { turns: [], queued: [], loaded: true },
-      { id: "e", type: "session.inbox.enqueued", created: 1, data: { inboxID: "i1", item: { type: "user", payload: { text: "hi", files: [{ uri: "data:image/png;base64,AAAA", name: "pasted.png" }] } } } },
+      {
+        id: "e",
+        type: "session.inbox.enqueued",
+        created: 1,
+        data: { inboxID: "i1", item: { type: "user", payload: { text: "hi", files: [{ uri: "data:image/png;base64,AAAA", name: "pasted.png" }] } } },
+      },
     )
     expect(live.queued[0]!.files).toEqual([{ name: "pasted.png", mime: "image/png", ref: { messageID: "i1", index: 0 } }])
     expect(JSON.stringify(live)).not.toContain("AAAA")

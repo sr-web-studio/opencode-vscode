@@ -1,16 +1,7 @@
 import { clip, firstLine } from "../format"
 import type { EventEnvelope } from "../api"
 import { withinDirectory } from "../paths"
-import {
-  isAttention,
-  type Notice,
-  type NoticeCommand,
-  type NoticeKind,
-  type Notifier,
-  type NotificationSettings,
-  type SessionMeta,
-  type UiState,
-} from "./types"
+import { isAttention, type Notice, type NoticeCommand, type NoticeKind, type Notifier, type NotificationSettings, type SessionMeta, type UiState } from "./types"
 
 export const COALESCE_MS = 5_000
 
@@ -120,12 +111,7 @@ export class NotificationEngine {
     await this.deps.notifier.dismiss(id)
   }
 
-  private async consider(
-    ev: EventEnvelope,
-    sessionID: string,
-    kind: NoticeKind,
-    opts: { meta?: SessionMeta; body: string; requestID?: string; failed?: boolean },
-  ): Promise<void> {
+  private async consider(ev: EventEnvelope, sessionID: string, kind: NoticeKind, opts: { meta?: SessionMeta; body: string; requestID?: string; failed?: boolean }): Promise<void> {
     if (!sessionID) {
       this.drop(kind, "-", "the event has no session id")
       return
@@ -167,18 +153,15 @@ export class NotificationEngine {
       kind,
       sessionID,
       severity: isAttention(kind) ? "warning" : "info",
-      title:
-        kind === "permission"
-          ? `${title} needs permission`
-          : kind === "question"
-            ? `${title} has a question`
-            : bad
-              ? `${title} failed`
-              : `${title} finished`,
+      title: kind === "permission" ? `${title} needs permission` : kind === "question" ? `${title} has a question` : bad ? `${title} failed` : `${title} finished`,
       body: opts.body,
       actions:
         kind === "permission"
-          ? [{ id: "open", label: "Open" }, { id: "allow", label: "Allow" }, { id: "deny", label: "Deny" }]
+          ? [
+              { id: "open", label: "Open" },
+              { id: "allow", label: "Allow" },
+              { id: "deny", label: "Deny" },
+            ]
           : [{ id: "open", label: "Open" }],
       requestID: opts.requestID,
       directory: dir,

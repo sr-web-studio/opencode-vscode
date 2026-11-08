@@ -106,10 +106,7 @@ export function pickWindows(candidates: WindowCandidate[], who: WindowIdentity, 
 /* ---------------------------------------------------- Windows helper protocol */
 
 /** One line of JSON per request on the helper's stdin, one line per answer on its stdout. */
-export type HelperRequest =
-  | { id: number; op: "windows"; pid: number }
-  | { id: number; op: "flash"; hwnds: number[] }
-  | { id: number; op: "quit" }
+export type HelperRequest = { id: number; op: "windows"; pid: number } | { id: number; op: "flash"; hwnds: number[] } | { id: number; op: "quit" }
 
 export type HelperWindow = { h: number; p: number; t: string }
 
@@ -174,16 +171,7 @@ const asArgument = (s: string): string => (s === "" || s.startsWith("-") ? ` ${s
  * so quotes, backslashes and any language need no escaping.
  */
 export function osascriptArgs(title: string, body: string): string[] {
-  return [
-    "-e",
-    "on run argv",
-    "-e",
-    "display notification (item 2 of argv) with title (item 1 of argv)",
-    "-e",
-    "end run",
-    asArgument(clip(title, 80)),
-    asArgument(clip(body, 240)),
-  ]
+  return ["-e", "on run argv", "-e", "display notification (item 2 of argv) with title (item 1 of argv)", "-e", "end run", asArgument(clip(title, 80)), asArgument(clip(body, 240))]
 }
 
 /** `notify-send` arguments; `--` keeps text that starts with "-" from being read as an option. */

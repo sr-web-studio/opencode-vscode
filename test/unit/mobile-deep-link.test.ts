@@ -17,7 +17,17 @@ describe("parseDeepLink: opencode-mobile://session/<sessionID>?server=<serverId>
     expect(parseDeepLink("opencode-mobile://session/ses_1?server=")).toEqual({ sessionID: "ses_1", serverId: undefined })
   })
   test("anything else is undefined", () => {
-    for (const raw of [undefined, null, "", "https://x/session/ses_1", "opencode-mobile://project/ses_1", "opencode-mobile://session/", "opencode-mobile://session/a b", "opencode-mobile://session/../etc", "opencode-mobile://session/%E0%A4%A"]) {
+    for (const raw of [
+      undefined,
+      null,
+      "",
+      "https://x/session/ses_1",
+      "opencode-mobile://project/ses_1",
+      "opencode-mobile://session/",
+      "opencode-mobile://session/a b",
+      "opencode-mobile://session/../etc",
+      "opencode-mobile://session/%E0%A4%A",
+    ]) {
       expect(parseDeepLink(raw)).toBeUndefined()
     }
   })

@@ -14,7 +14,14 @@
   import Markdown from "./Markdown.svelte"
   import StepList from "./StepList.svelte"
 
-  let { turn: raw, last, firstOfDay, cwd, settings, permissions }: { turn: TurnView; last: boolean; firstOfDay: boolean; cwd: string; settings: ViewSettings; permissions: Map<string, PermissionRequest> } = $props()
+  let {
+    turn: raw,
+    last,
+    firstOfDay,
+    cwd,
+    settings,
+    permissions,
+  }: { turn: TurnView; last: boolean; firstOfDay: boolean; cwd: string; settings: ViewSettings; permissions: Map<string, PermissionRequest> } = $props()
   const store = useStore()
   const view = useTranscript()
 
@@ -59,8 +66,8 @@
             disabled={running}
             title={running ? "Stop the session first" : "Revert to here"}
             aria-label={running ? "Revert to here (stop the session first)" : "Revert to here"}
-            onclick={() => store.bridge.confirmRevert(turn.user!.id)}
-          ><Codicon name="discard" /></button>
+            onclick={() => store.bridge.confirmRevert(turn.user!.id)}><Codicon name="discard" /></button
+          >
         {/if}
         {#if turn.user.text}<div class="text">{turn.user.text}</div>{/if}
         {#if turn.user.files?.length}<SentFiles files={turn.user.files} />{/if}
@@ -74,12 +81,22 @@
     <div class="foldrow">
       {#if folded}
         <button class="fold muted" bind:this={foldButton} onclick={() => keepAnchored(foldButton ?? null, () => (userOpen = !(userOpen ?? needsAttention)))} aria-expanded={expanded}>
-          <Codicon name={expanded ? "chevron-down" : "chevron-right"} /> {label}
+          <Codicon name={expanded ? "chevron-down" : "chevron-right"} />
+          {label}
         </button>
       {/if}
       {#if changes.length > 0}
-        <button class="link changes" onclick={() => store.bridge.openChanges(changes.map((c) => ({ file: c.file, patches: c.patches })), `OpenCode changes (${changes.length} ${changes.length === 1 ? "file" : "files"})`)} title="Open every file this turn changed in one diff view">
-          <Codicon name="diff-multiple" /> {changesLabel(changes.length)}
+        <button
+          class="link changes"
+          onclick={() =>
+            store.bridge.openChanges(
+              changes.map((c) => ({ file: c.file, patches: c.patches })),
+              `OpenCode changes (${changes.length} ${changes.length === 1 ? "file" : "files"})`,
+            )}
+          title="Open every file this turn changed in one diff view"
+        >
+          <Codicon name="diff-multiple" />
+          {changesLabel(changes.length)}
         </button>
       {/if}
     </div>
@@ -98,26 +115,106 @@
 
 <style>
   /* Turns are ~40px apart with a hairline halfway: the divider sits in the gap, half above and half below. */
-  .turn { position: relative; display: flex; flex-direction: column; gap: 0.5em; padding-bottom: calc(var(--oc-turn-gap) / 2); margin-bottom: calc(var(--oc-turn-gap) / 2); border-bottom: 1px solid var(--oc-hairline); }
-  .turn:last-child { border-bottom-color: transparent; }
-  .turn.compaction { gap: 0.2em; }
+  .turn {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5em;
+    padding-bottom: calc(var(--oc-turn-gap) / 2);
+    margin-bottom: calc(var(--oc-turn-gap) / 2);
+    border-bottom: 1px solid var(--oc-hairline);
+  }
+  .turn:last-child {
+    border-bottom-color: transparent;
+  }
+  .turn.compaction {
+    gap: 0.2em;
+  }
   /* The prompt is a bubble that leans right: indented by 15% (at least 32px) while the agent uses the full width. */
-  .uwrap { margin-left: max(32px, 15%); margin-bottom: 4px; }
-  .utime { text-align: right; font-size: 0.85em; line-height: 1.4; margin: 0 2px 2px; opacity: 0; transition: opacity 0.12s; }
-  .uwrap:hover .utime, .uwrap:focus-within .utime, .utime.always { opacity: 1; }
-  .user { position: relative; padding: 10px 14px; border: 1px solid var(--oc-user-line); background: var(--oc-user-bg); border-radius: 8px; }
-  .text { white-space: pre-wrap; word-break: break-word; }
+  .uwrap {
+    margin-left: max(32px, 15%);
+    margin-bottom: 4px;
+  }
+  .utime {
+    text-align: right;
+    font-size: 0.85em;
+    line-height: 1.4;
+    margin: 0 2px 2px;
+    opacity: 0;
+    transition: opacity 0.12s;
+  }
+  .uwrap:hover .utime,
+  .uwrap:focus-within .utime,
+  .utime.always {
+    opacity: 1;
+  }
+  .user {
+    position: relative;
+    padding: 10px 14px;
+    border: 1px solid var(--oc-user-line);
+    background: var(--oc-user-bg);
+    border-radius: 8px;
+  }
+  .text {
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
   /* On the bubble's top-left corner, only on hover. */
-  .revert { position: absolute; top: -10px; left: -10px; display: inline-flex; align-items: center; padding: 0.15em 0.3em; border-radius: 50%; color: var(--oc-muted); background: var(--oc-popover); border: 1px solid var(--oc-hairline); opacity: 0; }
-  .user:hover .revert, .revert:focus-visible { opacity: 1; }
-  @media (hover: none) { .revert, .utime { opacity: 1; } }
-  .revert:hover:not(:disabled) { color: var(--oc-fg); background: var(--oc-hover); }
-  .foldrow { display: flex; flex-wrap: wrap; align-items: center; gap: 0.2em 1.2em; }
-  .changes { display: inline-flex; align-items: center; gap: 0.35em; }
-  .fold { align-self: flex-start; display: inline-flex; align-items: center; gap: 0.35em; }
-  .fold:hover { color: var(--oc-fg); }
-  .answer { margin-top: 0.2em; }
-  .stamp { margin-top: -0.1em; }
+  .revert {
+    position: absolute;
+    top: -10px;
+    left: -10px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0.15em 0.3em;
+    border-radius: 50%;
+    color: var(--oc-muted);
+    background: var(--oc-popover);
+    border: 1px solid var(--oc-hairline);
+    opacity: 0;
+  }
+  .user:hover .revert,
+  .revert:focus-visible {
+    opacity: 1;
+  }
+  @media (hover: none) {
+    .revert,
+    .utime {
+      opacity: 1;
+    }
+  }
+  .revert:hover:not(:disabled) {
+    color: var(--oc-fg);
+    background: var(--oc-hover);
+  }
+  .foldrow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.2em 1.2em;
+  }
+  .changes {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35em;
+  }
+  .fold {
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35em;
+  }
+  .fold:hover {
+    color: var(--oc-fg);
+  }
+  .answer {
+    margin-top: 0.2em;
+  }
+  .stamp {
+    margin-top: -0.1em;
+  }
   /* About 12px between the bubble and the agent's part (the 4px margin plus the 0.5em gap). */
-  .uwrap + :global(*) { margin-top: 0.4em; }
+  .uwrap + :global(*) {
+    margin-top: 0.4em;
+  }
 </style>

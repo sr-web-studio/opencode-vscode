@@ -28,9 +28,34 @@
 </div>
 
 <style>
-  .setup { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 0.4em; padding: 1.5em; }
-  .h { font-weight: 600; font-size: 1.1em; }
-  p { margin: 0; max-width: 26em; }
-  .links { display: flex; gap: 1.2em; margin-top: 0.8em; flex-wrap: wrap; justify-content: center; }
-  .muted { display: flex; align-items: center; gap: 0.5em; }
+  .setup {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 0.4em;
+    padding: 1.5em;
+  }
+  .h {
+    font-weight: 600;
+    font-size: 1.1em;
+  }
+  p {
+    margin: 0;
+    max-width: 26em;
+  }
+  .links {
+    display: flex;
+    gap: 1.2em;
+    margin-top: 0.8em;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .muted {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+  }
 </style>

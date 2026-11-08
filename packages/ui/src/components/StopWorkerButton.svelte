@@ -44,14 +44,55 @@
 {/if}
 
 <style>
-  .ico { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 24px; min-height: 24px; border-radius: 4px; }
-  .ico.reveal { opacity: 0; }
-  .ico.reveal.pending { opacity: 1; }
-  :global(.row:hover) .ico.reveal, :global(.row:focus-within) .ico.reveal { opacity: 1; }
-  .ico:hover:not(:disabled) { color: var(--oc-error); background: var(--oc-hover); }
-  .ico:disabled { cursor: default; }
-  @media (hover: none) { .ico.reveal { opacity: 1; } }
-  .lbl { flex: none; display: inline-flex; align-items: center; gap: 0.35em; margin-left: 0.4em; padding: 0.1em 0.55em; border-radius: 4px; border: 1px solid var(--oc-hairline); font-weight: 400; font-size: 0.95em; }
-  .lbl:hover:not(:disabled) { color: var(--oc-error); background: var(--oc-hover); }
-  .lbl:disabled { cursor: default; opacity: 0.7; }
+  .ico {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    min-height: 24px;
+    border-radius: 4px;
+  }
+  .ico.reveal {
+    opacity: 0;
+  }
+  .ico.reveal.pending {
+    opacity: 1;
+  }
+  :global(.row:hover) .ico.reveal,
+  :global(.row:focus-within) .ico.reveal {
+    opacity: 1;
+  }
+  .ico:hover:not(:disabled) {
+    color: var(--oc-error);
+    background: var(--oc-hover);
+  }
+  .ico:disabled {
+    cursor: default;
+  }
+  @media (hover: none) {
+    .ico.reveal {
+      opacity: 1;
+    }
+  }
+  .lbl {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35em;
+    margin-left: 0.4em;
+    padding: 0.1em 0.55em;
+    border-radius: 4px;
+    border: 1px solid var(--oc-hairline);
+    font-weight: 400;
+    font-size: 0.95em;
+  }
+  .lbl:hover:not(:disabled) {
+    color: var(--oc-error);
+    background: var(--oc-hover);
+  }
+  .lbl:disabled {
+    cursor: default;
+    opacity: 0.7;
+  }
 </style>

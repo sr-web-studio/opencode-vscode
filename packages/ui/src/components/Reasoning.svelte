@@ -16,8 +16,21 @@
 </div>
 
 <style>
-  .reasoning { font-size: 0.95em; }
-  .reasoning button { display: inline-flex; align-items: center; gap: 0.35em; min-height: 28px; }
-  .reasoning button:hover { color: var(--oc-fg); }
-  .body { white-space: pre-wrap; margin: 0.2em 0 0.4em 1.2em; font-style: italic; }
+  .reasoning {
+    font-size: 0.95em;
+  }
+  .reasoning button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35em;
+    min-height: 28px;
+  }
+  .reasoning button:hover {
+    color: var(--oc-fg);
+  }
+  .body {
+    white-space: pre-wrap;
+    margin: 0.2em 0 0.4em 1.2em;
+    font-style: italic;
+  }
 </style>

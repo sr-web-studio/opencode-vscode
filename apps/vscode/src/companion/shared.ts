@@ -14,9 +14,7 @@ export interface Recorder {
 export type SessionStats = { frames: number; peak: number; answers: number; device?: string }
 
 export type SessionUpdate =
-  | { kind: "listening"; device?: string }
-  | { kind: "heard"; final: string; partial: string }
-  | { kind: "done"; final: string; error?: string; fix?: VoiceFix; stats?: SessionStats }
+  { kind: "listening"; device?: string } | { kind: "heard"; final: string; partial: string } | { kind: "done"; final: string; error?: string; fix?: VoiceFix; stats?: SessionStats }
 
 /**
  * A blocked or muted microphone delivers (near) digital zeros; any real microphone has a noise floor above this.

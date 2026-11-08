@@ -14,11 +14,41 @@
 </span>
 
 <style>
-  .chip { display: inline-flex; align-items: center; gap: 0.4em; max-width: 100%; padding: 0.15em 0.5em; border: 1px solid var(--oc-hairline); border-radius: 6px; background: var(--oc-popover); font-size: 0.9em; }
-  .chip.warn { border-color: var(--oc-amber); }
-  .chip.warn :global(.codicon-warning) { color: var(--oc-amber); }
-  img { width: 24px; height: 24px; object-fit: cover; border-radius: 3px; flex: none; }
-  .n { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .x { display: inline-flex; align-items: center; }
-  .x:hover { color: var(--oc-fg); }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+    max-width: 100%;
+    padding: 0.15em 0.5em;
+    border: 1px solid var(--oc-hairline);
+    border-radius: 6px;
+    background: var(--oc-popover);
+    font-size: 0.9em;
+  }
+  .chip.warn {
+    border-color: var(--oc-amber);
+  }
+  .chip.warn :global(.codicon-warning) {
+    color: var(--oc-amber);
+  }
+  img {
+    width: 24px;
+    height: 24px;
+    object-fit: cover;
+    border-radius: 3px;
+    flex: none;
+  }
+  .n {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .x {
+    display: inline-flex;
+    align-items: center;
+  }
+  .x:hover {
+    color: var(--oc-fg);
+  }
 </style>

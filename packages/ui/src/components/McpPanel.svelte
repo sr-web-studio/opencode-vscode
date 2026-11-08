@@ -42,7 +42,10 @@
     if (t && !panel?.contains(t) && !t.closest(".mcp-keep")) close()
   }
   function key(e: KeyboardEvent) {
-    if (e.key === "Escape" && !e.defaultPrevented) { e.preventDefault(); close() }
+    if (e.key === "Escape" && !e.defaultPrevented) {
+      e.preventDefault()
+      close()
+    }
   }
 </script>
 
@@ -87,8 +90,8 @@
                 aria-label="{r.title || r.name} {a.toggle === 'disconnect' ? 'on' : 'off'}"
                 disabled={busy(r)}
                 title="{a.toggle === 'disconnect' ? 'Turn off' : 'Turn on'}. {TOGGLE_NOTE}"
-                onclick={() => act("toggle", r.name)}
-              ><span class="knob"></span></button>
+                onclick={() => act("toggle", r.name)}><span class="knob"></span></button
+              >
               {#if busy(r)}<Codicon name="loading" spin />{/if}
             {/if}
             {#if a.signIn && caps.mcpSignIn !== false}<button class="btn" disabled={!!mcp.signIn} onclick={() => act("signIn", r.name)}><Codicon name="sign-in" /> Sign in</button>{/if}
@@ -103,44 +106,204 @@
   {#if caps.editConfig !== false}
     <div class="foot">
       <!-- mousedown is cancelled so the click never moves focus off the prompt box; the editor that opens takes it. -->
-      <button class="link edit" onmousedown={(e) => e.preventDefault()} onclick={() => store.bridge.postToHost({ type: "host", request: { type: "openGlobalConfig" } })} title="Open your global OpenCode config file in the editor. This extension never edits it."><Codicon name="settings-gear" /> Edit config</button>
+      <button
+        class="link edit"
+        onmousedown={(e) => e.preventDefault()}
+        onclick={() => store.bridge.postToHost({ type: "host", request: { type: "openGlobalConfig" } })}
+        title="Open your global OpenCode config file in the editor. This extension never edits it."><Codicon name="settings-gear" /> Edit config</button
+      >
     </div>
   {/if}
 </div>
 
 <style>
-  .panel { position: absolute; z-index: 25; left: 0; right: 0; bottom: calc(100% + 4px); max-height: 60vh; display: flex; flex-direction: column; outline: none; background: var(--oc-popover); border: 1px solid var(--oc-hairline); border-radius: 6px; box-shadow: 0 4px 16px var(--vscode-widget-shadow); }
-  .head { display: flex; align-items: center; gap: 0.2em; padding: 0.3em 0.4em 0.2em 0.8em; }
-  .title { font-weight: 600; }
-  .grow { flex: 1; }
-  .icon { display: inline-flex; padding: 0.25em; border-radius: 4px; }
-  .icon:hover { color: var(--oc-fg); background: var(--oc-hover); }
-  .msg { padding: 0.2em 0.8em 0.3em; font-size: 0.95em; overflow-wrap: anywhere; }
-  .msg.warn { color: var(--oc-amber); }
-  ul { list-style: none; margin: 0; padding: 0 0 0.3em; overflow-y: auto; min-height: 0; }
-  .row { padding: 0.35em 0.8em; border-top: 1px solid var(--oc-hairline); display: flex; flex-direction: column; gap: 0.2em; }
-  .line { display: flex; align-items: baseline; gap: 0.5em; min-width: 0; }
-  .name { font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .st { font-size: 0.9em; white-space: nowrap; color: var(--oc-muted); }
-  .st.connected { color: var(--oc-ok); }
-  .st.failed { color: var(--oc-error); }
-  .st.needs_auth { color: var(--oc-amber); }
-  .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; align-self: center; background: var(--oc-muted); }
-  .dot.connected { background: var(--oc-ok); }
-  .dot.failed { background: var(--oc-error); }
-  .dot.needs_auth { background: var(--oc-amber); }
-  .dot.pending { background: transparent; border: 1.5px solid var(--oc-muted); border-top-color: transparent; animation: oc-spin 0.9s linear infinite; }
-  .dot.disabled { background: transparent; border: 1.5px solid var(--oc-muted); }
-  .detail { padding-left: calc(8px + 0.5em); overflow-wrap: anywhere; white-space: pre-wrap; }
-  .acts { display: flex; align-items: center; gap: 0.6em; flex-wrap: wrap; padding-left: calc(8px + 0.5em); min-height: 22px; }
-  .btn { display: inline-flex; align-items: center; gap: 0.3em; padding: 0.05em 0.6em; border: 1px solid var(--oc-hairline); border-radius: 4px; }
-  .btn:hover:not(:disabled) { background: var(--oc-hover); }
-  .switch { position: relative; width: 30px; height: 16px; border-radius: 8px; border: 1px solid var(--oc-hairline); background: var(--vscode-input-background); flex: none; }
-  .switch[aria-checked="true"] { background: var(--vscode-button-background); border-color: transparent; }
-  .knob { position: absolute; top: 2px; left: 2px; width: 10px; height: 10px; border-radius: 50%; background: var(--oc-muted); transition: transform 0.12s; }
-  .switch[aria-checked="true"] .knob { transform: translateX(14px); background: var(--vscode-button-foreground); }
-  @media (prefers-reduced-motion: reduce) { .knob { transition: none; } .dot.pending { animation-duration: 3s; } }
-  .empty { padding: 0.5em 0.8em; }
-  .foot { padding: 0.25em 0.8em 0.35em; border-top: 1px solid var(--oc-hairline); font-size: 0.95em; }
-  .edit { display: inline-flex; align-items: center; gap: 0.35em; padding: 0; background: none; border: 0; font: inherit; }
+  .panel {
+    position: absolute;
+    z-index: 25;
+    left: 0;
+    right: 0;
+    bottom: calc(100% + 4px);
+    max-height: 60vh;
+    display: flex;
+    flex-direction: column;
+    outline: none;
+    background: var(--oc-popover);
+    border: 1px solid var(--oc-hairline);
+    border-radius: 6px;
+    box-shadow: 0 4px 16px var(--vscode-widget-shadow);
+  }
+  .head {
+    display: flex;
+    align-items: center;
+    gap: 0.2em;
+    padding: 0.3em 0.4em 0.2em 0.8em;
+  }
+  .title {
+    font-weight: 600;
+  }
+  .grow {
+    flex: 1;
+  }
+  .icon {
+    display: inline-flex;
+    padding: 0.25em;
+    border-radius: 4px;
+  }
+  .icon:hover {
+    color: var(--oc-fg);
+    background: var(--oc-hover);
+  }
+  .msg {
+    padding: 0.2em 0.8em 0.3em;
+    font-size: 0.95em;
+    overflow-wrap: anywhere;
+  }
+  .msg.warn {
+    color: var(--oc-amber);
+  }
+  ul {
+    list-style: none;
+    margin: 0;
+    padding: 0 0 0.3em;
+    overflow-y: auto;
+    min-height: 0;
+  }
+  .row {
+    padding: 0.35em 0.8em;
+    border-top: 1px solid var(--oc-hairline);
+    display: flex;
+    flex-direction: column;
+    gap: 0.2em;
+  }
+  .line {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5em;
+    min-width: 0;
+  }
+  .name {
+    font-weight: 600;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .st {
+    font-size: 0.9em;
+    white-space: nowrap;
+    color: var(--oc-muted);
+  }
+  .st.connected {
+    color: var(--oc-ok);
+  }
+  .st.failed {
+    color: var(--oc-error);
+  }
+  .st.needs_auth {
+    color: var(--oc-amber);
+  }
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex: none;
+    align-self: center;
+    background: var(--oc-muted);
+  }
+  .dot.connected {
+    background: var(--oc-ok);
+  }
+  .dot.failed {
+    background: var(--oc-error);
+  }
+  .dot.needs_auth {
+    background: var(--oc-amber);
+  }
+  .dot.pending {
+    background: transparent;
+    border: 1.5px solid var(--oc-muted);
+    border-top-color: transparent;
+    animation: oc-spin 0.9s linear infinite;
+  }
+  .dot.disabled {
+    background: transparent;
+    border: 1.5px solid var(--oc-muted);
+  }
+  .detail {
+    padding-left: calc(8px + 0.5em);
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+  }
+  .acts {
+    display: flex;
+    align-items: center;
+    gap: 0.6em;
+    flex-wrap: wrap;
+    padding-left: calc(8px + 0.5em);
+    min-height: 22px;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3em;
+    padding: 0.05em 0.6em;
+    border: 1px solid var(--oc-hairline);
+    border-radius: 4px;
+  }
+  .btn:hover:not(:disabled) {
+    background: var(--oc-hover);
+  }
+  .switch {
+    position: relative;
+    width: 30px;
+    height: 16px;
+    border-radius: 8px;
+    border: 1px solid var(--oc-hairline);
+    background: var(--vscode-input-background);
+    flex: none;
+  }
+  .switch[aria-checked="true"] {
+    background: var(--vscode-button-background);
+    border-color: transparent;
+  }
+  .knob {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--oc-muted);
+    transition: transform 0.12s;
+  }
+  .switch[aria-checked="true"] .knob {
+    transform: translateX(14px);
+    background: var(--vscode-button-foreground);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .knob {
+      transition: none;
+    }
+    .dot.pending {
+      animation-duration: 3s;
+    }
+  }
+  .empty {
+    padding: 0.5em 0.8em;
+  }
+  .foot {
+    padding: 0.25em 0.8em 0.35em;
+    border-top: 1px solid var(--oc-hairline);
+    font-size: 0.95em;
+  }
+  .edit {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35em;
+    padding: 0;
+    background: none;
+    border: 0;
+    font: inherit;
+  }
 </style>

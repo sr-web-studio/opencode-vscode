@@ -29,7 +29,15 @@ describe("native hand-over", () => {
 
 describe("status", () => {
   test("parses the plugin answer defensively", () => {
-    const s = parseStatus({ running: true, connected: 1, servers: 2, lastEventAt: 5, notificationsAllowed: false, batteryUnrestricted: true, watching: [{ id: "a", name: "A", connected: true }, { nope: 1 }] })
+    const s = parseStatus({
+      running: true,
+      connected: 1,
+      servers: 2,
+      lastEventAt: 5,
+      notificationsAllowed: false,
+      batteryUnrestricted: true,
+      watching: [{ id: "a", name: "A", connected: true }, { nope: 1 }],
+    })
     expect(s).toEqual({ running: true, connected: 1, servers: 2, lastEventAt: 5, notificationsAllowed: false, batteryUnrestricted: true, watching: [{ id: "a", name: "A", connected: true }] })
     expect(parseStatus(null)).toEqual(NO_STATUS)
   })

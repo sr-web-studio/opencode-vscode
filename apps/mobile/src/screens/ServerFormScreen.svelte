@@ -77,7 +77,12 @@
 
   async function remove() {
     if (!existing) return
-    const ok = await model.confirm({ title: `Remove “${existing.name}”?`, detail: "The saved address and password are deleted from this phone. Nothing changes on the server.", confirm: "Remove", danger: true })
+    const ok = await model.confirm({
+      title: `Remove “${existing.name}”?`,
+      detail: "The saved address and password are deleted from this phone. Nothing changes on the server.",
+      confirm: "Remove",
+      danger: true,
+    })
     if (!ok) return
     await model.removeProfile(existing.id)
     model.close(key)
@@ -132,18 +137,51 @@
 <div class="footer">
   {#if result}<div class="note" class:err={!result.ok} class:ok={result.ok} role="status">{result.text}</div>{/if}
   <div class="actions">
-    <button class="btn quiet" onclick={test} disabled={busy !== "" || !url.trim()}>{#if busy === "test"}<Codicon name="loading" spin />{/if} Test connection</button>
-    <button class="btn" onclick={save} disabled={busy !== "" || !url.trim()}>{#if busy === "save"}<Codicon name="loading" spin />{/if} Save and open</button>
+    <button class="btn quiet" onclick={test} disabled={busy !== "" || !url.trim()}
+      >{#if busy === "test"}<Codicon name="loading" spin />{/if} Test connection</button
+    >
+    <button class="btn" onclick={save} disabled={busy !== "" || !url.trim()}
+      >{#if busy === "save"}<Codicon name="loading" spin />{/if} Save and open</button
+    >
   </div>
 </div>
 
 <style>
-  .small { font-size: 0.85em; margin: 8px 0 14px; }
-  .pairing { margin-bottom: 8px; }
-  .or { font-size: 0.95em; font-weight: 600; margin: 22px 0 12px; color: var(--oc-muted); }
-  .footer { flex: none; max-height: 45%; overflow-y: auto; padding: 10px 16px 12px; border-top: 1px solid var(--oc-hairline); background: var(--vscode-editor-background); }
-  .actions { display: flex; flex-wrap: wrap; gap: 8px; }
-  .actions .btn { flex: 1; }
-  .del { margin-top: 10px; width: 100%; color: var(--oc-error); }
-  .note { margin-bottom: 10px; }
+  .small {
+    font-size: 0.85em;
+    margin: 8px 0 14px;
+  }
+  .pairing {
+    margin-bottom: 8px;
+  }
+  .or {
+    font-size: 0.95em;
+    font-weight: 600;
+    margin: 22px 0 12px;
+    color: var(--oc-muted);
+  }
+  .footer {
+    flex: none;
+    max-height: 45%;
+    overflow-y: auto;
+    padding: 10px 16px 12px;
+    border-top: 1px solid var(--oc-hairline);
+    background: var(--vscode-editor-background);
+  }
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .actions .btn {
+    flex: 1;
+  }
+  .del {
+    margin-top: 10px;
+    width: 100%;
+    color: var(--oc-error);
+  }
+  .note {
+    margin-bottom: 10px;
+  }
 </style>

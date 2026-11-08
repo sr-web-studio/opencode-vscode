@@ -12,7 +12,24 @@ describe("toolIcon", () => {
   test("every icon used exists in the bundled codicon font", () => {
     const csv = readFileSync(require.resolve("@vscode/codicons/dist/codicon.csv"), "utf8")
     const names = new Set(csv.split("\n").map((l) => l.split(",")[0]))
-    for (const tool of ["read", "write", "edit", "patch", "shell", "grep", "glob", "subagent", "question", "webfetch", "websearch", "skill", "execute", "todowrite", "experimental_image_generate", "other"]) {
+    for (const tool of [
+      "read",
+      "write",
+      "edit",
+      "patch",
+      "shell",
+      "grep",
+      "glob",
+      "subagent",
+      "question",
+      "webfetch",
+      "websearch",
+      "skill",
+      "execute",
+      "todowrite",
+      "experimental_image_generate",
+      "other",
+    ]) {
       expect(names.has(toolIcon(tool))).toBe(true)
     }
   })

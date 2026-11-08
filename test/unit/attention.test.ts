@@ -166,12 +166,7 @@ describe("osascript / notify-send arguments", () => {
 })
 
 describe("wmctrl", () => {
-  const out = [
-    "0x04600003  0 1234 laptop a.ts - api [SSH: box] - Visual Studio Code",
-    "0x04800007  1 5678 laptop Mozilla Firefox",
-    "0x05000001 -1 99 laptop ",
-    "garbage",
-  ].join("\n")
+  const out = ["0x04600003  0 1234 laptop a.ts - api [SSH: box] - Visual Studio Code", "0x04800007  1 5678 laptop Mozilla Firefox", "0x05000001 -1 99 laptop ", "garbage"].join("\n")
   test("parses ids, pids and titles with spaces", () => {
     expect(parseWmctrl(out)).toEqual([
       { id: "0x04600003", pid: 1234, title: "a.ts - api [SSH: box] - Visual Studio Code" },

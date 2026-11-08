@@ -22,7 +22,10 @@
 
 <div class="body view" class:zoomed>
   {#if failed}
-    <div class="center muted"><Codicon name="warning" /><p>This image is no longer available.</p></div>
+    <div class="center muted">
+      <Codicon name="warning" />
+      <p>This image is no longer available.</p>
+    </div>
   {:else if !src}
     <div class="center muted"><Codicon name="loading" spin /> Loading…</div>
   {:else}
@@ -31,9 +34,28 @@
 </div>
 
 <style>
-  .view { background: var(--vscode-editor-background); }
-  .pic { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 100%; padding: 8px; }
-  .pic img { max-width: 100%; max-height: calc(100vh - 120px); object-fit: contain; }
-  .zoomed .pic { display: block; width: max-content; }
-  .zoomed .pic img { max-width: none; max-height: none; }
+  .view {
+    background: var(--vscode-editor-background);
+  }
+  .pic {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 100%;
+    padding: 8px;
+  }
+  .pic img {
+    max-width: 100%;
+    max-height: calc(100vh - 120px);
+    object-fit: contain;
+  }
+  .zoomed .pic {
+    display: block;
+    width: max-content;
+  }
+  .zoomed .pic img {
+    max-width: none;
+    max-height: none;
+  }
 </style>

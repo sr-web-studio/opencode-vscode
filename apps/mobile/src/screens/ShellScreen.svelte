@@ -11,7 +11,7 @@
   /**
    * The output of a command the agent ran, read-only. It follows the command while it runs (the same pager the VS Code
    * terminal uses) and offers "Stop command", which asks first and then removes the shell on the server. That stops this
- * command only, like Ctrl+C in the VS Code terminal; the agent's turn goes on (the chat's own Stop ends it).
+   * command only, like Ctrl+C in the VS Code terminal; the agent's turn goes on (the chat's own Stop ends it).
    */
   let { directory, shellID, title, sessionID }: { directory: string; shellID: string; title?: string; sessionID?: string } = $props()
 
@@ -38,12 +38,27 @@
 
   const spans = $derived(ansiToSpans(text))
   const css = (s: AnsiSpan) =>
-    [s.fg ? `color:${cssColor(s.fg)}` : "", s.bg ? `background:${cssColor(s.bg)}` : "", s.bold ? "font-weight:700" : "", s.dim ? "opacity:.7" : "", s.italic ? "font-style:italic" : "", s.underline ? "text-decoration:underline" : ""]
+    [
+      s.fg ? `color:${cssColor(s.fg)}` : "",
+      s.bg ? `background:${cssColor(s.bg)}` : "",
+      s.bold ? "font-weight:700" : "",
+      s.dim ? "opacity:.7" : "",
+      s.italic ? "font-style:italic" : "",
+      s.underline ? "text-decoration:underline" : "",
+    ]
       .filter(Boolean)
       .join(";")
   const running = $derived(!status && !problem && !stopped)
   const verdict = $derived(
-    stopped || stopping || status?.status === "killed" ? "Stopped" : status?.status === "timeout" ? "Timed out" : status ? (status.exit === 0 ? "Finished" : `Exited with code ${status.exit ?? "?"}`) : "Running",
+    stopped || stopping || status?.status === "killed"
+      ? "Stopped"
+      : status?.status === "timeout"
+        ? "Timed out"
+        : status
+          ? status.exit === 0
+            ? "Finished"
+            : `Exited with code ${status.exit ?? "?"}`
+          : "Running",
   )
 
   async function scroll() {
@@ -150,17 +165,56 @@
 {/if}
 
 <div class="body term" bind:this={box} onscroll={onScroll}>
-  <pre>{#each spans as s, i (i)}{#if css(s)}<span style={css(s)}>{s.text}</span>{:else}{s.text}{/if}{/each}{#if running && !loading}<span class="cursor"> </span>{/if}</pre>
+  <pre>{#each spans as s, i (i)}{#if css(s)}<span style={css(s)}>{s.text}</span>{:else}{s.text}{/if}{/each}{#if running && !loading}<span class="cursor"></span>{/if}</pre>
   {#if !loading && !problem && text === "" && !running}<div class="center muted">The command printed nothing.</div>{/if}
 </div>
 
 <style>
-  .stopbtn { min-height: 40px; padding: 0 12px; }
-  .status { flex: none; padding: 6px 16px; font-size: 0.85em; border-bottom: 1px solid var(--oc-hairline); }
-  .hint { flex: none; padding: 6px 16px; font-size: 0.85em; border-bottom: 1px solid var(--oc-hairline); background: var(--oc-bubble); }
-  .term { background: var(--vscode-terminal-background); color: var(--vscode-terminal-foreground); padding: 10px 12px; }
-  pre { margin: 0; font-family: var(--vscode-editor-font-family); font-size: 12.5px; line-height: 1.45; white-space: pre-wrap; word-break: break-all; }
-  .cursor { display: inline-block; width: 0.6em; background: var(--vscode-terminal-foreground); opacity: 0.6; animation: blink 1s steps(2) infinite; }
-  @keyframes blink { 50% { opacity: 0; } }
-  @media (prefers-reduced-motion: reduce) { .cursor { animation: none; } }
+  .stopbtn {
+    min-height: 40px;
+    padding: 0 12px;
+  }
+  .status {
+    flex: none;
+    padding: 6px 16px;
+    font-size: 0.85em;
+    border-bottom: 1px solid var(--oc-hairline);
+  }
+  .hint {
+    flex: none;
+    padding: 6px 16px;
+    font-size: 0.85em;
+    border-bottom: 1px solid var(--oc-hairline);
+    background: var(--oc-bubble);
+  }
+  .term {
+    background: var(--vscode-terminal-background);
+    color: var(--vscode-terminal-foreground);
+    padding: 10px 12px;
+  }
+  pre {
+    margin: 0;
+    font-family: var(--vscode-editor-font-family);
+    font-size: 12.5px;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  .cursor {
+    display: inline-block;
+    width: 0.6em;
+    background: var(--vscode-terminal-foreground);
+    opacity: 0.6;
+    animation: blink 1s steps(2) infinite;
+  }
+  @keyframes blink {
+    50% {
+      opacity: 0;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .cursor {
+      animation: none;
+    }
+  }
 </style>

@@ -10,12 +10,24 @@ class FakeRecorder implements Recorder {
   stopped = false
   released = false
   private waiting: Array<(f: Int16Array) => void> = []
-  start() { this.started = true }
-  stop() { this.stopped = true }
-  release() { this.released = true }
-  getSelectedDevice() { return "Fake mic" }
-  read(): Promise<Int16Array> { return new Promise((r) => this.waiting.push(r)) }
-  frame(samples: number[] | Int16Array = [1000, -1000]) { this.waiting.shift()?.(samples instanceof Int16Array ? samples : new Int16Array(samples)) }
+  start() {
+    this.started = true
+  }
+  stop() {
+    this.stopped = true
+  }
+  release() {
+    this.released = true
+  }
+  getSelectedDevice() {
+    return "Fake mic"
+  }
+  read(): Promise<Int16Array> {
+    return new Promise((r) => this.waiting.push(r))
+  }
+  frame(samples: number[] | Int16Array = [1000, -1000]) {
+    this.waiting.shift()?.(samples instanceof Int16Array ? samples : new Int16Array(samples))
+  }
 }
 
 /**
@@ -30,7 +42,9 @@ class FakeStream implements LocalStream {
   resets = 0
   words: string[]
   atEndpoint = false
-  constructor(words: string[]) { this.words = [...words] }
+  constructor(words: string[]) {
+    this.words = [...words]
+  }
   accept(s: Float32Array) {
     this.accepts.push(s.length)
     this.accepted += s.length
@@ -39,11 +53,21 @@ class FakeStream implements LocalStream {
     if (w === "|") this.atEndpoint = true
     else if (w) this.text_ = this.text_ ? `${this.text_} ${w}` : w
   }
-  inputFinished() { this.finished = true }
+  inputFinished() {
+    this.finished = true
+  }
   decodeReady() {}
-  text() { return this.text_ }
-  endpoint() { return this.atEndpoint }
-  reset() { this.text_ = ""; this.atEndpoint = false; this.resets++ }
+  text() {
+    return this.text_
+  }
+  endpoint() {
+    return this.atEndpoint
+  }
+  reset() {
+    this.text_ = ""
+    this.atEndpoint = false
+    this.resets++
+  }
 }
 
 function setup(words: string[], extra: Partial<LocalSessionOptions> = {}, engineExtra: Partial<LocalEngine> = {}) {
@@ -56,12 +80,19 @@ function setup(words: string[], extra: Partial<LocalSessionOptions> = {}, engine
   let loadFail!: (e: unknown) => void
   const engine: LocalEngine = {
     stream,
-    offline: (a) => { offlineInputs.push(a.length); return `${stream.text_.split(" ").length} words!` },
+    offline: (a) => {
+      offlineInputs.push(a.length)
+      return `${stream.text_.split(" ").length} words!`
+    },
     ...engineExtra,
   }
   const s = new LocalDictationSession({
     recorder: () => rec,
-    load: () => new Promise((res, rej) => { loadNow = res; loadFail = rej }),
+    load: () =>
+      new Promise((res, rej) => {
+        loadNow = res
+        loadFail = rej
+      }),
     emit: (u) => updates.push(u),
     log: (l) => logs.push(l),
     ...extra,
@@ -76,10 +107,13 @@ describe("LocalDictationSession", () => {
   test("frames recorded while the models load are kept and fed after; `listening` comes only after loading", async () => {
     const { rec, stream, updates, loadNow } = setup(["a", "b"])
     expect(updates).toEqual([])
-    rec.frame([500, 500]); await wait()
-    rec.frame([500, 500]); await wait()
+    rec.frame([500, 500])
+    await wait()
+    rec.frame([500, 500])
+    await wait()
     expect(stream.accepted).toBe(0)
-    loadNow(); await wait()
+    loadNow()
+    await wait()
     expect(updates[0]).toEqual({ kind: "listening", device: "Fake mic" })
     expect(stream.accepts).toEqual([2, 2])
     expect(updates.at(-1)).toEqual({ kind: "heard", final: "", partial: "a b" })
@@ -87,8 +121,12 @@ describe("LocalDictationSession", () => {
 
   test("partials stream live; a pause re-decodes the segment offline and appends it to the final text", async () => {
     const { rec, stream, updates, offlineInputs, logs, loadNow } = setup(["এক", "দুই", "|", "তিন"])
-    loadNow(); await wait()
-    for (let i = 0; i < 4; i++) { rec.frame([800, 800, 800]); await wait() }
+    loadNow()
+    await wait()
+    for (let i = 0; i < 4; i++) {
+      rec.frame([800, 800, 800])
+      await wait()
+    }
     const heard = updates.filter((u) => u.kind === "heard")
     expect(heard.map((u) => u.kind === "heard" && `${u.final}|${u.partial}`)).toEqual(["|এক", "|এক দুই", "2 words!|", "2 words!| তিন"].map((x, i) => (i === 2 ? "2 words!|" : x)))
     expect(offlineInputs).toEqual([9]) // the audio of three frames, kept for the re-decode
@@ -99,10 +137,14 @@ describe("LocalDictationSession", () => {
 
   test("stop flushes: silence is fed, the stream is finished, the last segment is re-decoded, exactly one done", async () => {
     const { s, rec, stream, updates, offlineInputs, loadNow } = setup(["আমি", "যাই"], { tailSeconds: 0.5 })
-    loadNow(); await wait()
-    rec.frame([800, 800]); await wait()
-    rec.frame([800, 800]); await wait()
-    s.stop(); s.stop()
+    loadNow()
+    await wait()
+    rec.frame([800, 800])
+    await wait()
+    rec.frame([800, 800])
+    await wait()
+    s.stop()
+    s.stop()
     expect(rec.stopped).toBe(true)
     expect(stream.accepts.at(-1)).toBe(8000)
     expect(stream.finished).toBe(true)
@@ -111,25 +153,40 @@ describe("LocalDictationSession", () => {
     expect(updates.at(-1)).toMatchObject({ kind: "done", final: "2 words!", error: undefined, stats: { frames: 2, answers: 1 } })
     await wait(60)
     expect(rec.released).toBe(true)
-    rec.frame(); s.abort()
+    rec.frame()
+    s.abort()
     expect(dones(updates)).toHaveLength(1)
   })
 
   test("stop while the models still load: flushed right after loading, first words not lost", async () => {
     const { s, rec, updates, loadNow } = setup(["hi"])
-    rec.frame([900]); await wait()
+    rec.frame([900])
+    await wait()
     s.stop()
     expect(rec.stopped).toBe(true)
     expect(dones(updates)).toHaveLength(0)
-    loadNow(); await wait()
+    loadNow()
+    await wait()
     expect(updates.map((u) => u.kind)).toEqual(["listening", "heard", "heard", "done"])
     expect(updates.at(-1)).toMatchObject({ final: "1 words!" })
   })
 
   test("the offline model failing falls back to the streaming text", async () => {
-    const { s, rec, updates, logs, loadNow } = setup(["ক", "খ"], {}, { offline: () => { throw new Error("boom") } })
-    loadNow(); await wait()
-    rec.frame([700]); await wait(); rec.frame([700]); await wait()
+    const { s, rec, updates, logs, loadNow } = setup(
+      ["ক", "খ"],
+      {},
+      {
+        offline: () => {
+          throw new Error("boom")
+        },
+      },
+    )
+    loadNow()
+    await wait()
+    rec.frame([700])
+    await wait()
+    rec.frame([700])
+    await wait()
     s.stop()
     expect(updates.at(-1)).toMatchObject({ kind: "done", final: "ক খ", error: undefined })
     expect(logs.join("\n")).toContain("FAILED (boom)")
@@ -137,15 +194,20 @@ describe("LocalDictationSession", () => {
 
   test("an empty offline result falls back to the streaming text too", async () => {
     const { s, rec, updates, loadNow } = setup(["ক"], {}, { offline: () => "  " })
-    loadNow(); await wait(); rec.frame([700]); await wait()
+    loadNow()
+    await wait()
+    rec.frame([700])
+    await wait()
     s.stop()
     expect(updates.at(-1)).toMatchObject({ final: "ক" })
   })
 
   test("a segment without words (noise) adds nothing", async () => {
     const { s, rec, stream, updates, loadNow } = setup(["|"])
-    loadNow(); await wait()
-    rec.frame([700]); await wait()
+    loadNow()
+    await wait()
+    rec.frame([700])
+    await wait()
     expect(stream.resets).toBe(1) // default: an endpoint without words resets the stream
     s.stop()
     expect(updates.at(-1)).toMatchObject({ kind: "done", final: "" })
@@ -154,11 +216,15 @@ describe("LocalDictationSession", () => {
 
   test("multilingual engine (`resetOnSilence: false`): an endpoint without words keeps the stream, one with words still resets", async () => {
     const { s, rec, stream, updates, loadNow } = setup(["|", "hello", "|"], {}, { resetOnSilence: false })
-    loadNow(); await wait()
-    rec.frame([700]); await wait() // endpoint, no words: not reset
+    loadNow()
+    await wait()
+    rec.frame([700])
+    await wait() // endpoint, no words: not reset
     expect(stream.resets).toBe(0)
-    rec.frame([700]); await wait() // "hello"
-    rec.frame([700]); await wait() // endpoint with words: reset
+    rec.frame([700])
+    await wait() // "hello"
+    rec.frame([700])
+    await wait() // endpoint with words: reset
     expect(stream.resets).toBe(1)
     s.stop()
     expect(updates.at(-1)).toMatchObject({ kind: "done" })
@@ -166,13 +232,25 @@ describe("LocalDictationSession", () => {
 
   test("the engine's own stop tail is used (Nemotron 0.8 s); an explicit option wins; the default is 0.5 s", async () => {
     const a = setup(["x"], {}, { tailSeconds: 0.8 })
-    a.loadNow(); await wait(); a.rec.frame([700]); await wait(); a.s.stop()
+    a.loadNow()
+    await wait()
+    a.rec.frame([700])
+    await wait()
+    a.s.stop()
     expect(a.stream.accepts.at(-1)).toBe(12800)
     const b = setup(["x"], { tailSeconds: 0.5 }, { tailSeconds: 0.8 })
-    b.loadNow(); await wait(); b.rec.frame([700]); await wait(); b.s.stop()
+    b.loadNow()
+    await wait()
+    b.rec.frame([700])
+    await wait()
+    b.s.stop()
     expect(b.stream.accepts.at(-1)).toBe(8000)
     const c = setup(["x"])
-    c.loadNow(); await wait(); c.rec.frame([700]); await wait(); c.s.stop()
+    c.loadNow()
+    await wait()
+    c.rec.frame([700])
+    await wait()
+    c.s.stop()
     expect(c.stream.accepts.at(-1)).toBe(8000)
   })
 
@@ -187,9 +265,22 @@ describe("LocalDictationSession", () => {
   })
 
   test("a recognizer exception ends with one done and the Show Log fix", async () => {
-    const { rec, updates, loadNow } = setup([], {}, { stream: { ...new FakeStream([]), accept() { throw new Error("onnx failure") } } as unknown as LocalStream })
-    loadNow(); await wait()
-    rec.frame([700]); await wait()
+    const { rec, updates, loadNow } = setup(
+      [],
+      {},
+      {
+        stream: {
+          ...new FakeStream([]),
+          accept() {
+            throw new Error("onnx failure")
+          },
+        } as unknown as LocalStream,
+      },
+    )
+    loadNow()
+    await wait()
+    rec.frame([700])
+    await wait()
     expect(dones(updates)).toHaveLength(1)
     expect(updates.at(-1)).toMatchObject({ kind: "done", fix: "showLog", error: expect.stringContaining("onnx failure") })
   })
@@ -197,15 +288,28 @@ describe("LocalDictationSession", () => {
   test("a microphone that cannot open: one done, no loading", () => {
     const updates: SessionUpdate[] = []
     let loaded = false
-    new LocalDictationSession({ recorder: () => { throw new Error("no device") }, load: async () => { loaded = true; return {} as LocalEngine }, emit: (u) => updates.push(u) }).start()
+    new LocalDictationSession({
+      recorder: () => {
+        throw new Error("no device")
+      },
+      load: async () => {
+        loaded = true
+        return {} as LocalEngine
+      },
+      emit: (u) => updates.push(u),
+    }).start()
     expect(updates).toEqual([{ kind: "done", final: "", error: "Could not open the microphone: no device", stats: { frames: 0, peak: 0, answers: 0, device: undefined } }])
     expect(loaded).toBe(false)
   })
 
   test("a microphone that sends only zeros is reported within 2 s", async () => {
     const { rec, updates, loadNow } = setup([])
-    loadNow(); await wait()
-    for (let i = 0; i < 20; i++) { rec.frame([0, 0, 1]); await wait(1) }
+    loadNow()
+    await wait()
+    for (let i = 0; i < 20; i++) {
+      rec.frame([0, 0, 1])
+      await wait(1)
+    }
     expect(dones(updates)).toHaveLength(1)
     expect(updates.at(-1)).toMatchObject({ kind: "done", final: "", error: expect.stringContaining("not muted") })
     expect(rec.released || rec.stopped).toBe(true)
@@ -215,13 +319,17 @@ describe("LocalDictationSession", () => {
     let t = 0
     const { rec, updates, stream, loadNow } = setup(["x"], { idleMs: 1000, now: () => t })
     t = 5000 // the load took long
-    loadNow(); await wait()
-    rec.frame([700]); await wait() // hears "x": lastHeard = 5000
+    loadNow()
+    await wait()
+    rec.frame([700])
+    await wait() // hears "x": lastHeard = 5000
     t = 5500
-    rec.frame([700]); await wait()
+    rec.frame([700])
+    await wait()
     expect(rec.stopped).toBe(false)
     t = 6500
-    rec.frame([700]); await wait()
+    rec.frame([700])
+    await wait()
     expect(rec.stopped).toBe(true)
     expect(stream.finished).toBe(true)
     expect(dones(updates)).toHaveLength(1)
@@ -231,9 +339,11 @@ describe("LocalDictationSession", () => {
   test("the hard cap stops a long recording", async () => {
     let t = 0
     const { rec, updates, loadNow } = setup(["a"], { maxMs: 10_000, idleMs: 10 ** 9, now: () => t })
-    loadNow(); await wait()
+    loadNow()
+    await wait()
     t = 11_000
-    rec.frame([700]); await wait()
+    rec.frame([700])
+    await wait()
     expect(rec.stopped).toBe(true)
     expect(dones(updates)).toHaveLength(1)
   })
@@ -241,8 +351,12 @@ describe("LocalDictationSession", () => {
   test("audio without any words explains itself instead of ending quietly", async () => {
     let t = 0
     const { s, rec, updates, loadNow } = setup([], { now: () => t })
-    loadNow(); await wait()
-    for (let i = 0; i < 25; i++) { rec.frame([900, -700]); await wait(1) }
+    loadNow()
+    await wait()
+    for (let i = 0; i < 25; i++) {
+      rec.frame([900, -700])
+      await wait(1)
+    }
     t = 3000
     s.stop()
     expect(updates.at(-1)).toMatchObject({ kind: "done", final: "", error: expect.stringContaining("No words were heard"), stats: { frames: 25, peak: 900 } })
@@ -250,9 +364,11 @@ describe("LocalDictationSession", () => {
 
   test("abort ends once and later events change nothing", async () => {
     const { s, rec, updates, loadNow } = setup(["a"])
-    loadNow(); await wait()
+    loadNow()
+    await wait()
     s.abort()
-    rec.frame([700]); await wait()
+    rec.frame([700])
+    await wait()
     s.stop()
     expect(dones(updates)).toHaveLength(1)
   })

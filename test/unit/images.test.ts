@@ -18,7 +18,13 @@ describe("fileChips keeps refs, never the data", () => {
     expect(JSON.stringify(chips)).not.toContain(PNG)
   })
   test("a file:// source keeps its uri (the chip opens the file) and an image gets a ref too", () => {
-    const chips = fileChips([{ mime: "image/png", name: "shot.png", source: { type: "uri", uri: "file:///home/u/shot.png" } }, { mime: "text/plain", name: "notes.txt", source: { type: "uri", uri: "file:///home/u/notes.txt" } }], "m")!
+    const chips = fileChips(
+      [
+        { mime: "image/png", name: "shot.png", source: { type: "uri", uri: "file:///home/u/shot.png" } },
+        { mime: "text/plain", name: "notes.txt", source: { type: "uri", uri: "file:///home/u/notes.txt" } },
+      ],
+      "m",
+    )!
     expect(chips[0]).toEqual({ name: "shot.png", mime: "image/png", uri: "file:///home/u/shot.png", ref: { messageID: "m", index: 0 } })
     expect(chips[1]).toEqual({ name: "notes.txt", mime: "text/plain", uri: "file:///home/u/notes.txt" })
   })
@@ -35,7 +41,15 @@ describe("fileChips keeps refs, never the data", () => {
   test("history, queued and delivered turns carry refs; the state stays small", () => {
     const v = viewFromMessages([{ id: "u", type: "user", text: "look", files: [inline()] }] as any)
     expect(v.turns[0]!.user!.files).toEqual([{ name: "image.png", mime: "image/png", ref: { messageID: "u", index: 0 } }])
-    const live = applyEvent({ turns: [], queued: [], loaded: true }, { id: "e", type: "session.inbox.enqueued", created: 1, data: { inboxID: "i1", item: { type: "user", payload: { text: "hi", files: [{ uri: `data:image/png;base64,${PNG}`, name: "p.png" }] } } } })
+    const live = applyEvent(
+      { turns: [], queued: [], loaded: true },
+      {
+        id: "e",
+        type: "session.inbox.enqueued",
+        created: 1,
+        data: { inboxID: "i1", item: { type: "user", payload: { text: "hi", files: [{ uri: `data:image/png;base64,${PNG}`, name: "p.png" }] } } },
+      },
+    )
     expect(live.queued[0]!.files).toEqual([{ name: "p.png", mime: "image/png", ref: { messageID: "i1", index: 0 } }])
     const delivered = applyEvent(live, { id: "e2", type: "session.inbox.delivered", created: 2, data: { inboxID: "i1" } })
     expect(delivered.turns[0]!.user!.files).toEqual(live.queued[0]!.files)

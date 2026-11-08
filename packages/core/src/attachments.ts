@@ -88,8 +88,18 @@ export const attachmentFromUri = (id: string, uri: string, name?: string, mime?:
 })
 
 const MIME: Record<string, string> = {
-  png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", bmp: "image/bmp",
-  svg: "image/svg+xml", avif: "image/avif", pdf: "application/pdf", txt: "text/plain", md: "text/markdown", json: "application/json",
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+  bmp: "image/bmp",
+  svg: "image/svg+xml",
+  avif: "image/avif",
+  pdf: "application/pdf",
+  txt: "text/plain",
+  md: "text/markdown",
+  json: "application/json",
 }
 
 /** A guess from the extension, enough for the chip icon and the image warning. The server reads the real type. */
