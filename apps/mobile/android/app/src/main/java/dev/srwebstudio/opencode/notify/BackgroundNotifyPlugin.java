@@ -66,7 +66,7 @@ public final class BackgroundNotifyPlugin extends Plugin {
       WatchService.stop(ctx);
       return;
     }
-    WatchService.start(ctx, WatchService.ACTION_RELOAD);
+    WatchService.start(ctx, WatchService.RELOAD);
   }
 
   /** Which session is on screen (empty: none). The service does not notify for it while the app is in front. */

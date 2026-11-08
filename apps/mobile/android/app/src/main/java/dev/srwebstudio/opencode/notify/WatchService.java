@@ -24,10 +24,14 @@ import org.json.JSONObject;
  */
 public final class WatchService extends Service {
   private static final String TAG = "OccWatch";
-  public static final String ACTION_START = "dev.srwebstudio.opencode.notify.START";
-  public static final String ACTION_RELOAD = "dev.srwebstudio.opencode.notify.RELOAD";
+  /**
+   * Start reasons. The intent's action is the app's own package name plus one of these, so a test build and the released
+   * app never answer each other's broadcasts.
+   */
+  static final String START = "START";
+  static final String RELOAD = "RELOAD";
   /** Started by the {@link Watchdog} after the service was found dead. */
-  public static final String ACTION_WATCHDOG = "dev.srwebstudio.opencode.notify.WATCHDOG_START";
+  static final String WATCHDOG_START = "WATCHDOG_START";
 
   private static final class Watch {
     final EventStream stream;
@@ -61,8 +65,8 @@ public final class WatchService extends Service {
           });
 
   /** Start (or reload) the service from anywhere that is allowed to: the app in front, boot, package replaced. */
-  public static boolean start(Context context, String action) {
-    Intent i = new Intent(context, WatchService.class).setAction(action);
+  public static boolean start(Context context, String reason) {
+    Intent i = new Intent(context, WatchService.class).setAction(context.getPackageName() + ".notify." + reason);
     try {
       if (Build.VERSION.SDK_INT >= 26) context.startForegroundService(i);
       else context.startService(i);

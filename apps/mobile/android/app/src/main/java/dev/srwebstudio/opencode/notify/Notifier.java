@@ -118,7 +118,7 @@ public final class Notifier {
     PendingIntent pi = PendingIntent.getActivity(ctx, 0, i, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
     return new NotificationCompat.Builder(ctx, CH_CONNECTION)
         .setSmallIcon(R.drawable.ic_stat_opencode)
-        .setContentTitle("OpenCode")
+        .setContentTitle(ctx.getString(R.string.ongoing_title))
         .setContentText(text)
         .setContentIntent(pi)
         .setOngoing(ongoing)

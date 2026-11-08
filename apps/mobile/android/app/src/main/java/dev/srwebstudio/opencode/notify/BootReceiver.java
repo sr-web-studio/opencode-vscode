@@ -16,6 +16,6 @@ public final class BootReceiver extends BroadcastReceiver {
     if (!Intent.ACTION_BOOT_COMPLETED.equals(a) && !Intent.ACTION_MY_PACKAGE_REPLACED.equals(a)) return;
     Vault vault = new Vault(context);
     if (!vault.loadSettings().enabled || vault.loadProfiles().isEmpty()) return;
-    WatchService.start(context, WatchService.ACTION_START);
+    WatchService.start(context, WatchService.START);
   }
 }

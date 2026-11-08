@@ -9,7 +9,8 @@
     "build": "vite build",
     "typecheck": "svelte-check --tsconfig tsconfig.json",
     "android:sync": "vite build && cap sync android",
-    "apk": "bun run android:sync && cd android && ./gradlew assembleDebug"
+    "apk": "bun run android:sync && cd android && ./gradlew assembleDebug",
+    "apk:test": "bun run android:sync && cd android && ./gradlew assembleRelease"
   },
   "dependencies": {
     "@aparajita/capacitor-secure-storage": "8.0.1",
