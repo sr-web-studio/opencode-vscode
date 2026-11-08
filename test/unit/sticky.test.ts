@@ -20,24 +20,70 @@ describe("promptPosition", () => {
 describe("currentPrompt", () => {
   const order = ["a", "b", "c", "d"]
   test("the last prompt that is above the top edge", () => {
-    expect(currentPrompt(order, pos([["a", "above"], ["b", "above"], ["c", "visible"], ["d", "below"]]))).toBe("b")
+    expect(
+      currentPrompt(
+        order,
+        pos([
+          ["a", "above"],
+          ["b", "above"],
+          ["c", "visible"],
+          ["d", "below"],
+        ]),
+      ),
+    ).toBe("b")
   })
   test("all above: the newest one", () => {
-    expect(currentPrompt(order, pos([["a", "above"], ["b", "above"], ["c", "above"], ["d", "above"]]))).toBe("d")
+    expect(
+      currentPrompt(
+        order,
+        pos([
+          ["a", "above"],
+          ["b", "above"],
+          ["c", "above"],
+          ["d", "above"],
+        ]),
+      ),
+    ).toBe("d")
   })
   test("nothing scrolled out: no bar", () => {
-    expect(currentPrompt(order, pos([["a", "visible"], ["b", "below"], ["c", "below"], ["d", "below"]]))).toBeUndefined()
+    expect(
+      currentPrompt(
+        order,
+        pos([
+          ["a", "visible"],
+          ["b", "below"],
+          ["c", "below"],
+          ["d", "below"],
+        ]),
+      ),
+    ).toBeUndefined()
   })
   test("a visible prompt hides the bar even when an older one is above", () => {
     // The newest visible prompt sits below the older "above" one, so the bar shows the older one only while its turn is under the edge.
-    expect(currentPrompt(order, pos([["a", "above"], ["b", "visible"]]))).toBe("a")
+    expect(
+      currentPrompt(
+        order,
+        pos([
+          ["a", "above"],
+          ["b", "visible"],
+        ]),
+      ),
+    ).toBe("a")
   })
   test("unknown positions are skipped; an empty list gives nothing", () => {
     expect(currentPrompt(order, pos([["a", "above"]]))).toBe("a")
     expect(currentPrompt([], pos([]))).toBeUndefined()
   })
   test("order follows the transcript, not the map insertion order", () => {
-    expect(currentPrompt(order, pos([["c", "above"], ["a", "above"]]))).toBe("c")
+    expect(
+      currentPrompt(
+        order,
+        pos([
+          ["c", "above"],
+          ["a", "above"],
+        ]),
+      ),
+    ).toBe("c")
   })
 })
 

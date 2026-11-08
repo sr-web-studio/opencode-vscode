@@ -57,6 +57,11 @@
             </intent-filter>
         </receiver>
 
+        <!-- Inexact alarm every 15 min: starts the service again if its process was killed, or says "Not watching". -->
+        <receiver
+            android:name=".notify.Watchdog"
+            android:exported="false" />
+
         <!-- The QR scanner (Google code scanner UI) is downloaded by Google Play services when needed. -->
         <meta-data android:name="com.google.mlkit.vision.DEPENDENCIES" android:value="barcode_ui" />
 

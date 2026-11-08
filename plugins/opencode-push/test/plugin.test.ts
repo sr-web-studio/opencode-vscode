@@ -39,9 +39,12 @@ describe("plugin entry", () => {
   test("subscribes with the trigger types, looks the session up and pushes", async () => {
     const ntfy = fakeNtfy()
     stops.push(ntfy.stop)
-    const f = fakeCtx({ ntfy: { url: ntfy.url, topic: TOPIC }, click: { serverId: "box" } }, {
-      ses_a: { title: "Fix login bug", location: { directory: "/home/u/my-app" } },
-    })
+    const f = fakeCtx(
+      { ntfy: { url: ntfy.url, topic: TOPIC }, click: { serverId: "box" } },
+      {
+        ses_a: { title: "Fix login bug", location: { directory: "/home/u/my-app" } },
+      },
+    )
     const cleanup = await plugin.setup(f.ctx as any)
     expect(plugin.id).toBe("opencode-push")
     expect(f.subscribeCalls[0].types).toEqual([...EVENT_TYPES])

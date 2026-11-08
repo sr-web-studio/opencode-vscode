@@ -105,10 +105,7 @@ export function statusLine(settings: NotifySettings, status: NotifyStatus, serve
 }
 
 /** The session on screen, as the service needs it: its folder's current session for a chat, the worker's own id for a worker. */
-export function visibleSessionOf(
-  top: { kind: string; directory?: string; sessionID?: string } | undefined,
-  viewing: Readonly<Record<string, string | undefined>>,
-): string | undefined {
+export function visibleSessionOf(top: { kind: string; directory?: string; sessionID?: string } | undefined, viewing: Readonly<Record<string, string | undefined>>): string | undefined {
   if (!top?.directory) return undefined
   if (top.kind === "worker") return top.sessionID
   if (top.kind === "chat") return viewing[top.directory] ?? top.sessionID

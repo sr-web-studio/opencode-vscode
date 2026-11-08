@@ -52,6 +52,14 @@
 </div>
 
 <style>
-  .grow { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-  .grow > :global(*) { flex: 1; min-height: 0; }
+  .grow {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .grow > :global(*) {
+    flex: 1;
+    min-height: 0;
+  }
 </style>

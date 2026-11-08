@@ -12,8 +12,6 @@ export type PairHost = {
   log: (line: string) => void
 }
 
-const CUSTOM = "custom"
-
 /** Ask which address the phone should use. Undefined when cancelled. */
 async function pickAddress(serverUrls: readonly string[], windowUrl: string | undefined): Promise<string | undefined> {
   const { candidates, droppedLoopback } = candidateUrls(serverUrls, windowUrl)
@@ -22,9 +20,7 @@ async function pickAddress(serverUrls: readonly string[], windowUrl: string | un
   items.push({ label: "Enter a URL…", description: "an address your phone can reach, for example a Tailscale name or a domain", custom: true })
   const pick = await vscode.window.showQuickPick(items, {
     title: "Pair Mobile Device",
-    placeHolder: droppedLoopback
-      ? "Choose the address your phone will use (127.0.0.1 and localhost are left out: a phone cannot reach them)"
-      : "Choose the address your phone will use",
+    placeHolder: droppedLoopback ? "Choose the address your phone will use (127.0.0.1 and localhost are left out: a phone cannot reach them)" : "Choose the address your phone will use",
     ignoreFocusOut: true,
   })
   if (!pick) return undefined

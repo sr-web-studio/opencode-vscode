@@ -52,7 +52,10 @@ export class ShellTerminals implements vscode.Disposable {
   private readonly subs: vscode.Disposable[] = []
   private counter = 0
 
-  constructor(private readonly controller: Controller, private readonly settings: () => TerminalSettings) {
+  constructor(
+    private readonly controller: Controller,
+    private readonly settings: () => TerminalSettings,
+  ) {
     this.stop = controller.observe({
       event: (ev) => this.onEvent(ev),
       resync: () => void this.reattach(),
@@ -248,7 +251,8 @@ export class ShellTerminals implements vscode.Disposable {
       },
     }
 
-    const name = mode === "session" ? sessionTerminalName(this.controller.sessionMeta(sessionID)?.title, this.controller.agentOf(sessionID), slot) : terminalName(command, this.controller.agentOf(sessionID))
+    const name =
+      mode === "session" ? sessionTerminalName(this.controller.sessionMeta(sessionID)?.title, this.controller.agentOf(sessionID), slot) : terminalName(command, this.controller.agentOf(sessionID))
     term.terminal = vscode.window.createTerminal({ name, pty })
     this.terms.push(term)
     return term

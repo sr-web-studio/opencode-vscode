@@ -27,8 +27,7 @@ export function toCrlf(text: string, afterCR = false): { text: string; endsWithC
 }
 
 /** `12:33:05` (24-hour, with seconds) in the given zone, or the local one. */
-export const clockText = (at: number, timeZone?: string): string =>
-  new Intl.DateTimeFormat("en-GB", { timeZone, hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }).format(at)
+export const clockText = (at: number, timeZone?: string): string => new Intl.DateTimeFormat("en-GB", { timeZone, hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }).format(at)
 
 /** `1.2s` below a minute (one decimal), then `1m 05s`, `1h 02m`. Undefined for a time that makes no sense. */
 export function shortDuration(ms: number | undefined): string | undefined {
@@ -78,7 +77,10 @@ export type CommandBlock = {
 /** Everything printed before the output: rule, command, cwd (when changed) and the blank line. Ends at a line start. */
 export function commandBlockText(b: CommandBlock): string {
   const width = columnsOf(b.columns)
-  const lines = b.command.replace(/\t/g, "  ").split(/\r?\n/).flatMap((l) => wrapLine(l, width - 2))
+  const lines = b.command
+    .replace(/\t/g, "  ")
+    .split(/\r?\n/)
+    .flatMap((l) => wrapLine(l, width - 2))
   const body = lines.map((l, i) => `${i === 0 ? `${style("1;36", "❯")} ` : "  "}${style("1", l)}`).join("\r\n")
   const cwd = b.cwd && b.cwd !== b.lastCwd ? `${style("2", b.cwd)}\r\n` : ""
   return `\r\n${ruleText(width, clockText(b.at, b.timeZone))}\r\n${body}\r\n${cwd}\r\n`

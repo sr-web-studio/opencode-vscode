@@ -29,7 +29,11 @@ describe("sameDirectory", () => {
 function windowsServer(opts: { locationGet: boolean }) {
   const STORED = "D:\\Work\\acme\\app"
   const session = (id: string, directory: string, updated: number) => ({
-    id, title: id, projectID: "prj", time: { created: updated, updated }, location: { directory },
+    id,
+    title: id,
+    projectID: "prj",
+    time: { created: updated, updated },
+    location: { directory },
   })
   const all = [session("ses_a", STORED, 3), session("ses_b", STORED, 2), session("ses_other", "D:\\Other", 1)]
   const calls: Record<string, unknown>[] = []

@@ -3,7 +3,7 @@ import { DEFAULT_NOTIFY, NO_STATUS, ago, nativeServers, parseNotifySettings, par
 import { parseDeepLink, routeDeepLink } from "../../apps/mobile/src/lib/deep-link"
 import type { Profile } from "../../apps/mobile/src/lib/profiles"
 
-const profile = (over: Partial<Profile> = {}): Profile => ({ id: "srv-1", name: "Office", url: "http://10.0.0.10:4096", password: "pw", serverId: "office-box", ...over })
+const profile = (over: Partial<Profile> = {}): Profile => ({ id: "srv-1", name: "Home server", url: "http://192.168.1.10:4096", password: "pw", serverId: "my-server", ...over })
 
 describe("notify settings", () => {
   test("everything is on by default", () => {
@@ -23,13 +23,21 @@ describe("notify settings", () => {
 describe("native hand-over", () => {
   test("passes id, name, address, password and server id only", () => {
     const out = nativeServers([profile({ hostname: "box.local" })])
-    expect(out).toEqual([{ id: "srv-1", name: "Office", url: "http://10.0.0.10:4096", password: "pw", serverId: "office-box" }])
+    expect(out).toEqual([{ id: "srv-1", name: "Home server", url: "http://192.168.1.10:4096", password: "pw", serverId: "my-server" }])
   })
 })
 
 describe("status", () => {
   test("parses the plugin answer defensively", () => {
-    const s = parseStatus({ running: true, connected: 1, servers: 2, lastEventAt: 5, notificationsAllowed: false, batteryUnrestricted: true, watching: [{ id: "a", name: "A", connected: true }, { nope: 1 }] })
+    const s = parseStatus({
+      running: true,
+      connected: 1,
+      servers: 2,
+      lastEventAt: 5,
+      notificationsAllowed: false,
+      batteryUnrestricted: true,
+      watching: [{ id: "a", name: "A", connected: true }, { nope: 1 }],
+    })
     expect(s).toEqual({ running: true, connected: 1, servers: 2, lastEventAt: 5, notificationsAllowed: false, batteryUnrestricted: true, watching: [{ id: "a", name: "A", connected: true }] })
     expect(parseStatus(null)).toEqual(NO_STATUS)
   })
@@ -72,8 +80,8 @@ describe("session on screen", () => {
 
 describe("notification tap link (what the service puts in the PendingIntent)", () => {
   test("opens the exact session of the exact server", () => {
-    const link = parseDeepLink("opencode-mobile://session/ses_e4656bc8effeSAD316NuA1L1Cj?server=office-box")
-    expect(link).toEqual({ sessionID: "ses_e4656bc8effeSAD316NuA1L1Cj", serverId: "office-box" })
+    const link = parseDeepLink("opencode-mobile://session/ses_e4656bc8effeSAD316NuA1L1Cj?server=my-server")
+    expect(link).toEqual({ sessionID: "ses_e4656bc8effeSAD316NuA1L1Cj", serverId: "my-server" })
     const a = profile()
     const b = profile({ id: "srv-2", serverId: "laptop" })
     expect(routeDeepLink(link!, [b, a], "srv-2")).toEqual({ kind: "open", profile: a })

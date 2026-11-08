@@ -11,7 +11,7 @@ import java.net.SocketTimeoutException;
 import org.junit.Test;
 
 public class SessionApiAnswerTest {
-  private static final ServerRef SERVER = new ServerRef("srv-1", "Office", "http://h:4096", "pw", "office");
+  private static final ServerRef SERVER = new ServerRef("srv-1", "Home server", "http://h:4096", "pw", "my-server");
 
   private static final String TOOL_ONLY =
       "{\"id\":\"msg_3\",\"type\":\"assistant\",\"content\":[{\"type\":\"tool\",\"name\":\"shell\",\"state\":{\"status\":\"completed\",\"input\":{\"command\":\"cat secrets\"},\"content\":[{\"type\":\"text\",\"text\":\"TOOL OUTPUT sk-abcdefghijklmnop1234\"}]}}]}";

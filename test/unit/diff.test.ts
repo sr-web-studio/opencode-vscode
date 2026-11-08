@@ -27,12 +27,18 @@ describe("parsePatch", () => {
   })
   test("a removed line that starts with dashes is not a file header", () => {
     const h = parsePatch("@@ -1,2 +1,1 @@\n--- not a header\n kept\n")
-    expect(h[0]!.lines).toEqual([{ op: "-", text: "-- not a header" }, { op: " ", text: "kept" }])
+    expect(h[0]!.lines).toEqual([
+      { op: "-", text: "-- not a header" },
+      { op: " ", text: "kept" },
+    ])
   })
   test("a patch with two hunks, no-newline markers, CRLF text and an empty patch", () => {
     const two = parsePatch("Index: a\n@@ -1,1 +1,1 @@\n-a\n+b\n\\ No newline at end of file\n@@ -10,2 +10,2 @@\n x\n-y\n+z\n")
     expect(two.map((h) => h.oldStart)).toEqual([1, 10])
-    expect(two[0]!.lines).toEqual([{ op: "-", text: "a" }, { op: "+", text: "b" }])
+    expect(two[0]!.lines).toEqual([
+      { op: "-", text: "a" },
+      { op: "+", text: "b" },
+    ])
     expect(parsePatch("@@ -1,1 +1,1 @@\n-a\r\n+b\r\n")[0]!.lines[0]!.text).toBe("a")
     expect(parsePatch("")).toEqual([])
     expect(parsePatch("not a patch at all")).toEqual([])
@@ -62,7 +68,11 @@ describe("patchRows (the inline view)", () => {
     expect(wordMarks("same line", "same line")?.a).toEqual([])
   })
   test("segments cut a row at its marks", () => {
-    expect(segments("abcdef", [{ start: 1, end: 3 }])).toEqual([{ text: "a", mark: false }, { text: "bc", mark: true }, { text: "def", mark: false }])
+    expect(segments("abcdef", [{ start: 1, end: 3 }])).toEqual([
+      { text: "a", mark: false },
+      { text: "bc", mark: true },
+      { text: "def", mark: false },
+    ])
     expect(segments("abc")).toEqual([{ text: "abc", mark: false }])
   })
   test("every hunk gets its own separator, and the gutter fits the widest number", () => {
@@ -131,7 +141,11 @@ describe("hunksOnly (the fallback)", () => {
 })
 
 describe("changedFiles (the turn level)", () => {
-  const edit = (file: string, p: string, extra: Record<string, unknown> = {}) => ({ name: "edit", status: "completed", metadata: { files: [{ file, patch: p, additions: 2, deletions: 1, ...extra }] } })
+  const edit = (file: string, p: string, extra: Record<string, unknown> = {}) => ({
+    name: "edit",
+    status: "completed",
+    metadata: { files: [{ file, patch: p, additions: 2, deletions: 1, ...extra }] },
+  })
   test("one entry per file, patches in order, counts added up", () => {
     const files = changedFiles([edit("a.ts", patch), edit("b.ts", second), edit("a.ts", second)])
     expect(files.map((f) => f.file)).toEqual(["a.ts", "b.ts"])

@@ -5,13 +5,7 @@ import { randomBytes } from "node:crypto"
 export function webviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri): string {
   const nonce = randomBytes(16).toString("base64")
   const asset = (name: string) => webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, "dist", "webview", name))
-  const csp = [
-    "default-src 'none'",
-    `style-src ${webview.cspSource} 'unsafe-inline'`,
-    `script-src 'nonce-${nonce}'`,
-    `font-src ${webview.cspSource}`,
-    `img-src ${webview.cspSource} data:`,
-  ].join("; ")
+  const csp = ["default-src 'none'", `style-src ${webview.cspSource} 'unsafe-inline'`, `script-src 'nonce-${nonce}'`, `font-src ${webview.cspSource}`, `img-src ${webview.cspSource} data:`].join("; ")
   return `<!doctype html>
 <html lang="en">
 <head>

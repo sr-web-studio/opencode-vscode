@@ -34,9 +34,7 @@ export function groupModels({ models, providers, query }: ModelQueryInput): Mode
     g.models.push(m)
     groups.set(m.providerID, g)
   }
-  return [...groups.values()]
-    .map((g) => ({ ...g, models: g.models.sort((a, b) => a.name.localeCompare(b.name)) }))
-    .sort((a, b) => a.providerName.localeCompare(b.providerName))
+  return [...groups.values()].map((g) => ({ ...g, models: g.models.sort((a, b) => a.name.localeCompare(b.name)) })).sort((a, b) => a.providerName.localeCompare(b.providerName))
 }
 
 /** Pinned models that still exist and are usable, in pin order (stale pins are skipped, not removed). */
@@ -59,19 +57,14 @@ export function modelSections(input: ModelQueryInput & { pins: ReadonlyArray<str
 
 export type ModelSelection = { id: string; providerID: string; variant?: string }
 
-export const sameModel = (a: ModelSelection | undefined, b: { id: string; providerID: string }) =>
-  !!a && a.id === b.id && a.providerID === b.providerID
+export const sameModel = (a: ModelSelection | undefined, b: { id: string; providerID: string }) => !!a && a.id === b.id && a.providerID === b.providerID
 
 export function findModel(models: ReadonlyArray<SlimModel>, ref: { id: string; providerID: string } | undefined) {
   return ref ? models.find((m) => m.id === ref.id && m.providerID === ref.providerID) : undefined
 }
 
 /** `Sonnet 5.5 · high`-style label parts for the footer. */
-export function footerLabel(args: {
-  agent?: string
-  model?: ModelSelection
-  models: ReadonlyArray<SlimModel>
-}): { agent: string; model: string; variant?: string } {
+export function footerLabel(args: { agent?: string; model?: ModelSelection; models: ReadonlyArray<SlimModel> }): { agent: string; model: string; variant?: string } {
   const found = findModel(args.models, args.model)
   return {
     agent: args.agent ?? "agent",

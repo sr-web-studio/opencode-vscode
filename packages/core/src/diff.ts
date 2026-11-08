@@ -48,9 +48,7 @@ export function parsePatch(patch: string): Hunk[] {
 /* --------------------------------------------------------------------- rows */
 
 export type Mark = { start: number; end: number }
-export type DiffRow =
-  | { kind: "hunk"; line: number }
-  | { kind: "context" | "add" | "del"; oldNo?: number; newNo?: number; text: string; marks?: Mark[] }
+export type DiffRow = { kind: "hunk"; line: number } | { kind: "context" | "add" | "del"; oldNo?: number; newNo?: number; text: string; marks?: Mark[] }
 
 /** Rows for the inline view: a slim separator before each hunk, then the lines with both gutters. */
 export function patchRows(hunks: ReadonlyArray<Hunk>): DiffRow[] {

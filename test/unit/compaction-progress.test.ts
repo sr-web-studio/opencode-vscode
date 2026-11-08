@@ -72,7 +72,7 @@ describe("compaction between turns: started → delta → ended", () => {
   test("a prompt delivered after the compaction keeps the marker and starts its own turn", () => {
     let v = apply(settled(), started(), ended("sum"))
     v = apply(v, ev("session.inbox.enqueued", { inboxID: "q1", item: { type: "user", payload: { text: "next" }, delivery: "queue" } }), ev("session.inbox.delivered", { inboxID: "q1" }))
-    expect(v.turns.map((t) => (t.compaction ? "marker" : t.user?.text ?? "?"))).toEqual(["hi", "marker", "next"])
+    expect(v.turns.map((t) => (t.compaction ? "marker" : (t.user?.text ?? "?")))).toEqual(["hi", "marker", "next"])
   })
 })
 
@@ -206,7 +206,10 @@ describe("history with a compaction that is not finished", () => {
   })
 
   test("a feed that loaded a pending compaction does not replay deltas over it twice", () => {
-    const feed = new SessionFeed(() => {}, () => {})
+    const feed = new SessionFeed(
+      () => {},
+      () => {},
+    )
     feed.view = viewFromMessages([{ id: "c1", type: "compaction", status: "running", summary: "" }] as never)
     expect(feed.apply(started())).toBe(false)
     expect(feed.apply(delta("x"))).toBe(true)
@@ -216,7 +219,10 @@ describe("history with a compaction that is not finished", () => {
 
 describe("feed behaviour around a live compaction", () => {
   test("trim is only requested when the compaction ends, not while it is pending", () => {
-    const feed = new SessionFeed(() => {}, () => {})
+    const feed = new SessionFeed(
+      () => {},
+      () => {},
+    )
     feed.view = settled()
     feed.apply(started())
     feed.apply(delta("a"))

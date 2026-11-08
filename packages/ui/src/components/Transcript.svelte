@@ -33,7 +33,15 @@
   const orphans = $derived<PermissionRequest[]>(app.permissions.filter((p) => !p.source?.id || !toolIDs.has(p.source.id)))
   const busy = $derived(isRunning(app.view))
   // A pending compaction line has its own spinner, so there is no separate "Working…".
-  const idleSpinner = $derived(busy && !isCompacting(app.view) && !runningTool(app.view.turns) && !app.view.turns.at(-1)?.steps.at(-1)?.items.some((i) => i.kind !== "tool" && i.streaming))
+  const idleSpinner = $derived(
+    busy &&
+      !isCompacting(app.view) &&
+      !runningTool(app.view.turns) &&
+      !app.view.turns
+        .at(-1)
+        ?.steps.at(-1)
+        ?.items.some((i) => i.kind !== "tool" && i.streaming),
+  )
   const revert = $derived(app.view.revert)
 
   // The prompt time above a bubble is always visible for the first prompt of a day.
@@ -241,7 +249,13 @@
   <div class="float" bind:this={floatEl}>{@render children?.()}</div>
 
   {#if showJump(scroll) && !app.loadingView}
-    <button class="jump" style:bottom="{12 + floatH}px" onclick={jump} title={scroll.unseen ? "New content below. Jump to the end" : "Jump to the end"} aria-label={scroll.unseen ? "Jump to the end (new content)" : "Jump to the end"}>
+    <button
+      class="jump"
+      style:bottom="{12 + floatH}px"
+      onclick={jump}
+      title={scroll.unseen ? "New content below. Jump to the end" : "Jump to the end"}
+      aria-label={scroll.unseen ? "Jump to the end (new content)" : "Jump to the end"}
+    >
       <Codicon name="arrow-down" />
       {#if scroll.unseen}<span class="new" aria-hidden="true"></span>{/if}
     </button>
@@ -249,26 +263,150 @@
 </div>
 
 <style>
-  .wrap { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
-  .transcript { flex: 1; min-height: 0; overflow-y: auto; padding: 0.8em var(--oc-side) 0.6em; overflow-anchor: none; }
+  .wrap {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .transcript {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 0.8em var(--oc-side) 0.6em;
+    overflow-anchor: none;
+  }
   /* Over the bottom of the transcript, just above the prompt box; the transcript scrolls underneath. */
-  .float { position: absolute; left: 0; right: 0; bottom: 0; z-index: 3; }
-  .sticky { position: absolute; z-index: 4; top: 6px; left: var(--oc-side); right: var(--oc-side); margin-left: max(32px, 15%); display: flex; align-items: center; gap: 0.5em; padding: 3px 12px; text-align: left; min-width: 0; background: var(--oc-user-bg); border: 1px solid var(--oc-user-line); border-radius: 8px; box-shadow: 0 2px 8px var(--vscode-widget-shadow); }
-  .sticky:hover { border-color: var(--oc-accent); }
-  .slabel { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .pad { padding: 0.5em 0; }
-  .earlier { display: flex; justify-content: center; margin-bottom: 1em; }
-  .queued { opacity: 0.75; margin: 0 0 var(--oc-turn-gap) max(32px, 15%); }
-  .qlabel { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 0 0.9em; margin: 2px 2px 0; }
-  .user { padding: 10px 14px; border: 1px solid var(--oc-user-line); background: var(--oc-user-bg); border-radius: 8px; white-space: pre-wrap; word-break: break-word; }
-  .orphan { display: flex; gap: 0.6em; align-items: baseline; flex-wrap: wrap; border-left: 2px solid var(--oc-amber); padding-left: 0.5em; margin: 0.4em 0; }
-  .label { font-weight: 600; }
-  .target { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
-  .working { display: flex; align-items: center; gap: 0.5em; margin: 0.3em 0 0.8em; }
-  .rbar { display: flex; align-items: center; gap: 0.5em; padding: 6px 12px; margin: 0 0 var(--oc-turn-gap); border: 1px solid var(--oc-hairline); border-radius: 6px; background: var(--oc-popover); }
-  .rtext { flex: 1; min-width: 0; }
-  .redo { font-weight: 600; }
-  .jump { position: absolute; z-index: 5; right: calc(var(--oc-side) + 4px); bottom: 12px; width: 32px; height: 32px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--oc-popover); border: 1px solid var(--oc-hairline); box-shadow: 0 2px 8px var(--vscode-widget-shadow); color: var(--oc-fg); }
-  .jump:hover { background: var(--oc-hover); }
-  .new { position: absolute; top: 3px; right: 3px; width: 8px; height: 8px; border-radius: 50%; background: var(--oc-accent); border: 1px solid var(--oc-popover); }
+  .float {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 3;
+  }
+  .sticky {
+    position: absolute;
+    z-index: 4;
+    top: 6px;
+    left: var(--oc-side);
+    right: var(--oc-side);
+    margin-left: max(32px, 15%);
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    padding: 3px 12px;
+    text-align: left;
+    min-width: 0;
+    background: var(--oc-user-bg);
+    border: 1px solid var(--oc-user-line);
+    border-radius: 8px;
+    box-shadow: 0 2px 8px var(--vscode-widget-shadow);
+  }
+  .sticky:hover {
+    border-color: var(--oc-accent);
+  }
+  .slabel {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .pad {
+    padding: 0.5em 0;
+  }
+  .earlier {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 1em;
+  }
+  .queued {
+    opacity: 0.75;
+    margin: 0 0 var(--oc-turn-gap) max(32px, 15%);
+  }
+  .qlabel {
+    display: flex;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 0 0.9em;
+    margin: 2px 2px 0;
+  }
+  .user {
+    padding: 10px 14px;
+    border: 1px solid var(--oc-user-line);
+    background: var(--oc-user-bg);
+    border-radius: 8px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .orphan {
+    display: flex;
+    gap: 0.6em;
+    align-items: baseline;
+    flex-wrap: wrap;
+    border-left: 2px solid var(--oc-amber);
+    padding-left: 0.5em;
+    margin: 0.4em 0;
+  }
+  .label {
+    font-weight: 600;
+  }
+  .target {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+  }
+  .working {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    margin: 0.3em 0 0.8em;
+  }
+  .rbar {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    padding: 6px 12px;
+    margin: 0 0 var(--oc-turn-gap);
+    border: 1px solid var(--oc-hairline);
+    border-radius: 6px;
+    background: var(--oc-popover);
+  }
+  .rtext {
+    flex: 1;
+    min-width: 0;
+  }
+  .redo {
+    font-weight: 600;
+  }
+  .jump {
+    position: absolute;
+    z-index: 5;
+    right: calc(var(--oc-side) + 4px);
+    bottom: 12px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--oc-popover);
+    border: 1px solid var(--oc-hairline);
+    box-shadow: 0 2px 8px var(--vscode-widget-shadow);
+    color: var(--oc-fg);
+  }
+  .jump:hover {
+    background: var(--oc-hover);
+  }
+  .new {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--oc-accent);
+    border: 1px solid var(--oc-popover);
+  }
 </style>

@@ -27,7 +27,10 @@ export class ImageCache {
   private readonly inflight = new Map<string, Promise<ImageBytes | undefined>>()
   private chars = 0
 
-  constructor(private readonly loaders: ImageLoaders, private readonly maxChars = DEFAULT_CACHE_CHARS) {}
+  constructor(
+    private readonly loaders: ImageLoaders,
+    private readonly maxChars = DEFAULT_CACHE_CHARS,
+  ) {}
 
   get size(): number {
     return this.entries.size

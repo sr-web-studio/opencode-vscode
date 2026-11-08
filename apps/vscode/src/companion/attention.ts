@@ -224,7 +224,14 @@ async function windowsAttention(helper: WindowsHelper, who: WindowIdentity, log:
   log(`Windows: ${candidates.length} VS Code window(s) in process ${found.pid ?? "?"}: ${candidates.map((c) => JSON.stringify(c.title)).join(", ") || "-"}`)
   const pick = pickWindows(candidates, who, { trustSingle: true })
   if (pick.chosen.length === 0) {
-    return { ok: false, method: "none", candidates: titles(candidates), chosen: [], reason: pick.reason, problem: candidates.length ? "no window title matched this window (a custom window.title can cause this)" : "no VS Code window was found for this process" }
+    return {
+      ok: false,
+      method: "none",
+      candidates: titles(candidates),
+      chosen: [],
+      reason: pick.reason,
+      problem: candidates.length ? "no window title matched this window (a custom window.title can cause this)" : "no VS Code window was found for this process",
+    }
   }
   if (pick.reason === "tie") log(`Windows: ${pick.chosen.length} titles fit equally well; flashing all of them`)
   const flashed = await helper.call({ op: "flash", hwnds: pick.chosen.map((c) => c.id) })
@@ -297,7 +304,14 @@ async function macAttention(req: AttentionRequest): Promise<Omit<AttentionResult
 export async function askForAttention(helper: WindowsHelper, who: WindowIdentity, req: AttentionRequest, log: Log, platform: NodeJS.Platform = process.platform): Promise<AttentionResult> {
   const started = Date.now()
   try {
-    const r = platform === "win32" ? await windowsAttention(helper, who, log) : platform === "darwin" ? await macAttention(req) : platform === "linux" ? await linuxAttention(who, req, log) : { ok: false, method: "none" as const, candidates: [], chosen: [], problem: `not supported on ${platform}` }
+    const r =
+      platform === "win32"
+        ? await windowsAttention(helper, who, log)
+        : platform === "darwin"
+          ? await macAttention(req)
+          : platform === "linux"
+            ? await linuxAttention(who, req, log)
+            : { ok: false, method: "none" as const, candidates: [], chosen: [], problem: `not supported on ${platform}` }
     return { ...r, ms: Date.now() - started }
   } catch (e) {
     return { ok: false, method: "none", candidates: [], chosen: [], problem: e instanceof Error ? e.message : String(e), ms: Date.now() - started }

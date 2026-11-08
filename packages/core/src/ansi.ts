@@ -38,8 +38,10 @@ function applySgr(style: Style, params: number[]): Style {
     else if (p === 2) s.dim = true
     else if (p === 3) s.italic = true
     else if (p === 4) s.underline = true
-    else if (p === 22) { s.bold = undefined; s.dim = undefined }
-    else if (p === 23) s.italic = undefined
+    else if (p === 22) {
+      s.bold = undefined
+      s.dim = undefined
+    } else if (p === 23) s.italic = undefined
     else if (p === 24) s.underline = undefined
     else if (p >= 30 && p <= 37) s.fg = named(p - 30)
     else if (p >= 90 && p <= 97) s.fg = named(p - 90 + 8)

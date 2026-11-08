@@ -19,15 +19,31 @@ describe("ansiToSpans", () => {
   })
   test("a bare ESC[m resets; 39 clears only the foreground", () => {
     const s = ansiToSpans("\u001b[31;1ma\u001b[39mb\u001b[mc")
-    expect(s.map((x) => [x.text, x.fg?.kind, x.bold])).toEqual([["a", "named", true], ["b", undefined, true], ["c", undefined, undefined]])
+    expect(s.map((x) => [x.text, x.fg?.kind, x.bold])).toEqual([
+      ["a", "named", true],
+      ["b", undefined, true],
+      ["c", undefined, undefined],
+    ])
   })
   test("cursor movement, OSC titles and unknown escapes are dropped, text kept", () => {
     expect(stripAnsi("a\u001b[2Kb\u001b]0;title\u0007c\u001b[?25hd")).toBe("abcd")
-    expect(ansiToSpans("\u001b[2Jx").map((s) => s.text).join("")).toBe("x")
+    expect(
+      ansiToSpans("\u001b[2Jx")
+        .map((s) => s.text)
+        .join(""),
+    ).toBe("x")
   })
   test("CRLF becomes LF and a progress-bar carriage return is not shown", () => {
-    expect(ansiToSpans("a\r\nb").map((s) => s.text).join("")).toBe("a\nb")
-    expect(ansiToSpans("50%\r100%").map((s) => s.text).join("")).toBe("50%100%")
+    expect(
+      ansiToSpans("a\r\nb")
+        .map((s) => s.text)
+        .join(""),
+    ).toBe("a\nb")
+    expect(
+      ansiToSpans("50%\r100%")
+        .map((s) => s.text)
+        .join(""),
+    ).toBe("50%100%")
   })
   test("garbage parameters do not throw", () => {
     expect(() => ansiToSpans("\u001b[38;5mx\u001b[999;;;mx\u001b[;mx")).not.toThrow()

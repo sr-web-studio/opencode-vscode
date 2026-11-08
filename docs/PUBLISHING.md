@@ -1,6 +1,6 @@
 # Publishing
 
-How SR Web Studio ships this extension, `sr-web-studio.opencode-unofficial` (Marketplace names are unique across publishers and `opencode-vscode` was taken), with the companion `sr-web-studio.opencode-voice`. This is the same setup as `grok-build-unofficial`, which is already published from these accounts.
+How SR Web Studio ships this extension, `sr-web-studio.opencode-unofficial` (Marketplace names are unique across publishers and `opencode-vscode` was taken), with the companion `sr-web-studio.opencode-voice`.
 
 ## Accounts (already exist)
 
@@ -10,7 +10,7 @@ How SR Web Studio ships this extension, `sr-web-studio.opencode-unofficial` (Mar
 | Open VSX | `sr-web-studio` (verified) | https://open-vsx.org/user-settings/namespaces | https://open-vsx.org/user-settings/tokens |
 
 - The Microsoft identity behind `VSCE_PAT` must be an **Owner** of the `sr-web-studio` publisher. If publishing returns "Access Denied", the PAT's identity is usually a different MSA/Azure AD account; add it as Owner.
-- No tokens are stored on the build server: `grok-build-unofficial` has no `.env` and no GitHub Actions secrets. Create new tokens, or copy them from wherever they were saved, into this repo's `.env`.
+- No tokens are stored in the repository or in CI secrets. Create new tokens, or copy them from wherever they were saved, into this repo's `.env`.
 
 ## Local setup
 
@@ -44,7 +44,16 @@ Everything below runs from the repo root. The extensions live in `apps/vscode/`;
    bun run publish:openvsx       # → https://open-vsx.org/extension/sr-web-studio/opencode-unofficial (and .../opencode-voice)
    ```
 
-5. Commit, then tag `vX.Y.Z` and push the tag.
+5. On `dev`: commit (`Release X.Y.Z`), tag `vX.Y.Z`. Then merge `dev` into `main` with `--no-ff` (`Merge dev: release X.Y.Z`) and push `main`, `dev` and the tag. `main` only ever receives these release merges (see [AGENTS.md](../AGENTS.md)).
+
+## Android app (beta pre-release)
+
+The Android app (`apps/mobile`) is never part of the vsix; it is published as an APK on GitHub Releases, marked as a pre-release.
+
+1. Bump `version` in `apps/mobile/package.json` and `versionName`/`versionCode` in `apps/mobile/android/app/build.gradle` (versions end in `-beta` while the app is a preview).
+2. Load the signing password: `set -a; . ./.env; set +a` (`ANDROID_KEYSTORE_PASSWORD`). The release keystore lives outside the repo (default `~/.config/occ-android/release.jks`, override with `ANDROID_KEYSTORE_PATH`; key alias `opencode-mobile`). Without the password the release build is unsigned.
+3. `cd apps/mobile && bun run android:sync && cd android && ./gradlew assembleRelease`, then check the APK: `apksigner verify --print-certs` shows the release certificate, `aapt dump badging` shows the version.
+4. Tag `mobile-vX.Y.Z-beta` on `dev`, push it, and create the release with `gh release create mobile-vX.Y.Z-beta <apk> --prerelease --latest=false`. The notes say beta, unofficial and not affiliated, how to install and pair, and list the APK's SHA-256 and the certificate fingerprint.
 
 ## Test builds (never published)
 
@@ -64,4 +73,4 @@ bun run package -- --test 11
 - **Name:** `sst-dev.opencode` ("opencode") and `sst-dev.opencode-v2` ("OpenCode Beta") are the official extensions, and "OpenCode" belongs to the OpenCode team. This one is "OpenCode (unofficial)", with a disclaimer at the top of the README and the companion's README.
 - **Listing:** 128×128 PNG icon (the Marketplace does not accept SVG), README with the `opencode` CLI requirement, CHANGELOG, `repository`/`bugs`/`homepage` in `package.json`, and a LICENSE file.
 - **Repo:** `sr-web-studio/opencode-vscode` is public (since 0.3.5).
-- **CI (optional, not set up):** a tag-triggered GitHub Action like `grok-build-unofficial/.github/workflows/release.yml`, with `VSCE_PAT` and `OVSX_PAT` as repository secrets.
+- **CI:** `.github/workflows/ci.yml` runs typecheck, unit tests, formatting, the Android Gradle tests and the plugin tests on every push and pull request. Publishing stays a local, manual step with the tokens in `.env`; no release secret is stored in the repository.

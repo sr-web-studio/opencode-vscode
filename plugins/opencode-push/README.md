@@ -13,7 +13,9 @@ An [OpenCode](https://opencode.ai) V2 **server plugin** that sends a phone push 
 Attention pushes (permission, question) and failures use ntfy priority 4 (`high`); "finished" uses 3 (`default`).
 Rules, the same as the VS Code extension's notification engine: one push per session per 5 s (an attention push always gets through and replaces a pending "finished"), the same request id is never announced twice.
 
-Tapping a push opens `opencode-mobile://session/<sessionID>?server=<serverId>` (the `Click` header of ntfy). That link is for the upcoming Android app; until it exists, tapping does nothing useful.
+Tapping a push opens `opencode-mobile://session/<sessionID>?server=<serverId>` (the `Click` header of ntfy), which the Android app handles. If the app is not installed, nothing happens.
+
+The Android app does not need this plugin: it keeps its own connection to the server and notifies itself. The plugin is for setups that want push delivered through a notification service instead.
 
 ## Privacy
 
@@ -30,15 +32,15 @@ Never sent: transcript text, tool inputs or outputs, file contents, diffs, permi
 
 **On ntfy.sh anyone who knows the topic name can read the pushes.** Use a long random topic (20+ characters) or a self-hosted ntfy with access control. Titles of your sessions are visible to whoever can read the topic.
 
-## Install (owner, Ubuntu service)
+## Install
 
-The plugin is plain TypeScript; OpenCode (Bun) runs `src/index.ts` directly, there is no build step, and the plugin needs no `node_modules` (OpenCode provides `@opencode/plugin` at runtime — checked by loading a copy that has only `src/` and `package.json`).
+The plugin is plain TypeScript; OpenCode (Bun) runs `src/index.ts` directly, there is no build step, and the plugin needs no `node_modules` (OpenCode provides `@opencode/plugin` at runtime).
 
 1. Put the folder somewhere stable on the server, for example:
 
    ```sh
-   git clone <repo> ~/src/opencode-vscode   # or copy plugins/opencode-push
-   # the plugin directory is ~/src/opencode-vscode/plugins/opencode-push
+   git clone <repo> /path/to/opencode-vscode   # or copy plugins/opencode-push
+   # the plugin directory is /path/to/opencode-vscode/plugins/opencode-push
    ```
 
 2. Pick a topic and keep it out of git:
@@ -53,14 +55,14 @@ The plugin is plain TypeScript; OpenCode (Bun) runs `src/index.ts` directly, the
    {
      "plugins": [
        {
-         "package": "/home/salim/work/projects/opencode-vscode/plugins/opencode-push",
+         "package": "/path/to/opencode-vscode/plugins/opencode-push",
          "options": {
            "ntfy": {
              "url": "https://ntfy.sh",
              "topic": "{file:~/.config/opencode/secrets/ntfy-topic}",
              "token": "{file:~/.config/opencode/secrets/ntfy-token}"
            },
-           "click": { "serverId": "office" },
+           "click": { "serverId": "my-server" },
            "workers": false,
            "minDurationSeconds": 0
          }

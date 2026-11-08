@@ -8,8 +8,7 @@ import type { ShellTerminals } from "./terminal"
 import type { ImagePreviews } from "./images"
 import type { DiffViews } from "./diffs"
 
-const REVERT_PROMPT =
-  "Revert to before this prompt? Messages after it are hidden, and files changed by later steps are restored. Shell side effects (git, databases, other files) are not undone."
+const REVERT_PROMPT = "Revert to before this prompt? Messages after it are hidden, and files changed by later steps are restored. Shell side effects (git, databases, other files) are not undone."
 
 /** What a webview (the chat view or a worker tab) lets the host do on its behalf. */
 export type Surface = {
@@ -40,7 +39,15 @@ export class HostActions {
       await this.run(req, surface)
     } catch (e) {
       const what =
-        req.type === "openSession" ? "Could not open the worker" : req.type === "showTerminal" ? "Could not show the terminal" : req.type === "openImage" ? "Could not open the image" : req.type === "openDiff" || req.type === "openChanges" ? "Could not open the diff" : "OpenCode could not do that"
+        req.type === "openSession"
+          ? "Could not open the worker"
+          : req.type === "showTerminal"
+            ? "Could not show the terminal"
+            : req.type === "openImage"
+              ? "Could not open the image"
+              : req.type === "openDiff" || req.type === "openChanges"
+                ? "Could not open the diff"
+                : "OpenCode could not do that"
       void vscode.window.showErrorMessage(`${what}: ${e instanceof Error ? e.message : "unknown error"}`)
     }
   }
@@ -50,7 +57,9 @@ export class HostActions {
       case "openFile":
         return this.openFile(req.path, req.line)
       case "imageData": {
-        const dataUri = await this.images().thumbnail(surface.sessionID(), req.ref).catch(() => undefined)
+        const dataUri = await this.images()
+          .thumbnail(surface.sessionID(), req.ref)
+          .catch(() => undefined)
         surface.post({ type: "image", requestID: req.requestID, dataUri })
         return
       }

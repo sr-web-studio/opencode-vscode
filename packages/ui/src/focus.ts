@@ -1,8 +1,7 @@
 import { canTakeFocus, type FocusEnv } from "@occ/core/focus"
 
 const isEditable = (el: Element | null): boolean =>
-  !!el &&
-  (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement || (el as HTMLElement).isContentEditable === true)
+  !!el && (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement || (el as HTMLElement).isContentEditable === true)
 
 /** The facts `shouldFocusPrompt` needs, read from the DOM. `target` itself (or anything inside it) is not "another" input. */
 export function readFocusEnv(target?: Element | null): FocusEnv {

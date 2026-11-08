@@ -16,7 +16,20 @@ import { dirname, join } from "node:path"
 import { gunzipSync } from "node:zlib"
 import { LOCAL_ROOT, SHERPA_VERSION, sherpaTarget, type LocalPaths, type ModelPaths, type SherpaTarget } from "@occ/core/local-voice"
 import { parseTar, stripTopFolder } from "@occ/core/tar"
-import { CATALOG, REQUIRED_ROLES, knownModelIds, languageFor, modelBytes, modelUrl, packModels, modelsToRemove, packFor, type Catalog, type LanguagePack, type ModelSpec } from "@occ/core/voice-catalog"
+import {
+  CATALOG,
+  REQUIRED_ROLES,
+  knownModelIds,
+  languageFor,
+  modelBytes,
+  modelUrl,
+  packModels,
+  modelsToRemove,
+  packFor,
+  type Catalog,
+  type LanguagePack,
+  type ModelSpec,
+} from "@occ/core/voice-catalog"
 
 export type FetchLike = (url: string, init?: { signal?: AbortSignal }) => Promise<{ ok: boolean; status: number; body: ReadableStream<Uint8Array> | null }>
 
@@ -112,8 +125,7 @@ export async function localState(o: StateOptions): Promise<LocalState> {
 export const isInstalled = (s: LocalState, pack: LanguagePack): boolean => s.native && packModels(pack).every((m) => s.models.includes(m.id))
 
 /** Ids of the packs whose models are all on this computer (the engine is not counted: it is the same for all). */
-export const installedLanguages = (s: LocalState, packs: readonly LanguagePack[] = CATALOG.packs): string[] =>
-  packs.filter((p) => packModels(p).every((m) => s.models.includes(m.id))).map((p) => p.id)
+export const installedLanguages = (s: LocalState, packs: readonly LanguagePack[] = CATALOG.packs): string[] => packs.filter((p) => packModels(p).every((m) => s.models.includes(m.id))).map((p) => p.id)
 
 /** Bytes still to download to use `pack`: what is missing of the engine and of its models. */
 export function missingBytes(s: LocalState, pack: LanguagePack): number {
@@ -312,7 +324,12 @@ export async function removeUnknownModels(o: StateOptions): Promise<string[]> {
     if (!e.isDirectory() || e.isSymbolicLink() || !OURS.test(e.name) || known.has(e.name)) continue
     const dir = join(models, e.name)
     const leftover = /\.tmp-[0-9a-f]{8}$/.test(e.name) && known.has(e.name.replace(/\.tmp-[0-9a-f]{8}$/, ""))
-    const ours = leftover || (await readFile(join(dir, "ready.json"), "utf8").then(() => true, () => false))
+    const ours =
+      leftover ||
+      (await readFile(join(dir, "ready.json"), "utf8").then(
+        () => true,
+        () => false,
+      ))
     if (!ours) continue
     await rm(dir, { recursive: true, force: true })
     removed.push(e.name)

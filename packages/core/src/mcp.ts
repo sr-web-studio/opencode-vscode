@@ -351,13 +351,7 @@ export class McpManager {
     }
   }
 
-  private async finishSignIn(
-    client: OpenCodeClient,
-    attempt: NonNullable<McpManager["attempt"]>,
-    mode: "auto" | "code",
-    server: string,
-    gen: number,
-  ): Promise<void> {
+  private async finishSignIn(client: OpenCodeClient, attempt: NonNullable<McpManager["attempt"]>, mode: "auto" | "code", server: string, gen: number): Promise<void> {
     const { integrationID, attemptID } = attempt
     const location = this.location()
     const alive = () => gen === this.generation && !attempt.cancelled

@@ -7,7 +7,13 @@ import { emptyView, type SessionView, type ToolItem } from "@occ/core/transcript
 import { folderName, looksLikePath, relativeTo, shortenHome, splitLine } from "@occ/core/paths"
 
 const todoTool = (todos: unknown, status: ToolItem["status"] = "completed"): ToolItem => ({
-  kind: "tool", id: Math.random().toString(), name: "todowrite", status, input: { todos } as any, metadata: {}, output: "",
+  kind: "tool",
+  id: Math.random().toString(),
+  name: "todowrite",
+  status,
+  input: { todos } as any,
+  metadata: {},
+  output: "",
 })
 const viewWith = (...tools: ToolItem[]): SessionView => ({
   ...emptyView(),
@@ -27,13 +33,18 @@ describe("todo parser (shape captured live from OpenCode 2.2.5 with experimental
     const live = (todoLive.events as any[]).reduce((v, e) => applyEvent(v, e), emptyView())
     for (const view of [hist, live]) {
       const items = latestTodos(view)!
-      expect(items).toEqual([{ content: "First task", status: "in_progress" }, { content: "Second task", status: "pending" }])
+      expect(items).toEqual([
+        { content: "First task", status: "in_progress" },
+        { content: "Second task", status: "pending" },
+      ])
       const bar = todoBar(view, false)!
       expect([bar.done, bar.total, bar.current]).toEqual([0, 2, "First task"])
     }
   })
   test("live tool state carries metadata.todos next to the input", () => {
-    const tool = viewFromMessages(todoLive.messages as any).turns[0]!.steps.flatMap((s) => s.items).find((i) => i.kind === "tool" && i.name === "todowrite") as ToolItem
+    const tool = viewFromMessages(todoLive.messages as any)
+      .turns[0]!.steps.flatMap((s) => s.items)
+      .find((i) => i.kind === "tool" && i.name === "todowrite") as ToolItem
     expect(tool.status).toBe("completed")
     expect(tool.metadata.todos).toEqual(tool.input.todos)
     expect(tool.output).toMatch(/^Todos updated: 0\/2 completed, 1 in progress, 1 pending/)
@@ -51,12 +62,23 @@ describe("todo parser (shape captured live from OpenCode 2.2.5 with experimental
     expect(latestTodos(emptyView())).toBeUndefined()
   })
   test("summary counts and current item", () => {
-    const s = summarizeTodos(parseTodos([{ content: "a", status: "completed" }, { content: "b", status: "in_progress" }, { content: "c", status: "pending" }]))
+    const s = summarizeTodos(
+      parseTodos([
+        { content: "a", status: "completed" },
+        { content: "b", status: "in_progress" },
+        { content: "c", status: "pending" },
+      ]),
+    )
     expect([s.done, s.total, s.current]).toEqual([1, 3, "b"])
     expect(s.progress).toBeCloseTo(1 / 3)
   })
   test("bar hides when all finished and the turn ended, stays while running", () => {
-    const done = viewWith(todoTool([{ content: "a", status: "completed" }, { content: "b", status: "cancelled" }]))
+    const done = viewWith(
+      todoTool([
+        { content: "a", status: "completed" },
+        { content: "b", status: "cancelled" },
+      ]),
+    )
     expect(todoBar(done, false)).toBeUndefined()
     expect(todoBar(done, true)?.total).toBe(2)
     expect(todoBar(viewWith(todoTool([{ content: "a", status: "pending" }])), false)).toBeDefined()

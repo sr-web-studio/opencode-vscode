@@ -4,15 +4,7 @@ import { SessionFeed } from "./feed"
 import { detectFeatures, isUnsupported } from "./features"
 import { primaryAgents, type ModelSelection } from "./models"
 import { normalizePins, togglePin } from "./pins"
-import {
-  defaultViewSettings,
-  type Action,
-  type AgentSummary,
-  type AppState,
-  type ConnectionState,
-  type PromptRestore,
-  type ViewSettings,
-} from "./protocol"
+import { defaultViewSettings, type Action, type AgentSummary, type AppState, type ConnectionState, type PromptRestore, type ViewSettings } from "./protocol"
 import { isRoot, upsertSession } from "./sessions"
 import { isWindowsPath, sameDirectory, withinDirectory } from "./paths"
 import { isRunning } from "./transcript/reducer"
@@ -55,7 +47,6 @@ const LAST_SESSION_KEY = "lastSession"
 export const RESUME_QUIET_MS = 5000
 const HIDDEN_WORKERS_KEY = "hiddenWorkers"
 const CHILD_PAGE = 200
-
 
 /**
  * State for one project. It talks to the server only through the root `@opencode/client` API and keeps no
@@ -149,7 +140,7 @@ export class Controller {
 
   snapshot(): AppState {
     const id = this.target.kind === "session" ? this.target.id : undefined
-    const current = id ? this.sessions.find((s) => s.id === id) ?? this.archived.find((s) => s.id === id) : undefined
+    const current = id ? (this.sessions.find((s) => s.id === id) ?? this.archived.find((s) => s.id === id)) : undefined
     const waiting = new Set([...this.permissions.entries(), ...this.forms.entries()].filter(([, v]) => v.length > 0).map(([k]) => k))
     return {
       connection: this.shownConnection(),
@@ -225,7 +216,9 @@ export class Controller {
     const id = this.currentSessionID
     const stored = id ? this.hidden[id] : undefined
     if (!id || !stored) return
-    const running = this.workers().filter((w) => w.status === "running" && stored.includes(w.key)).map((w) => w.key)
+    const running = this.workers()
+      .filter((w) => w.status === "running" && stored.includes(w.key))
+      .map((w) => w.key)
     if (running.length) this.setHidden(removeHidden(this.hidden, id, running))
   }
 
@@ -351,7 +344,6 @@ export class Controller {
       return undefined
     }
   }
-
 
   /** Attach a ready client and start following events. Replaces any previous attachment. */
   attach(client: OpenCodeClient) {
@@ -547,14 +539,20 @@ export class Controller {
         this.permissions.set(d.sessionID, [...(this.permissions.get(d.sessionID) ?? []).filter((p) => p.id !== d.id), d as PermissionRequest])
         break
       case "permission.replied":
-        this.permissions.set(d.sessionID, (this.permissions.get(d.sessionID) ?? []).filter((p) => p.id !== d.requestID))
+        this.permissions.set(
+          d.sessionID,
+          (this.permissions.get(d.sessionID) ?? []).filter((p) => p.id !== d.requestID),
+        )
         break
       case "form.created":
         if (d.form) this.forms.set(d.form.sessionID, [...(this.forms.get(d.form.sessionID) ?? []).filter((f) => f.id !== d.form.id), d.form as FormInfo])
         break
       case "form.replied":
       case "form.cancelled":
-        this.forms.set(d.sessionID, (this.forms.get(d.sessionID) ?? []).filter((f) => f.id !== d.id))
+        this.forms.set(
+          d.sessionID,
+          (this.forms.get(d.sessionID) ?? []).filter((f) => f.id !== d.id),
+        )
         break
     }
     if (sessionID && sessionID === this.currentSessionID && ev.type.startsWith("session.")) this.feed.apply(ev)
@@ -587,12 +585,22 @@ export class Controller {
       await this.resolveDirectory(client)
       this.catalog.invalidateCommands()
       this.catalog.invalidateSkills()
-      await Promise.all([this.loadSessions(), this.loadPending(client), this.loadCatalog(client), this.loadShells(client), this.catalog.loadCommands(client, this.dir, this.opts.log), this.mcp.refresh()])
+      await Promise.all([
+        this.loadSessions(),
+        this.loadPending(client),
+        this.loadCatalog(client),
+        this.loadShells(client),
+        this.catalog.loadCommands(client, this.dir, this.opts.log),
+        this.mcp.refresh(),
+      ])
       const first = !this.synced
       this.synced = true
       if (first) {
         const remembered = this.opts.storage?.get(LAST_SESSION_KEY)
-        this.target = initialTarget(this.sessions.map((s) => s.id), typeof remembered === "string" ? remembered : undefined)
+        this.target = initialTarget(
+          this.sessions.map((s) => s.id),
+          typeof remembered === "string" ? remembered : undefined,
+        )
       }
       if (this.target.kind === "session") await this.loadView(this.target.id)
       else this.children.clear()
@@ -652,7 +660,14 @@ export class Controller {
       for (const [id, c] of this.children) if (c.parentID === parentID) this.children.delete(id)
       for (const c of res.data) if (c.parentID === parentID) this.children.set(c.id, c)
       // Hidden keys of children the server no longer has are dropped (only when the list is complete).
-      this.setHidden(pruneHidden(this.hidden, parentID, res.data.map((c) => c.id), res.data.length < CHILD_PAGE))
+      this.setHidden(
+        pruneHidden(
+          this.hidden,
+          parentID,
+          res.data.map((c) => c.id),
+          res.data.length < CHILD_PAGE,
+        ),
+      )
     } catch {
       // Older server or a transient error: the Background row then relies on the tool lines alone.
     }
@@ -688,7 +703,9 @@ export class Controller {
     if (roots.data.length === 0 && isWindowsPath(this.dir)) roots = await client.session.list({ parentID: null, limit: 200 })
     this.sessions = this.sort(roots.data.filter((s) => isRoot(s) && this.isListed(s.location.directory)))
     const others = [...new Set(roots.data.filter((s) => !this.isListed(s.location?.directory)).map((s) => s.location?.directory))]
-    this.opts.log?.(`Sessions: ${this.sessions.length} for this folder of ${roots.data.length} listed for ${this.projectID ? `project ${this.projectID}` : this.dir}${others.length ? `; other folders: ${others.slice(0, 5).join(", ")}` : ""}`)
+    this.opts.log?.(
+      `Sessions: ${this.sessions.length} for this folder of ${roots.data.length} listed for ${this.projectID ? `project ${this.projectID}` : this.dir}${others.length ? `; other folders: ${others.slice(0, 5).join(", ")}` : ""}`,
+    )
     this.running = new Set(Object.keys(active).filter((id) => this.sessions.some((s) => s.id === id) || this.children.has(id) || this.running.has(id) || id === this.currentSessionID))
     this.sessionsLoaded = true
     if (this.showArchived) await this.loadArchived()
@@ -724,7 +741,12 @@ export class Controller {
     this.agents = primaryAgents(agents.data).map((a) => ({ id: a.id, name: a.name, description: a.description }))
     // Only what the pickers need. Provider settings, headers and keys never leave this method.
     this.models = models.data.map((m) => ({
-      id: m.id, modelID: m.modelID, providerID: m.providerID, name: m.name, enabled: m.enabled, status: m.status,
+      id: m.id,
+      modelID: m.modelID,
+      providerID: m.providerID,
+      name: m.name,
+      enabled: m.enabled,
+      status: m.status,
       variants: m.variants.map((v) => ({ id: v.id })),
       input: m.capabilities?.input,
     }))
@@ -960,7 +982,7 @@ export class Controller {
     this.sentTick++
     this.emitNow()
     // No `delivery`: the server default is `steer`, so a prompt sent while the agent works joins the running turn at
-    // its next step (Salim wants this). Prompts queued by other clients still show, with Send now / Remove.
+    // its next step. Prompts queued by other clients still show, with Send now / Remove.
     await deliver(id)
   }
 

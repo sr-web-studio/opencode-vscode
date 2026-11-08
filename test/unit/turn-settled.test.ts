@@ -89,7 +89,12 @@ describe("turns loaded from history", () => {
   test("a turn whose prompt text is just '..' still gets its time and a duration", () => {
     const messages: any[] = [
       { id: "u1", type: "user", text: "..", time: { created: at(14, 0) } },
-      { id: "a1", type: "assistant", content: [{ type: "tool", id: "t1", name: "read", state: { status: "completed", input: {}, content: [] }, time: { created: at(14, 0), completed: at(14, 0) } }], time: { created: at(14, 0), completed: at(14, 0) } },
+      {
+        id: "a1",
+        type: "assistant",
+        content: [{ type: "tool", id: "t1", name: "read", state: { status: "completed", input: {}, content: [] }, time: { created: at(14, 0), completed: at(14, 0) } }],
+        time: { created: at(14, 0), completed: at(14, 0) },
+      },
       { id: "a2", type: "assistant", content: [{ type: "text", text: "all good" }], time: { created: at(14, 0), completed: at(14, 0) + 19_000 } },
     ]
     const v = viewFromMessages(messages)

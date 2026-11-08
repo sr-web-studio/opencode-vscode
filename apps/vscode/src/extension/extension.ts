@@ -49,10 +49,16 @@ export function activate(context: vscode.ExtensionContext): void {
   })
   context.globalState.setKeysForSync([PINS_KEY])
   // `provider` is created below; dictation text is only posted after a recording starts, long after activation.
-  const voice = new Voice(context.secrets, (v) => controller.setVoice(v), (m) => provider.post(m), (line) => output.info(line), {
-    vsix: vscode.Uri.joinPath(context.extensionUri, "dist", "opencode-voice.vsix"),
-    version: String(context.extension.packageJSON.version ?? ""),
-  })
+  const voice = new Voice(
+    context.secrets,
+    (v) => controller.setVoice(v),
+    (m) => provider.post(m),
+    (line) => output.info(line),
+    {
+      vsix: vscode.Uri.joinPath(context.extensionUri, "dist", "opencode-voice.vsix"),
+      version: String(context.extension.packageJSON.version ?? ""),
+    },
+  )
   void voice.refresh()
   // Installing OpenCode installs its voice companion on this computer too (also from a remote window). Quietly, a
   // little after startup; a failure is only logged here and explained when the mic is clicked.
@@ -65,7 +71,13 @@ export function activate(context: vscode.ExtensionContext): void {
   let workers!: WorkerPanels
   const images = new ImagePreviews(context.globalStorageUri, controller)
   void images.cleanup()
-  const host: HostActions = new HostActions(directory, () => terminals, () => workers, () => images, () => diffs)
+  const host: HostActions = new HostActions(
+    directory,
+    () => terminals,
+    () => workers,
+    () => images,
+    () => diffs,
+  )
   const diffs = new DiffViews((path) => host.resolvePath(path))
   terminals = new ShellTerminals(controller, readTerminalSettings)
   workers = new WorkerPanels(context.extensionUri, controller, () => host)
@@ -157,7 +169,12 @@ export function activate(context: vscode.ExtensionContext): void {
     workers,
     images,
     diffs,
-    { dispose: () => { generation++; controller.detach() } },
+    {
+      dispose: () => {
+        generation++
+        controller.detach()
+      },
+    },
     vscode.window.registerWebviewViewProvider(VIEW_ID, provider),
     vscode.commands.registerCommand("opencode.focus", () => vscode.commands.executeCommand(`${VIEW_ID}.focus`)),
     vscode.commands.registerCommand("opencode.newSession", async () => {
@@ -172,7 +189,11 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("opencode.openGlobalConfig", () => openGlobalConfigCommand(serverHostname)),
     vscode.commands.registerCommand("opencode.reconnect", () => start()),
     vscode.commands.registerCommand("opencode.pairMobileDevice", () =>
-      pairMobileCommand({ client: () => (controller.snapshot().connection.status === "connected" ? controller.api : undefined), windowUrl: () => controller.snapshot().connection.url, log: (line) => output.info(line) }),
+      pairMobileCommand({
+        client: () => (controller.snapshot().connection.status === "connected" ? controller.api : undefined),
+        windowUrl: () => controller.snapshot().connection.url,
+        log: (line) => output.info(line),
+      }),
     ),
     voice,
     vscode.commands.registerCommand("opencode.voice.setKey", () => voice.setKey()),
@@ -218,7 +239,8 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration("opencode.voice.engine")) void voice.refresh()
-      if (e.affectsConfiguration("opencode.voice.localLanguages") || e.affectsConfiguration("opencode.voice.localLanguage") || e.affectsConfiguration("opencode.voice.maxLanguages")) voice.syncLanguages()
+      if (e.affectsConfiguration("opencode.voice.localLanguages") || e.affectsConfiguration("opencode.voice.localLanguage") || e.affectsConfiguration("opencode.voice.maxLanguages"))
+        voice.syncLanguages()
       if (affectsView(e)) controller.setSettings(readViewSettings())
       if (affectsConnection(e)) void start()
     }),

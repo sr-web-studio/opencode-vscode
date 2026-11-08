@@ -40,7 +40,10 @@ export async function checkSonioxKey(fetch: FetchLike, raw: string, timeoutMs = 
     return { ok: false, reason: `Soniox answered with HTTP ${res.status}. The key was not saved.` }
   } catch (e) {
     const timedOut = abort.signal.aborted
-    return { ok: false, reason: timedOut ? "Soniox did not answer in time. The key was not saved." : `Could not reach Soniox (${e instanceof Error ? e.message : "network error"}). The key was not saved.` }
+    return {
+      ok: false,
+      reason: timedOut ? "Soniox did not answer in time. The key was not saved." : `Could not reach Soniox (${e instanceof Error ? e.message : "network error"}). The key was not saved.`,
+    }
   } finally {
     clearTimeout(timer)
   }
@@ -52,7 +55,11 @@ export type TempKey = { ok: true; key: string } | { ok: false; reason: string }
  * A short-lived key for one recording. The companion (on the user's laptop) connects to Soniox with it, so the user's
  * long-lived key never leaves the main extension's secret storage. The key only has to be valid when the stream opens.
  */
-export async function mintSonioxTempKey(fetch: (url: string, init: { method: string; headers: Record<string, string>; body: string; signal?: AbortSignal }) => Promise<{ status: number; ok: boolean; json(): Promise<unknown> }>, key: string, timeoutMs = 10_000): Promise<TempKey> {
+export async function mintSonioxTempKey(
+  fetch: (url: string, init: { method: string; headers: Record<string, string>; body: string; signal?: AbortSignal }) => Promise<{ status: number; ok: boolean; json(): Promise<unknown> }>,
+  key: string,
+  timeoutMs = 10_000,
+): Promise<TempKey> {
   const abort = new AbortController()
   const timer = setTimeout(() => abort.abort(), timeoutMs)
   try {

@@ -1,15 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
-import {
-  CONFIG_SCHEMA,
-  NEW_CONFIG_TEXT,
-  configPlace,
-  globalConfigDir,
-  openGlobalConfig,
-  remoteConfigNotice,
-  resolveGlobalConfig,
-  type ConfigHost,
-} from "@occ/core/global-config"
+import { CONFIG_SCHEMA, NEW_CONFIG_TEXT, configPlace, globalConfigDir, openGlobalConfig, remoteConfigNotice, resolveGlobalConfig, type ConfigHost } from "@occ/core/global-config"
 
 const linux = { env: {}, home: "/home/ann", platform: "linux" }
 
@@ -69,10 +60,10 @@ describe("which computer", () => {
     expect(configPlace({ serverUrl: "localhost:4096" })).toEqual({ where: "here" })
   })
   test("another address with the same host name as this machine: this machine", () => {
-    expect(configPlace({ serverUrl: "http://10.0.0.10:4096", serverHostname: "Office", localHostname: "office" })).toEqual({ where: "here" })
+    expect(configPlace({ serverUrl: "http://192.168.1.10:4096", serverHostname: "Home server", localHostname: "home server" })).toEqual({ where: "here" })
   })
   test("another computer: the server's, with its name when known", () => {
-    expect(configPlace({ serverUrl: "http://10.0.0.10:4096", serverHostname: "srws-server-office", localHostname: "laptop" })).toEqual({ where: "server", hostname: "srws-server-office" })
+    expect(configPlace({ serverUrl: "http://192.168.1.10:4096", serverHostname: "my-server", localHostname: "laptop" })).toEqual({ where: "server", hostname: "my-server" })
     expect(configPlace({ serverUrl: "https://opencode.example.com" })).toEqual({ where: "server", hostname: undefined })
   })
   test("the notice names the computer and never claims a path as fact", () => {
@@ -118,10 +109,10 @@ describe("openGlobalConfig", () => {
   })
   test("another computer's server: an info message, no file access at all", async () => {
     const { host, log } = fake(["/home/ann/.config/opencode/opencode.json"])
-    const r = await openGlobalConfig({ ...local, serverUrl: "http://10.0.0.10:4096", serverHostname: "srws-server-office", localHostname: "laptop" }, host)
+    const r = await openGlobalConfig({ ...local, serverUrl: "http://192.168.1.10:4096", serverHostname: "my-server", localHostname: "laptop" }, host)
     expect(r).toBe("remote")
     expect(log).toHaveLength(1)
-    expect(log[0]).toContain("srws-server-office")
+    expect(log[0]).toContain("my-server")
   })
   test("no home folder: says so", async () => {
     const { host, log } = fake([])

@@ -6,8 +6,7 @@ import { isRoot, UNTITLED } from "./sessions"
  * The only way this extension deletes a session: the user asks for it and confirms in a host modal. Nothing else
  * (no event, no cleanup, no timer) ever calls `session.remove`.
  */
-export const DELETE_DETAIL =
-  "This deletes the session and its workers on the OpenCode server for every client (TUI, other windows). It cannot be undone."
+export const DELETE_DETAIL = "This deletes the session and its workers on the OpenCode server for every client (TUI, other windows). It cannot be undone."
 
 export const DELETE_BUTTON = "Delete"
 

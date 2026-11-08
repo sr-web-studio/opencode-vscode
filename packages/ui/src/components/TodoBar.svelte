@@ -38,17 +38,73 @@
 
 <style>
   /* Floats over the bottom of the transcript: its own background and a shadow, so the text scrolls underneath. */
-  .todo { padding: 0.4em var(--oc-side) 0.35em; background: var(--vscode-sideBar-background, var(--vscode-editor-background)); box-shadow: 0 -4px 10px -4px var(--vscode-widget-shadow); border-top: 1px solid var(--oc-hairline); }
-  .line { display: flex; align-items: center; gap: 0.5em; width: 100%; text-align: left; min-width: 0; }
-  .cur-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .panel { border: 1px solid var(--oc-hairline); border-radius: 6px; padding: 0.5em 0.7em; margin-bottom: 0.35em; background: var(--oc-popover); }
-  .head { font-weight: 600; margin-bottom: 0.35em; }
-  .bar { height: 2px; background: var(--oc-hairline); border-radius: 1px; margin-bottom: 0.45em; }
-  .fill { height: 100%; background: var(--oc-accent); border-radius: 1px; }
-  ul { list-style: none; margin: 0; padding: 0; max-height: 14em; overflow-y: auto; }
-  li { display: flex; gap: 0.55em; padding: 0.1em 0; }
-  li.done { color: var(--oc-muted); }
-  li.done .txt { text-decoration: line-through; }
-  li.cur { color: var(--oc-accent); }
-  .ico { width: 1em; text-align: center; flex: none; }
+  .todo {
+    padding: 0.4em var(--oc-side) 0.35em;
+    background: var(--vscode-sideBar-background, var(--vscode-editor-background));
+    box-shadow: 0 -4px 10px -4px var(--vscode-widget-shadow);
+    border-top: 1px solid var(--oc-hairline);
+  }
+  .line {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    width: 100%;
+    text-align: left;
+    min-width: 0;
+  }
+  .cur-text {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .panel {
+    border: 1px solid var(--oc-hairline);
+    border-radius: 6px;
+    padding: 0.5em 0.7em;
+    margin-bottom: 0.35em;
+    background: var(--oc-popover);
+  }
+  .head {
+    font-weight: 600;
+    margin-bottom: 0.35em;
+  }
+  .bar {
+    height: 2px;
+    background: var(--oc-hairline);
+    border-radius: 1px;
+    margin-bottom: 0.45em;
+  }
+  .fill {
+    height: 100%;
+    background: var(--oc-accent);
+    border-radius: 1px;
+  }
+  ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 14em;
+    overflow-y: auto;
+  }
+  li {
+    display: flex;
+    gap: 0.55em;
+    padding: 0.1em 0;
+  }
+  li.done {
+    color: var(--oc-muted);
+  }
+  li.done .txt {
+    text-decoration: line-through;
+  }
+  li.cur {
+    color: var(--oc-accent);
+  }
+  .ico {
+    width: 1em;
+    text-align: center;
+    flex: none;
+  }
 </style>

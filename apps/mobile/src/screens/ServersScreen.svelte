@@ -2,9 +2,10 @@
   import Codicon from "@occ/ui/components/Codicon.svelte"
   import Bar from "../components/Bar.svelte"
   import { model } from "../model.svelte"
+  import { IS_PREVIEW, PREVIEW_TAG } from "../lib/version"
 </script>
 
-<Bar title="Servers" back={false}>
+<Bar title="Servers" back={false} badge={IS_PREVIEW ? PREVIEW_TAG : undefined}>
   {#snippet actions()}
     <button class="iconbtn" onclick={() => model.openSettings()} aria-label="Settings"><Codicon name="settings-gear" /></button>
     <button class="iconbtn" onclick={() => model.push({ kind: "server-form" })} aria-label="Add server"><Codicon name="add" /></button>
@@ -16,7 +17,9 @@
     <div class="center">
       <Codicon name="server-environment" />
       <strong>No server yet</strong>
-      <p class="muted">Add the OpenCode server that runs on your computer. The easiest way is to scan the QR code from “OpenCode: Pair Mobile Device” in VS Code, or from <code>opencode pair</code>.</p>
+      <p class="muted">
+        Add the OpenCode server that runs on your computer. The easiest way is to scan the QR code from “OpenCode: Pair Mobile Device” in VS Code. You can also type the address and password yourself.
+      </p>
       <button class="btn" onclick={() => model.push({ kind: "server-form" })}><Codicon name="add" /> Add server</button>
     </div>
   {:else}
@@ -39,7 +42,20 @@
 </div>
 
 <style>
-  .entry { display: flex; align-items: center; border-bottom: 1px solid var(--oc-hairline); padding-right: 8px; }
-  .entry .row { border-bottom: none; }
-  .bad { display: block; margin-top: 2px; font-size: 0.85em; color: var(--oc-error); white-space: normal; }
+  .entry {
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid var(--oc-hairline);
+    padding-right: 8px;
+  }
+  .entry .row {
+    border-bottom: none;
+  }
+  .bad {
+    display: block;
+    margin-top: 2px;
+    font-size: 0.85em;
+    color: var(--oc-error);
+    white-space: normal;
+  }
 </style>

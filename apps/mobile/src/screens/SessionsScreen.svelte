@@ -54,7 +54,9 @@
       {#each g.rows as r (r.id)}
         <button class="row" onclick={() => model.push({ kind: "chat", directory, sessionID: r.id })}>
           <span class="dot {r.dot}" role="img" aria-label={r.dot === "running" ? "Running" : r.dot === "waiting" ? "Waiting for you" : ""}></span>
-          <span class="main"><span class="t">{r.title}</span>{#if r.dot !== "none"}<span class="s">{r.dot === "running" ? "Running" : "Waiting for your answer"}</span>{/if}</span>
+          <span class="main"
+            ><span class="t">{r.title}</span>{#if r.dot !== "none"}<span class="s">{r.dot === "running" ? "Running" : "Waiting for your answer"}</span>{/if}</span
+          >
           <span class="end">{relativeTime(r.updated, now)}</span>
         </button>
       {/each}
@@ -63,5 +65,13 @@
 </div>
 
 <style>
-  .group { margin: 0; padding: 14px 16px 4px; font-size: 0.8em; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--oc-muted); }
+  .group {
+    margin: 0;
+    padding: 14px 16px 4px;
+    font-size: 0.8em;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--oc-muted);
+  }
 </style>

@@ -7,7 +7,14 @@ const f = (x: unknown) => x as FormField
 
 describe("visibility", () => {
   const fields = [
-    f({ key: "db", type: "string", options: [{ value: "pg", label: "Postgres" }, { value: "sqlite", label: "SQLite" }] }),
+    f({
+      key: "db",
+      type: "string",
+      options: [
+        { value: "pg", label: "Postgres" },
+        { value: "sqlite", label: "SQLite" },
+      ],
+    }),
     f({ key: "url", type: "string", when: [{ key: "db", op: "eq", value: "pg" }] }),
     f({ key: "file", type: "string", when: [{ key: "db", op: "neq", value: "pg" }] }),
     f({ key: "secret", type: "string", hidden: true }),
@@ -51,7 +58,17 @@ describe("validation", () => {
     expect(validateField(f({ key: "n", type: "number", required: true }), undefined)).toBe("Required")
   })
   test("multiselect min/max and Other", () => {
-    const m = f({ key: "m", type: "multiselect", options: [{ value: "a", label: "A" }, { value: "b", label: "B" }], minItems: 1, maxItems: 2, custom: true })
+    const m = f({
+      key: "m",
+      type: "multiselect",
+      options: [
+        { value: "a", label: "A" },
+        { value: "b", label: "B" },
+      ],
+      minItems: 1,
+      maxItems: 2,
+      custom: true,
+    })
     expect(validateField(m, [])).toBe("Choose at least 1")
     expect(validateField(m, ["a", "b", "c"])).toBe("Choose at most 2")
     expect(validateField(m, ["a"])).toBeUndefined()
@@ -87,11 +104,21 @@ describe("answers", () => {
     expect(out).toEqual({ q0: "teal", m: ["a", "mine"], n: 7 })
   })
   test("defaults", () => {
-    expect(defaultAnswers([f({ key: "a", type: "string", default: "x" }), f({ key: "b", type: "boolean", default: true }), f({ key: "c", type: "multiselect", options: [], default: ["z"] }), f({ key: "d", type: "number", default: "NaN" })])).toEqual({ a: "x", b: true, c: ["z"] })
+    expect(
+      defaultAnswers([
+        f({ key: "a", type: "string", default: "x" }),
+        f({ key: "b", type: "boolean", default: true }),
+        f({ key: "c", type: "multiselect", options: [], default: ["z"] }),
+        f({ key: "d", type: "number", default: "NaN" }),
+      ]),
+    ).toEqual({ a: "x", b: true, c: ["z"] })
   })
   test("tabs track visibility and completion", () => {
     const fields = [f({ key: "a", title: "Database", type: "boolean" }), f({ key: "b", title: "Auth", type: "string", required: true })]
-    expect(tabsFor(fields, { a: true }, {})).toEqual([{ key: "a", label: "Database", done: true }, { key: "b", label: "Auth", done: false }])
+    expect(tabsFor(fields, { a: true }, {})).toEqual([
+      { key: "a", label: "Database", done: true },
+      { key: "b", label: "Auth", done: false },
+    ])
     expect(clampStep(5, 2)).toBe(1)
     expect(clampStep(-1, 2)).toBe(0)
     expect(clampStep(3, 0)).toBe(0)

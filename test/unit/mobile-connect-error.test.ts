@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { classifyConnectError, diagnoseConnectError, hostLabel, startProbe, PROBE_TIMEOUT_MS, type Probe } from "../../apps/mobile/src/lib/connect-error"
 
-const URL = "http://10.0.0.10:4096"
+const URL = "http://192.168.1.10:4096"
 const answered = (yes: boolean) => (): Probe => ({ result: Promise.resolve(yes), cancel() {} })
 
 describe("diagnoseConnectError: Failed to fetch is settled by a second request", () => {
@@ -9,7 +9,7 @@ describe("diagnoseConnectError: Failed to fetch is settled by a second request",
 
   test("the host does not answer: unreachable, in the wording for the user", async () => {
     const r = await diagnoseConnectError(fetchError, URL, "http://tauri.localhost", answered(false))
-    expect(r).toEqual({ kind: "unreachable", message: "Can't reach 10.0.0.10:4096. Check the address, Wi-Fi or Tailscale." })
+    expect(r).toEqual({ kind: "unreachable", message: "Can't reach 192.168.1.10:4096. Check the address, Wi-Fi or Tailscale." })
   })
 
   test("the host answers: it is the CORS list, and the origin is named", async () => {
@@ -87,18 +87,18 @@ describe("connection test errors", () => {
     for (const m of ["Transport: ECONNREFUSED: Unable to connect", "connect ETIMEDOUT", "net::ERR_ADDRESS_UNREACHABLE EHOSTUNREACH", "getaddrinfo ENOTFOUND box", "The request timed out"]) {
       const r = classifyConnectError(new Error(m), URL)
       expect(r.kind).toBe("unreachable")
-      expect(r.message).toBe("Can't reach 10.0.0.10:4096. Check the address, Wi-Fi or Tailscale.")
+      expect(r.message).toBe("Can't reach 192.168.1.10:4096. Check the address, Wi-Fi or Tailscale.")
     }
   })
   test("a browser TypeError (Failed to fetch) is provisionally CORS and names the app's origin", () => {
     const r = classifyConnectError(new TypeError("Failed to fetch"), URL, "http://tauri.localhost")
     expect(r.kind).toBe("cors")
     expect(r.message).toContain("http://tauri.localhost")
-    expect(r.message).toContain("10.0.0.10:4096")
+    expect(r.message).toContain("192.168.1.10:4096")
     expect(classifyConnectError(new TypeError("Load failed"), URL).kind).toBe("cors")
   })
   test("a TypeError caused by a refused connection is still reported as unreachable (Bun/Node wording)", () => {
-    const e = new TypeError("fetch failed", { cause: new Error("connect ECONNREFUSED 10.0.0.10:4096") })
+    const e = new TypeError("fetch failed", { cause: new Error("connect ECONNREFUSED 192.168.1.10:4096") })
     expect(classifyConnectError(e, URL).kind).toBe("unreachable")
   })
   test("anything else keeps its message; empty errors still say something", () => {

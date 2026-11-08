@@ -9,6 +9,10 @@ const config: CapacitorConfig = {
   appId: "dev.srwebstudio.opencode",
   appName: "OpenCode (unofficial)",
   webDir: "dist",
+  // Never log plugin call payloads. Capacitor's default ("debug") logs every plugin call and result in debug builds
+  // (JS `LOG FROM NATIVE`, then the WebView console, then logcat `Capacitor/Console`), and SecureStorage results hold
+  // the saved servers with their passwords. "none" turns that bridge logging off in every build.
+  loggingBehavior: "none",
   server: {
     androidScheme: "http",
     hostname: "tauri.localhost",

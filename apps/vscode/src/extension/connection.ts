@@ -46,11 +46,7 @@ export async function connect(opts: ConnectOptions): Promise<Connected> {
     if (!endpoint) {
       const cli = resolveCli(opts.cliPath)
       if (!cli) {
-        throw new SetupError(
-          opts.cliPath.trim()
-            ? `No executable found at the configured CLI path: ${opts.cliPath.trim()}`
-            : "The opencode command was not found on PATH or in ~/.opencode/bin.",
-        )
+        throw new SetupError(opts.cliPath.trim() ? `No executable found at the configured CLI path: ${opts.cliPath.trim()}` : "The opencode command was not found on PATH or in ~/.opencode/bin.")
       }
       endpoint = await Service.ensure({ command: [cli, "serve", "--service"] })
     }

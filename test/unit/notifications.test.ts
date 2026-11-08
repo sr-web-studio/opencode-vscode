@@ -8,8 +8,12 @@ const loc = { directory: DIR }
 class Recorder implements Notifier {
   shown: Notice[] = []
   dismissed: string[] = []
-  show(n: Notice) { this.shown.push(n) }
-  dismiss(id: string) { this.dismissed.push(id) }
+  show(n: Notice) {
+    this.shown.push(n)
+  }
+  dismiss(id: string) {
+    this.dismissed.push(id)
+  }
 }
 
 let rec: Recorder
@@ -31,7 +35,11 @@ beforeEach(() => {
 })
 
 const permission = (id = "per_1", sessionID = "root", location: any = loc) => ({ type: "permission.asked", location, data: { id, sessionID, action: "shell", resources: ["rm -rf dist"] } })
-const form = (id = "frm_1", sessionID = "root") => ({ type: "form.created", location: loc, data: { form: { id, sessionID, title: "Questions", fields: [{ key: "q0", title: "Color", description: "Red or blue?", type: "string" }] } } })
+const form = (id = "frm_1", sessionID = "root") => ({
+  type: "form.created",
+  location: loc,
+  data: { form: { id, sessionID, title: "Questions", fields: [{ key: "q0", title: "Color", description: "Red or blue?", type: "string" }] } },
+})
 const done = (sessionID = "root", type = "session.execution.succeeded", extra: any = {}) => ({ type, location: loc, data: { sessionID, ...extra } })
 
 describe("triggers and defaults", () => {

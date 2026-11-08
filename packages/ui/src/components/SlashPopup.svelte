@@ -58,20 +58,67 @@
 
 <style>
   .pop {
-    position: absolute; left: 0; right: 0; bottom: calc(100% + 4px); z-index: 25;
-    max-height: min(40vh, 15em); overflow-y: auto; padding: 3px 0;
-    font-size: inherit; line-height: 1.5;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: calc(100% + 4px);
+    z-index: 25;
+    max-height: min(40vh, 15em);
+    overflow-y: auto;
+    padding: 3px 0;
+    font-size: inherit;
+    line-height: 1.5;
     color: var(--vscode-editorSuggestWidget-foreground, var(--oc-fg));
     background: var(--vscode-editorSuggestWidget-background, var(--oc-popover));
     border: 1px solid var(--vscode-editorSuggestWidget-border, var(--oc-hairline));
-    border-radius: 6px; box-shadow: 0 4px 16px var(--vscode-widget-shadow);
+    border-radius: 6px;
+    box-shadow: 0 4px 16px var(--vscode-widget-shadow);
   }
-  .row { display: flex; align-items: baseline; gap: 0.7em; min-height: 24px; padding: 1px 10px; cursor: pointer; }
-  .row.sel { background: var(--vscode-editorSuggestWidget-selectedBackground, var(--vscode-quickInputList-focusBackground, var(--oc-selected))); color: var(--vscode-editorSuggestWidget-selectedForeground, var(--vscode-quickInputList-focusForeground, var(--oc-selected-fg, inherit))); }
-  .row.sel .muted { color: inherit; opacity: 0.8; }
-  .n { font-weight: 600; white-space: nowrap; flex: none; max-width: 70%; overflow: hidden; text-overflow: ellipsis; }
-  .d { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .mark { flex: none; margin-left: auto; opacity: 0.7; }
-  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-  .empty { padding: 4px 10px; }
+  .row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.7em;
+    min-height: 24px;
+    padding: 1px 10px;
+    cursor: pointer;
+  }
+  .row.sel {
+    background: var(--vscode-editorSuggestWidget-selectedBackground, var(--vscode-quickInputList-focusBackground, var(--oc-selected)));
+    color: var(--vscode-editorSuggestWidget-selectedForeground, var(--vscode-quickInputList-focusForeground, var(--oc-selected-fg, inherit)));
+  }
+  .row.sel .muted {
+    color: inherit;
+    opacity: 0.8;
+  }
+  .n {
+    font-weight: 600;
+    white-space: nowrap;
+    flex: none;
+    max-width: 70%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .d {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mark {
+    flex: none;
+    margin-left: auto;
+    opacity: 0.7;
+  }
+  .sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .empty {
+    padding: 4px 10px;
+  }
 </style>

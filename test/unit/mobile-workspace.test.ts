@@ -96,7 +96,10 @@ describe("screen stack", () => {
 
   test("the folders still in use are those of the screens on the stack", () => {
     const k = keys()
-    let s: Entry[] = [{ key: k(), screen: { kind: "servers" } }, { key: k(), screen: { kind: "projects" } }]
+    let s: Entry[] = [
+      { key: k(), screen: { kind: "servers" } },
+      { key: k(), screen: { kind: "projects" } },
+    ]
     expect([...directoriesInUse(s)]).toEqual([])
     s = push(s, { kind: "sessions", directory: "/a" }, k())
     s = push(s, { kind: "chat", directory: "/a" }, k())

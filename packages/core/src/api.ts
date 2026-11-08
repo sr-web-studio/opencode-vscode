@@ -2,17 +2,7 @@
  * Type-only re-exports from the root `@opencode/client` entry. Nothing here exists at runtime,
  * so core and UI code stay free of Node and of the service-lifecycle entry point.
  */
-import type {
-  AgentInfo,
-  FormField,
-  FormInfo,
-  ModelRef,
-  OpenCodeClient,
-  OpenCodeEvent,
-  PermissionRequest,
-  SessionInfo,
-  SessionMessageInfo,
-} from "@opencode/client"
+import type { AgentInfo, FormField, FormInfo, ModelRef, OpenCodeClient, OpenCodeEvent, PermissionRequest, SessionInfo, SessionMessageInfo } from "@opencode/client"
 
 export type { AgentInfo, FormField, FormInfo, ModelRef, OpenCodeClient, OpenCodeEvent, PermissionRequest, SessionInfo, SessionMessageInfo }
 

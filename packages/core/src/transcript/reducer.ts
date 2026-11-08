@@ -4,18 +4,7 @@ import { attachmentSource } from "../images"
 import { settledTurn } from "./turn"
 import { applyRevertEvent } from "./revert"
 import { toolErrorText } from "./tool-error"
-import {
-  emptyView,
-  type CompactionView,
-  type FileChip,
-  type Outcome,
-  type QueuedMessage,
-  type SessionView,
-  type StepItem,
-  type StepView,
-  type ToolItem,
-  type TurnView,
-} from "./types"
+import { emptyView, type CompactionView, type FileChip, type Outcome, type QueuedMessage, type SessionView, type StepItem, type StepView, type ToolItem, type TurnView } from "./types"
 
 /* ------------------------------------------------------------------ helpers */
 
@@ -35,8 +24,7 @@ export function contentText(content: Content): string {
   return out.length > MAX_OUTPUT ? `…${out.slice(out.length - MAX_OUTPUT)}` : out
 }
 
-const record = (v: unknown): Record<string, unknown> =>
-  v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {}
+const record = (v: unknown): Record<string, unknown> => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {})
 
 /**
  * Chips for the files of a user message (history items carry `name`/`mime`/`data`/`source`; live payloads carry `uri`/`name`).
@@ -257,12 +245,7 @@ function locateStep(view: SessionView, id: string): { turn: number; step: number
   return undefined
 }
 
-function updateStep(
-  view: SessionView,
-  id: string,
-  created: number | undefined,
-  fn: (step: StepView) => StepView,
-): SessionView {
+function updateStep(view: SessionView, id: string, created: number | undefined, fn: (step: StepView) => StepView): SessionView {
   let v = view
   let at = locateStep(v, id)
   if (!at) {
@@ -285,11 +268,23 @@ function upsertItem(step: StepView, match: (i: StepItem) => boolean, make: () =>
 }
 
 const emptyTool = (id: string, name = "tool", created?: number): ToolItem => ({
-  kind: "tool", id, name, status: "streaming", input: {}, metadata: {}, output: "", created,
+  kind: "tool",
+  id,
+  name,
+  status: "streaming",
+  input: {},
+  metadata: {},
+  output: "",
+  created,
 })
 
 function patchTool(step: StepView, id: string, created: number | undefined, patch: (t: ToolItem) => ToolItem): StepView {
-  return upsertItem(step, (i) => i.kind === "tool" && i.id === id, () => emptyTool(id, "tool", created), (i) => patch(i as ToolItem))
+  return upsertItem(
+    step,
+    (i) => i.kind === "tool" && i.id === id,
+    () => emptyTool(id, "tool", created),
+    (i) => patch(i as ToolItem),
+  )
 }
 
 function patchText(step: StepView, kind: "text" | "reasoning", ordinal: number, patch: (text: string) => { text: string; streaming: boolean }): StepView {

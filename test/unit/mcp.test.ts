@@ -1,14 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import {
-  forwardMismatchNotice,
-  McpManager,
-  mcpActions,
-  mcpSummary,
-  redirectLoopbackPort,
-  signInAdvice,
-  type McpDeps,
-  type McpHost,
-} from "@occ/core/mcp"
+import { forwardMismatchNotice, McpManager, mcpActions, mcpSummary, redirectLoopbackPort, signInAdvice, type McpDeps, type McpHost } from "@occ/core/mcp"
 import { isLocalServer } from "@occ/core/server-url"
 
 describe("mcpActions", () => {
@@ -106,7 +97,18 @@ function fakeServer(rows: Row[]) {
         },
       }),
       oauth: {
-        connect: async (i: any) => (calls.push(`oauth.connect ${i.integrationID} ${i.methodID}`), { data: { attemptID: "att_1", url: "https://auth.example/authorize?redirect_uri=http%3A%2F%2F127.0.0.1%3A35465%2Fcallback", instructions: "Sign in", mode: state.attempt.mode, time: { created: 1, expires: Date.now() + 60_000 } } }),
+        connect: async (i: any) => (
+          calls.push(`oauth.connect ${i.integrationID} ${i.methodID}`),
+          {
+            data: {
+              attemptID: "att_1",
+              url: "https://auth.example/authorize?redirect_uri=http%3A%2F%2F127.0.0.1%3A35465%2Fcallback",
+              instructions: "Sign in",
+              mode: state.attempt.mode,
+              time: { created: 1, expires: Date.now() + 60_000 },
+            },
+          }
+        ),
         status: async () => (calls.push("oauth.status"), { data: state.attempt.polls.shift() ?? { status: "pending" } }),
         complete: async (i: any) => (calls.push(`oauth.complete ${i.code}`), void 0),
         cancel: async (i: any) => (calls.push(`oauth.cancel ${i.attemptID}`), void 0),
@@ -167,7 +169,9 @@ describe("McpManager list", () => {
   })
   test("a failing list shows nothing and, while the panel is open, the reason", async () => {
     const { mcp, server } = manager(rows())
-    server.client.mcp.list = async () => { throw new Error("boom") }
+    server.client.mcp.list = async () => {
+      throw new Error("boom")
+    }
     mcp.open()
     await mcp.refresh()
     expect(mcp.state.servers).toEqual([])
@@ -222,7 +226,9 @@ describe("McpManager sign-in", () => {
     return { h, opened }
   }
   /** Let the background wait run to its end. */
-  const settle = async (mcp: McpManager) => { for (let i = 0; i < 30 && (mcp.state.signIn || (mcp as any).attempt); i++) await new Promise((r) => setTimeout(r, 0)) }
+  const settle = async (mcp: McpManager) => {
+    for (let i = 0; i < 30 && (mcp.state.signIn || (mcp as any).attempt); i++) await new Promise((r) => setTimeout(r, 0))
+  }
 
   test("auto mode: opens the URL, polls until complete, then re-lists", async () => {
     const { h, opened } = host()

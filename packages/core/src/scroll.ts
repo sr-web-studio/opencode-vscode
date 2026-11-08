@@ -24,12 +24,7 @@ export type ScrollState = {
 
 export const initialScroll: ScrollState = { follow: true, unseen: false }
 
-export type ScrollEvent =
-  | { type: "scrolled"; metrics: Metrics }
-  | { type: "content"; metrics: Metrics }
-  | { type: "sent" }
-  | { type: "jump" }
-  | { type: "reset" }
+export type ScrollEvent = { type: "scrolled"; metrics: Metrics } | { type: "content"; metrics: Metrics } | { type: "sent" } | { type: "jump" } | { type: "reset" }
 
 export type ScrollStep = { state: ScrollState; /** Move the view to the end now. */ scrollToEnd: boolean }
 
@@ -58,5 +53,4 @@ export const showJump = (state: ScrollState): boolean => !state.follow
 export const anchoredScrollTop = (scrollTop: number, before: number, after: number): number => scrollTop + (after - before)
 
 /** `scrollTop` after older content was added above: the visible part must not move. */
-export const scrollTopAfterPrepend = (scrollTop: number, heightBefore: number, heightAfter: number): number =>
-  scrollTop + (heightAfter - heightBefore)
+export const scrollTopAfterPrepend = (scrollTop: number, heightBefore: number, heightAfter: number): number => scrollTop + (heightAfter - heightBefore)

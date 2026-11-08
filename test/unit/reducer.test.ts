@@ -13,7 +13,11 @@ const replay = (f: Fixture): SessionView => f.events.reduce((v, e) => applyEvent
 const tools = (v: SessionView): ToolItem[] => v.turns.flatMap((t) => t.steps.flatMap((s) => s.items.filter((i): i is ToolItem => i.kind === "tool")))
 
 describe("live events and history agree", () => {
-  for (const [name, f] of [["simple-edit-shell", fixtureA], ["grep-glob-subagent-question", fixtureB], ["shell-exit-and-error", fixtureC]] as const) {
+  for (const [name, f] of [
+    ["simple-edit-shell", fixtureA],
+    ["grep-glob-subagent-question", fixtureB],
+    ["shell-exit-and-error", fixtureC],
+  ] as const) {
     test(name, () => {
       const live = replay(f as Fixture)
       const hist = viewFromMessages((f as Fixture).messages)
@@ -43,7 +47,10 @@ describe("history view", () => {
 
   test("a turn without an idle marker is running", () => {
     const messages = (fixtureB as Fixture).messages
-    const cut = messages.slice(0, messages.findIndex((m) => m.type === "idle"))
+    const cut = messages.slice(
+      0,
+      messages.findIndex((m) => m.type === "idle"),
+    )
     expect(isRunning(viewFromMessages(cut))).toBe(true)
   })
 
@@ -192,10 +199,16 @@ describe("tool lines", () => {
 
   test("shell exit codes", () => {
     const sh = all.filter((t) => t.name === "shell")
-    const bad = summarizeTool(sh.find((t) => t.metadata.exit === 3)!, cwd)
+    const bad = summarizeTool(
+      sh.find((t) => t.metadata.exit === 3)!,
+      cwd,
+    )
     expect(bad.result).toBe("✗ exit 3")
     expect(bad.tone).toBe("error")
-    const ok = summarizeTool(sh.find((t) => t.metadata.exit === 0)!, cwd)
+    const ok = summarizeTool(
+      sh.find((t) => t.metadata.exit === 0)!,
+      cwd,
+    )
     expect(ok.result).toBe("✓ exit 0")
   })
 

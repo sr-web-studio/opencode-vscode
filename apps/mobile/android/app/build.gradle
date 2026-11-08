@@ -7,8 +7,8 @@ android {
         applicationId "dev.srwebstudio.opencode"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "0.1.0"
+        versionCode 3
+        versionName "0.2.2-beta"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,8 +16,26 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // Release signing: the keystore lives outside the repo (default ~/.config/occ-android/release.jks, or
+    // ANDROID_KEYSTORE_PATH). The password comes from the environment (ANDROID_KEYSTORE_PASSWORD, e.g. from the
+    // git-ignored root .env). Without it a release build stays unsigned; debug builds are unaffected.
+    def releaseStore = file(System.getenv("ANDROID_KEYSTORE_PATH") ?: "${System.getProperty('user.home')}/.config/occ-android/release.jks")
+    def releasePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+    signingConfigs {
+        release {
+            if (releaseStore.exists() && releasePassword) {
+                storeFile releaseStore
+                storePassword releasePassword
+                keyAlias "opencode-mobile"
+                keyPassword releasePassword
+            }
+        }
+    }
     buildTypes {
         release {
+            if (releaseStore.exists() && releasePassword) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

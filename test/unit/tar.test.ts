@@ -26,7 +26,11 @@ describe("parseTar", () => {
   test("reads files and directories from a gzipped tarball", () => {
     const tgz = gzipSync(archive(entry("package/", "", "5", 0o755), entry("package/index.js", "module.exports = 1"), entry("package/lib/a.so", new Uint8Array([1, 2, 3]), "0", 0o755)))
     const entries = parseTar(gunzipSync(tgz))
-    expect(entries.map((e) => [e.path, e.type])).toEqual([["package", "dir"], ["package/index.js", "file"], ["package/lib/a.so", "file"]])
+    expect(entries.map((e) => [e.path, e.type])).toEqual([
+      ["package", "dir"],
+      ["package/index.js", "file"],
+      ["package/lib/a.so", "file"],
+    ])
     expect(new TextDecoder().decode(entries[1]!.data)).toBe("module.exports = 1")
     expect([...entries[2]!.data]).toEqual([1, 2, 3])
     expect(entries[2]!.mode).toBe(0o755)

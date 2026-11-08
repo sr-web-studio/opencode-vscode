@@ -41,7 +41,11 @@ beforeEach(() => {
 })
 
 const finished = (sessionID = "root", type = "session.execution.succeeded") => ({ type, data: { sessionID } }) // no location, as on the wire
-const question = (sessionID = "root", location: any = { directory: "D:\\Work\\proj" }) => ({ type: "form.created", location, data: { form: { id: "f1", sessionID, title: "Q", fields: [{ key: "a", title: "Pick" }] } } })
+const question = (sessionID = "root", location: any = { directory: "D:\\Work\\proj" }) => ({
+  type: "form.created",
+  location,
+  data: { form: { id: "f1", sessionID, title: "Q", fields: [{ key: "a", title: "Pick" }] } },
+})
 
 describe("turn end without an event location", () => {
   test("session folder spelled differently: still shown when the window lists the session", async () => {

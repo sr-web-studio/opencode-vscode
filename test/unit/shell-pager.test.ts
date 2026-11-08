@@ -112,7 +112,12 @@ describe("ShellPager", () => {
 
   test("other errors are reported with their message and stop the pager", async () => {
     const out = collect()
-    const source = { state: async (): Promise<ShellState> => ({ status: "running" }), output: async (): Promise<ShellPage> => { throw new Error("boom") } }
+    const source = {
+      state: async (): Promise<ShellState> => ({ status: "running" }),
+      output: async (): Promise<ShellPage> => {
+        throw new Error("boom")
+      },
+    }
     await new ShellPager(source, out.sink).run()
     expect(out.gone[0]).toContain("boom")
   })

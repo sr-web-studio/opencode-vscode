@@ -25,10 +25,10 @@ describe("profile store", () => {
 
   test("save normalizes the address and defaults serverId to the URL host and the name to the host", async () => {
     const store = new ProfileStore(fakeKV().kv)
-    const p = await store.save({ url: "10.0.0.10:4096/", password: "pw" })
-    expect(p).toMatchObject({ url: "http://10.0.0.10:4096", serverId: "10.0.0.10", name: "10.0.0.10", password: "pw" })
-    const q = await store.save({ url: "https://oc.example.com", password: "x", name: " Office ", serverId: " srws-server-office " })
-    expect(q).toMatchObject({ url: "https://oc.example.com", serverId: "srws-server-office", name: "Office" })
+    const p = await store.save({ url: "192.168.1.10:4096/", password: "pw" })
+    expect(p).toMatchObject({ url: "http://192.168.1.10:4096", serverId: "192.168.1.10", name: "192.168.1.10", password: "pw" })
+    const q = await store.save({ url: "https://oc.example.com", password: "x", name: " Home server ", serverId: " my-server " })
+    expect(q).toMatchObject({ url: "https://oc.example.com", serverId: "my-server", name: "Home server" })
     expect((await store.list()).map((x) => x.id)).toEqual([p.id, q.id])
   })
 
@@ -40,7 +40,10 @@ describe("profile store", () => {
     expect(edited).toMatchObject({ id: a.id, url: "http://a2:4096", name: "A two", password: "secret-a", serverId: "a2" })
     const again = await store.save({ id: a.id, url: "http://a2:4096", password: "new" })
     expect(again.password).toBe("new")
-    expect((await store.list()).map((p) => [p.id, p.password])).toEqual([[a.id, "new"], [b.id, "secret-b"]])
+    expect((await store.list()).map((p) => [p.id, p.password])).toEqual([
+      [a.id, "new"],
+      [b.id, "secret-b"],
+    ])
   })
 
   test("an unusable address is refused with a message", async () => {
@@ -67,17 +70,17 @@ describe("profile store", () => {
   test("learnHostname stores the server's host name once", async () => {
     const { kv, data } = fakeKV()
     const store = new ProfileStore(kv)
-    const a = await store.save({ url: "http://10.0.0.10:4096", password: "1" })
-    await store.learnHostname(a.id, "srws-server-office")
-    expect((await store.get(a.id))?.hostname).toBe("srws-server-office")
+    const a = await store.save({ url: "http://192.168.1.10:4096", password: "1" })
+    await store.learnHostname(a.id, "my-server")
+    expect((await store.get(a.id))?.hostname).toBe("my-server")
     const before = data.get("profiles")
-    await store.learnHostname(a.id, "srws-server-office")
+    await store.learnHostname(a.id, "my-server")
     await store.learnHostname("missing", "x")
     expect(data.get("profiles")).toBe(before)
   })
 
   test("hostOf", () => {
-    expect(hostOf("http://10.0.0.10:4096")).toBe("10.0.0.10")
+    expect(hostOf("http://192.168.1.10:4096")).toBe("192.168.1.10")
     expect(hostOf("oc.example.com:8443")).toBe("oc.example.com")
     expect(hostOf("http://[::1]:4096")).toBe("::1")
     expect(hostOf("")).toBe("")

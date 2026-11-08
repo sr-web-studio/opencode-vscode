@@ -14,7 +14,7 @@ import org.json.JSONObject;
 import org.junit.Test;
 
 public class EventStreamTest {
-  private static final ServerRef SERVER = new ServerRef("srv-1", "Office", "http://h:4096", "pw", "office");
+  private static final ServerRef SERVER = new ServerRef("srv-1", "Home server", "http://h:4096", "pw", "my-server");
 
   /** A scripted server: each open() takes the next step. */
   private static final class Script implements EventStream.Transport {

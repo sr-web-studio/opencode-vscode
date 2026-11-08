@@ -59,8 +59,7 @@ export const readConnectionSettings = () => ({
 })
 
 /** Config keys whose change requires a new connection. */
-export const affectsConnection = (e: vscode.ConfigurationChangeEvent) =>
-  e.affectsConfiguration("opencode.serverUrl") || e.affectsConfiguration("opencode.cliPath")
+export const affectsConnection = (e: vscode.ConfigurationChangeEvent) => e.affectsConfiguration("opencode.serverUrl") || e.affectsConfiguration("opencode.cliPath")
 
 export const affectsView = (e: vscode.ConfigurationChangeEvent) =>
   e.affectsConfiguration("opencode.transcript") || e.affectsConfiguration("opencode.todo") || e.affectsConfiguration("chat.editor.fontSize") || e.affectsConfiguration("terminal.integrated.fontFamily")

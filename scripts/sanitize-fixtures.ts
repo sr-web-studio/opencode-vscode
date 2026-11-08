@@ -17,7 +17,10 @@ const clean = (v: unknown): unknown => {
 const DROP = new Set(["session.instructions.updated", "session.usage.updated", "session.inbox.delivery.changed"])
 const events = (JSON.parse(readFileSync(`${src}/events.json`, "utf8")) as any[]).filter((e) => !DROP.has(e.type))
 const messages = JSON.parse(readFileSync(`${src}/messages.json`, "utf8"))
-for (const e of events) { delete e.durable; delete e.metadata }
+for (const e of events) {
+  delete e.durable
+  delete e.metadata
+}
 const out = { events: clean(events), messages: clean(messages.data) }
 writeFileSync(`test/fixtures/${name}.json`, JSON.stringify(out, null, 1) + "\n")
 console.log(name, "events", events.length, "messages", messages.data.length)

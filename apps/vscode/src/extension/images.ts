@@ -13,7 +13,10 @@ export class ImagePreviews implements vscode.Disposable {
   private readonly cache: ImageCache
   private readonly stop: () => void
 
-  constructor(private readonly storage: vscode.Uri, private readonly controller: Controller) {
+  constructor(
+    private readonly storage: vscode.Uri,
+    private readonly controller: Controller,
+  ) {
     this.cache = new ImageCache({
       message: async (sessionID, messageID) => {
         const client = this.controller.api

@@ -19,7 +19,10 @@ export class WorkerTab {
   private readonly off: Array<() => void> = []
   private disposed = false
 
-  constructor(private readonly controller: Controller, readonly sessionID: string) {
+  constructor(
+    private readonly controller: Controller,
+    readonly sessionID: string,
+  ) {
     this.feed = new SessionFeed(
       (immediate) => (immediate ? this.emitNow() : this.emit()),
       (m) => {

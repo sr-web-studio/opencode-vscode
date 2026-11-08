@@ -26,7 +26,11 @@ export class DiffViews implements vscode.TextDocumentContentProvider, vscode.Dis
 
   /** A virtual document that ends in the real file name, so VS Code picks the right language for highlighting. */
   private virtual(file: string, side: string, text: string): vscode.Uri {
-    const name = file.split(/[\\/]+/).filter(Boolean).pop() ?? "file"
+    const name =
+      file
+        .split(/[\\/]+/)
+        .filter(Boolean)
+        .pop() ?? "file"
     const uri = vscode.Uri.from({ scheme: DIFF_SCHEME, path: `/${++this.seq}/${side}/${name}` })
     this.docs.set(uri.toString(), text)
     if (this.docs.size > MAX_DOCS) this.docs.delete(this.docs.keys().next().value as string)
@@ -87,7 +91,11 @@ export class DiffViews implements vscode.TextDocumentContentProvider, vscode.Dis
   async changes(files: ReadonlyArray<{ file: string; patches: string[] }>, title: string): Promise<void> {
     const pairs = await Promise.all(files.filter((f) => f.patches.length > 0).map((f) => this.pair(f.file, f.patches)))
     if (pairs.length === 0) return
-    await vscode.commands.executeCommand("vscode.changes", title, pairs.map((p) => [p.resource, p.before, p.after]))
+    await vscode.commands.executeCommand(
+      "vscode.changes",
+      title,
+      pairs.map((p) => [p.resource, p.before, p.after]),
+    )
   }
 
   dispose(): void {

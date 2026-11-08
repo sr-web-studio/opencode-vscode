@@ -105,12 +105,15 @@ public final class Notifier {
     NotificationManagerCompat.from(ctx).cancel(tag(serverId, sessionID), 1);
   }
 
-  /** The ongoing "Watching N servers" notification. */
-  public Notification ongoing(int connected, int total, boolean allowed) {
-    String text;
-    if (total == 0) text = "No servers to watch";
-    else if (connected == total) text = "Watching " + total + (total == 1 ? " server" : " servers");
-    else text = "Watching " + total + (total == 1 ? " server" : " servers") + " (" + connected + " connected)";
+  /** The words of the "Not watching" notification: the service is not running, and a tap opens the app (which starts it). */
+  public static final String NOT_WATCHING = "Not watching \u2014 tap to resume";
+
+  /** The ongoing connection notification with this text (see {@link StatusText}). */
+  public Notification ongoing(String text) {
+    return connection(text, true);
+  }
+
+  private Notification connection(String text, boolean ongoing) {
     Intent i = new Intent(ctx, MainActivity.class).setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
     PendingIntent pi = PendingIntent.getActivity(ctx, 0, i, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
     return new NotificationCompat.Builder(ctx, CH_CONNECTION)
@@ -118,7 +121,8 @@ public final class Notifier {
         .setContentTitle("OpenCode")
         .setContentText(text)
         .setContentIntent(pi)
-        .setOngoing(true)
+        .setOngoing(ongoing)
+        .setAutoCancel(!ongoing)
         .setOnlyAlertOnce(true)
         .setShowWhen(false)
         .setPriority(NotificationCompat.PRIORITY_MIN)
@@ -127,11 +131,23 @@ public final class Notifier {
         .build();
   }
 
-  public void updateOngoing(int connected, int total) {
+  public void updateOngoing(String text) {
+    post(connection(text, true));
+  }
+
+  /**
+   * Replace the connection notification with the honest "Not watching" one (the service died and could not be
+   * restarted from the background). The owner can dismiss it; a tap opens the app, which starts the service again.
+   */
+  public void postNotWatching() {
+    post(connection(NOT_WATCHING, false));
+  }
+
+  private void post(Notification n) {
     try {
-      NotificationManagerCompat.from(ctx).notify(ONGOING_ID, ongoing(connected, total, true));
+      NotificationManagerCompat.from(ctx).notify(ONGOING_ID, n);
     } catch (SecurityException ignored) {
-      // no notification permission: the service still runs
+      // no notification permission: nothing to show
     }
   }
 }

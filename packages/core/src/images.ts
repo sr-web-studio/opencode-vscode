@@ -35,8 +35,14 @@ export function attachmentSource(f: unknown): AttachmentSource | undefined {
 export const safeImageMime = (mime: string | undefined): mime is string => !!mime && isImageMime(mime) && /^image\/[A-Za-z0-9.+-]+$/.test(mime)
 
 const EXT: Record<string, string> = {
-  "image/png": "png", "image/jpeg": "jpg", "image/jpg": "jpg", "image/gif": "gif", "image/webp": "webp",
-  "image/bmp": "bmp", "image/svg+xml": "svg", "image/avif": "avif",
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/jpg": "jpg",
+  "image/gif": "gif",
+  "image/webp": "webp",
+  "image/bmp": "bmp",
+  "image/svg+xml": "svg",
+  "image/avif": "avif",
 }
 
 /** File name of a preview in `globalStorageUri/previews/`: `<messageID>-<index>.<ext>`. */

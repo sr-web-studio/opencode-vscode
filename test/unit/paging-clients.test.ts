@@ -33,7 +33,10 @@ describe("SessionFeed paging against a strict message.list", () => {
     const fake = messageListFake(history(), 3)
     const client = { message: { list: fake.list } } as never
     const errors: string[] = []
-    const feed = new SessionFeed(() => {}, (m) => errors.push(m))
+    const feed = new SessionFeed(
+      () => {},
+      (m) => errors.push(m),
+    )
     await feed.load(client, "ses_x")
     expect(errors).toEqual([])
     expect(feed.view.loaded).toBe(true)

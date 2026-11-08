@@ -8,11 +8,7 @@ const inflight = new Map<string, Promise<string | undefined>>()
  * The thumbnail of a sent image as a small `data:` URI. Asked from the host once per image and kept in memory
  * (bounded), so scrolling past a chip again or re-rendering it costs nothing.
  */
-export function thumbFor(
-  ref: ImageRef,
-  fetchData: (ref: ImageRef) => Promise<string | undefined>,
-  downscale: (dataUri: string) => Promise<string>,
-): Promise<string | undefined> {
+export function thumbFor(ref: ImageRef, fetchData: (ref: ImageRef) => Promise<string | undefined>, downscale: (dataUri: string) => Promise<string>): Promise<string | undefined> {
   const key = `${ref.messageID}:${ref.index}`
   const hit = cache.get(key)
   if (hit) return Promise.resolve(hit)

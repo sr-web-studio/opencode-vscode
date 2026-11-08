@@ -104,8 +104,7 @@ export function validateField(field: FormField, value: FormValue | undefined, ot
 type StringField = Extract<FormField, { type: "string" }>
 
 /** The field as a single-choice string (numbered rows), or undefined for free text and other types. */
-export const choiceOf = (f: FormField | undefined): StringField | undefined =>
-  f?.type === "string" && Array.isArray(f.options) && f.options.length > 0 ? f : undefined
+export const choiceOf = (f: FormField | undefined): StringField | undefined => (f?.type === "string" && Array.isArray(f.options) && f.options.length > 0 ? f : undefined)
 
 /** True for single-choice string fields. Deliberately not a type guard: the `else` side still includes free-text strings. */
 export const isChoice = (f: FormField): boolean => choiceOf(f) !== undefined

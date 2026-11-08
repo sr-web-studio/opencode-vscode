@@ -22,6 +22,10 @@
 </div>
 
 <style>
-  .one { padding: 8px; }
-  .one :global(.diff) { max-height: none; }
+  .one {
+    padding: 8px;
+  }
+  .one :global(.diff) {
+    max-height: none;
+  }
 </style>

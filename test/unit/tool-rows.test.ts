@@ -6,7 +6,13 @@ import type { ToolItem } from "@occ/core/transcript/types"
 
 const cwd = "/w"
 const tool = (name: string, input: Record<string, unknown>, metadata: Record<string, unknown> = {}, status: ToolItem["status"] = "completed"): ToolItem => ({
-  kind: "tool", id: "t", name, status, input, metadata, output: "",
+  kind: "tool",
+  id: "t",
+  name,
+  status,
+  input,
+  metadata,
+  output: "",
 })
 
 describe("readLine", () => {
@@ -98,7 +104,16 @@ describe("summarizeTool lines", () => {
   })
   test("patch has no path input: the file comes from metadata or headers", () => {
     const patch = "@@ -3,2 +3,2 @@\n-a\n+b\n"
-    const done = tool("patch", { patchText: "x" }, { files: [{ file: "/w/a.ts", patch }, { file: "/w/b.ts", patch }] })
+    const done = tool(
+      "patch",
+      { patchText: "x" },
+      {
+        files: [
+          { file: "/w/a.ts", patch },
+          { file: "/w/b.ts", patch },
+        ],
+      },
+    )
     expect(summarizeTool(done, cwd)).toMatchObject({ target: "a.ts +1", path: "/w/a.ts", at: 3 })
     const running = tool("patch", { patchText: "*** Begin Patch\n*** Update File: /w/z.ts\n@@\n" }, {}, "running")
     expect(summarizeTool(running, cwd)).toMatchObject({ target: "z.ts", path: "/w/z.ts" })

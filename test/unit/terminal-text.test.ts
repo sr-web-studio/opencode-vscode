@@ -79,9 +79,7 @@ describe("wrapLine", () => {
 describe("commandBlockText", () => {
   const rule = `${E}2m${"─".repeat(71)} 12:33:05${E}0m`
   test("blank line, rule, bold cyan prompt and bold command, cwd, blank line (exact bytes)", () => {
-    expect(commandBlockText({ command: "echo hi", cwd: "~/proj", at, timeZone: "UTC" })).toBe(
-      `\r\n${rule}\r\n${E}1;36m❯${E}0m ${bold("echo hi")}\r\n${dim("~/proj")}\r\n\r\n`,
-    )
+    expect(commandBlockText({ command: "echo hi", cwd: "~/proj", at, timeZone: "UTC" })).toBe(`\r\n${rule}\r\n${E}1;36m❯${E}0m ${bold("echo hi")}\r\n${dim("~/proj")}\r\n\r\n`)
   })
   test("the cwd is left out when it did not change, and shown when it did", () => {
     const same = commandBlockText({ command: "ls", cwd: "~/proj", lastCwd: "~/proj", at, timeZone: "UTC" })

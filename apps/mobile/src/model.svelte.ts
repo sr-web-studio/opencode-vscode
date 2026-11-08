@@ -13,6 +13,7 @@ import { deleteQuestion, DELETE_BUTTON, DELETE_DETAIL } from "@occ/core/delete-s
 import { normalizeServerUrl } from "@occ/core/server-url"
 import { makeClient, redeemPairing, testConnection } from "./lib/client"
 import { parseDeepLink, routeDeepLink } from "./lib/deep-link"
+import { LinkGate } from "./lib/link-gate"
 import { canPop, directoriesInUse, pop, popKey, push, stackForSession, type Entry, type Screen } from "./lib/nav"
 import { DEFAULT_NOTIFY, NO_STATUS, nativeServers, parseNotifySettings, visibleSessionOf, type NotifySettings, type NotifyStatus } from "./lib/notify"
 import {
@@ -97,7 +98,15 @@ class AppModel {
   private synced = $state.raw<ReadonlySet<string>>(new Set())
   private readonly caches = new Map<string, ImageCache>()
   private toastTimer: ReturnType<typeof setTimeout> | undefined
-  private lastLink = { url: "", at: 0 }
+  private markProfilesLoaded: () => void = () => {}
+  /** Deep links wait here until the saved servers are loaded (a cold start delivers the launch link first). */
+  private readonly links = new LinkGate({
+    ready: new Promise<void>((resolve) => {
+      this.markProfilesLoaded = resolve
+    }),
+    handle: (raw) => this.routeLink(raw),
+    dedupeMs: LINK_DEDUPE_MS,
+  })
   private started = false
   /** The session each open project's controller shows (a chat opens "the newest one" without saying which). */
   private readonly viewing = new Map<string, string | undefined>()
@@ -117,8 +126,12 @@ class AppModel {
       void this.syncNotify()
     })
     onUrlOpen((url) => void this.openLink(url))
-    this.profiles = await this.store.list()
-    this.activeID = await this.store.activeID()
+    try {
+      this.profiles = await this.store.list()
+      this.activeID = await this.store.activeID()
+    } finally {
+      this.markProfilesLoaded()
+    }
     this.notifySettings = parseNotifySettings(readJSON(NOTIFY_KEY))
     void this.syncNotify()
     const launch = await launchUrl()
@@ -251,7 +264,11 @@ class AppModel {
     this.closeWorkspace()
     this.profile = fresh
     this.workspace = new Workspace(makeClient(fresh), (project) => this.makeController(fresh, project))
-    if (navigate) this.setStack([{ key: nextKey(), screen: { kind: "servers" } }, { key: nextKey(), screen: { kind: "projects" } }])
+    if (navigate)
+      this.setStack([
+        { key: nextKey(), screen: { kind: "servers" } },
+        { key: nextKey(), screen: { kind: "projects" } },
+      ])
     return true
   }
 
@@ -397,7 +414,8 @@ class AppModel {
     writeJSON(BATTERY_ASKED_KEY, true)
     const ok = await this.confirm({
       title: "Keep notifications reliable?",
-      detail: "Phones put idle apps to sleep and then miss events. The next screen asks Android to let this app run in the background. On Samsung phones you can also add it to “Never sleeping apps” (see Settings).",
+      detail:
+        "Phones put idle apps to sleep and then miss events. The next screen asks Android to let this app run in the background. On Samsung phones you can also add it to “Never sleeping apps” (see Settings).",
       confirm: "Continue",
     })
     if (ok) await askBatteryExemption()
@@ -430,31 +448,40 @@ class AppModel {
 
   /* -------------------------------------------------------- deep link */
 
-  /** `opencode-mobile://session/<id>?server=<serverId>`: pick the server, find the folder, open the session. */
-  async openLink(raw: string): Promise<void> {
+  /**
+   * `opencode-mobile://session/<id>?server=<serverId>`: pick the server, find the folder, open the session.
+   * Waits for the saved servers (a cold start delivers the link before they are loaded) and drops a repeat delivery.
+   */
+  openLink(raw: string): Promise<void> {
+    return this.links.open(raw)
+  }
+
+  /** True when the link opened its session. */
+  private async routeLink(raw: string): Promise<boolean> {
     const link = parseDeepLink(raw)
-    if (!link) return
-    const now = Date.now()
-    if (this.lastLink.url === raw && now - this.lastLink.at < LINK_DEDUPE_MS) return
-    this.lastLink = { url: raw, at: now }
+    if (!link) return false
     const bottom = (): Entry[] => [{ key: nextKey(), screen: { kind: "servers" } }]
     const route = routeDeepLink(link, this.profiles, this.activeID)
     if (route.kind === "no-servers") {
       this.setStack(bottom())
-      return this.notify("info", "Add a server first, then open the link again.")
+      this.notify("info", "Add a server first, then open the link again.")
+      return false
     }
     if (route.kind === "unknown-server") {
       this.setStack(bottom())
-      return this.notify("warning", `This link is for the server “${route.serverId}”, which is not saved on this phone.`)
+      this.notify("warning", `This link is for the server “${route.serverId}”, which is not saved on this phone.`)
+      return false
     }
     if (route.kind === "ambiguous") {
       this.setStack(bottom())
-      return this.notify("warning", "This link does not say which server it is for. Open the server first, then the link again.")
+      this.notify("warning", "This link does not say which server it is for. Open the server first, then the link again.")
+      return false
     }
     const ok = await this.connect(route.profile, false)
     if (!ok) {
       this.setStack(bottom())
-      return this.notify("error", this.problem?.message ?? "Could not connect to the server.")
+      this.notify("error", this.problem?.message ?? "Could not connect to the server.")
+      return false
     }
     let directory: string | undefined
     try {
@@ -464,9 +491,11 @@ class AppModel {
     }
     if (!directory) {
       this.setStack([...bottom(), { key: nextKey(), screen: { kind: "projects" } }])
-      return this.notify("warning", `That session was not found on ${route.profile.name}. It may have been deleted.`)
+      this.notify("warning", `That session was not found on ${route.profile.name}. It may have been deleted.`)
+      return false
     }
     this.setStack(stackForSession(directory, nextKey, link.sessionID))
+    return true
   }
 
   /* ----------------------------------------------------- toast, modal */

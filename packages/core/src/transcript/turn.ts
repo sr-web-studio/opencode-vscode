@@ -37,7 +37,11 @@ export function lastActivity(turn: TurnView): number | undefined {
   for (const s of turn.steps) {
     see(s.started)
     see(s.completed)
-    for (const i of s.items) if (i.kind === "tool") { see(i.created); see(i.completed) }
+    for (const i of s.items)
+      if (i.kind === "tool") {
+        see(i.created)
+        see(i.completed)
+      }
   }
   return last
 }
@@ -77,5 +81,7 @@ export function allTools(turn: TurnView): ToolItem[] {
 export function runningTool(turns: TurnView[]): ToolItem | undefined {
   const last = turns[turns.length - 1]
   if (!last || last.outcome) return undefined
-  return allTools(last).reverse().find((t) => t.status === "running" || t.status === "streaming")
+  return allTools(last)
+    .reverse()
+    .find((t) => t.status === "running" || t.status === "streaming")
 }
