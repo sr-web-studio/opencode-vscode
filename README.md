@@ -5,6 +5,12 @@
 A chat panel for [OpenCode](https://opencode.ai) V2 in the VS Code sidebar. Your sessions live on the OpenCode server, so they keep running when you close VS Code, and you find them again when you come back.
 
 <p align="center">
+  <img src="https://raw.githubusercontent.com/sr-web-studio/opencode-vscode/main/docs/images/vscode-panel.png" width="320" alt="The OpenCode panel in the VS Code sidebar">
+</p>
+
+<p align="center"><em>The OpenCode panel in VS Code.</em></p>
+
+<p align="center">
   <img src="https://raw.githubusercontent.com/sr-web-studio/opencode-vscode/main/docs/images/mobile-sessions.png" width="260" alt="Sessions list in the Android app">
   <img src="https://raw.githubusercontent.com/sr-web-studio/opencode-vscode/main/docs/images/mobile-chat.png" width="260" alt="Chat with an agent in the Android app">
 </p>
