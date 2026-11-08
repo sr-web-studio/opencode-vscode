@@ -19,7 +19,7 @@ describe("project list rows", () => {
     expect(rows.find((r) => r.directory === "/home/me/x")?.title).toBe("x")
   })
   test("the path is shown with ~ for the home folder seen in the list; trailing slashes do not split a folder", () => {
-    const rows = projectRows([p("a", "/home/salim/work/app/", 1), p("b", "/home/salim/work/app", 2), p("c", "/tmp", 3)])
+    const rows = projectRows([p("a", "/home/user/work/app/", 1), p("b", "/home/user/work/app", 2), p("c", "/tmp", 3)])
     expect(rows.map((r) => r.path)).toEqual(["/tmp", "~/work/app"])
     expect(rows[1]?.ids).toEqual(["a", "b"])
   })
@@ -36,7 +36,7 @@ describe("project list rows", () => {
     expect(projectRows([], "")).toEqual([])
   })
   test("guessHome", () => {
-    expect(guessHome(["/tmp", "/home/salim/x"])).toBe("/home/salim")
+    expect(guessHome(["/tmp", "/home/user/x"])).toBe("/home/user")
     expect(guessHome(["/Users/ann/dev"])).toBe("/Users/ann")
     expect(guessHome(["/tmp", "/srv"])).toBeUndefined()
   })

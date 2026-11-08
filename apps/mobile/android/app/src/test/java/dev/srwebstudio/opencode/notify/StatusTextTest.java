@@ -86,9 +86,9 @@ public class StatusTextTest {
 
   @Test
   public void partlyConnectedSaysHowManyAndWhichOneIsDown() {
-    assertEquals("Watching 1 of 2 servers \u00b7 Home: reconnecting\u2026", text(up("Office"), down("Home", "closed", 2_000)));
-    assertEquals("Watching 1 of 2 servers \u00b7 Home: can't reach the server", text(up("Office"), down("Home", "Connection refused", StatusText.GRACE_MS + 1)));
-    assertEquals("Watching 1 of 2 servers \u00b7 Home: reconnecting\u2026", text(up("Office"), fresh("Home")));
+    assertEquals("Watching 1 of 2 servers \u00b7 Home: reconnecting\u2026", text(up("Home server"), down("Home", "closed", 2_000)));
+    assertEquals("Watching 1 of 2 servers \u00b7 Home: can't reach the server", text(up("Home server"), down("Home", "Connection refused", StatusText.GRACE_MS + 1)));
+    assertEquals("Watching 1 of 2 servers \u00b7 Home: reconnecting\u2026", text(up("Home server"), fresh("Home")));
   }
 
   @Test

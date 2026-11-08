@@ -1,6 +1,6 @@
 /**
  * The pairing link of "OpenCode: Pair Mobile Device" (VS Code): `<base-url>/auth/connect/<code>`, for example
- * `http://10.0.0.10:4096/auth/connect/AbC...` (the code is 22 URL-safe characters). Pure: no DOM, no Capacitor.
+ * `http://192.168.1.10:4096/auth/connect/AbC...` (the code is 22 URL-safe characters). Pure: no DOM, no Capacitor.
  */
 
 export type PairingLink = { baseUrl: string; code: string }
@@ -17,7 +17,7 @@ export function parsePairingLink(raw: string): PairingParse {
   try {
     url = new URL(text)
   } catch {
-    return { ok: false, reason: "This is not a link. A pairing link looks like http://10.0.0.10:4096/auth/connect/…" }
+    return { ok: false, reason: "This is not a link. A pairing link looks like http://192.168.1.10:4096/auth/connect/…" }
   }
   if (url.protocol !== "http:" && url.protocol !== "https:") return { ok: false, reason: `Use a http:// or https:// link, not ${url.protocol}//` }
   const m = SUFFIX.exec(url.pathname)

@@ -12,8 +12,6 @@ export type PairHost = {
   log: (line: string) => void
 }
 
-const CUSTOM = "custom"
-
 /** Ask which address the phone should use. Undefined when cancelled. */
 async function pickAddress(serverUrls: readonly string[], windowUrl: string | undefined): Promise<string | undefined> {
   const { candidates, droppedLoopback } = candidateUrls(serverUrls, windowUrl)

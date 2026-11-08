@@ -13,7 +13,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 public class NoticeEngineTest {
-  private static final ServerRef SERVER = new ServerRef("srv-1", "Office", "http://h:4096", "pw", "office");
+  private static final ServerRef SERVER = new ServerRef("srv-1", "Home server", "http://h:4096", "pw", "my-server");
 
   private final List<Notice> shown = new ArrayList<>();
   private final List<String> cancelled = new ArrayList<>();
@@ -137,7 +137,7 @@ public class NoticeEngineTest {
     assertEquals(Kind.PERMISSION, n.kind);
     assertTrue("the request's message text is not used", !n.body.contains("token") && !n.expanded.contains("token"));
     assertNull("one server: no sub-text", n.subText);
-    assertEquals("opencode-mobile://session/ses_root?server=office", n.deepLink());
+    assertEquals("opencode-mobile://session/ses_root?server=my-server", n.deepLink());
   }
 
   @Test
@@ -169,7 +169,7 @@ public class NoticeEngineTest {
     assertEquals("worker of Fix login", shown.get(0).subText);
     assertEquals("Found 3 errors in the logs. \u00b7 webapp", shown.get(0).body);
     assertEquals(Kind.WORKER, shown.get(0).kind);
-    assertEquals("opencode-mobile://session/ses_work?server=office", shown.get(0).deepLink());
+    assertEquals("opencode-mobile://session/ses_work?server=my-server", shown.get(0).deepLink());
   }
 
   @Test
@@ -188,11 +188,11 @@ public class NoticeEngineTest {
     profiles = 2;
     now += 6_000;
     engine.handle(SERVER, ev(turn("e2", "session.execution.succeeded", "ses_root", null)));
-    assertEquals("Office", shown.get(1).subText);
-    assertEquals("Office", shown.get(1).profileName);
+    assertEquals("Home server", shown.get(1).subText);
+    assertEquals("Home server", shown.get(1).profileName);
     now += 6_000;
     engine.handle(SERVER, ev(turn("e3", "session.execution.succeeded", "ses_work", null)));
-    assertEquals("worker of Fix login \u00b7 Office", shown.get(2).subText);
+    assertEquals("worker of Fix login \u00b7 Home server", shown.get(2).subText);
   }
 
   @Test
