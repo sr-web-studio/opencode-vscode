@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **A worker keeps streaming after it moves to its own folder.** A worker that moves its session into a worktree (or any other folder) went on working, but its tab, its row in the conversation and its notifications stopped updating until the tab was reopened. Live events now follow the session, not the folder it runs in.
+
 ## 0.3.10 (preview)
 
 - **Pair Mobile Device:** **OpenCode: Pair Mobile Device…** shows a QR code (LAN or Tailscale address, one-time code valid for 5 minutes) that the Android app scans to connect. It never exposes the server to the internet.
