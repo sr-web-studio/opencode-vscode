@@ -37,7 +37,7 @@ I'm also working on an Android app with the same UI, for the same always-on setu
 - **Agent and model picker**, session switcher, pinned sessions, a floating task list, and background workers in a header chip. Click a worker to open it read-only.
 - **Slash commands** in the prompt box (`/compact`, `/undo`, `/fork`, `/skills`, your own commands) and an **MCP servers** panel (`/mcps`) to check status, switch servers on or off and sign in.
 - **Delete a session** you no longer need (trash icon in the session switcher, or **OpenCode: Delete Session…**): only stopped sessions, only after you confirm. It is deleted on the server for every client, with its workers. The extension never deletes anything on its own.
-- **Pair your phone** with **OpenCode: Pair Mobile Device…**: pick an address your phone can reach (LAN or Tailscale), scan the QR code in the new panel with the [Android app (beta)](#android-app-beta). The code is one-time and expires after 5 minutes; nothing is sent to the internet.
+- **Pair your phone** with **OpenCode: Pair Mobile Device…**: choose the address of the OpenCode server that your phone can reach (Wi-Fi/LAN or Tailscale; the picker lists the server's addresses, never the phone's), then scan the QR code in the new panel with the [Android app (beta)](#android-app-beta). The code is one-time and expires after 5 minutes; nothing is sent to the internet. See [Connect the Android app](https://github.com/sr-web-studio/opencode-vscode/blob/main/docs/mobile-setup.md).
 - **Notifications** when OpenCode needs you or finishes work.
 - **Voice input**: speak into the prompt box. Free and offline on your own computer (one multilingual model for English and about 28 other languages, Bangla as an optional pack), or Soniox with your own key for mixed languages and many more. See [Voice input](#voice-input).
 
@@ -88,8 +88,9 @@ Open Settings and search for **OpenCode**:
 A separate Android app, **OpenCode (unofficial)** for phones, lists all your projects and their sessions on the same OpenCode server, with chat, diffs, command output and notifications when a session needs you or finishes.
 
 - **Not shipped with this extension.** Installing the extension never installs anything on your phone. The app is a separate APK.
-- **Beta.** Download the APK from the latest `mobile-v…-beta` pre-release on [GitHub Releases](https://github.com/sr-web-studio/opencode-vscode/releases) and install it on your phone (Android asks you to allow installing apps from your browser or file manager). It is not in the Play Store yet.
-- **Connect:** run **OpenCode: Pair Mobile Device…** in VS Code and scan the QR code in the app, or enter the server address and password by hand.
+- **Beta.** Download the APK from the latest `mobile-v…-beta` pre-release on [GitHub Releases](https://github.com/sr-web-studio/opencode-vscode/releases) and install it on your phone (Android 7.0 or newer; allow installing apps from your browser or file manager). It is not in the Play Store yet.
+- **Connect:** the phone needs an OpenCode server that listens on your network with a password. Then run **OpenCode: Pair Mobile Device…** in VS Code and scan the QR code in the app, or type the computer's address and the server password.
+- **Setup guide:** [Connect the Android app to your OpenCode server](https://github.com/sr-web-studio/opencode-vscode/blob/main/docs/mobile-setup.md) — run the server, find its address, firewall and Tailscale, troubleshooting, security.
 - Like the extension, it is not affiliated with the OpenCode team.
 
 ## Privacy
