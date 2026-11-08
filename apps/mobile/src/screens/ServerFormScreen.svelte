@@ -96,7 +96,7 @@
       <p class="muted small">On your computer run “OpenCode: Pair Mobile Device” in VS Code and scan the code it shows.</p>
       <label class="field">
         <span>Or paste the pairing link</span>
-        <textarea rows="2" bind:value={link} placeholder="http://10.0.0.10:4096/auth/connect/…" autocapitalize="off" autocomplete="off" spellcheck="false"></textarea>
+        <textarea rows="2" bind:value={link} placeholder="http://192.168.1.10:4096/auth/connect/…" autocapitalize="off" autocomplete="off" spellcheck="false"></textarea>
       </label>
       <button class="btn quiet" onclick={() => pair(link)} disabled={busy !== "" || !link.trim()}>
         {#if busy === "pair"}<Codicon name="loading" spin />{/if} Pair with this link
@@ -107,7 +107,7 @@
 
   <label class="field">
     <span>Server address</span>
-    <input type="url" inputmode="url" bind:value={url} placeholder="http://10.0.0.10:4096" autocapitalize="off" autocomplete="off" spellcheck="false" />
+    <input type="url" inputmode="url" bind:value={url} placeholder="http://192.168.1.10:4096" autocapitalize="off" autocomplete="off" spellcheck="false" />
   </label>
   <label class="field">
     <span>Password</span>

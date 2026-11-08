@@ -14,7 +14,7 @@ export type ConnectProblem = { kind: "unauthorized" | "unreachable" | "cors" | "
 /** How long the second request may take before the host counts as unreachable. */
 export const PROBE_TIMEOUT_MS = 5000
 
-/** `10.0.0.10:4096` from `http://10.0.0.10:4096/`: what the messages call the server. */
+/** `192.168.1.10:4096` from `http://192.168.1.10:4096/`: what the messages call the server. */
 export function hostLabel(url: string): string {
   try {
     return new URL(url).host || url
