@@ -2,8 +2,6 @@ package dev.srwebstudio.opencode.notify;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.regex.Pattern;
-import org.json.JSONArray;
 import org.json.JSONObject;
 
 /**
@@ -18,11 +16,19 @@ public final class NoticeEngine {
   public static final long COALESCE_MS = 5_000;
   private static final long META_TTL_MS = 20_000;
   private static final int SEEN_MAX = 300;
-  private static final Pattern ACTION = Pattern.compile("^[\\w.:-]{1,40}$");
 
   public interface Deps {
     /** Title, parent and folder of a session. May return null or throw: wording then falls back. */
     SessionMeta session(ServerRef server, String sessionID) throws Exception;
+
+    /**
+     * The text of the agent's last answer in this session (text parts only), or null when there is none. Called after a
+     * successful turn. May throw or time out (a few seconds): the notice then reads "Finished".
+     */
+    String lastAnswer(ServerRef server, String sessionID) throws Exception;
+
+    /** How many server profiles are saved: the profile name is shown only when there is more than one. */
+    int profileCount();
 
     void show(Notice notice);
 
@@ -92,15 +98,13 @@ public final class NoticeEngine {
     JSONObject d = ev.optJSONObject("data");
     if (d == null) d = new JSONObject();
     switch (type) {
-      case "permission.asked": {
-        String action = d.optString("action", "");
-        attention(server, ev, d.optString("sessionID", ""), Kind.PERMISSION, d.optString("id", ""), ACTION.matcher(action).matches() ? action : "Permission");
+      case "permission.asked":
+        attention(server, ev, d.optString("sessionID", ""), Kind.PERMISSION, d.optString("id", ""), Detail.permission(d));
         return;
-      }
       case "form.created": {
         JSONObject form = d.optJSONObject("form");
         if (form == null) return;
-        attention(server, ev, form.optString("sessionID", ""), Kind.QUESTION, form.optString("id", ""), questionText(form));
+        attention(server, ev, form.optString("sessionID", ""), Kind.QUESTION, form.optString("id", ""), Detail.question(form));
         return;
       }
       case "session.execution.succeeded":
@@ -121,24 +125,11 @@ public final class NoticeEngine {
     }
   }
 
-  /** The question as the extension words it: the first field's description (the question itself), else its title. */
-  static String questionText(JSONObject form) {
-    JSONArray fields = form.optJSONArray("fields");
-    JSONObject f = fields != null && fields.length() > 0 ? fields.optJSONObject(0) : null;
-    String text = "";
-    if (f != null) {
-      text = f.optString("description", "");
-      if (text.trim().isEmpty()) text = f.optString("title", "");
-    }
-    if (text.trim().isEmpty()) text = form.optString("title", "");
-    return text.trim().isEmpty() ? "Needs your input" : text;
-  }
-
   private static String key(ServerRef server, String sessionID) {
     return server.id + "|" + sessionID;
   }
 
-  private void attention(ServerRef server, JSONObject ev, String sessionID, Kind kind, String requestID, String detail) throws Exception {
+  private void attention(ServerRef server, JSONObject ev, String sessionID, Kind kind, String requestID, Detail detail) throws Exception {
     if (sessionID.isEmpty()) return;
     if (!deps.settings().allows(kind)) return;
     if (!requestID.isEmpty() && !markSeen("req|" + server.id + "|" + requestID)) {
@@ -156,7 +147,15 @@ public final class NoticeEngine {
     }
     SessionMeta meta = lookup(server, sessionID);
     String dir = meta != null && meta.directory != null ? meta.directory : directoryOf(ev);
-    deps.show(Wording.build(server, sessionID, kind, meta, parent(server, meta), detail, dir, false));
+    deps.show(Wording.build(server, sessionID, kind, meta, parent(server, meta), detail, dir, multiServer(), false));
+  }
+
+  private boolean multiServer() {
+    try {
+      return deps.profileCount() > 1;
+    } catch (RuntimeException e) {
+      return false;
+    }
   }
 
   private void turnEnd(ServerRef server, JSONObject ev, JSONObject d, boolean failed) throws Exception {
@@ -187,15 +186,24 @@ public final class NoticeEngine {
       // The same session finishing the same turn twice with different event ids is caught here as well.
       shown.put(k, new Shown(kind, null, t));
     }
-    String detail = failed ? errorLine(d) : null;
+    Detail detail = failed ? Detail.error(errorMessage(d)) : answer(server, sessionID);
     String dir = meta != null && meta.directory != null ? meta.directory : directoryOf(ev);
-    deps.show(Wording.build(server, sessionID, kind, meta, parent(server, meta), detail, dir, failed));
+    deps.show(Wording.build(server, sessionID, kind, meta, parent(server, meta), detail, dir, multiServer(), failed));
   }
 
-  private static String errorLine(JSONObject d) {
+  private static String errorMessage(JSONObject d) {
     JSONObject err = d.optJSONObject("error");
-    String m = err == null ? "" : err.optString("message", "");
-    return m.trim().isEmpty() ? "The turn failed" : m;
+    return err == null ? "" : err.optString("message", "");
+  }
+
+  /** The last answer of the turn as notification text. A failed or empty lookup reads "Finished": never blocks the notice. */
+  private Detail answer(ServerRef server, String sessionID) {
+    try {
+      return Detail.answer(deps.lastAnswer(server, sessionID));
+    } catch (Exception e) {
+      log("last answer lookup failed (" + sessionID + "): " + e.getClass().getSimpleName());
+      return Detail.answer(null);
+    }
   }
 
   private static String directoryOf(JSONObject ev) {

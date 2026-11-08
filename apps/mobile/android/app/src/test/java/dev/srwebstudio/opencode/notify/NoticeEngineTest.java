@@ -1,6 +1,7 @@
 package dev.srwebstudio.opencode.notify;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.util.ArrayList;
@@ -23,6 +24,10 @@ public class NoticeEngineTest {
   private String visible = null;
   private int lookups = 0;
   private boolean lookupFails = false;
+  private final Map<String, String> answers = new HashMap<>();
+  private boolean answerFails = false;
+  private int answerCalls = 0;
+  private int profiles = 1;
   private NoticeEngine engine;
 
   private NoticeEngine make(String seen) {
@@ -33,6 +38,18 @@ public class NoticeEngineTest {
             lookups++;
             if (lookupFails) throw new java.io.IOException("down");
             return sessions.get(id);
+          }
+
+          @Override
+          public String lastAnswer(ServerRef s, String id) throws Exception {
+            answerCalls++;
+            if (answerFails) throw new java.net.SocketTimeoutException("slow");
+            return answers.get(id);
+          }
+
+          @Override
+          public int profileCount() {
+            return profiles;
           }
 
           @Override
@@ -102,46 +119,102 @@ public class NoticeEngineTest {
   }
 
   @Test
-  public void permissionAskedShowsTitleActionAndFolderOnly() {
+  public void permissionAskedSaysWhatItWantsAndNeverTheMessage() {
     engine.handle(SERVER, ev(permAsked("per_1", "ses_root", "bash")));
     assertEquals(1, shown.size());
     Notice n = shown.get(0);
-    assertEquals("Fix login needs permission", n.title);
-    assertEquals("bash \u00b7 webapp", n.body);
+    assertEquals("\uD83D\uDD10 Fix login", n.title);
+    assertEquals("Run: rm -rf /secret/path \u00b7 webapp", n.body);
     assertEquals(Kind.PERMISSION, n.kind);
-    assertTrue("no tool input or message text", !n.body.contains("rm -rf") && !n.body.contains("token"));
+    assertTrue("the request's message text is not used", !n.body.contains("token") && !n.expanded.contains("token"));
+    assertNull("one server: no sub-text", n.subText);
     assertEquals("opencode-mobile://session/ses_root?server=office", n.deepLink());
   }
 
   @Test
-  public void formCreatedShowsFirstFieldQuestion() {
+  public void formCreatedShowsTheQuestionWithTitleAndDescription() {
     engine.handle(SERVER, ev(formCreated("frm_1", "ses_root")));
-    assertEquals("Fix login has a question", shown.get(0).title);
-    assertEquals("Do you like blue? \u00b7 webapp", shown.get(0).body);
+    assertEquals("\u2753 Fix login", shown.get(0).title);
+    assertEquals("Colour \u2014 Do you like blue? \u00b7 webapp", shown.get(0).body);
   }
 
   @Test
-  public void rootTurnSucceededAndFailed() {
+  public void rootTurnSucceededShowsTheAnswerAndFailedTheError() {
+    answers.put("ses_root", "Here is the plan:\n\n**1.** Add login");
     engine.handle(SERVER, ev(turn("e1", "session.execution.succeeded", "ses_root", null)));
-    assertEquals("Fix login finished", shown.get(0).title);
+    assertEquals("\u2705 Fix login", shown.get(0).title);
+    assertEquals("Here is the plan: \u00b7 webapp", shown.get(0).body);
+    assertEquals("Here is the plan:\n1. Add login\nwebapp", shown.get(0).expanded);
     now += 6_000;
     engine.handle(SERVER, ev(turn("e2", "session.execution.failed", "ses_root", "Provider returned 500\\nat x.js:1")));
-    assertEquals("Fix login failed", shown.get(1).title);
+    assertEquals("\u274c Fix login", shown.get(1).title);
     assertEquals("Provider returned 500 \u00b7 webapp", shown.get(1).body);
+    assertEquals(1, answerCalls);
   }
 
   @Test
-  public void workerTurnEndNamesTheParent() {
+  public void workerTurnEndNamesTheParentInTheSubText() {
+    answers.put("ses_work", "Found 3 errors in the logs.");
     engine.handle(SERVER, ev(turn("e1", "session.execution.succeeded", "ses_work", null)));
-    assertEquals("Read the logs finished (worker of Fix login)", shown.get(0).title);
+    assertEquals("\u2705 Read the logs", shown.get(0).title);
+    assertEquals("worker of Fix login", shown.get(0).subText);
+    assertEquals("Found 3 errors in the logs. \u00b7 webapp", shown.get(0).body);
     assertEquals(Kind.WORKER, shown.get(0).kind);
     assertEquals("opencode-mobile://session/ses_work?server=office", shown.get(0).deepLink());
   }
 
   @Test
-  public void failedWorkerSaysFailed() {
+  public void failedWorkerGetsTheFailedMark() {
     engine.handle(SERVER, ev(turn("e1", "session.execution.failed", "ses_work", "bad tool")));
-    assertEquals("Read the logs failed (worker of Fix login)", shown.get(0).title);
+    assertEquals("\u274c Read the logs", shown.get(0).title);
+    assertEquals("worker of Fix login", shown.get(0).subText);
+    assertEquals("bad tool \u00b7 webapp", shown.get(0).body);
+  }
+
+  @Test
+  public void profileNameShownOnlyWithMoreThanOneServer() {
+    engine.handle(SERVER, ev(turn("e1", "session.execution.succeeded", "ses_root", null)));
+    assertNull(shown.get(0).subText);
+    assertNull(shown.get(0).profileName);
+    profiles = 2;
+    now += 6_000;
+    engine.handle(SERVER, ev(turn("e2", "session.execution.succeeded", "ses_root", null)));
+    assertEquals("Office", shown.get(1).subText);
+    assertEquals("Office", shown.get(1).profileName);
+    now += 6_000;
+    engine.handle(SERVER, ev(turn("e3", "session.execution.succeeded", "ses_work", null)));
+    assertEquals("worker of Fix login \u00b7 Office", shown.get(2).subText);
+  }
+
+  @Test
+  public void answerLookupFailureStillNotifiesWithFinished() {
+    answerFails = true;
+    answers.put("ses_root", "never read");
+    engine.handle(SERVER, ev(turn("e1", "session.execution.succeeded", "ses_root", null)));
+    assertEquals(1, shown.size());
+    assertEquals("\u2705 Fix login", shown.get(0).title);
+    assertEquals("Finished \u00b7 webapp", shown.get(0).body);
+  }
+
+  @Test
+  public void noAnswerTextReadsFinished() {
+    engine.handle(SERVER, ev(turn("e1", "session.execution.succeeded", "ses_root", null)));
+    assertEquals("Finished \u00b7 webapp", shown.get(0).body);
+    assertEquals("Finished\nwebapp", shown.get(0).expanded);
+  }
+
+  @Test
+  public void answerIsRedacted() {
+    answers.put("ses_root", "Set password=hunter2hunter2 and use Bearer abcdefghijklmnopqrstuv");
+    engine.handle(SERVER, ev(turn("e1", "session.execution.succeeded", "ses_root", null)));
+    assertTrue(!shown.get(0).body.contains("hunter2") && !shown.get(0).body.contains("abcdefghijklmnopqrstuv"));
+    assertTrue(!shown.get(0).expanded.contains("hunter2") && !shown.get(0).expanded.contains("abcdefghijklmnopqrstuv"));
+  }
+
+  @Test
+  public void failedTurnDoesNotFetchTheAnswer() {
+    engine.handle(SERVER, ev(turn("e1", "session.execution.failed", "ses_root", "boom")));
+    assertEquals(0, answerCalls);
   }
 
   @Test
@@ -262,8 +335,8 @@ public class NoticeEngineTest {
   public void lookupFailureFallsBackToGenericWording() {
     lookupFails = true;
     engine.handle(SERVER, ev(permAsked("per_1", "ses_root", "bash")));
-    assertEquals("OpenCode needs permission", shown.get(0).title);
-    assertEquals("bash \u00b7 webapp", shown.get(0).body);
+    assertEquals("\uD83D\uDD10 OpenCode", shown.get(0).title);
+    assertEquals("Run: rm -rf /secret/path \u00b7 webapp", shown.get(0).body);
   }
 
   @Test
@@ -290,7 +363,8 @@ public class NoticeEngineTest {
   @Test
   public void unsafePermissionActionIsNotShown() {
     engine.handle(SERVER, ev(permAsked("per_1", "ses_root", "rm -rf / ; curl x")));
-    assertEquals("Permission \u00b7 webapp", shown.get(0).body);
+    assertEquals("Permission: rm -rf /secret/path \u00b7 webapp", shown.get(0).body);
+    assertTrue(!shown.get(0).body.contains("curl"));
   }
 
   @Test
