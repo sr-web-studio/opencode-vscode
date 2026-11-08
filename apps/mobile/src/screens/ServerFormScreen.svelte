@@ -123,23 +123,27 @@
     <small>Notification links name the server by this id. It is the host of the address unless you change it.</small>
   </label>
 
-  {#if result}<div class="note" class:err={!result.ok} class:ok={result.ok} role="status">{result.text}</div>{/if}
+  {#if existing}
+    <button class="btn quiet del" onclick={remove} disabled={busy !== ""}><Codicon name="trash" /> Remove this server</button>
+  {/if}
+</div>
 
+<!-- Outside the scroll area: the result and the two buttons stay on screen, above the bottom inset (the screen itself is padded by it). -->
+<div class="footer">
+  {#if result}<div class="note" class:err={!result.ok} class:ok={result.ok} role="status">{result.text}</div>{/if}
   <div class="actions">
     <button class="btn quiet" onclick={test} disabled={busy !== "" || !url.trim()}>{#if busy === "test"}<Codicon name="loading" spin />{/if} Test connection</button>
     <button class="btn" onclick={save} disabled={busy !== "" || !url.trim()}>{#if busy === "save"}<Codicon name="loading" spin />{/if} Save and open</button>
   </div>
-  {#if existing}
-    <button class="btn quiet del" onclick={remove} disabled={busy !== ""}><Codicon name="trash" /> Remove this server</button>
-  {/if}
 </div>
 
 <style>
   .small { font-size: 0.85em; margin: 8px 0 14px; }
   .pairing { margin-bottom: 8px; }
   .or { font-size: 0.95em; font-weight: 600; margin: 22px 0 12px; color: var(--oc-muted); }
-  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .footer { flex: none; max-height: 45%; overflow-y: auto; padding: 10px 16px 12px; border-top: 1px solid var(--oc-hairline); background: var(--vscode-editor-background); }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; }
   .actions .btn { flex: 1; }
-  .del { margin-top: 22px; width: 100%; color: var(--oc-error); }
-  .note { margin-top: 6px; }
+  .del { margin-top: 10px; width: 100%; color: var(--oc-error); }
+  .note { margin-bottom: 10px; }
 </style>
