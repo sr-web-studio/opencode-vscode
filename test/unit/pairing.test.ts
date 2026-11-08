@@ -4,13 +4,13 @@ import { escapeHtml, pairPanelCsp, pairPanelHtml, qrSvg } from "../../apps/vscod
 
 describe("address classification", () => {
   test("private LAN ranges", () => {
-    for (const h of ["10.0.0.10", "192.168.1.5", "172.16.0.1", "172.31.255.254", "printer.local"]) expect(classifyHost(h)).toBe("lan")
+    for (const h of ["192.168.1.10", "192.168.1.5", "172.16.0.1", "172.31.255.254", "printer.local"]) expect(classifyHost(h)).toBe("lan")
     expect(classifyHost("172.32.0.1")).toBe("custom")
     expect(classifyHost("172.15.0.1")).toBe("custom")
   })
   test("Tailscale is 100.64.0.0/10 and *.ts.net", () => {
     expect(classifyHost("100.64.0.1")).toBe("tailscale")
-    expect(classifyHost("100.92.114.18")).toBe("tailscale")
+    expect(classifyHost("100.64.0.10")).toBe("tailscale")
     expect(classifyHost("100.127.255.255")).toBe("tailscale")
     expect(classifyHost("100.63.0.1")).toBe("custom")
     expect(classifyHost("100.128.0.1")).toBe("custom")
@@ -26,18 +26,18 @@ describe("address classification", () => {
 })
 
 describe("candidate URLs", () => {
-  const server = ["http://127.0.0.1:4096", "http://10.0.0.10:4096", "http://100.92.114.18:4096"]
+  const server = ["http://127.0.0.1:4096", "http://192.168.1.10:4096", "http://100.64.0.10:4096"]
   test("server URLs first, loopback dropped with a flag, kinds set", () => {
     const r = candidateUrls(server, "http://127.0.0.1:4096")
     expect(r.droppedLoopback).toBe(true)
     expect(r.candidates).toEqual([
-      { url: "http://10.0.0.10:4096", kind: "lan" },
-      { url: "http://100.92.114.18:4096", kind: "tailscale" },
+      { url: "http://192.168.1.10:4096", kind: "lan" },
+      { url: "http://100.64.0.10:4096", kind: "tailscale" },
     ])
   })
   test("the window URL is added once, even in another spelling", () => {
-    const r = candidateUrls(server, "http://10.0.0.10:4096/")
-    expect(r.candidates.map((c) => c.url)).toEqual(["http://10.0.0.10:4096", "http://100.92.114.18:4096"])
+    const r = candidateUrls(server, "http://192.168.1.10:4096/")
+    expect(r.candidates.map((c) => c.url)).toEqual(["http://192.168.1.10:4096", "http://100.64.0.10:4096"])
     const extra = candidateUrls(server, "https://Box.tail1234.ts.net")
     expect(extra.candidates.at(-1)).toEqual({ url: "https://box.tail1234.ts.net", kind: "tailscale" })
   })
@@ -65,12 +65,12 @@ describe("typed address", () => {
 
 describe("link and logging", () => {
   test("link is base + /auth/connect/ + code", () => {
-    expect(pairLink("http://10.0.0.10:4096/", "abc123")).toBe("http://10.0.0.10:4096/auth/connect/abc123")
+    expect(pairLink("http://192.168.1.10:4096/", "abc123")).toBe("http://192.168.1.10:4096/auth/connect/abc123")
     expect(pairLink("https://x.example.com", "a b/c")).toBe("https://x.example.com/auth/connect/a%20b%2Fc")
     expect(() => pairLink("nope", "x")).toThrow()
   })
   test("log line carries the host only", () => {
-    expect(logHost("http://10.0.0.10:4096")).toBe("10.0.0.10:4096")
+    expect(logHost("http://192.168.1.10:4096")).toBe("192.168.1.10:4096")
     expect(logHost("junk")).toBe("unknown host")
   })
 })
@@ -99,7 +99,7 @@ describe("expiry countdown", () => {
 })
 
 describe("panel HTML", () => {
-  const link = "http://10.0.0.10:4096/auth/connect/abc"
+  const link = "http://192.168.1.10:4096/auth/connect/abc"
   const html = (now: number) => pairPanelHtml({ nonce: "N0NCE", cspSource: "vscode-webview://x", link, expiresAt: 300_000, now })
   test("strict CSP: no remote content, scripts and styles by nonce", () => {
     const csp = pairPanelCsp("N0NCE")

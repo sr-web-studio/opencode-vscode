@@ -8,7 +8,7 @@ import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 
 public class TextAndWordingTest {
-  private static final ServerRef SERVER = new ServerRef("srv-1", "Office", "http://10.0.0.10:4096", "secret-pass", "office-box");
+  private static final ServerRef SERVER = new ServerRef("srv-1", "Home server", "http://192.168.1.10:4096", "secret-pass", "my-server");
 
   @Test
   public void redactBlanksCredentials() {
@@ -85,7 +85,7 @@ public class TextAndWordingTest {
     assertEquals("Tests live in test/. \u00b7 app", n.body);
     Notice multi = build(Kind.WORKER, worker, parent, null, "/p/app", true, true);
     assertEquals("\u274c Explore the tests", multi.title);
-    assertEquals("worker of Main task \u00b7 Office", multi.subText);
+    assertEquals("worker of Main task \u00b7 Home server", multi.subText);
     assertEquals("worker of an unknown session", "worker of OpenCode", build(Kind.WORKER, worker, null, null, "/p/app", false, false).subText);
   }
 
@@ -93,7 +93,7 @@ public class TextAndWordingTest {
   public void profileNameOnlyWithMultipleServers() {
     SessionMeta m = new SessionMeta("T", null, "/p/app");
     assertNull(build(Kind.FINISHED, m, null, null, "/p/app", false, false).subText);
-    assertEquals("Office", build(Kind.FINISHED, m, null, null, "/p/app", true, false).subText);
+    assertEquals("Home server", build(Kind.FINISHED, m, null, null, "/p/app", true, false).subText);
   }
 
   @Test
@@ -114,7 +114,7 @@ public class TextAndWordingTest {
   @Test
   public void deepLinkNamesSessionAndServer() {
     Notice n = Wording.build(SERVER, "ses_e4656bc8effeSAD316NuA1L1Cj", Kind.FINISHED, null, null, null, null, false, false);
-    assertEquals("opencode-mobile://session/ses_e4656bc8effeSAD316NuA1L1Cj?server=office-box", n.deepLink());
+    assertEquals("opencode-mobile://session/ses_e4656bc8effeSAD316NuA1L1Cj?server=my-server", n.deepLink());
     assertEquals("opencode-mobile://session/a%20b?server=x%26y", Notice.deepLink("x&y", "a b"));
   }
 

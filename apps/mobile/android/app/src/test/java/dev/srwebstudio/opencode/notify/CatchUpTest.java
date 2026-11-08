@@ -15,7 +15,7 @@ import org.junit.Test;
 
 /** The catch-up after a gap: open questions and permission requests are announced once, never twice. */
 public class CatchUpTest {
-  private static final ServerRef SERVER = new ServerRef("srv-1", "Office", "http://h:4096", "pw", "office");
+  private static final ServerRef SERVER = new ServerRef("srv-1", "Home server", "http://h:4096", "pw", "my-server");
 
   private final List<Notice> shown = new ArrayList<>();
   private boolean visible = false;
@@ -130,7 +130,7 @@ public class CatchUpTest {
     assertEquals(Kind.QUESTION, shown.get(0).kind);
     assertEquals("ses_a", shown.get(0).sessionID);
     assertEquals(Kind.PERMISSION, shown.get(1).kind);
-    assertEquals("opencode-mobile://session/ses_b?server=office", shown.get(1).deepLink());
+    assertEquals("opencode-mobile://session/ses_b?server=my-server", shown.get(1).deepLink());
   }
 
   @Test

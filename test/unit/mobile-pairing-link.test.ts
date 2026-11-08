@@ -6,7 +6,7 @@ const CODE = "AbCdEfGhIjKlMnOpQrStUv" // 22 URL-safe characters, like the server
 
 describe("pairing link (the QR of “OpenCode: Pair Mobile Device”)", () => {
   test("accepts exactly what the extension builds", () => {
-    for (const base of ["http://10.0.0.10:4096", "http://10.0.0.10:4096/", "https://oc.example.com", "http://100.92.114.18:4096"]) {
+    for (const base of ["http://192.168.1.10:4096", "http://192.168.1.10:4096/", "https://oc.example.com", "http://100.64.0.1:4096"]) {
       const r = parsePairingLink(pairLink(base, CODE))
       expect(r.ok).toBe(true)
       if (r.ok) {
@@ -16,8 +16,8 @@ describe("pairing link (the QR of “OpenCode: Pair Mobile Device”)", () => {
     }
   })
   test("the example from the brief", () => {
-    const r = parsePairingLink(`http://10.0.0.10:4096/auth/connect/${CODE}`)
-    expect(r).toEqual({ ok: true, link: { baseUrl: "http://10.0.0.10:4096", code: CODE } })
+    const r = parsePairingLink(`http://192.168.1.10:4096/auth/connect/${CODE}`)
+    expect(r).toEqual({ ok: true, link: { baseUrl: "http://192.168.1.10:4096", code: CODE } })
   })
   test("trims whitespace and a trailing slash; decodes the code", () => {
     expect(parsePairingLink(`  http://h:1/auth/connect/${CODE}/  \n`)).toEqual({ ok: true, link: { baseUrl: "http://h:1", code: CODE } })
@@ -28,7 +28,7 @@ describe("pairing link (the QR of “OpenCode: Pair Mobile Device”)", () => {
     expect(parsePairingLink(`https://x.example.com/oc/auth/connect/${CODE}?utm=1#frag`)).toEqual({ ok: true, link: { baseUrl: "https://x.example.com/oc", code: CODE } })
   })
   test("refuses anything else, with a reason", () => {
-    const bad = ["", "   ", "hello", "10.0.0.10:4096/auth/connect/abc", "ftp://h/auth/connect/abc", "http://h:4096", "http://h:4096/auth/connect/", "http://h:4096/auth/connect", "http://h:4096/other/abc", "opencode-mobile://session/ses_1", "http://h/auth/connect/%E0%A4%A"]
+    const bad = ["", "   ", "hello", "192.168.1.10:4096/auth/connect/abc", "ftp://h/auth/connect/abc", "http://h:4096", "http://h:4096/auth/connect/", "http://h:4096/auth/connect", "http://h:4096/other/abc", "opencode-mobile://session/ses_1", "http://h/auth/connect/%E0%A4%A"]
     for (const raw of bad) {
       const r = parsePairingLink(raw)
       expect(r.ok).toBe(false)
