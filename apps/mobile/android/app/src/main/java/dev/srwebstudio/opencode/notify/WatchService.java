@@ -26,6 +26,8 @@ public final class WatchService extends Service {
   private static final String TAG = "OccWatch";
   public static final String ACTION_START = "dev.srwebstudio.opencode.notify.START";
   public static final String ACTION_RELOAD = "dev.srwebstudio.opencode.notify.RELOAD";
+  /** Started by the {@link Watchdog} after the service was found dead. */
+  public static final String ACTION_WATCHDOG = "dev.srwebstudio.opencode.notify.WATCHDOG_START";
 
   private static final class Watch {
     final EventStream stream;
@@ -46,20 +48,34 @@ public final class WatchService extends Service {
   private ConnectivityManager connectivity;
   private ConnectivityManager.NetworkCallback networkCallback;
   private boolean firstNetworkCallback;
+  /** One thread: catch-ups of different servers queue up instead of piling HTTP calls on a phone that just woke. */
+  private final java.util.concurrent.ExecutorService catchUps =
+      java.util.concurrent.Executors.newSingleThreadExecutor(
+          new java.util.concurrent.ThreadFactory() {
+            @Override
+            public Thread newThread(Runnable r) {
+              Thread t = new Thread(r, "occ-catchup");
+              t.setDaemon(true);
+              return t;
+            }
+          });
 
   /** Start (or reload) the service from anywhere that is allowed to: the app in front, boot, package replaced. */
-  public static void start(Context context, String action) {
+  public static boolean start(Context context, String action) {
     Intent i = new Intent(context, WatchService.class).setAction(action);
     try {
       if (Build.VERSION.SDK_INT >= 26) context.startForegroundService(i);
       else context.startService(i);
+      return true;
     } catch (RuntimeException e) {
       // Not allowed right now (background start limits): the app starts it the next time it is in front.
       Log.w(TAG, "service start refused: " + e.getClass().getSimpleName());
+      return false;
     }
   }
 
   public static void stop(Context context) {
+    Watchdog.cancel(context);
     context.stopService(new Intent(context, WatchService.class));
   }
 
@@ -140,16 +156,21 @@ public final class WatchService extends Service {
 
   @Override
   public int onStartCommand(Intent intent, int flags, int startId) {
+    // intent is null when the system restarts the service after its process died (START_STICKY).
     List<ServerRef> servers = vault.loadProfiles();
     if (!vault.loadSettings().enabled || servers.isEmpty()) {
       // Show the notification the system demands for a started foreground service, then leave.
-      goForeground(notifier.ongoing(0, 0, true));
+      goForeground(notifier.ongoing("No servers to watch"));
       stopForeground(STOP_FOREGROUND_REMOVE);
+      Watchdog.cancel(this);
       stopSelf();
       return START_NOT_STICKY;
     }
-    goForeground(notifier.ongoing(WatchState.connectedCount(), servers.size(), true));
+    // Nothing is connected yet: the first text is "Connecting…", never "Watching".
+    WatchState.setServers(servers);
+    goForeground(notifier.ongoing(StatusText.text(WatchState.statuses(), System.currentTimeMillis())));
     WatchState.setRunning(true);
+    Watchdog.schedule(this);
     reconcile(servers);
     return START_STICKY;
   }
@@ -187,9 +208,11 @@ public final class WatchService extends Service {
     return new EventStream.Listener() {
       @Override
       public void onConnected(ServerRef server) {
-        WatchState.setConnected(server.id, true);
+        WatchState.setUp(server.id);
         Log.i(TAG, "connected " + server);
         refreshOngoing();
+        // The stream is open, so nothing new can slip through; what happened before it opened is read here.
+        catchUp(server);
       }
 
       @Override
@@ -200,7 +223,7 @@ public final class WatchService extends Service {
 
       @Override
       public void onDisconnected(ServerRef server, String reason) {
-        WatchState.setConnected(server.id, false);
+        WatchState.setDown(server.id, reason, System.currentTimeMillis());
         Log.i(TAG, "disconnected " + server + ": " + reason);
         refreshOngoing();
       }
@@ -210,8 +233,27 @@ public final class WatchService extends Service {
     };
   }
 
+  /** Read the open questions and permission requests of this server on a worker thread (HTTP, never on the stream's). */
+  private void catchUp(final ServerRef server) {
+    try {
+      catchUps.execute(
+          new Runnable() {
+            @Override
+            public void run() {
+              try {
+                engine.catchUp(server, new PendingApi());
+              } catch (RuntimeException e) {
+                Log.w(TAG, "catch-up failed: " + e.getClass().getSimpleName());
+              }
+            }
+          });
+    } catch (java.util.concurrent.RejectedExecutionException ignored) {
+      // the service is shutting down
+    }
+  }
+
   private void refreshOngoing() {
-    notifier.updateOngoing(WatchState.connectedCount(), WatchState.serverCount());
+    notifier.updateOngoing(StatusText.text(WatchState.statuses(), System.currentTimeMillis()));
   }
 
   /** A new network (Wi-Fi to mobile data, or back) kills the old socket without a word: reconnect at once. */
@@ -254,6 +296,7 @@ public final class WatchService extends Service {
       for (Watch w : watches.values()) w.stream.stop();
       watches.clear();
     }
+    catchUps.shutdownNow();
     WatchState.setRunning(false);
     super.onDestroy();
   }
