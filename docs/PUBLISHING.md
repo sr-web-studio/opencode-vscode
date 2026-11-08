@@ -68,6 +68,23 @@ bun run package -- --test 11
 - Files (in `apps/vscode/`): `opencode-unofficial-0.3.7-test.11.vsix` and `opencode-voice-0.3.7-test.11.vsix` (install the main one with **Extensions: Install from VSIX…**; it installs the companion by itself). `apps/vscode/package.json` and `apps/vscode/companion/package.json` are restored afterwards, so the working tree stays clean.
 - **Never publish a test build.** `bun run publish:*` only reads `opencode-vscode.vsix` and `opencode-voice.vsix`, which a test build does not write; do not pass a test vsix to `vsce publish` or `ovsx publish` by hand.
 
+### Android app
+
+The APK gets a second identity, so it installs **next to** the released app instead of replacing it:
+
+```bash
+set -a; . ./.env; set +a            # ANDROID_KEYSTORE_PASSWORD
+cd apps/mobile
+bun run apk:test -- -PtestBuild=19  # everything after -- goes to Gradle
+```
+
+- Id `dev.srwebstudio.opencode.test`, name **OpenCode TEST 19** (launcher, activity title and the ongoing "watching your servers" notification), version `0.2.2-beta-test.19` (`<versionName>-test.<n>`). The number is the build counter; bump it for each new test build, as with the VS Code test builds.
+- Signed with the same release key as the normal build, so it behaves like a release build (without `ANDROID_KEYSTORE_PASSWORD` it stays unsigned, as usual).
+- File: `apps/mobile/android/app/build/outputs/apk/release/opencode-mobile-0.2.2-beta-test.19.apk`. The normal release keeps its default `app-release.apk`.
+- The two apps are independent: own data, service, alarms and notifications. Broadcast actions are built from the real package name and the FileProvider authority follows the id. The `opencode-mobile://` deep link is the same in both, so a link from outside the app shows a chooser; a notification always opens the app that posted it.
+- **Never publish a test build.** A test build writes `opencode-mobile-<versionName>-test.<n>.apk` and removes `app-release.apk` from the output folder. Build the release again (`./gradlew assembleRelease`, no property) before the release step, and never upload a `*-test.*.apk` by hand.
+- Uninstalling one does not touch the other: `adb uninstall dev.srwebstudio.opencode.test`.
+
 ## Listing (done)
 
 - **Name:** `sst-dev.opencode` ("opencode") and `sst-dev.opencode-v2` ("OpenCode Beta") are the official extensions, and "OpenCode" belongs to the OpenCode team. This one is "OpenCode (unofficial)", with a disclaimer at the top of the README and the companion's README.
