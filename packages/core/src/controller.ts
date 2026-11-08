@@ -960,7 +960,7 @@ export class Controller {
     this.sentTick++
     this.emitNow()
     // No `delivery`: the server default is `steer`, so a prompt sent while the agent works joins the running turn at
-    // its next step (Salim wants this). Prompts queued by other clients still show, with Send now / Remove.
+    // its next step. Prompts queued by other clients still show, with Send now / Remove.
     await deliver(id)
   }
 
