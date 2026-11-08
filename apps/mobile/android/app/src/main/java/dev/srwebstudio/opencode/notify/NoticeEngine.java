@@ -14,6 +14,8 @@ import org.json.JSONObject;
  */
 public final class NoticeEngine {
   public static final long COALESCE_MS = 5_000;
+  /** Wait before the one retry of the answer lookup. Measured live: the text was there at the first fetch 5 of 5 times. */
+  public static final long ANSWER_RETRY_MS = 700;
   private static final long META_TTL_MS = 20_000;
   private static final int SEEN_MAX = 300;
 
@@ -26,6 +28,9 @@ public final class NoticeEngine {
      * successful turn. May throw or time out (a few seconds): the notice then reads "Finished".
      */
     String lastAnswer(ServerRef server, String sessionID) throws Exception;
+
+    /** Wait this long (the answer may not be stored yet). Returns early when interrupted. */
+    void pause(long ms);
 
     /** How many server profiles are saved: the profile name is shown only when there is more than one. */
     int profileCount();
@@ -196,10 +201,20 @@ public final class NoticeEngine {
     return err == null ? "" : err.optString("message", "");
   }
 
-  /** The last answer of the turn as notification text. A failed or empty lookup reads "Finished": never blocks the notice. */
+  /**
+   * The last answer of this turn as notification text. {@code lastAnswer} only returns text that sits after the
+   * message that started the turn, so an empty result means "not stored yet" or "no text": one retry after
+   * {@link #ANSWER_RETRY_MS}. A failed lookup (timeout, HTTP error) is not retried. Either way the notice goes out,
+   * reading "Finished" when there is no text.
+   */
   private Detail answer(ServerRef server, String sessionID) {
     try {
-      return Detail.answer(deps.lastAnswer(server, sessionID));
+      String text = deps.lastAnswer(server, sessionID);
+      if (text == null || text.trim().isEmpty()) {
+        deps.pause(ANSWER_RETRY_MS);
+        text = deps.lastAnswer(server, sessionID);
+      }
+      return Detail.answer(text);
     } catch (Exception e) {
       log("last answer lookup failed (" + sessionID + "): " + e.getClass().getSimpleName());
       return Detail.answer(null);

@@ -84,6 +84,15 @@ public final class WatchService extends Service {
               }
 
               @Override
+              public void pause(long ms) {
+                try {
+                  Thread.sleep(ms);
+                } catch (InterruptedException e) {
+                  Thread.currentThread().interrupt();
+                }
+              }
+
+              @Override
               public int profileCount() {
                 return WatchState.serverCount();
               }

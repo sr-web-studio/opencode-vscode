@@ -31,9 +31,47 @@ public final class Markdown {
   private static final Pattern ESCAPED = Pattern.compile("\\\\([\\\\`*_{}\\[\\]()#+.!|>~-])");
   private static final Pattern SPACES = Pattern.compile("\\s+");
 
+  /** One meaningful line as plain text, and whether it was a heading. */
+  private static final class Line {
+    final String text;
+    final boolean heading;
+
+    Line(String text, boolean heading) {
+      this.text = text;
+      this.heading = heading;
+    }
+  }
+
   /** The meaningful lines of {@code md}, in order, as plain text. Empty lines, fences and code blocks are gone. */
   public static List<String> lines(String md) {
     List<String> out = new ArrayList<>();
+    for (Line l : parse(md)) out.add(l.text);
+    return out;
+  }
+
+  /**
+   * The line that says what the text is about, for a one-line summary. The first line that is neither a heading nor
+   * only a lead-in ending with a colon ("Here is the plan:") while a content line follows it. A lead-in with nothing
+   * after it still counts. Only when there is no such line, the first heading. Null for no text at all.
+   */
+  public static String summary(String md) {
+    List<Line> all = parse(md);
+    if (all.isEmpty()) return null;
+    List<String> body = new ArrayList<>();
+    for (Line l : all) if (!l.heading) body.add(l.text);
+    for (int i = 0; i < body.size(); i++) {
+      if (isLeadIn(body.get(i)) && i < body.size() - 1) continue;
+      return body.get(i);
+    }
+    return all.get(0).text;
+  }
+
+  private static boolean isLeadIn(String s) {
+    return s.endsWith(":") || s.endsWith("\uff1a");
+  }
+
+  private static List<Line> parse(String md) {
+    List<Line> out = new ArrayList<>();
     if (md == null) return out;
     boolean fenced = false;
     for (String raw : md.split("\\r?\\n|\\r")) {
@@ -46,10 +84,11 @@ public final class Markdown {
       if (RULE.matcher(raw).matches()) continue;
       if (trimmed.indexOf('-') >= 0 && TABLE_SEP.matcher(trimmed).matches() && trimmed.indexOf('|') >= 0) continue;
       String s = QUOTE.matcher(raw).replaceFirst("");
+      boolean heading = HEADING.matcher(s).find();
       s = HEADING.matcher(s).replaceFirst("");
       s = BULLET.matcher(s).replaceFirst("");
       s = inline(s);
-      if (hasWord(s)) out.add(s);
+      if (hasWord(s)) out.add(new Line(s, heading));
     }
     return out;
   }

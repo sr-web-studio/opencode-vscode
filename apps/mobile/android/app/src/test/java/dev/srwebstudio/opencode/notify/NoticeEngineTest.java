@@ -27,6 +27,9 @@ public class NoticeEngineTest {
   private final Map<String, String> answers = new HashMap<>();
   private boolean answerFails = false;
   private int answerCalls = 0;
+  /** The first N lookups find no text yet (the answer is not stored). */
+  private int answerMissingFirst = 0;
+  private final List<Long> pauses = new ArrayList<>();
   private int profiles = 1;
   private NoticeEngine engine;
 
@@ -44,7 +47,13 @@ public class NoticeEngineTest {
           public String lastAnswer(ServerRef s, String id) throws Exception {
             answerCalls++;
             if (answerFails) throw new java.net.SocketTimeoutException("slow");
+            if (answerCalls <= answerMissingFirst) return null;
             return answers.get(id);
+          }
+
+          @Override
+          public void pause(long ms) {
+            pauses.add(ms);
           }
 
           @Override
@@ -143,7 +152,7 @@ public class NoticeEngineTest {
     answers.put("ses_root", "Here is the plan:\n\n**1.** Add login");
     engine.handle(SERVER, ev(turn("e1", "session.execution.succeeded", "ses_root", null)));
     assertEquals("\u2705 Fix login", shown.get(0).title);
-    assertEquals("Here is the plan: \u00b7 webapp", shown.get(0).body);
+    assertEquals("1. Add login \u00b7 webapp", shown.get(0).body);
     assertEquals("Here is the plan:\n1. Add login\nwebapp", shown.get(0).expanded);
     now += 6_000;
     engine.handle(SERVER, ev(turn("e2", "session.execution.failed", "ses_root", "Provider returned 500\\nat x.js:1")));
@@ -197,10 +206,51 @@ public class NoticeEngineTest {
   }
 
   @Test
-  public void noAnswerTextReadsFinished() {
+  public void noAnswerTextReadsFinishedAfterOneRetry() {
     engine.handle(SERVER, ev(turn("e1", "session.execution.succeeded", "ses_root", null)));
     assertEquals("Finished \u00b7 webapp", shown.get(0).body);
     assertEquals("Finished\nwebapp", shown.get(0).expanded);
+    assertEquals("one lookup and one retry, no more", 2, answerCalls);
+    assertEquals(List.of(NoticeEngine.ANSWER_RETRY_MS), pauses);
+  }
+
+  @Test
+  public void answerPresentAtFirstFetchIsNotRetried() {
+    answers.put("ses_root", "All done.");
+    engine.handle(SERVER, ev(turn("e1", "session.execution.succeeded", "ses_root", null)));
+    assertEquals("All done. \u00b7 webapp", shown.get(0).body);
+    assertEquals(1, answerCalls);
+    assertTrue("no wait when the text is there", pauses.isEmpty());
+  }
+
+  @Test
+  public void answerNotStoredYetIsFoundByTheRetry() {
+    answers.put("ses_root", "Here is the plan:\n\n**1.** Add login");
+    answerMissingFirst = 1;
+    engine.handle(SERVER, ev(turn("e1", "session.execution.succeeded", "ses_root", null)));
+    assertEquals(1, shown.size());
+    assertEquals("1. Add login \u00b7 webapp", shown.get(0).body);
+    assertEquals(2, answerCalls);
+    assertEquals(List.of(700L), pauses);
+  }
+
+  @Test
+  public void answerStillMissingAfterTheRetryStillNotifies() {
+    answers.put("ses_root", "late text");
+    answerMissingFirst = 2;
+    engine.handle(SERVER, ev(turn("e1", "session.execution.succeeded", "ses_root", null)));
+    assertEquals(1, shown.size());
+    assertEquals("Finished \u00b7 webapp", shown.get(0).body);
+    assertEquals(2, answerCalls);
+  }
+
+  @Test
+  public void failedLookupIsNotRetried() {
+    answerFails = true;
+    engine.handle(SERVER, ev(turn("e1", "session.execution.succeeded", "ses_root", null)));
+    assertEquals("Finished \u00b7 webapp", shown.get(0).body);
+    assertEquals(1, answerCalls);
+    assertTrue(pauses.isEmpty());
   }
 
   @Test
@@ -215,6 +265,7 @@ public class NoticeEngineTest {
   public void failedTurnDoesNotFetchTheAnswer() {
     engine.handle(SERVER, ev(turn("e1", "session.execution.failed", "ses_root", "boom")));
     assertEquals(0, answerCalls);
+    assertTrue(pauses.isEmpty());
   }
 
   @Test

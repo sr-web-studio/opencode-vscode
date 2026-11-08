@@ -80,8 +80,18 @@ public final class SessionApi {
   }
 
   /**
+   * What starts a turn: a prompt from the owner, a synthetic prompt, a skill, or a compaction. Anything an assistant
+   * message sits behind belongs to an earlier turn. (Markers like {@code idle} or {@code model-switched} and shell
+   * output are skipped, they do not start a turn.)
+   */
+  private static boolean startsTurn(String type) {
+    return "user".equals(type) || "synthetic".equals(type) || "skill".equals(type) || "compaction".equals(type);
+  }
+
+  /**
    * From a newest-first message page: the text parts of the newest assistant message that has any, never going past
-   * the user message that started the turn. Tool, reasoning and every other part is ignored. Null when there is none.
+   * the message that started the turn (so a previous turn's answer is never returned for this one). Tool, reasoning and
+   * every other part is ignored. Null when there is none yet.
    */
   public static String answerText(String json) throws JSONException {
     JSONObject root = new JSONObject(json);
@@ -91,7 +101,7 @@ public final class SessionApi {
       JSONObject m = data.optJSONObject(i);
       if (m == null) continue;
       String type = m.optString("type", "");
-      if ("user".equals(type)) return null;
+      if (startsTurn(type)) return null;
       if (!"assistant".equals(type)) continue;
       String text = textOf(m);
       if (!text.isEmpty()) return text;

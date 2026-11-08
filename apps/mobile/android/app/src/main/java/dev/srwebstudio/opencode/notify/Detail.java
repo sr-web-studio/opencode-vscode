@@ -35,11 +35,14 @@ public final class Detail {
     this.full = full == null || full.isEmpty() ? line : full;
   }
 
-  /** The first meaningful line of an answer, and a few more lines for the expanded view. "Finished" when there is no text. */
+  /**
+   * The collapsed line is the answer's {@link Markdown#summary} (first line that is not a heading or a bare lead-in);
+   * the expanded text is its first few lines as they come, headings included. "Finished" when there is no text.
+   */
   public static Detail answer(String markdown) {
     List<String> lines = Markdown.lines(markdown);
     if (lines.isEmpty()) return new Detail("Finished", null);
-    return new Detail(Text.clip(Text.redact(lines.get(0)), LINE_MAX), join(lines, FULL_LINES));
+    return new Detail(Text.clip(Text.redact(Markdown.summary(markdown)), LINE_MAX), join(lines, FULL_LINES));
   }
 
   /** An error message: its first line, and a few lines of it. */

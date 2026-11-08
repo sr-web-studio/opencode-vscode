@@ -48,10 +48,37 @@ public class MarkdownAndDetailTest {
   @Test
   public void firstMeaningfulLineOfAnAnswer() {
     Detail d = Detail.answer("\n## Summary\n\nI added the **login** form with `useAuth`.\n\n- one\n- two");
-    assertEquals("Summary", d.line);
+    assertEquals("I added the login form with useAuth.", d.line);
+    assertEquals("the expanded text keeps the heading", "Summary\nI added the login form with useAuth.\none\ntwo", d.full);
     Detail e = Detail.answer("```\ncode\n```\n\nHere is the plan:\n\n**1.** Add login\n**2.** Add logout");
-    assertEquals("Here is the plan:", e.line);
+    assertEquals("1. Add login", e.line);
     assertEquals("Here is the plan:\n1. Add login\n2. Add logout", e.full);
+  }
+
+  @Test
+  public void summarySkipsHeadingsAndLeadIns() {
+    // the live example
+    String live = "## Plan\n\nHere is the plan:\n\n**1.** Add login with `useAuth` ([docs](https://example.com/auth))\n**2.** Add logout\n- keep tests green";
+    assertEquals("1. Add login with useAuth (docs)", Markdown.summary(live));
+    assertEquals("1. Add login with useAuth (docs)", Detail.answer(live).line);
+    assertEquals("heading only: the heading", "Plan", Markdown.summary("## Plan"));
+    assertEquals("only headings: the first", "Plan", Markdown.summary("## Plan\n### Details\n"));
+    assertEquals("a lone lead-in has nothing after it: it stays", "Here is the plan:", Markdown.summary("Here is the plan:"));
+    assertEquals("heading then a lone lead-in", "Next steps:", Markdown.summary("# Done\n\nNext steps:"));
+    assertEquals("lead-in followed only by a heading is still the last body line", "Here it is:", Markdown.summary("Here it is:\n\n## Code"));
+    assertEquals("two lead-ins", "Real content", Markdown.summary("Intro:\nMore intro:\nReal content"));
+    assertEquals("plain first line wins", "All good.", Markdown.summary("All good.\n\n## Notes\nmore"));
+    assertEquals("a colon inside a line is not a lead-in", "Use key: value pairs", Markdown.summary("Use key: value pairs\nsecond"));
+    assertEquals(null, Markdown.summary(null));
+    assertEquals(null, Markdown.summary("```\ncode\n```"));
+  }
+
+  @Test
+  public void summaryIsStillRedactedAndClipped() {
+    Detail d = Detail.answer("# Title\n\nSet password=hunter2hunter2 " + "word ".repeat(60));
+    assertFalse(d.line.contains("hunter2"));
+    assertTrue(d.line.length() <= Detail.LINE_MAX);
+    assertTrue(d.line.startsWith("Set password=[redacted]"));
   }
 
   @Test

@@ -47,6 +47,38 @@ public class SessionApiAnswerTest {
   }
 
   @Test
+  public void staleAnswerOfAnEarlierTurnIsNeverReturned() throws Exception {
+    String oldAnswer = "{\"id\":\"msg_old\",\"type\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"OLD TURN ANSWER\"}]}";
+    String newUser = "{\"id\":\"msg_new\",\"type\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"second question\"}]}";
+    String idle = "{\"id\":\"msg_idle\",\"type\":\"idle\"}";
+    // This turn's assistant message has no text yet; the previous turn's answer sits behind the new prompt.
+    assertNull(SessionApi.answerText(page(TOOL_ONLY, newUser, oldAnswer, USER)));
+    assertNull(SessionApi.answerText(page(idle, newUser, oldAnswer)));
+    // Other turn starters are boundaries too.
+    String synthetic = "{\"id\":\"msg_syn\",\"type\":\"synthetic\",\"content\":[{\"type\":\"text\",\"text\":\"continue\"}]}";
+    String skill = "{\"id\":\"msg_sk\",\"type\":\"skill\"}";
+    String compaction = "{\"id\":\"msg_cp\",\"type\":\"compaction\"}";
+    assertNull(SessionApi.answerText(page(synthetic, oldAnswer)));
+    assertNull(SessionApi.answerText(page(skill, oldAnswer)));
+    assertNull(SessionApi.answerText(page(compaction, oldAnswer)));
+    // Once this turn's text is stored it wins over the old one.
+    assertEquals("Here is the plan:\n\n**1.** Add login", SessionApi.answerText(page(idle, ANSWER, TOOL_ONLY, newUser, oldAnswer)));
+    // Markers that do not start a turn are stepped over.
+    String switched = "{\"id\":\"m\",\"type\":\"model-switched\"}";
+    assertEquals("Here is the plan:\n\n**1.** Add login", SessionApi.answerText(page(switched, ANSWER, USER)));
+  }
+
+  @Test
+  public void lastAnswerOnAStaleThenFreshPageSequence() throws Exception {
+    final String oldAnswer = "{\"id\":\"msg_old\",\"type\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"OLD\"}]}";
+    final String newUser = "{\"id\":\"u2\",\"type\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"q2\"}]}";
+    final int[] n = {0};
+    SessionApi.Fetch fetch = (s, p, c, r, m) -> ++n[0] == 1 ? page(newUser, oldAnswer, USER) : page(ANSWER, newUser, oldAnswer, USER);
+    assertNull("first look: stale answer hidden", SessionApi.lastAnswer(fetch, SERVER, "ses_x"));
+    assertEquals("second look: this turn's answer", "Here is the plan:\n\n**1.** Add login", SessionApi.lastAnswer(fetch, SERVER, "ses_x"));
+  }
+
+  @Test
   public void ignoresBlankTextAndOtherMessageTypes() throws Exception {
     String blank = "{\"id\":\"m\",\"type\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"  \\n\"}]}";
     String shell = "{\"id\":\"s\",\"type\":\"shell\",\"content\":[{\"type\":\"text\",\"text\":\"SHELL OUT\"}]}";
