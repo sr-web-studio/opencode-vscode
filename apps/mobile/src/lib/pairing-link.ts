@@ -1,5 +1,5 @@
 /**
- * The pairing link of "OpenCode: Pair Mobile Device" and `opencode pair`: `<base-url>/auth/connect/<code>`, for example
+ * The pairing link of "OpenCode: Pair Mobile Device" (VS Code): `<base-url>/auth/connect/<code>`, for example
  * `http://10.0.0.10:4096/auth/connect/AbC...` (the code is 22 URL-safe characters). Pure: no DOM, no Capacitor.
  */
 

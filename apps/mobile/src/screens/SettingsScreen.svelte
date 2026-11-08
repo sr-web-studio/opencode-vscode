@@ -5,6 +5,7 @@
   import { model } from "../model.svelte"
   import { NOTIFY_KINDS, ago, statusLine } from "../lib/notify"
   import { canWatchInBackground } from "../lib/notify-native"
+  import { aboutLine } from "../lib/version"
 
   const st = $derived(model.notifyStatus)
   const cfg = $derived(model.notifySettings)
@@ -80,9 +81,12 @@
       </p>
     </section>
   {/if}
+
+  <p class="about">{aboutLine()}</p>
 </div>
 
 <style>
+  .about { margin: 24px 16px 16px; color: var(--oc-muted); font-size: 0.8em; line-height: 1.4; text-align: center; }
   .main-switch { padding-bottom: 6px; }
   .switch { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 56px; padding: 8px 0; }
   .switch .txt { flex: 1; min-width: 0; }
