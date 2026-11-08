@@ -39,9 +39,14 @@ public final class ServerRef {
     return o != null && id.equals(o.id) && url.equals(o.url) && password.equals(o.password) && name.equals(o.name) && serverId.equals(o.serverId);
   }
 
+  /** The address without anything before an {@code @} in its authority ({@code http://user:pw@host} becomes {@code http://host}). */
+  static String withoutUserInfo(String address) {
+    return address == null ? "" : address.replaceFirst("^([a-zA-Z][a-zA-Z0-9+.-]*://)[^/?#]*@", "$1");
+  }
+
   @Override
   public String toString() {
-    // No password, ever.
-    return "ServerRef(" + id + " " + url + ")";
+    // No password, ever: not the field, and not one typed into the address either.
+    return "ServerRef(" + id + " " + withoutUserInfo(url) + ")";
   }
 }

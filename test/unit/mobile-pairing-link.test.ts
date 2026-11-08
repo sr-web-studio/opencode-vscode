@@ -4,7 +4,7 @@ import { parsePairingLink } from "../../apps/mobile/src/lib/pairing-link"
 
 const CODE = "AbCdEfGhIjKlMnOpQrStUv" // 22 URL-safe characters, like the server's codes
 
-describe("pairing link (the QR of “Pair mobile device” and `opencode pair`)", () => {
+describe("pairing link (the QR of “OpenCode: Pair Mobile Device”)", () => {
   test("accepts exactly what the extension builds", () => {
     for (const base of ["http://10.0.0.10:4096", "http://10.0.0.10:4096/", "https://oc.example.com", "http://100.92.114.18:4096"]) {
       const r = parsePairingLink(pairLink(base, CODE))

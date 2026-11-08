@@ -93,7 +93,7 @@
         {#if busy === "scan" || busy === "pair"}<Codicon name="loading" spin />{:else}<Codicon name="device-camera" />{/if}
         Scan QR code
       </button>
-      <p class="muted small">On your computer run “OpenCode: Pair Mobile Device” in VS Code, or <code>opencode pair</code>, and scan the code it shows.</p>
+      <p class="muted small">On your computer run “OpenCode: Pair Mobile Device” in VS Code and scan the code it shows.</p>
       <label class="field">
         <span>Or paste the pairing link</span>
         <textarea rows="2" bind:value={link} placeholder="http://10.0.0.10:4096/auth/connect/…" autocapitalize="off" autocomplete="off" spellcheck="false"></textarea>

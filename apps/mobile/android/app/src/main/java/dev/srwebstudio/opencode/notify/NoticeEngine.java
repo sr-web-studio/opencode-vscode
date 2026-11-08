@@ -104,12 +104,12 @@ public final class NoticeEngine {
     if (d == null) d = new JSONObject();
     switch (type) {
       case "permission.asked":
-        attention(server, ev, d.optString("sessionID", ""), Kind.PERMISSION, d.optString("id", ""), Detail.permission(d));
+        attention(server, directoryOf(ev), d.optString("sessionID", ""), Kind.PERMISSION, d.optString("id", ""), Detail.permission(d));
         return;
       case "form.created": {
         JSONObject form = d.optJSONObject("form");
         if (form == null) return;
-        attention(server, ev, form.optString("sessionID", ""), Kind.QUESTION, form.optString("id", ""), Detail.question(form));
+        attention(server, directoryOf(ev), form.optString("sessionID", ""), Kind.QUESTION, form.optString("id", ""), Detail.question(form));
         return;
       }
       case "session.execution.succeeded":
@@ -134,16 +134,68 @@ public final class NoticeEngine {
     return server.id + "|" + sessionID;
   }
 
-  private void attention(ServerRef server, JSONObject ev, String sessionID, Kind kind, String requestID, Detail detail) throws Exception {
-    if (sessionID.isEmpty()) return;
-    if (!deps.settings().allows(kind)) return;
+  /** Where the pending requests of a server can be read (the catch-up after a gap). */
+  public interface PendingSource {
+    /** The folders worth asking about. */
+    java.util.List<String> directories(ServerRef server) throws Exception;
+
+    /** Pending forms of one folder: {@code [{id, sessionID, title, fields}]}. */
+    org.json.JSONArray forms(ServerRef server, String directory) throws Exception;
+
+    /** Pending permission requests of one folder: {@code [{id, sessionID, action, resources}]}. */
+    org.json.JSONArray permissions(ServerRef server, String directory) throws Exception;
+  }
+
+  /** At most this many catch-up notices per run, so an old backlog cannot flood the shade. */
+  public static final int CATCHUP_MAX = 8;
+
+  /**
+   * After a (re)connect: the questions and permission requests that are open right now, announced when they were not
+   * announced before. A gap (the service was killed, the network was away) must not silently lose one. Same rules as a
+   * live event: the seen set dedupes, the visible session is skipped, the switches apply. Never throws. Returns how many
+   * notices went out.
+   */
+  public int catchUp(ServerRef server, PendingSource source) {
+    int shownNow = 0;
+    java.util.List<String> dirs;
+    try {
+      dirs = source.directories(server);
+    } catch (Exception e) {
+      log("catch-up: folder list failed: " + e.getClass().getSimpleName());
+      return 0;
+    }
+    for (String dir : dirs) {
+      if (shownNow >= CATCHUP_MAX) break;
+      try {
+        org.json.JSONArray forms = source.forms(server, dir);
+        for (int i = 0; forms != null && i < forms.length() && shownNow < CATCHUP_MAX; i++) {
+          JSONObject f = forms.optJSONObject(i);
+          if (f != null && attention(server, dir, f.optString("sessionID", ""), Kind.QUESTION, f.optString("id", ""), Detail.question(f))) shownNow++;
+        }
+        org.json.JSONArray perms = source.permissions(server, dir);
+        for (int i = 0; perms != null && i < perms.length() && shownNow < CATCHUP_MAX; i++) {
+          JSONObject p = perms.optJSONObject(i);
+          if (p != null && attention(server, dir, p.optString("sessionID", ""), Kind.PERMISSION, p.optString("id", ""), Detail.permission(p))) shownNow++;
+        }
+      } catch (Exception e) {
+        log("catch-up: folder skipped: " + e.getClass().getSimpleName());
+      }
+    }
+    if (shownNow > 0) log("catch-up: " + shownNow + " open request(s) announced");
+    return shownNow;
+  }
+
+  /** True when a notice went out. */
+  private boolean attention(ServerRef server, String fallbackDir, String sessionID, Kind kind, String requestID, Detail detail) throws Exception {
+    if (sessionID.isEmpty()) return false;
+    if (!deps.settings().allows(kind)) return false;
     if (!requestID.isEmpty() && !markSeen("req|" + server.id + "|" + requestID)) {
       log("skip " + kind + " (" + sessionID + "): request already announced");
-      return;
+      return false;
     }
     if (deps.isVisible(server, sessionID)) {
       log("skip " + kind + " (" + sessionID + "): session on screen");
-      return;
+      return false;
     }
     long t = deps.now();
     String k = key(server, sessionID);
@@ -151,8 +203,9 @@ public final class NoticeEngine {
       shown.put(k, new Shown(kind, requestID.isEmpty() ? null : requestID, t));
     }
     SessionMeta meta = lookup(server, sessionID);
-    String dir = meta != null && meta.directory != null ? meta.directory : directoryOf(ev);
+    String dir = meta != null && meta.directory != null ? meta.directory : fallbackDir;
     deps.show(Wording.build(server, sessionID, kind, meta, parent(server, meta), detail, dir, multiServer(), false));
+    return true;
   }
 
   private boolean multiServer() {
