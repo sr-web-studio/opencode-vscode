@@ -3,6 +3,7 @@ import { Controller } from "@occ/core/controller"
 import { NotificationEngine } from "@occ/core/notifications/engine"
 import type { NoticeCommand } from "@occ/core/notifications/types"
 import { folderName, shortenHome } from "@occ/core/paths"
+import { normalizeModelSelection } from "@occ/core/models"
 import { homedir } from "node:os"
 import { SetupError, connect } from "./connection"
 import { deleteSessionCommand } from "./delete-session"
@@ -23,6 +24,7 @@ import { VOICE_FEED_COMMAND, type VoiceFeed } from "@occ/core/dictation"
 
 const PASSWORD_KEY = "opencode.serverPassword"
 const PINS_KEY = "opencode.pinnedModels"
+const ENHANCE_MODEL_KEY = "opencode.enhanceModel"
 
 export function activate(context: vscode.ExtensionContext): void {
   const folder = vscode.workspace.workspaceFolders?.[0]
@@ -44,10 +46,15 @@ export function activate(context: vscode.ExtensionContext): void {
       get: () => context.globalState.get<string[]>(PINS_KEY, []),
       set: (pins) => void context.globalState.update(PINS_KEY, pins),
     },
+    // The "Enhance prompt" model is independent of the session's model and is never written to OpenCode config.
+    enhanceModel: {
+      get: () => normalizeModelSelection(context.globalState.get<unknown>(ENHANCE_MODEL_KEY)),
+      set: (model) => void context.globalState.update(ENHANCE_MODEL_KEY, model),
+    },
     log: (line) => output.info(line),
     mcp: createMcpHost((line) => output.info(line)),
   })
-  context.globalState.setKeysForSync([PINS_KEY])
+  context.globalState.setKeysForSync([PINS_KEY, ENHANCE_MODEL_KEY])
   // `provider` is created below; dictation text is only posted after a recording starts, long after activation.
   const voice = new Voice(
     context.secrets,
