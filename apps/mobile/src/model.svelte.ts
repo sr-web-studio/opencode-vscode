@@ -9,6 +9,7 @@ import { dataUri } from "@occ/core/attachments"
 import { ImageCache } from "@occ/core/image-cache"
 import { safeImageMime, type ImageRef } from "@occ/core/images"
 import { folderName, shortenHome } from "@occ/core/paths"
+import { normalizeModelSelection } from "@occ/core/models"
 import { deleteQuestion, DELETE_BUTTON, DELETE_DETAIL } from "@occ/core/delete-session"
 import { normalizeServerUrl } from "@occ/core/server-url"
 import { makeClient, redeemPairing, testConnection } from "./lib/client"
@@ -327,6 +328,11 @@ class AppModel {
           return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []
         },
         set: (pins) => writeJSON(`occ.pins.${profile.id}`, pins),
+      },
+      // The "Enhance prompt" model is independent of the session's model and stays on this phone, per server.
+      enhanceModel: {
+        get: () => normalizeModelSelection(readJSON(`occ.enhanceModel.${profile.id}`)),
+        set: (m) => writeJSON(`occ.enhanceModel.${profile.id}`, m),
       },
       mcp: {},
     })
