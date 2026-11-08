@@ -1,7 +1,7 @@
 import * as vscode from "vscode"
 import { randomBytes } from "node:crypto"
 import type { OpenCodeClient } from "@opencode/client"
-import { KIND_LABEL, candidateUrls, canonicalUrl, customUrlProblem, expiresAt, logHost, pairLink, type Candidate } from "./pairing"
+import { KIND_DETAIL, KIND_LABEL, candidateUrls, canonicalUrl, customUrlProblem, expiresAt, logHost, pairLink, type Candidate } from "./pairing"
 import { pairPanelHtml } from "./pairing-html"
 
 export type PairHost = {
@@ -16,11 +16,23 @@ export type PairHost = {
 async function pickAddress(serverUrls: readonly string[], windowUrl: string | undefined): Promise<string | undefined> {
   const { candidates, droppedLoopback } = candidateUrls(serverUrls, windowUrl)
   type Item = vscode.QuickPickItem & { url?: string; custom?: boolean }
-  const items: Item[] = candidates.map((c: Candidate) => ({ label: c.url, description: KIND_LABEL[c.kind], url: c.url }))
-  items.push({ label: "Enter a URL…", description: "an address your phone can reach, for example a Tailscale name or a domain", custom: true })
+  const items: Item[] = candidates.map((c: Candidate) => ({
+    label: c.url,
+    description: KIND_LABEL[c.kind],
+    detail: c.recommended ? `Recommended. ${KIND_DETAIL[c.kind]}` : KIND_DETAIL[c.kind],
+    url: c.url,
+  }))
+  items.push({
+    label: "Enter a URL…",
+    description: "an address your phone can reach",
+    detail: "For example a Tailscale name or a domain. The list above holds this computer's addresses, not your phone's.",
+    custom: true,
+  })
   const pick = await vscode.window.showQuickPick(items, {
-    title: "Pair Mobile Device",
-    placeHolder: droppedLoopback ? "Choose the address your phone will use (127.0.0.1 and localhost are left out: a phone cannot reach them)" : "Choose the address your phone will use",
+    title: "Pair Mobile Device: which address of the OpenCode server can your phone reach?",
+    placeHolder: droppedLoopback
+      ? "These are this computer's addresses, not your phone's. 127.0.0.1 and localhost are left out: a phone cannot reach them."
+      : "These are this computer's addresses, not your phone's.",
     ignoreFocusOut: true,
   })
   if (!pick) return undefined
@@ -69,7 +81,7 @@ export async function pairMobileCommand(host: PairHost): Promise<void> {
   const panel = vscode.window.createWebviewPanel("opencode.pairMobile", "Pair Mobile Device", vscode.ViewColumn.Active, { enableScripts: true, localResourceRoots: [] })
   current = panel
   const render = () => {
-    panel.webview.html = pairPanelHtml({ nonce: randomBytes(16).toString("base64"), cspSource: panel.webview.cspSource, link: state.link, expiresAt: state.expiresAt, now: Date.now() })
+    panel.webview.html = pairPanelHtml({ nonce: randomBytes(16).toString("base64"), cspSource: panel.webview.cspSource, link: state.link, address: base, expiresAt: state.expiresAt, now: Date.now() })
   }
   render()
   panel.webview.onDidReceiveMessage(async (msg: unknown) => {

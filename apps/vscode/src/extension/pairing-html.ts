@@ -19,6 +19,8 @@ export type PairPanelInput = {
   /** `webview.cspSource`; the page loads nothing from it, but keeping it explicit makes the policy readable. */
   cspSource: string
   link: string
+  /** The address of the server the phone will connect to (the base of `link`). */
+  address: string
   /** Epoch ms at which the code stops working. */
   expiresAt: number
   now: number
@@ -47,7 +49,12 @@ button:hover { background: var(--vscode-button-hoverBackground, #1177bb); }
 button:focus-visible { outline: 1px solid var(--vscode-focusBorder, #007fd4); outline-offset: 2px; }
 button.secondary { color: var(--vscode-button-secondaryForeground, #fff); background: var(--vscode-button-secondaryBackground, #3a3d41); }
 button[hidden], .expired .live { display: none; }
+.address { margin: 0; overflow-wrap: anywhere; opacity: .9; }
+.address code { font-family: var(--vscode-editor-font-family, monospace); user-select: all; }
 .steps { text-align: left; margin: 0; padding-left: 1.2em; line-height: 1.6; }
+.hint { width: 100%; text-align: left; }
+.hint summary { cursor: pointer; font-weight: 600; }
+.hint ul { margin: 6px 0 0; padding-left: 1.2em; line-height: 1.6; opacity: .85; }
 .note { opacity: .75; font-size: .95em; margin: 0; }
 `
 
@@ -87,6 +94,14 @@ const SCRIPT = `
 export function pairPanelHtml(input: PairPanelInput): string {
   const left = secondsLeft(input.expiresAt, input.now)
   const expired = left === 0
+  const port = (() => {
+    try {
+      const u = new URL(input.address)
+      return u.port || (u.protocol === "https:" ? "443" : "80")
+    } catch {
+      return "4096"
+    }
+  })()
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -105,11 +120,21 @@ export function pairPanelHtml(input: PairPanelInput): string {
   <p class="status" id="status" role="status">${expired ? "This code has expired." : ""}</p>
   <div class="link"><code id="link">${escapeHtml(input.link)}</code><button id="copy" class="secondary live"${expired ? " hidden" : ""}>Copy</button></div>
   <button id="renew"${expired ? "" : " hidden"}>New code</button>
+  <p class="address">Your phone will connect to <code>${escapeHtml(input.address)}</code></p>
   <ol class="steps">
     <li>Open <strong>OpenCode (unofficial)</strong> on your phone.</li>
-    <li>Choose <strong>Add server</strong>, then <strong>Scan QR</strong>.</li>
+    <li>Tap <strong>Add server</strong> → <strong>Scan QR code</strong>.</li>
+    <li>Point the camera at this code.</li>
   </ol>
-  <p class="note">The code works once, for 5 minutes. Your phone must reach this address (same Wi-Fi or Tailscale).</p>
+  <details class="hint">
+    <summary>Phone can't connect?</summary>
+    <ul>
+      <li>The phone and this computer must be on the same Wi-Fi, or both signed in to the same Tailscale network.</li>
+      <li>Allow TCP ${port} through this computer's firewall.</li>
+      <li>The server must listen on all interfaces: run <code>opencode service set hostname 0.0.0.0</code>, then <code>opencode service start</code>.</li>
+    </ul>
+  </details>
+  <p class="note">The code works once, for 5 minutes. Your phone must be able to reach the address above.</p>
 </main>
 </div>
 <script nonce="${input.nonce}">${SCRIPT}</script>
