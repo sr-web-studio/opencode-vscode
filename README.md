@@ -4,6 +4,13 @@
 
 A chat panel for [OpenCode](https://opencode.ai) V2 in the VS Code sidebar. Your sessions live on the OpenCode server, so they keep running when you close VS Code, and you find them again when you come back.
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/sr-web-studio/opencode-vscode/main/docs/images/mobile-sessions.png" width="260" alt="Sessions list in the Android app">
+  <img src="https://raw.githubusercontent.com/sr-web-studio/opencode-vscode/main/docs/images/mobile-chat.png" width="260" alt="Chat with an agent in the Android app">
+</p>
+
+<p align="center"><em>The Android app (beta) connected to the same OpenCode server.</em></p>
+
 ## Why I built this
 
 I'm a big OpenCode fan. I run OpenCode as a service on a machine that is on 24/7, so I can open my sessions from anywhere, my laptop or my phone, and pick each one up exactly where it is, even hours later.
@@ -87,7 +94,7 @@ A separate Android app, **OpenCode (unofficial)** for phones, lists all your pro
 
 ## Development
 
-The repo is a Bun workspace monorepo: shared logic in `packages/core`, the Svelte UI in `packages/ui`, the VS Code extension and the OpenCode Voice companion in `apps/vscode`. Run `bun install`, then `bun run build`, `bun run typecheck`, `bun run test` and `bun run package` from the repo root. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) and [docs/monorepo.md](docs/monorepo.md).
+The repo is a Bun workspace monorepo: shared logic in `packages/core`, the Svelte UI in `packages/ui`, the VS Code extension and the OpenCode Voice companion in `apps/vscode`. Run `bun install`, then `bun run build`, `bun run typecheck`, `bun run test` and `bun run package` from the repo root. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md), [docs/architecture.md](docs/architecture.md) and [docs/monorepo.md](docs/monorepo.md).
 
 ## License
 
