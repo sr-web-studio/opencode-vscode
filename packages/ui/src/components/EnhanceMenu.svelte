@@ -117,7 +117,7 @@
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div class="row" class:sel={index === 0} role="menuitem" tabindex="-1" onclick={() => choose("polish")} onmousemove={() => (index = 0)}>
       <span class="n">Polish</span>
-      <span class="d muted">Fix grammar, spelling and dictation errors</span>
+      <span class="d muted">Fix grammar, spelling, sentence structure and dictation errors</span>
     </div>
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div class="row" class:sel={index === 1} role="menuitem" tabindex="-1" onclick={() => choose("rewrite")} onmousemove={() => (index = 1)}>

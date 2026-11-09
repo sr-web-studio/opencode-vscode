@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Polish also fixes sentence structure.** Enhance prompt → Polish now splits run-on sentences, reorders clumsy phrasing and joins fragments, besides grammar, spelling and dictation errors, while keeping the order of your ideas.
+
 ## 0.3.11 (preview)
 
 - **Enhance prompt.** The sparkle button in the prompt box turns a rough or dictated message into a clear prompt: **Polish** fixes grammar, spelling, punctuation and speech-to-text slips while keeping every technical detail, and **Rewrite** turns it into a detailed, well-structured prompt for the agent. The result replaces the text in the box, with **Undo** until you edit or send, and a notice instead of an overwrite if you changed the prompt while it ran. It is one stateless model call (OpenCode 2.2 or newer): only the prompt text is sent, never files, images or session history, and it never changes the session's agent or model. Pick the model for it in the button's menu; by default the server's default model is used.
