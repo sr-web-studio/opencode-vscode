@@ -298,11 +298,13 @@ export function activate(context: vscode.ExtensionContext): void {
       const directory = directoryArg(arg)
       if (directory) folders.setActive(directory)
     }),
-    // The tree passes the session's folder so a delete from the sidebar acts on the right project.
+    // A sidebar row names its session and folder; the palette passes nothing and acts on the active folder.
+    // Deleting does not switch the chat's folder: the folder's own controller does the work.
     vscode.commands.registerCommand("opencode.deleteSession", (arg?: unknown) => {
-      const directory = directoryArg(arg)
-      if (directory) folders.setActive(directory)
-      return deleteSessionCommand(folders.active)
+      const target = sessionTarget(arg)
+      const directory = target?.directory ?? directoryArg(arg)
+      const controller = (directory ? folders.controllerAt(directory) : undefined) ?? (target ? folders.forSession(target.sessionID) : folders.active)
+      return deleteSessionCommand(controller, target?.sessionID)
     }),
     vscode.commands.registerCommand("opencode.mcps", async () => {
       await vscode.commands.executeCommand(`${VIEW_ID}.focus`)
