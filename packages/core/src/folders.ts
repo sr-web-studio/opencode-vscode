@@ -57,6 +57,8 @@ export function folderStorageKey(base: string, directory: string, primary: boole
  */
 export class FolderRegistry<C extends FolderController> {
   private readonly byDirectory = new Map<string, C>()
+  /** OpenCode's name for each folder's project, keyed by the workspace path. Absent: the folder name shows. */
+  private readonly projectNames = new Map<string, string>()
   private entries: FolderEntry[] = []
   private activeDirectory = ""
   private client?: OpenCodeClient
@@ -65,6 +67,7 @@ export class FolderRegistry<C extends FolderController> {
   private voice?: AppState["voice"]
   private readonly activeListeners = new Set<() => void>()
   private readonly changeListeners = new Set<() => void>()
+  private readonly nameListeners = new Set<() => void>()
 
   constructor(private readonly opts: FolderRegistryOptions<C>) {}
 
@@ -83,6 +86,8 @@ export class FolderRegistry<C extends FolderController> {
       controllersChanged = true
     }
     this.entries = nextEntries
+    const open = new Set(nextEntries.map((entry) => entry.directory))
+    for (const directory of [...this.projectNames.keys()]) if (!open.has(directory)) this.projectNames.delete(directory)
 
     for (const [directory, entry] of wanted) {
       const existing = this.byDirectory.get(directory)
@@ -172,6 +177,27 @@ export class FolderRegistry<C extends FolderController> {
     return controller
   }
 
+  /**
+   * The name OpenCode has for one folder's project. Empty or undefined falls back to the workspace folder name.
+   * Listeners hear about it, so a rename in the browser UI or on the phone shows here without a reload.
+   */
+  setProjectName(directory: string, name: string | undefined): void {
+    const key = this.resolve(directory)
+    if (!key) return
+    const next = name?.trim() || undefined
+    const previous = this.projectNames.get(key)
+    if (previous === next) return
+    if (next) this.projectNames.set(key, next)
+    else this.projectNames.delete(key)
+    for (const listener of this.nameListeners) listener()
+  }
+
+  /** OpenCode's name for a folder's project, or undefined when it has none. */
+  projectName(directory: string): string | undefined {
+    const key = this.resolve(directory)
+    return key ? this.projectNames.get(key) : undefined
+  }
+
   /** The folder list for the UI. Empty for a window without folders; the dropdown only appears with two or more. */
   foldersState(): FolderInfo[] {
     return this.entries.map((entry) => {
@@ -179,6 +205,7 @@ export class FolderRegistry<C extends FolderController> {
       return {
         directory: entry.directory,
         name: entry.folderName,
+        projectName: this.projectNames.get(entry.directory),
         displayPath: entry.displayPath,
         active: entry.directory === this.activeDirectory,
         busy: controller?.isBusy() ?? false,
@@ -235,13 +262,21 @@ export class FolderRegistry<C extends FolderController> {
     return () => this.activeListeners.delete(listener)
   }
 
+  /** A folder's OpenCode project name was set, cleared or changed. */
+  onProjectNames(listener: () => void): () => void {
+    this.nameListeners.add(listener)
+    return () => this.nameListeners.delete(listener)
+  }
+
   dispose(): void {
     this.detach()
     this.byDirectory.clear()
+    this.projectNames.clear()
     this.entries = []
     this.activeDirectory = ""
     this.activeListeners.clear()
     this.changeListeners.clear()
+    this.nameListeners.clear()
   }
 
   private setActiveDirectory(directory: string): boolean {

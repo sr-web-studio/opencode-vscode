@@ -53,6 +53,11 @@ export interface HostBridge {
   confirmRevert(messageID: string): void
   /** Ask for confirmation in the host's own UI (a VS Code modal), then delete the session on the server. */
   confirmDeleteSession(sessionID: string, title: string): void
+  /**
+   * Rename an OpenCode project (its display name on the server, not the folder on disk). The host asks for the name
+   * and saves it; hosts without a project list (the phone) leave this out. VS Code shows it in the folder dropdown.
+   */
+  renameProject?(directory: string): void
   /** Open a web link outside the app. */
   openExternal(url: string): void
   /**

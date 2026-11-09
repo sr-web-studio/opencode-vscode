@@ -135,7 +135,7 @@
       <div class="banner muted">Connection lost. Reconnecting…</div>
     {/if}
     {#if empty}
-      <EmptyState folderName={app.folderName} displayPath={app.displayPath} onsuggest={suggest} />
+      <EmptyState folderName={app.projectName ?? app.folderName} displayPath={app.displayPath} onsuggest={suggest} />
     {:else}
       <Transcript {app}>
         {#if todos && !app.form && !app.readOnly}

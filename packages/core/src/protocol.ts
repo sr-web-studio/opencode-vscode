@@ -71,6 +71,8 @@ export type FolderInfo = {
   directory: string
   /** The folder's name in the workspace (the last path segment, or the name given in a `.code-workspace`). */
   name: string
+  /** The project's name in OpenCode, when it has one. The dropdown shows this instead of `name`. */
+  projectName?: string
   /** `~`-shortened path for the dropdown. */
   displayPath: string
   /** The folder the chat view shows. */
@@ -87,6 +89,8 @@ export type AppState = {
   settings: ViewSettings
   directory: string
   folderName: string
+  /** The active folder's project name in OpenCode, when it has one. */
+  projectName?: string
   /** `~`-shortened project path for display. */
   displayPath: string
   /** The workspace folders of a VS Code multi-root window (two or more). Absent in a single-folder window and in the app. */
@@ -255,6 +259,8 @@ export type HostRequest =
   | { type: "reconnect" }
   /** "Edit config" in the MCP panel: the host opens the user's global OpenCode config (it never edits it). */
   | { type: "openGlobalConfig" }
+  /** The pencil in the folder dropdown: the host asks for a new OpenCode project name for that folder. */
+  | { type: "renameProject"; directory: string }
   | { type: "notify"; level: "info" | "warning" | "error"; message: string }
 
 /** Messages from the webview to the extension host. */

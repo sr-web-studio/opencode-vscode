@@ -218,6 +218,42 @@ describe("folder registry: one server connection for every folder", () => {
     a.waiting = ["ses_elsewhere"]
     expect(folders.foldersState()[0]).toMatchObject({ busy: false, attention: false })
   })
+
+  test("a project name from OpenCode shows in the folder list and falls back to the folder name", () => {
+    const { folders } = registry()
+    folders.sync([entry("/a"), entry("/b")])
+    expect(folders.projectName("/a")).toBeUndefined()
+    expect(folders.foldersState().map((f) => f.projectName)).toEqual([undefined, undefined])
+    let changes = 0
+    let folderChanges = 0
+    const off = folders.onProjectNames(() => changes++)
+    const offFolders = folders.onChange(() => folderChanges++)
+    folders.setProjectName("/a", "  My Project  ")
+    expect(folders.projectName("/a")).toBe("My Project")
+    expect(folders.foldersState().map((f) => f.projectName)).toEqual(["My Project", undefined])
+    expect(changes).toBe(1)
+    expect(folderChanges).toBe(0)
+    // The same name again is not a change; an empty one clears it back to the folder name.
+    folders.setProjectName("/a", "My Project")
+    expect(changes).toBe(1)
+    folders.setProjectName("/a", "   ")
+    expect(folders.projectName("/a")).toBeUndefined()
+    expect(changes).toBe(2)
+    folders.setProjectName("/nope", "Ignored")
+    expect(changes).toBe(2)
+    off()
+    offFolders()
+  })
+
+  test("removing a folder drops its project name; re-adding it starts without one", () => {
+    const { folders } = registry()
+    folders.sync([entry("/a"), entry("/b")])
+    folders.setProjectName("/a", "Named")
+    folders.sync([entry("/b")])
+    expect(folders.projectName("/a")).toBeUndefined()
+    folders.sync([entry("/a"), entry("/b")])
+    expect(folders.foldersState().find((f) => f.directory === "/a")?.projectName).toBeUndefined()
+  })
 })
 
 describe("folder registry: a session belongs to its own folder", () => {

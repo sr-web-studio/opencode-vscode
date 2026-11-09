@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Project names from OpenCode.** The folder dropdown shows the name a project has in OpenCode, and **OpenCode: Rename Project…** (also in the dropdown and on the Settings page) renames it; a rename in the browser UI or on the phone shows up live.
 - **Android app: worker sessions are read-only everywhere.** A notification tap, a deep link or any other route to a child session now opens the read-only worker screen (with the parent's chat under it), never a writable chat; the prompt box can no longer send to a worker.
 - **Android app: worker notifications are off by default.** A worker finishing or failing no longer notifies unless **Workers** is switched on in Settings (existing installs are migrated once). A worker's permission request or question is still announced, because it blocks the parent turn; tapping it opens the worker screen.
 
