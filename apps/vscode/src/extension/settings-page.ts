@@ -48,21 +48,40 @@ const COMPANION_COMMANDS: ActionRow[] = [
 
 const ACTIONS: ActionRow[] = [
   {
-    id: "pairMobile",
-    label: "Pair mobile device…",
-    description: "Show a QR code and link for the OpenCode (unofficial) Android app.",
-    command: "opencode.pairMobileDevice",
-    icon: "device-mobile",
-    button: "Pair…",
-  },
-  { id: "reconnect", label: "Reconnect", description: "Detach and connect to the OpenCode server again.", command: "opencode.reconnect", icon: "debug-restart", button: "Reconnect" },
-  {
     id: "globalConfig",
     label: "Open global OpenCode config",
     description: "Open the OpenCode server's own config file in an editor. This page never changes it.",
     command: "opencode.openGlobalConfig",
     icon: "json",
     button: "Open",
+    group: "OpenCode config",
+  },
+  {
+    id: "projectConfig",
+    label: "Open project OpenCode config",
+    description: "Open this workspace folder's own OpenCode config (opencode.jsonc or .opencode/opencode.jsonc) in an editor. This page never changes it.",
+    command: "opencode.openProjectConfig",
+    icon: "json",
+    button: "Open",
+    group: "OpenCode config",
+  },
+  {
+    id: "pairMobile",
+    label: "Pair mobile device…",
+    description: "Show a QR code and link for the OpenCode (unofficial) Android app.",
+    command: "opencode.pairMobileDevice",
+    icon: "device-mobile",
+    button: "Pair…",
+    group: "Quick actions",
+  },
+  {
+    id: "reconnect",
+    label: "Reconnect",
+    description: "Detach and connect to the OpenCode server again.",
+    command: "opencode.reconnect",
+    icon: "debug-restart",
+    button: "Reconnect",
+    group: "Quick actions",
   },
   {
     id: "voiceLanguage",
@@ -71,6 +90,7 @@ const ACTIONS: ActionRow[] = [
     command: "opencode.voice.chooseLanguage",
     icon: "globe",
     button: "Choose…",
+    group: "Quick actions",
   },
 ]
 

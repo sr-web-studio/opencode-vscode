@@ -92,8 +92,12 @@
       {
         "command": "opencode.openGlobalConfig",
         "title": "Open Global Config",
-        "category": "OpenCode",
-        "icon": "$(settings-gear)"
+        "category": "OpenCode"
+      },
+      {
+        "command": "opencode.openProjectConfig",
+        "title": "Open Project Config",
+        "category": "OpenCode"
       },
       {
         "command": "opencode.reconnect",
@@ -149,11 +153,6 @@
     ],
     "menus": {
       "view/title": [
-        {
-          "command": "opencode.openGlobalConfig",
-          "when": "view == opencode.chat",
-          "group": "navigation@90"
-        },
         {
           "command": "opencode.openSettings",
           "when": "view == opencode.chat",

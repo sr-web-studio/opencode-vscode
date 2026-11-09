@@ -19,6 +19,16 @@
   const sections = $derived(settings ? filterSections(settings.sections, query) : [])
   const secrets = $derived((settings?.secrets ?? []).filter((row) => matchesQuery(`${row.label} ${row.description}`, query)))
   const actions = $derived((settings?.actions ?? []).filter((row) => matchesQuery(`${row.label} ${row.description}`, query)))
+  const actionGroups = $derived.by(() => {
+    const groups: { title: string; rows: SettingsState["actions"] }[] = []
+    for (const row of actions) {
+      const title = row.group ?? "Actions"
+      const group = groups.find((item) => item.title === title)
+      if (group) group.rows.push(row)
+      else groups.push({ title, rows: [row] })
+    }
+    return groups
+  })
   const companionCommands = $derived((settings?.companion.commands ?? []).filter((row) => matchesQuery(`${row.label} ${row.description}`, query)))
   const aboutLinks = $derived((settings?.about.links ?? []).filter((link) => matchesQuery(`${link.label} ${link.description ?? ""}`, query)))
   const enhanceVisible = $derived(!!settings && (!query.trim() || matchesQuery("Enhance prompt model sparkle reset server default", query)))
@@ -170,9 +180,9 @@
             {/each}
           {/if}
 
-          {#if actions.length}
-            <h3 class="group">Actions</h3>
-            {#each actions as row (row.id)}
+          {#each actionGroups as group (group.title)}
+            <h3 class="group">{group.title}</h3>
+            {#each group.rows as row (row.id)}
               <div class="row custom">
                 <div class="text">
                   <div class="label">
@@ -186,7 +196,7 @@
                 </div>
               </div>
             {/each}
-          {/if}
+          {/each}
         </Section>
       {/if}
 

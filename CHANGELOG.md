@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **One gear in the chat's title bar.** It opens the OpenCode Settings page, which now also opens the global and the project OpenCode config.
 - **Polish also fixes sentence structure.** Enhance prompt → Polish now splits run-on sentences, reorders clumsy phrasing and joins fragments, besides grammar, spelling and dictation errors, while keeping the order of your ideas.
 - **Pictures the agent reads.** A `read` of an image shows a thumbnail in the tool's details (a large picture shows an **Open picture** link instead). On the phone, tapping it opens the picture, also when it is outside the project, for example a screenshot in `/tmp`.
 - **Android app: long lines wrap.** The file viewer and diffs no longer scroll sideways; long lines and URLs wrap at the screen width and the line numbers stay in place.

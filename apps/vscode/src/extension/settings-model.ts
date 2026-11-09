@@ -69,7 +69,7 @@ export type SecretRow = {
   clearCommand: string
 }
 
-export type ActionRow = { id: string; label: string; description: string; command: string; icon?: string; button?: string }
+export type ActionRow = { id: string; label: string; description: string; command: string; icon?: string; button?: string; /** Rows with the same group share a heading on the page. */ group?: string }
 
 export type AboutLink = { label: string; url: string; description?: string }
 

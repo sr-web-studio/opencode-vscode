@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { readFileSync } from "node:fs"
 import { NEW_CONFIG_TEXT, type ConfigHost } from "@occ/core/global-config"
 import { openProjectConfig, projectConfigCandidates, resolveProjectConfig } from "@occ/core/project-config"
 
@@ -91,5 +92,29 @@ describe("openProjectConfig", () => {
     const { host, log } = fake([])
     expect(await openProjectConfig({ ...local, root: "" }, host)).toBe("no-folder")
     expect(log).toEqual(["info Open a folder first."])
+  })
+})
+
+describe("wiring", () => {
+  const pkg = JSON.parse(readFileSync("apps/vscode/package.json", "utf8"))
+  test("the command is contributed and in the palette, without a title-bar icon", () => {
+    const cmd = pkg.contributes.commands.find((c: { command: string }) => c.command === "opencode.openProjectConfig")
+    expect(cmd).toMatchObject({ title: "Open Project Config", category: "OpenCode" })
+    expect(cmd.icon).toBeUndefined()
+    expect(pkg.contributes.menus["view/title"]).not.toContainEqual(expect.objectContaining({ command: "opencode.openProjectConfig" }))
+    expect(pkg.contributes.menus.commandPalette ?? []).not.toContainEqual(expect.objectContaining({ command: "opencode.openProjectConfig", when: "false" }))
+  })
+  test("the command reads the chat view's active folder", () => {
+    const src = readFileSync("apps/vscode/src/extension/extension.ts", "utf8")
+    expect(src).toContain(`registerCommand("opencode.openProjectConfig"`)
+    expect(src).toMatch(/registerCommand\("opencode\.openProjectConfig",\s*\(\)\s*=>\s*openProjectConfigCommand\(folders\.activeDirectoryName,/)
+  })
+  test("the Settings page groups both config actions and allows the new command", () => {
+    const src = readFileSync("apps/vscode/src/extension/settings-page.ts", "utf8")
+    expect(src).toContain(`command: "opencode.openGlobalConfig"`)
+    expect(src).toContain(`command: "opencode.openProjectConfig"`)
+    expect(src.match(/group: "OpenCode config"/g)).toHaveLength(2)
+    // ALLOWED_COMMANDS is derived from every action, so the new row is allowed without a second list to keep in sync.
+    expect(src).toContain("...ACTIONS.map((action) => action.command)")
   })
 })
