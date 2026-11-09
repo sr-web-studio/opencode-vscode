@@ -9,9 +9,11 @@ import { dataUri } from "@occ/core/attachments"
 import { ImageCache } from "@occ/core/image-cache"
 import { safeImageMime, type ImageRef } from "@occ/core/images"
 import { folderName, shortenHome } from "@occ/core/paths"
-import { normalizeModelSelection } from "@occ/core/models"
+import type { ModelSelection } from "@occ/core/models"
+import { defaultViewSettings, type ViewSettings } from "@occ/core/protocol"
 import { deleteQuestion, DELETE_BUTTON, DELETE_DETAIL } from "@occ/core/delete-session"
 import { normalizeServerUrl } from "@occ/core/server-url"
+import { enhanceModelKey, parseEnhanceModel, parseViewSettings, patchViewSettings, resetSettingKeys, VIEW_KEY } from "./lib/app-settings"
 import { makeClient, redeemPairing, testConnection } from "./lib/client"
 import { parseDeepLink, routeDeepLink } from "./lib/deep-link"
 import { LinkGate } from "./lib/link-gate"
@@ -85,6 +87,10 @@ class AppModel {
   ready = $state(false)
   /** The Settings layer is open above the screen stack. */
   settingsOpen = $state(false)
+  /** What the chat looks like on this phone; applied to every open project's controller. */
+  viewSettings = $state.raw<ViewSettings>(defaultViewSettings)
+  /** Bumped when a saved setting outside `viewSettings` changes (an enhancement model, a reset). */
+  settingsTick = $state(0)
   /** Background notifications: the owner's switches (not secret; the service gets them too). */
   notifySettings = $state.raw<NotifySettings>(DEFAULT_NOTIFY)
   /** What the watching service reports (refreshed while the Settings screen is open). */
@@ -133,6 +139,7 @@ class AppModel {
     } finally {
       this.markProfilesLoaded()
     }
+    this.viewSettings = parseViewSettings(readJSON(VIEW_KEY))
     this.notifySettings = parseNotifySettings(readJSON(NOTIFY_KEY))
     void this.syncNotify()
     const launch = await launchUrl()
@@ -174,6 +181,11 @@ class AppModel {
   openSettings() {
     this.settingsOpen = true
     void this.refreshNotifyStatus()
+  }
+
+  /** Close Settings and show the saved server list (the screen the gear lives on). */
+  goServers() {
+    this.setStack([{ key: nextKey(), screen: { kind: "servers" } }])
   }
 
   /** Close the screen with this key, unless something else has been opened above it since. */
@@ -331,11 +343,13 @@ class AppModel {
       },
       // The "Enhance prompt" model is independent of the session's model and stays on this phone, per server.
       enhanceModel: {
-        get: () => normalizeModelSelection(readJSON(`occ.enhanceModel.${profile.id}`)),
-        set: (m) => writeJSON(`occ.enhanceModel.${profile.id}`, m),
+        get: () => parseEnhanceModel(readJSON(enhanceModelKey(profile.id))),
+        set: (m) => writeJSON(enhanceModelKey(profile.id), m),
       },
       mcp: {},
     })
+    // A controller made after a change already starts with what Settings shows.
+    ctl.setSettings(this.viewSettings)
     const cache = new ImageCache({
       message: async (sessionID, messageID) => ctl.api?.session.message.get({ sessionID, messageID }),
       // This phone has no `file://` attachments: every image it sends is a data URI.
@@ -366,6 +380,46 @@ class AppModel {
   async imageUri(directory: string, sessionID: string, ref: ImageRef): Promise<string | undefined> {
     const bytes = await this.caches.get(directory)?.get(sessionID, ref)
     return bytes && safeImageMime(bytes.mime) ? dataUri(bytes.mime, bytes.base64) : undefined
+  }
+
+  /* ------------------------------------------------------- app settings */
+
+  /** Change chat display settings: save them and update every open chat right away. */
+  setViewSettings(patch: Partial<ViewSettings>): void {
+    this.viewSettings = patchViewSettings(this.viewSettings, patch)
+    writeJSON(VIEW_KEY, this.viewSettings)
+    this.applyViewSettings()
+  }
+
+  /** The "Enhance prompt" model saved for a server; undefined means its default model. */
+  enhanceModelOf(profileID: string): ModelSelection | undefined {
+    return parseEnhanceModel(readJSON(enhanceModelKey(profileID)))
+  }
+
+  /** Forget a server's enhancement model, so "Enhance prompt" uses the server default again. */
+  resetEnhanceModel(profileID: string): void {
+    writeJSON(enhanceModelKey(profileID), undefined)
+    this.settingsTick++
+    // The open chats of that server read the saved model on their next snapshot; this asks for one now.
+    if (this.profile?.id === profileID) this.applyViewSettings()
+  }
+
+  /**
+   * Put chat display and every server's enhancement model back to their defaults. Saved servers, sessions, passwords
+   * and the notification switches are not touched.
+   */
+  resetAppSettings(): void {
+    for (const key of resetSettingKeys(this.profiles.map((p) => p.id))) writeJSON(key, undefined)
+    this.viewSettings = defaultViewSettings
+    this.settingsTick++
+    this.applyViewSettings()
+  }
+
+  /** Hand the current chat display settings to the controllers that are open. */
+  private applyViewSettings(): void {
+    const ws = this.workspace
+    if (!ws) return
+    for (const directory of ws.directories) ws.get(directory)?.setSettings(this.viewSettings)
   }
 
   /* ---------------------------------------------- background notifications */
