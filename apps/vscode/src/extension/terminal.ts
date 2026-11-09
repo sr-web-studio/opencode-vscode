@@ -72,9 +72,11 @@ export class ShellTerminals implements vscode.Disposable {
       this.stops.delete(directory)
     }
     for (const controller of this.folders.controllers()) {
-      if (!controller.directory || this.stops.has(controller.directory)) continue
+      // The workspace path: `controller.directory` is the server's spelling and would duplicate the stream after a sync.
+      const path = controller.folderPath
+      if (!path || this.stops.has(path)) continue
       this.stops.set(
-        controller.directory,
+        path,
         controller.observe({
           event: (ev) => this.onEvent(ev),
           resync: () => void this.reattach(controller),
