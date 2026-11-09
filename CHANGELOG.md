@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- **Android app: worker sessions are read-only everywhere.** A notification tap, a deep link or any other route to a child session now opens the read-only worker screen (with the parent's chat under it), never a writable chat; the prompt box can no longer send to a worker.
+- **Android app: worker notifications are off by default.** A worker finishing or failing no longer notifies unless **Workers** is switched on in Settings (existing installs are migrated once). A worker's permission request or question is still announced, because it blocks the parent turn; tapping it opens the worker screen.
+
 ## 0.3.12 (preview)
 
 - **Polish also fixes sentence structure.** Enhance prompt → Polish now splits run-on sentences, reorders clumsy phrasing and joins fragments, besides grammar, spelling and dictation errors, while keeping the order of your ideas.

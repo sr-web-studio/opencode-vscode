@@ -17,8 +17,8 @@ import { enhanceModelKey, parseEnhanceModel, parseViewSettings, patchViewSetting
 import { makeClient, redeemPairing, testConnection } from "./lib/client"
 import { parseDeepLink, routeDeepLink } from "./lib/deep-link"
 import { LinkGate } from "./lib/link-gate"
-import { canPop, directoriesInUse, pop, popKey, push, stackForSession, type Entry, type Screen } from "./lib/nav"
-import { DEFAULT_NOTIFY, NO_STATUS, nativeServers, parseNotifySettings, visibleSessionOf, type NotifySettings, type NotifyStatus } from "./lib/notify"
+import { canPop, directoriesInUse, pop, popKey, push, stackForSession, stackForWorker, type Entry, type Screen } from "./lib/nav"
+import { DEFAULT_NOTIFY, NO_STATUS, NOTIFY_VERSION, nativeServers, parseNotifySettings, visibleSessionOf, type NotifySettings, type NotifyStatus } from "./lib/notify"
 import {
   askBatteryExemption,
   askNotificationPermission,
@@ -191,6 +191,33 @@ class AppModel {
   /** Close the screen with this key, unless something else has been opened above it since. */
   close(key: number) {
     this.setStack(popKey(this.stack, key))
+  }
+
+  /**
+   * Open the session of a chat screen. A worker (child session) never becomes a writable chat: the screen is replaced by
+   * the read-only worker screen. The root list already knows the roots; only an unknown id asks the server for its parent.
+   */
+  async openChatSession(ctl: Controller, directory: string, sessionID: string, key: number): Promise<void> {
+    const known = ctl.sessionMeta(sessionID)
+    const worker = known ? !!known.parentID : !!(await this.sessionParent(sessionID))
+    if (worker) {
+      this.replace(key, { kind: "worker", directory, sessionID })
+      return
+    }
+    await ctl.dispatch({ type: "openSession", id: sessionID })
+  }
+
+  private async sessionParent(sessionID: string): Promise<string | undefined> {
+    try {
+      return (await this.client.session.get({ sessionID })).parentID
+    } catch {
+      return undefined
+    }
+  }
+
+  /** Replace the screen with this key (a chat that turns out to be a worker). */
+  private replace(key: number, screen: Screen) {
+    this.setStack(this.stack.map((e) => (e.key === key ? { key, screen } : e)))
   }
 
   /** Android back: a dialog first, then the top screen. False at the bottom: the app leaves. */
@@ -435,7 +462,8 @@ class AppModel {
 
   async setNotify(patch: Partial<NotifySettings>): Promise<void> {
     this.notifySettings = { ...this.notifySettings, ...patch }
-    writeJSON(NOTIFY_KEY, this.notifySettings)
+    // The version marks the file as v2, so a later read keeps a worker switch the owner turned back on.
+    writeJSON(NOTIFY_KEY, { ...this.notifySettings, version: NOTIFY_VERSION })
     // Turning notifications on is the moment to ask Android for permission.
     if (patch.enabled === true) await askNotificationPermission()
     await this.syncNotify()
@@ -457,7 +485,7 @@ class AppModel {
     })
     if (!ok) {
       this.notifySettings = { ...this.notifySettings, enabled: false }
-      writeJSON(NOTIFY_KEY, this.notifySettings)
+      writeJSON(NOTIFY_KEY, { ...this.notifySettings, version: NOTIFY_VERSION })
       await this.syncNotify()
       return
     }
@@ -543,16 +571,29 @@ class AppModel {
       this.notify("error", this.problem?.message ?? "Could not connect to the server.")
       return false
     }
-    let directory: string | undefined
+    let info: { location?: { directory?: string }; parentID?: string } | undefined
     try {
-      directory = (await this.client.session.get({ sessionID: link.sessionID })).location?.directory
+      info = await this.client.session.get({ sessionID: link.sessionID })
     } catch {
-      directory = undefined
+      info = undefined
     }
+    const directory = info?.location?.directory
     if (!directory) {
       this.setStack([...bottom(), { key: nextKey(), screen: { kind: "projects" } }])
       this.notify("warning", `That session was not found on ${route.profile.name}. It may have been deleted.`)
       return false
+    }
+    if (info?.parentID) {
+      // A worker (child session) is read-only: its own screen, with the parent's chat under it when that is still there.
+      let parentDirectory: string | undefined
+      try {
+        parentDirectory = (await this.client.session.get({ sessionID: info.parentID })).location?.directory
+      } catch {
+        parentDirectory = undefined
+      }
+      const parent = parentDirectory ? { directory: parentDirectory, sessionID: info.parentID } : undefined
+      this.setStack(stackForWorker(directory, nextKey, link.sessionID, parent))
+      return true
     }
     this.setStack(stackForSession(directory, nextKey, link.sessionID))
     return true

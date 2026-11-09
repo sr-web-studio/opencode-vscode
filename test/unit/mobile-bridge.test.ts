@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { Controller } from "@occ/core/controller"
 import type { Action, AppState, ToWebview } from "@occ/core/protocol"
-import { createBridge, MOBILE_CAPABILITIES, VOICE_LATER, type KeyValueStore, type MobileHost, type Surface } from "../../apps/mobile/src/lib/bridge"
+import { createBridge, MOBILE_CAPABILITIES, VOICE_LATER, WORKER_READ_ONLY, type KeyValueStore, type MobileHost, type Surface } from "../../apps/mobile/src/lib/bridge"
 
 const session = (id: string, updated: number) => ({ id, title: `Title ${id}`, projectID: "prj", time: { created: 1, updated }, location: { directory: "/w" } })
 
@@ -43,6 +43,7 @@ const surfaceOf = (ctl: Controller): Surface => ({
   subscribe: (l) => ctl.subscribe(l),
   dispatch: (a: Action) => ctl.dispatch(a),
   sessionID: () => ctl.currentSessionID,
+  isWorker: (id) => !!ctl.sessionMeta(id)?.parentID,
 })
 
 function recordingHost(answers: { revert?: boolean; del?: boolean } = {}) {
@@ -140,6 +141,33 @@ describe("in-process bridge", () => {
     b.openSession("ses_b", { readOnly: false })
     await settle()
     expect(ctl.currentSessionID).toBe("ses_b")
+  })
+
+  test("a worker opened without readOnly still becomes the read-only worker screen", async () => {
+    const ctl = await readyController()
+    const { host, log } = recordingHost()
+    const b = createBridge(surfaceOf(ctl), host, memoryStore())
+    ;(ctl as any).children.set("ses_kid", { ...session("ses_kid", 1), parentID: "ses_a" })
+    b.openSession("ses_kid", { readOnly: false })
+    b.postToHost({ type: "action", action: { type: "openSession", id: "ses_kid" } })
+    b.postToHost({ type: "host", request: { type: "openSession", id: "ses_kid", readOnly: false } })
+    await settle()
+    expect(log).toEqual([
+      ["openWorker", "ses_kid"],
+      ["openWorker", "ses_kid"],
+      ["openWorker", "ses_kid"],
+    ])
+    expect(ctl.currentSessionID).not.toBe("ses_kid")
+  })
+
+  test("a prompt sent while a worker is the screen is refused with a calm message", async () => {
+    const dispatched: Action[] = []
+    const { host, log } = recordingHost()
+    const surface: Surface = { subscribe: () => () => {}, dispatch: async (a) => void dispatched.push(a), sessionID: () => "ses_w", isWorker: () => true }
+    createBridge(surface, host, memoryStore()).postToHost({ type: "action", action: { type: "send", text: "hello" } })
+    await settle()
+    expect(dispatched).toEqual([])
+    expect(log).toEqual([["notify", "warning", WORKER_READ_ONLY]])
   })
 
   test("delete: only the modal's yes deletes; cancel does nothing", async () => {

@@ -49,3 +49,19 @@ export function stackForSession(directory: string, keys: () => number, sessionID
     { key: keys(), screen: { kind: "chat", directory, sessionID } },
   ]
 }
+
+/**
+ * The stack for "open this worker": a worker is read-only, so it never becomes a chat. When the parent is known its
+ * chat sits under the worker screen, so back returns to the conversation the worker belongs to; without the parent the
+ * worker opens straight from the project's session list.
+ */
+export function stackForWorker(directory: string, keys: () => number, sessionID: string, parent?: { directory: string; sessionID: string }): Entry[] {
+  const stack: Entry[] = [
+    { key: keys(), screen: { kind: "servers" } },
+    { key: keys(), screen: { kind: "projects" } },
+    { key: keys(), screen: { kind: "sessions", directory: parent?.directory ?? directory } },
+  ]
+  if (parent) stack.push({ key: keys(), screen: { kind: "chat", directory: parent.directory, sessionID: parent.sessionID } })
+  stack.push({ key: keys(), screen: { kind: "worker", directory, sessionID } })
+  return stack
+}

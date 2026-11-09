@@ -16,7 +16,7 @@
   const tab = new WorkerTab(ctl, sessionID)
   const live = liveState(tab)
   const bridge = createBridge(
-    { subscribe: (l) => tab.subscribe(l), dispatch: (a) => tab.dispatch(a), sessionID: () => sessionID },
+    { subscribe: (l) => tab.subscribe(l), dispatch: (a) => tab.dispatch(a), sessionID: () => sessionID, isWorker: () => true },
     // svelte-ignore state_referenced_locally
     model.hostFor(directory),
     localStorage,

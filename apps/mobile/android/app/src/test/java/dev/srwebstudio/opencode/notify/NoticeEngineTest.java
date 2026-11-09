@@ -100,6 +100,9 @@ public class NoticeEngineTest {
   @Before
   public void setUp() {
     engine = make("");
+    // These tests exercise what an enabled switch does; the default itself is covered by SettingsTest and the
+    // worker-off tests below.
+    settings = new Settings(true, true, true, true, true, true);
     sessions.put("ses_root", new SessionMeta("Fix login", null, "/home/a/webapp"));
     sessions.put("ses_work", new SessionMeta("Read the logs", "ses_root", "/home/a/webapp"));
   }
@@ -428,5 +431,66 @@ public class NoticeEngineTest {
     t.load(s.serialize());
     assertTrue(t.contains("b") && t.contains("d"));
     assertTrue(!t.add("d"));
+  }
+
+  @Test
+  public void workerTurnEndIsSkippedWhenWorkersAreOff() {
+    settings = new Settings(true, true, true, true, true, false);
+    engine.handle(SERVER, ev(turn("e1", "session.execution.succeeded", "ses_work", null)));
+    engine.handle(SERVER, ev(turn("e2", "session.execution.failed", "ses_work", "boom")));
+    assertEquals("a worker ending is not announced", 0, shown.size());
+    now += 6_000;
+    engine.handle(SERVER, ev(turn("e3", "session.execution.succeeded", "ses_root", null)));
+    assertEquals("a root turn still is", 1, shown.size());
+    assertEquals(Kind.FINISHED, shown.get(0).kind);
+  }
+
+  @Test
+  public void workerTurnEndIsAnnouncedWhenWorkersAreOn() {
+    settings = new Settings(true, true, true, true, true, true);
+    engine.handle(SERVER, ev(turn("e1", "session.execution.succeeded", "ses_work", null)));
+    assertEquals(1, shown.size());
+    assertEquals(Kind.WORKER, shown.get(0).kind);
+    assertEquals("worker of Fix login", shown.get(0).subText);
+  }
+
+  @Test
+  public void workerPermissionAndQuestionStayAttentionWhenWorkersAreOff() {
+    // They block the parent turn, so they are announced like any attention request; the tap opens the worker screen.
+    settings = new Settings(true, true, true, true, true, false);
+    engine.handle(SERVER, ev(permAsked("per_1", "ses_work", "bash")));
+    assertEquals(1, shown.size());
+    assertEquals(Kind.PERMISSION, shown.get(0).kind);
+    assertEquals("worker of Fix login", shown.get(0).subText);
+    assertEquals("opencode-mobile://session/ses_work?server=my-server", shown.get(0).deepLink());
+    engine.handle(SERVER, ev(formCreated("frm_1", "ses_work")));
+    assertEquals(2, shown.size());
+    assertEquals(Kind.QUESTION, shown.get(1).kind);
+    assertEquals("worker of Fix login", shown.get(1).subText);
+  }
+
+  @Test
+  public void turnEndWithAnUnknownSessionIsSkipped() {
+    // The event names only the session; without its facts a worker would read as a root "finished".
+    engine.handle(SERVER, ev(turn("e1", "session.execution.succeeded", "ses_gone", null)));
+    assertEquals(0, shown.size());
+  }
+
+  @Test
+  public void turnEndWithAFailedLookupIsSkipped() {
+    lookupFails = true;
+    engine.handle(SERVER, ev(turn("e1", "session.execution.succeeded", "ses_work", null)));
+    assertEquals("a worker is never announced as a root turn end", 0, shown.size());
+  }
+
+  @Test
+  public void workerTurnEndUsesTheCachedMetaAfterTheServerGoesAway() {
+    // The first event fills the cache; a later failure must not turn the worker into a root notice.
+    engine.handle(SERVER, ev(permAsked("per_1", "ses_work", "bash")));
+    now += 6_000;
+    lookupFails = true;
+    engine.handle(SERVER, ev(turn("e1", "session.execution.succeeded", "ses_work", null)));
+    assertEquals(2, shown.size());
+    assertEquals(Kind.WORKER, shown.get(1).kind);
   }
 }
