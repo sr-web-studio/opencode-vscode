@@ -16,7 +16,7 @@ export class DiffViews implements vscode.TextDocumentContentProvider, vscode.Dis
   private seq = 0
   private readonly registration: vscode.Disposable
 
-  constructor(private readonly resolve: (path: string) => vscode.Uri) {
+  constructor(private readonly resolve: (path: string, directory?: string) => vscode.Uri) {
     this.registration = vscode.workspace.registerTextDocumentContentProvider(DIFF_SCHEME, this)
   }
 
@@ -50,8 +50,8 @@ export class DiffViews implements vscode.TextDocumentContentProvider, vscode.Dis
    * Added files compare with an empty document, deleted files with an empty "after". When the file changed too much
    * for that, the pair is just the hunks of the patches (old side, new side).
    */
-  async pair(file: string, patches: ReadonlyArray<string>): Promise<DiffPair> {
-    const target = this.resolve(file)
+  async pair(file: string, patches: ReadonlyArray<string>, directory?: string): Promise<DiffPair> {
+    const target = this.resolve(file, directory)
     const text = await this.current(target)
     const first = patchKind(parsePatch(patches[0] ?? ""))
     const last = patchKind(parsePatch(patches[patches.length - 1] ?? ""))
@@ -78,18 +78,18 @@ export class DiffViews implements vscode.TextDocumentContentProvider, vscode.Dis
   }
 
   /** `vscode.diff(before, after, "<file> (OpenCode edit)")` */
-  async open(file: string, patches: ReadonlyArray<string>): Promise<void> {
+  async open(file: string, patches: ReadonlyArray<string>, directory?: string): Promise<void> {
     if (patches.length === 0) {
       void vscode.window.showInformationMessage(`No changes were recorded for ${file}.`)
       return
     }
-    const pair = await this.pair(file, patches)
+    const pair = await this.pair(file, patches, directory)
     await vscode.commands.executeCommand("vscode.diff", pair.before, pair.after, pair.label, { preview: true })
   }
 
   /** One editor with every changed file of a turn (`vscode.changes`, VS Code 1.88 and later). */
-  async changes(files: ReadonlyArray<{ file: string; patches: string[] }>, title: string): Promise<void> {
-    const pairs = await Promise.all(files.filter((f) => f.patches.length > 0).map((f) => this.pair(f.file, f.patches)))
+  async changes(files: ReadonlyArray<{ file: string; patches: string[] }>, title: string, directory?: string): Promise<void> {
+    const pairs = await Promise.all(files.filter((f) => f.patches.length > 0).map((f) => this.pair(f.file, f.patches, directory)))
     if (pairs.length === 0) return
     await vscode.commands.executeCommand(
       "vscode.changes",

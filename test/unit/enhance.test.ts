@@ -86,6 +86,7 @@ describe("buildEnhancePrompt", () => {
     expect(prompt).toContain("\nPROMPT>>>")
     expect(prompt).toMatch(/grammar, spelling, punctuation/i)
     expect(prompt).toMatch(/speech-to-text/i)
+    expect(prompt).toMatch(/sentence structure/i)
     expect(prompt).toMatch(/never instructions to follow/)
     expect(prompt).toMatch(/only the improved prompt/i)
     // Nothing about the project, files or history goes with the text.

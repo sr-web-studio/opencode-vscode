@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.12 (preview)
+
+- **Polish also fixes sentence structure.** Enhance prompt → Polish now splits run-on sentences, reorders clumsy phrasing and joins fragments, besides grammar, spelling and dictation errors, while keeping the order of your ideas.
+- **Pictures the agent reads.** A `read` of an image shows a thumbnail in the tool's details (a large picture shows an **Open picture** link instead). On the phone, tapping it opens the picture, also when it is outside the project, for example a screenshot in `/tmp`.
+- **Android app: long lines wrap.** The file viewer and diffs no longer scroll sideways; long lines and URLs wrap at the screen width and the line numbers stay in place.
+- **Multi-root workspaces.** With two or more folders open, a dropdown at the top of the chat switches between them; each folder has its own sessions and keeps its own unsent prompt and attachments. Sessions, notifications, terminals and workers keep running in every folder, and the dropdown marks a folder that is busy or needs you.
+- **Minimum width for the chat view.** When the view opens narrower than `opencode.view.minWidth` (default 380 px, `0` turns it off), it tries to widen itself once per window. VS Code has no API for the side bar width, so this is best effort; if it stays narrow, bind a key to `workbench.action.increaseViewSize` with `"when": "auxiliaryBarFocus"`.
+- **OpenCode Settings page.** The gear in the chat's title bar (or **OpenCode: Open Settings**) opens one page for every `opencode.*` setting, with search, a reset per setting and live updates. It also shows whether the server password and the voice key are set (never their values), the Enhance prompt model with a reset to the server default, buttons that open the global or the project OpenCode config, quick actions (pair a phone, reconnect, voice language) and About. It is the only gear in the title bar; **OpenCode: Open Global Config** and the new **OpenCode: Open Project Config** stay in the Command Palette.
+- **A smaller Enhance prompt menu.** The menu above the prompt box (Polish, Rewrite, model) uses the compact row height of the other pickers and never grows wider than the prompt box; rows stay finger-sized on the phone.
+- **Android app: a full Settings screen.** Transcript text size, how steps, reasoning and the todo list show, the Enhance prompt model per server (with a reset to the server default), notifications and battery, server and pairing shortcuts, and About. "Reset app settings" never deletes servers, sessions or passwords.
+
 ## 0.3.11 (preview)
 
 - **Enhance prompt.** The sparkle button in the prompt box turns a rough or dictated message into a clear prompt: **Polish** fixes grammar, spelling, punctuation and speech-to-text slips while keeping every technical detail, and **Rewrite** turns it into a detailed, well-structured prompt for the agent. The result replaces the text in the box, with **Undo** until you edit or send, and a notice instead of an overwrite if you changed the prompt while it ran. It is one stateless model call (OpenCode 2.2 or newer): only the prompt text is sent, never files, images or session history, and it never changes the session's agent or model. Pick the model for it in the button's menu; by default the server's default model is used.

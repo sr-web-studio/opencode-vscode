@@ -1,5 +1,6 @@
 import * as vscode from "vscode"
 import type { Controller } from "@occ/core/controller"
+import type { FolderRegistry } from "@occ/core/folders"
 import type { Action, ToHost, ToWebview } from "@occ/core/protocol"
 import { WorkerTab } from "@occ/core/worker-tab"
 import type { HostActions } from "./host"
@@ -17,14 +18,17 @@ export class WorkerPanels implements vscode.Disposable {
 
   constructor(
     private readonly extensionUri: vscode.Uri,
-    private readonly controller: Controller,
+    private readonly folders: FolderRegistry<Controller>,
     private readonly host: () => HostActions,
   ) {}
 
   async open(sessionID: string, readOnly: boolean): Promise<void> {
+    // A worker belongs to the folder whose session list knows it, which need not be the folder on screen.
+    const controller = this.folders.forSession(sessionID)
     if (!readOnly) {
-      // Writable sessions open in the chat view.
-      await this.controller.open(sessionID)
+      // Writable sessions open in the chat view: switch the view to their folder first.
+      if (controller.directory) this.folders.setActive(controller.directory)
+      await controller.open(sessionID)
       return
     }
     const existing = this.open_.get(sessionID)
@@ -32,7 +36,7 @@ export class WorkerPanels implements vscode.Disposable {
       existing.panel.reveal(undefined, false)
       return
     }
-    const tab = new WorkerTab(this.controller, sessionID)
+    const tab = new WorkerTab(controller, sessionID)
     const panel = vscode.window.createWebviewPanel("opencode.worker", "Worker", this.column(), {
       enableScripts: true,
       retainContextWhenHidden: true,
@@ -48,7 +52,7 @@ export class WorkerPanels implements vscode.Disposable {
     })
     const sub = panel.webview.onDidReceiveMessage(async (m: ToHost) => {
       if (m.type === "action") await tab.dispatch(m.action as Action)
-      else if (m.type === "host") await this.host().handle(m.request, { post, act: () => undefined, sessionID: () => sessionID })
+      else if (m.type === "host") await this.host().handle(m.request, { post, act: () => undefined, sessionID: () => sessionID, directory: () => controller.directory })
     })
     panel.onDidDispose(() => {
       off()

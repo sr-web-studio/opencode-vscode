@@ -2,12 +2,34 @@
  * What the read-only file viewer shows for the bytes of a file. Pure: no DOM, so the rules are tested directly.
  */
 import { isImageMime, mimeFromName } from "@occ/core/attachments"
+import { isAbsolutePath, withinDirectory } from "@occ/core/paths"
 
 export type FileContent = { kind: "text"; text: string; lines: number; truncated: boolean } | { kind: "image"; mime: string } | { kind: "binary"; size: number }
 
 /** A phone should not render megabytes of text in one go. */
 export const MAX_VIEW_BYTES = 1_000_000
 export const MAX_VIEW_LINES = 5000
+
+/** The folder that holds `path`, in the spelling the path itself uses (`/a/b.txt` → `/a`, `C:\a\b.txt` → `C:\`). */
+function parentOf(path: string): string {
+  const clean = path.replace(/[\\/]+$/, "")
+  const cut = Math.max(clean.lastIndexOf("/"), clean.lastIndexOf("\\"))
+  if (cut < 0) return path
+  const head = clean.slice(0, cut)
+  if (!head) return clean.slice(0, 1)
+  if (/^[A-Za-z]:$/.test(head)) return `${head}${clean[cut]}`
+  return head
+}
+
+/**
+ * The `file.read` input of the viewer. The server only reads a path that is inside `location.directory` (the project
+ * instance), so a picture the agent read from elsewhere — a worktree, `/tmp`, the home folder — needs the folder that
+ * holds it as the location. Inside the project the project itself stays the location.
+ */
+export function fileReadInput(path: string, directory: string): { path: string; location: { directory: string } } {
+  if (!isAbsolutePath(path)) return { path, location: { directory } }
+  return { path, location: { directory: withinDirectory(path, directory) ? directory : parentOf(path) } }
+}
 
 export function classifyFile(name: string, bytes: Uint8Array): FileContent {
   const mime = mimeFromName(name)

@@ -3,7 +3,7 @@
   import Codicon from "@occ/ui/components/Codicon.svelte"
   import { dataUri } from "@occ/core/attachments"
   import Bar from "../components/Bar.svelte"
-  import { classifyFile, humanSize, leaf, MAX_VIEW_LINES, type FileContent } from "../lib/files"
+  import { classifyFile, fileReadInput, humanSize, leaf, MAX_VIEW_LINES, type FileContent } from "../lib/files"
   import { model } from "../model.svelte"
 
   /** A read-only view of a file of the project (what "open file" does in the editor). */
@@ -13,6 +13,8 @@
   let image = $state<string | undefined>()
   let error = $state<string | undefined>()
   let box: HTMLElement | undefined = $state()
+  /** Images: tap to switch between "fit the screen" and "actual size" (scroll to pan). */
+  let zoomed = $state(false)
 
   const lines = $derived(content?.kind === "text" ? content.text.split("\n") : [])
 
@@ -26,7 +28,7 @@
     error = undefined
     content = undefined
     try {
-      const bytes = await model.client.file.read({ path, location: { directory } })
+      const bytes = await model.client.file.read(fileReadInput(path, directory))
       const c = classifyFile(path, bytes)
       if (c.kind === "image") image = dataUri(c.mime, base64(bytes))
       content = c
@@ -54,8 +56,10 @@
   {:else if !content}
     <div class="center muted"><Codicon name="loading" spin /> Opening…</div>
   {:else if content.kind === "image"}
-    <div class="img">
-      {#if image}<img src={image} alt={leaf(path)} />{/if}
+    <div class="img" class:zoomed>
+      {#if image}
+        <button class="pic" onclick={() => (zoomed = !zoomed)} aria-label={zoomed ? "Fit to screen" : "Actual size"}><img src={image} alt={leaf(path)} /></button>
+      {/if}
     </div>
   {:else if content.kind === "binary"}
     <div class="center">
@@ -78,8 +82,27 @@
     justify-content: center;
     padding: 12px;
   }
-  .img img {
+  .pic {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: 0;
+  }
+  .pic img {
     max-width: 100%;
     height: auto;
+  }
+  .zoomed {
+    display: block;
+    overflow: auto;
+  }
+  .zoomed .pic {
+    width: max-content;
+    max-width: none;
+  }
+  .zoomed .pic img {
+    max-width: none;
+    max-height: none;
   }
 </style>

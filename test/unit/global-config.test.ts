@@ -130,12 +130,18 @@ describe("new file content", () => {
 
 describe("wiring", () => {
   const pkg = JSON.parse(readFileSync("apps/vscode/package.json", "utf8"))
-  test("the command is contributed, in the palette, and a gear in the chat view's title bar", () => {
+  test("the command is contributed and in the palette, without a title-bar icon", () => {
     const cmd = pkg.contributes.commands.find((c: { command: string }) => c.command === "opencode.openGlobalConfig")
-    expect(cmd).toMatchObject({ title: "Open Global Config", category: "OpenCode", icon: "$(settings-gear)" })
-    const view = pkg.contributes.views.opencode[0].id
-    expect(pkg.contributes.menus["view/title"]).toContainEqual(expect.objectContaining({ command: "opencode.openGlobalConfig", when: `view == ${view}`, group: expect.stringMatching(/^navigation/) }))
+    expect(cmd).toMatchObject({ title: "Open Global Config", category: "OpenCode" })
+    expect(cmd.icon).toBeUndefined()
+    expect(pkg.contributes.menus["view/title"]).not.toContainEqual(expect.objectContaining({ command: "opencode.openGlobalConfig" }))
     expect(pkg.contributes.menus.commandPalette ?? []).not.toContainEqual(expect.objectContaining({ command: "opencode.openGlobalConfig", when: "false" }))
+  })
+  test("the chat view's title bar has one gear: the Settings page", () => {
+    const view = pkg.contributes.views.opencode[0].id
+    expect(pkg.contributes.menus["view/title"]).toEqual([{ command: "opencode.openSettings", when: `view == ${view}`, group: "navigation@95" }])
+    const gear = pkg.contributes.commands.find((c: { command: string }) => c.command === "opencode.openSettings")
+    expect(gear).toMatchObject({ icon: "$(settings-gear)" })
   })
   test("the MCP panel button posts the host request, and the host routes it to the command", () => {
     expect(readFileSync("packages/ui/src/components/McpPanel.svelte", "utf8")).toContain(`request: { type: "openGlobalConfig" }`)

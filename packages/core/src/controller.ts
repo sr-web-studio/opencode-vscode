@@ -268,6 +268,32 @@ export class Controller {
     return this.dir
   }
 
+  /** The workspace path this controller was created for: stable, unlike `directory` after a server sync. */
+  get folderPath(): string {
+    return this.opts.directory
+  }
+
+  /** A session this folder lists is executing. Cheap enough for the folder dropdown. */
+  isBusy(): boolean {
+    for (const id of this.running) if (this.listsSession(id)) return true
+    return false
+  }
+
+  /** A session this folder lists waits for the user (a permission or a question). Cheap: no snapshot. */
+  isWaiting(): boolean {
+    for (const [id, requests] of this.permissions) if (requests.length > 0 && this.listsSession(id)) return true
+    for (const [id, forms] of this.forms) if (forms.length > 0 && this.listsSession(id)) return true
+    return false
+  }
+
+  /** The workspace folder was renamed in place (same path): update the labels the view shows. */
+  setFolderInfo(folderName: string, displayPath: string): void {
+    if (this.opts.folderName === folderName && this.opts.displayPath === displayPath) return
+    this.opts.folderName = folderName
+    this.opts.displayPath = displayPath
+    this.emitNow()
+  }
+
   /** The agent of a worker (child) session, for terminal names. Undefined for the session on screen and other roots. */
   agentOf(sessionID: string): string | undefined {
     const child = this.children.get(sessionID)

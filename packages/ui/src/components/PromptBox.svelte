@@ -32,7 +32,13 @@
   import McpPanel from "./McpPanel.svelte"
   import SlashPopup from "./SlashPopup.svelte"
 
-  let { app, text = $bindable() }: { app: AppState; text: string } = $props()
+  let {
+    app,
+    folder = "",
+    text = $bindable(),
+    files = $bindable<Attachment[]>([]),
+    skills = $bindable<Array<{ id: string; name: string }>>([]),
+  }: { app: AppState; folder?: string; text: string; files?: Attachment[]; skills?: Array<{ id: string; name: string }> } = $props()
   const store = useStore()
   const caps = store.bridge.capabilities ?? {}
 
@@ -40,12 +46,9 @@
   const MAX_LINES = 12
 
   let area: HTMLTextAreaElement | undefined = $state()
-  let files = $state<Attachment[]>([])
   let note = $state("")
   // A short remark about a slash command that cannot run now. Not an error, so it is muted and goes away when typing.
   let hint = $state("")
-  // Skills chosen with `/skills`: sent with the next prompt.
-  let skills = $state<Array<{ id: string; name: string }>>([])
   let caret = $state(0)
   let active = $state(0)
   // Esc closes the popup for the text it was closed on; any edit brings it back.
@@ -514,6 +517,27 @@
   onMount(() => {
     resize()
     focusWhenAllowed(() => area)
+  })
+
+  // Switching folders keeps the text, files and skills (App stores one draft per folder) but drops transient UI that
+  // belonged to the folder that was on screen.
+  let seenFolder: string | undefined
+  $effect(() => {
+    const current = folder
+    if (seenFolder === undefined) {
+      seenFolder = current
+      return
+    }
+    if (current === seenFolder) return
+    seenFolder = current
+    undo = undefined
+    restored = undefined
+    hint = ""
+    enhanceMenu = false
+    enhanceNotice = ""
+    enhanceError = ""
+    dismissedFor = undefined
+    dictation = undefined
   })
 </script>
 

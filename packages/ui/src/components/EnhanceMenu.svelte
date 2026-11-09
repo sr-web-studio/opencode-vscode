@@ -111,18 +111,26 @@
   })
 </script>
 
-<div class="pop enhance-menu" class:wide={view === "model"} bind:this={root} tabindex="-1" role="menu" aria-label="Enhance prompt" onkeydown={onKey}>
+<div class="pop enhance-menu" bind:this={root} tabindex="-1" role="menu" aria-label="Enhance prompt" onkeydown={onKey}>
   {#if view === "menu"}
     <div class="title muted">Enhance prompt</div>
     <!-- svelte-ignore a11y_click_events_have_key_events -->
-    <div class="row" class:sel={index === 0} role="menuitem" tabindex="-1" onclick={() => choose("polish")} onmousemove={() => (index = 0)}>
+    <div
+      class="row"
+      class:sel={index === 0}
+      role="menuitem"
+      tabindex="-1"
+      title="Fix grammar, spelling, sentence structure and dictation errors"
+      onclick={() => choose("polish")}
+      onmousemove={() => (index = 0)}
+    >
       <span class="n">Polish</span>
-      <span class="d muted">Fix grammar, spelling and dictation errors</span>
+      <span class="d muted wrap">Fix grammar, spelling, sentence structure and dictation errors</span>
     </div>
     <!-- svelte-ignore a11y_click_events_have_key_events -->
-    <div class="row" class:sel={index === 1} role="menuitem" tabindex="-1" onclick={() => choose("rewrite")} onmousemove={() => (index = 1)}>
+    <div class="row" class:sel={index === 1} role="menuitem" tabindex="-1" title="A detailed, clear prompt for the agent" onclick={() => choose("rewrite")} onmousemove={() => (index = 1)}>
       <span class="n">Rewrite</span>
-      <span class="d muted">A detailed, clear prompt for the agent</span>
+      <span class="d muted wrap">A detailed, clear prompt for the agent</span>
     </div>
     <div class="sep"></div>
     <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -175,13 +183,16 @@
 </div>
 
 <style>
+  /* A menu, not a dialog: it takes the width of the prompt box (never more than a compact panel) and the density of the
+     other popups (model picker, slash list): single-line rows, secondary text at the `.small` size. */
   .pop {
     position: absolute;
     bottom: calc(100% + 4px);
     left: 0;
     z-index: 30;
-    min-width: 18em;
-    max-width: calc(100vw - 1.5em);
+    width: min(21em, 100%);
+    min-width: min(13em, 100%);
+    max-width: 100%;
     background: var(--oc-popover);
     border: 1px solid var(--oc-hairline);
     border-radius: 6px;
@@ -190,26 +201,19 @@
     flex-direction: column;
     overflow: hidden;
     outline: none;
-  }
-  .wide {
-    width: min(24em, calc(100vw - 1.5em));
+    line-height: 1.5;
   }
   .title {
     font-size: 0.9em;
-    padding: 0.5em 0.8em 0.2em;
+    padding: 0.35em 0.8em 0.1em;
   }
   .row {
     display: flex;
     align-items: baseline;
     gap: 0.5em;
-    min-height: 40px;
-    padding: 0.5em 0.8em;
+    min-height: 26px;
+    padding: 0.1em 0.8em;
     cursor: pointer;
-  }
-  @media (hover: none) {
-    .row {
-      min-height: 44px;
-    }
   }
   .row.sel {
     background: var(--oc-hover);
@@ -217,14 +221,26 @@
   .n {
     font-weight: 600;
     white-space: nowrap;
-    flex: none;
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .d {
     flex: 1;
     min-width: 0;
+    font-size: 0.9em;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  /* Polish and Rewrite must say what they do in full, so their description wraps onto a second line instead of
+     ending in an ellipsis; the row only grows when the text really needs it. */
+  .d.wrap {
+    white-space: normal;
+    text-overflow: clip;
+    overflow: visible;
+    line-height: 1.35;
   }
   .mark {
     flex: none;
@@ -237,24 +253,24 @@
   }
   .sep {
     height: 1px;
-    margin: 0.25em 0;
+    margin: 0.2em 0;
     background: var(--oc-hairline);
   }
   .list {
     overflow-y: auto;
-    max-height: min(50vh, 20em);
-    padding-bottom: 0.3em;
+    max-height: min(45vh, 18em);
+    padding-bottom: 0.2em;
   }
   .group {
     font-size: 0.9em;
-    padding: 0.45em 0.8em 0.1em;
+    padding: 0.35em 0.8em 0.1em;
   }
   .empty {
-    padding: 0.6em 0.8em;
+    padding: 0.4em 0.8em;
   }
   input {
-    margin: 0.45em;
-    padding: 0.35em 0.5em;
+    margin: 0.4em;
+    padding: 0.25em 0.5em;
     background: var(--vscode-input-background);
     border: 1px solid var(--vscode-input-border, var(--oc-hairline));
     border-radius: 3px;
@@ -262,18 +278,29 @@
   .back {
     display: flex;
     align-items: center;
-    gap: 0.4em;
-    min-height: 40px;
-    padding: 0.4em 0.8em;
+    gap: 0.35em;
+    min-height: 26px;
+    padding: 0.15em 0.8em;
     border-top: 1px solid var(--oc-hairline);
-    font-size: 0.92em;
+    font-size: 0.9em;
   }
   .back:hover {
     color: var(--oc-fg);
     background: var(--oc-hover);
   }
   .stale {
-    font-size: 0.88em;
-    padding: 0 0.8em 0.5em;
+    font-size: 0.9em;
+    padding: 0 0.8em 0.4em;
+  }
+  /* Touch: the rows and the Back button grow back to a comfortable target (they come after the sizes above, so they win).
+     The extra height is shared above and below the text instead of staying under it. */
+  @media (hover: none) {
+    .row {
+      align-items: center;
+      min-height: 44px;
+    }
+    .back {
+      min-height: 44px;
+    }
   }
 </style>

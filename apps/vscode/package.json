@@ -21,7 +21,7 @@
   "bugs": {
     "url": "https://github.com/sr-web-studio/opencode-vscode/issues"
   },
-  "version": "0.3.11",
+  "version": "0.3.12",
   "publisher": "sr-web-studio",
   "license": "MIT",
   "repository": {
@@ -84,10 +84,20 @@
         "category": "OpenCode"
       },
       {
-        "command": "opencode.openGlobalConfig",
-        "title": "Open Global Config",
+        "command": "opencode.openSettings",
+        "title": "Open Settings",
         "category": "OpenCode",
         "icon": "$(settings-gear)"
+      },
+      {
+        "command": "opencode.openGlobalConfig",
+        "title": "Open Global Config",
+        "category": "OpenCode"
+      },
+      {
+        "command": "opencode.openProjectConfig",
+        "title": "Open Project Config",
+        "category": "OpenCode"
       },
       {
         "command": "opencode.reconnect",
@@ -144,9 +154,9 @@
     "menus": {
       "view/title": [
         {
-          "command": "opencode.openGlobalConfig",
+          "command": "opencode.openSettings",
           "when": "view == opencode.chat",
-          "group": "navigation@90"
+          "group": "navigation@95"
         }
       ]
     },
@@ -287,6 +297,13 @@
           "minimum": 1,
           "maximum": 50,
           "markdownDescription": "Most OpenCode terminals kept open. When there are more, the least recently used idle one is closed. A terminal with a running command is never closed."
+        },
+        "opencode.view.minWidth": {
+          "type": "number",
+          "default": 380,
+          "minimum": 0,
+          "maximum": 2000,
+          "markdownDescription": "Minimum width in px the OpenCode view tries to open with. Best effort: VS Code has no API for the side bar width. `0` turns this off."
         },
         "opencode.voice.engine": {
           "type": "string",
@@ -461,11 +478,11 @@
   "scripts": {
     "build": "bun run build:ext && bun run build:webview",
     "build:ext": "bun esbuild.mjs",
-    "build:webview": "vite build",
+    "build:webview": "vite build && vite build --config vite.settings.config.ts",
     "watch": "bun run watch:ext & bun run watch:webview & wait",
     "watch:ext": "bun esbuild.mjs --watch",
-    "watch:webview": "vite build --watch",
-    "typecheck": "tsc --noEmit -p tsconfig.json && svelte-check --tsconfig tsconfig.webview.json",
+    "watch:webview": "vite build --watch & vite build --config vite.settings.config.ts --watch & wait",
+    "typecheck": "tsc --noEmit -p tsconfig.json && svelte-check --tsconfig tsconfig.webview.json && svelte-check --tsconfig tsconfig.settings.json",
     "test:host": "bun run build && bun test/host/run.mjs",
     "package": "bun tools/package.ts",
     "publish:marketplace": "bun tools/publish.ts marketplace",
