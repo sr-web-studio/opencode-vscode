@@ -48,6 +48,17 @@ export function onResume(handler: () => void): Off {
   }
 }
 
+/** The app went to the background (another app, the lock screen). */
+export function onPause(handler: () => void): Off {
+  let off: Off = () => {}
+  let dead = false
+  void listen(() => App.addListener("pause", handler)).then((o) => (dead ? o() : (off = o)))
+  return () => {
+    dead = true
+    off()
+  }
+}
+
 /** A deep link arrived while the app runs. */
 export function onUrlOpen(handler: (url: string) => void): Off {
   let off: Off = () => {}

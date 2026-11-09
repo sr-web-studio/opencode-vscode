@@ -42,7 +42,7 @@
   }
 </script>
 
-<Bar title="Projects" sub={model.profile?.name}>
+<Bar title="Projects" sub={model.profile?.name} menu>
   {#snippet actions()}
     <button class="iconbtn" onclick={load} aria-label="Refresh"><Codicon name="refresh" /></button>
   {/snippet}
