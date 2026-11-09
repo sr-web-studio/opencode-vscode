@@ -63,6 +63,24 @@ export type EnhanceState = {
 
 export type AgentSummary = { id: string; name: string; description?: string }
 
+/**
+ * One workspace folder of a multi-root window. Only the VS Code host fills `AppState.folders`, and only when the window
+ * has two or more folders; the Android app never does, so its UI is unchanged.
+ */
+export type FolderInfo = {
+  directory: string
+  /** The folder's name in the workspace (the last path segment, or the name given in a `.code-workspace`). */
+  name: string
+  /** `~`-shortened path for the dropdown. */
+  displayPath: string
+  /** The folder the chat view shows. */
+  active: boolean
+  /** A session of this folder is executing. */
+  busy?: boolean
+  /** A session of this folder waits for the user (a permission or a question). */
+  attention?: boolean
+}
+
 /** Everything the UI renders. Plain data: it crosses postMessage (VS Code) or stays in memory (browser). */
 export type AppState = {
   connection: ConnectionState
@@ -71,6 +89,8 @@ export type AppState = {
   folderName: string
   /** `~`-shortened project path for display. */
   displayPath: string
+  /** The workspace folders of a VS Code multi-root window (two or more). Absent in a single-folder window and in the app. */
+  folders?: FolderInfo[]
   target: ViewTarget
   /** Root sessions of this project, newest first. */
   sessions: SessionInfo[]
@@ -149,6 +169,8 @@ export type AppState = {
 
 export type Action =
   | { type: "ready" }
+  /** Handled by the host, not by a Controller: it binds the view to that folder's controller. */
+  | { type: "switchFolder"; directory: string }
   | { type: "openSession"; id: string }
   | { type: "newDraft"; hasText: boolean }
   /** `skills`: skills chosen with `/skills`, sent with this prompt. */
@@ -196,6 +218,8 @@ export type Action =
 /** Messages from the extension host to the webview. */
 export type ToWebview =
   | { type: "state"; state: AppState }
+  /** A light refresh of the folder dropdown (busy/attention dots) when a folder the view is not showing changes. */
+  | { type: "folders"; folders: FolderInfo[] }
   | { type: "command"; name: "newSession" }
   | { type: "picked"; requestID: string; files: PickedFile[] }
   /** The answer to `imageData`: a `data:` URI, or nothing when the image is gone or unreadable. */
@@ -235,3 +259,18 @@ export type HostRequest =
 
 /** Messages from the webview to the extension host. */
 export type ToHost = { type: "action"; action: Action } | { type: "host"; request: HostRequest }
+
+/**
+ * The VS Code webview's own size and focus, for the host's best-effort minimum width. Deliberately not part of
+ * `ToHost`: only the VS Code webview sends it and only the VS Code host handles it, so the Android bridge and every
+ * shared component stay exactly as they were.
+ */
+export type WebviewMetrics = {
+  type: "viewMetrics"
+  /** The webview's CSS pixel width. */
+  width: number
+  /** The webview document has focus. */
+  focused: boolean
+  /** `screen.availWidth` in CSS pixels, or 0 when the webview could not read it. */
+  screenWidth: number
+}

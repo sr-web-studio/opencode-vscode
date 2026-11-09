@@ -1,6 +1,8 @@
 <script lang="ts">
   import "./app.css"
   import { onDestroy } from "svelte"
+  import type { Attachment } from "@occ/core/attachments"
+  import { isWindowsPath } from "@occ/core/paths"
   import { todoBar } from "@occ/core/todo"
   import { isRunning } from "@occ/core/transcript/reducer"
   import { showEmptyState } from "@occ/core/draft"
@@ -11,6 +13,7 @@
   import { Store } from "./store.svelte"
   import Codicon from "./components/Codicon.svelte"
   import EmptyState from "./components/EmptyState.svelte"
+  import FolderSwitcher from "./components/FolderSwitcher.svelte"
   import PromptBox from "./components/PromptBox.svelte"
   import QuestionPrompt from "./components/QuestionPrompt.svelte"
   import SessionSwitcher from "./components/SessionSwitcher.svelte"
@@ -28,23 +31,55 @@
   onDestroy(() => store.dispose())
 
   const app = $derived(store.state)
-  let draft = $state("")
+  /** One prompt per folder: text, attachments and skills travel together and come back when the folder does. */
+  type FolderDraft = { text: string; files: Attachment[]; skills: Array<{ id: string; name: string }> }
+  const emptyDraft = (): FolderDraft => ({ text: "", files: [], skills: [] })
+  const drafts = new Map<string, FolderDraft>()
+  let draft = $state<FolderDraft>(emptyDraft())
+  let draftKey = $state("")
   let prompt: PromptBox | undefined = $state()
   let lastEpoch = -1
+  let lastEpochFolder: string | undefined
   let lastTick = 0
+
+  /**
+   * The draft key: the workspace folder when the host sends the list, otherwise the controller's directory. Both are
+   * normalised, because the server may respell a single folder (`d:` vs `D:`) without the folder changing.
+   */
+  function draftFolderKey(state: typeof app): string {
+    const directory = state?.folders?.find((f) => f.active)?.directory ?? state?.directory ?? ""
+    if (!directory) return ""
+    const slashed = directory.replace(/\\/g, "/").replace(/\/+$/, "")
+    return isWindowsPath(directory) ? slashed.toLowerCase() : slashed
+  }
 
   // `+` from the title bar: the host asks, we know whether the draft has text.
   $effect(() => {
     const t = store.newSessionTick
     if (t === lastTick) return
     lastTick = t
-    store.dispatch({ type: "newDraft", hasText: draft.trim().length > 0 })
+    store.dispatch({ type: "newDraft", hasText: draft.text.trim().length > 0 })
   })
-  // A fresh draft clears the prompt text.
+  // Switching workspace folder shows another controller: keep this folder's draft and restore the other folder's.
+  $effect(() => {
+    const key = draftFolderKey(app)
+    if (key === draftKey) return
+    if (draftKey) drafts.set(draftKey, { text: draft.text, files: [...draft.files], skills: [...draft.skills] })
+    const saved = drafts.get(key)
+    draft = saved ? { text: saved.text, files: [...saved.files], skills: [...saved.skills] } : emptyDraft()
+    draftKey = key
+  })
+  // A fresh draft clears the prompt text of the folder on screen. A folder switch is not a fresh draft.
   $effect(() => {
     const epoch = app?.draftEpoch ?? 0
+    const key = draftKey
+    if (key !== lastEpochFolder) {
+      lastEpochFolder = key
+      lastEpoch = epoch
+      return
+    }
     if (epoch !== lastEpoch) {
-      if (lastEpoch !== -1) draft = ""
+      if (lastEpoch !== -1) draft.text = ""
       lastEpoch = epoch
     }
   })
@@ -67,7 +102,7 @@
   const todos = $derived(app ? todoBar(app.view, running || (app.target.kind === "session" && app.running.includes(app.target.id))) : undefined)
 
   function suggest(text: string) {
-    draft = text
+    draft.text = text
     prompt?.focusPrompt()
   }
 </script>
@@ -87,7 +122,8 @@
         {#if workerRunning && app.target.kind === "session"}<StopWorkerButton sessionID={app.target.id} running variant="label" />{/if}
       </header>
     {:else}
-      <SessionSwitcher {app} hasDraftText={draft.trim().length > 0}>
+      <FolderSwitcher {app} />
+      <SessionSwitcher {app} hasDraftText={draft.text.trim().length > 0}>
         {#snippet extra()}
           {#if shownWorkers > 0 || app.runningShells > 0}
             <WorkersRow workers={app.workers} hidden={app.hiddenWorkers} models={app.models} shells={app.runningShells} />
@@ -118,7 +154,7 @@
     {:else if app.form}
       <div class="qwrap"><QuestionPrompt form={app.form} /></div>
     {:else}
-      <PromptBox bind:this={prompt} {app} bind:text={draft} />
+      <PromptBox bind:this={prompt} {app} folder={draftKey} bind:text={draft.text} bind:files={draft.files} bind:skills={draft.skills} />
     {/if}
   {/if}
 </div>

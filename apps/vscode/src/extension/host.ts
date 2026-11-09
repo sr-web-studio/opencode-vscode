@@ -18,12 +18,14 @@ export type Surface = {
   act(action: { type: "revert"; messageID: string } | { type: "deleteSession"; sessionID: string }): void
   /** The session the surface shows, for shell location lookups. */
   sessionID(): string | undefined
+  /** The project folder the surface shows, for relative paths. Defaults to the active folder. */
+  directory?(): string | undefined
 }
 
 /** Host-side effects the webview asks for. Everything here needs `vscode`, so it cannot live in core/ or ui/. */
 export class HostActions {
   constructor(
-    private readonly directory: string,
+    private readonly directory: () => string,
     private readonly terminals: () => ShellTerminals,
     private readonly workers: () => WorkerPanels,
     private readonly images: () => ImagePreviews,
@@ -31,7 +33,12 @@ export class HostActions {
   ) {}
 
   /** Used by the diff views to find a file of the project. */
-  resolvePath = (path: string): vscode.Uri => this.resolve(path)
+  resolvePath = (path: string, directory?: string): vscode.Uri => this.resolve(path, directory)
+
+  /** The folder a request belongs to: the surface's own (a worker tab), else the folder the view shows. */
+  private folder(surface: Surface): string {
+    return surface.directory?.() || this.directory()
+  }
 
   /** Run a request from a webview. A failure is shown to the user; it never disappears silently. */
   async handle(req: HostRequest, surface: Surface): Promise<void> {
@@ -55,7 +62,7 @@ export class HostActions {
   private async run(req: HostRequest, surface: Surface): Promise<void> {
     switch (req.type) {
       case "openFile":
-        return this.openFile(req.path, req.line)
+        return this.openFile(req.path, req.line, this.folder(surface))
       case "imageData": {
         const dataUri = await this.images()
           .thumbnail(surface.sessionID(), req.ref)
@@ -66,9 +73,9 @@ export class HostActions {
       case "openImage":
         return this.images().open(surface.sessionID(), req.ref, req.name)
       case "openDiff":
-        return this.diffs().open(req.file, req.patches)
+        return this.diffs().open(req.file, req.patches, this.folder(surface))
       case "openChanges":
-        return this.diffs().changes(req.files, req.title ?? "OpenCode changes")
+        return this.diffs().changes(req.files, req.title ?? "OpenCode changes", this.folder(surface))
       case "showTerminal":
         return this.terminals().show(req.shellID, req.sessionID ?? surface.sessionID())
       case "openSession":
@@ -103,17 +110,17 @@ export class HostActions {
   }
 
   /** Relative paths resolve against the project directory. */
-  private resolve(path: string): vscode.Uri {
+  private resolve(path: string, directory = this.directory()): vscode.Uri {
     if (/^file:\/\//i.test(path)) return vscode.Uri.parse(path)
-    return isAbsolutePath(path) ? vscode.Uri.file(path) : vscode.Uri.joinPath(vscode.Uri.file(this.directory), ...path.split(/[\\/]+/).filter(Boolean))
+    return isAbsolutePath(path) ? vscode.Uri.file(path) : vscode.Uri.joinPath(vscode.Uri.file(directory), ...path.split(/[\\/]+/).filter(Boolean))
   }
 
   /**
    * `vscode.open` picks the right editor for the file: text, image preview, PDF, notebook, or a custom editor.
    * `openTextDocument` only handles text and fails on images and other binary files.
    */
-  private async openFile(path: string, line?: number): Promise<void> {
-    const uri = this.resolve(path)
+  private async openFile(path: string, line: number | undefined, directory: string): Promise<void> {
+    const uri = this.resolve(path, directory)
     try {
       await vscode.workspace.fs.stat(uri)
     } catch {
@@ -135,7 +142,7 @@ export class HostActions {
       canSelectMany: true,
       canSelectFolders: false,
       openLabel: "Attach",
-      defaultUri: vscode.Uri.file(this.directory),
+      defaultUri: vscode.Uri.file(this.folder(surface)),
     })
     if (!picked || picked.length === 0) return
     const files: PickedFile[] = picked.map((uri) => {

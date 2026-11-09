@@ -207,9 +207,9 @@ describe("actions", () => {
   test("open, allow, deny map to host commands", async () => {
     await engine.handle(permission("per_1"))
     const n = rec.shown[0]!
-    expect(engine.resolveAction(n, "open")).toEqual({ type: "open", sessionID: "root" })
-    expect(engine.resolveAction(n, "allow")).toEqual({ type: "permission.reply", sessionID: "root", requestID: "per_1", decision: "once" })
-    expect(engine.resolveAction(n, "deny")).toEqual({ type: "permission.reply", sessionID: "root", requestID: "per_1", decision: "reject" })
+    expect(engine.resolveAction(n, "open")).toEqual({ type: "open", sessionID: "root", directory: DIR })
+    expect(engine.resolveAction(n, "allow")).toEqual({ type: "permission.reply", sessionID: "root", requestID: "per_1", decision: "once", directory: DIR })
+    expect(engine.resolveAction(n, "deny")).toEqual({ type: "permission.reply", sessionID: "root", requestID: "per_1", decision: "reject", directory: DIR })
     expect(engine.resolveAction(n, undefined)).toBeUndefined()
   })
   test("allow/deny are not available for non-permission notices", async () => {

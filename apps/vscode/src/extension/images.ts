@@ -1,6 +1,7 @@
 import { Buffer } from "node:buffer"
 import * as vscode from "vscode"
 import type { Controller } from "@occ/core/controller"
+import type { FolderRegistry } from "@occ/core/folders"
 import { MAX_ATTACHMENT_BYTES, dataUri, mimeFromName } from "@occ/core/attachments"
 import { ImageCache, type ImageBytes } from "@occ/core/image-cache"
 import { previewName, safeImageMime, stalePreviews, type ImageRef } from "@occ/core/images"
@@ -11,15 +12,16 @@ import { previewName, safeImageMime, stalePreviews, type ImageRef } from "@occ/c
  */
 export class ImagePreviews implements vscode.Disposable {
   private readonly cache: ImageCache
-  private readonly stop: () => void
+  private readonly stops = new Map<string, () => void>()
+  private readonly offFolders: () => void
 
   constructor(
     private readonly storage: vscode.Uri,
-    private readonly controller: Controller,
+    private readonly folders: FolderRegistry<Controller>,
   ) {
     this.cache = new ImageCache({
       message: async (sessionID, messageID) => {
-        const client = this.controller.api
+        const client = this.folders.controllers().find((c) => c.api)?.api
         return client ? await client.session.message.get({ sessionID, messageID }) : undefined
       },
       file: async (uri) => {
@@ -30,14 +32,33 @@ export class ImagePreviews implements vscode.Disposable {
         return { mime: mimeFromName(target.path), base64: Buffer.from(bytes).toString("base64") }
       },
     })
-    // A pasted image keeps its picture from the moment it is sent, before the server's stored copy is read.
-    this.stop = controller.observe({
-      event: (ev) => {
-        if (ev.type !== "session.inbox.enqueued") return
-        const item = ev.data?.item
-        if (item?.type === "user" && typeof ev.data?.inboxID === "string") this.cache.seed(ev.data.inboxID, item.payload?.files)
-      },
-    })
+    this.syncFolders()
+    this.offFolders = folders.onChange(() => this.syncFolders())
+  }
+
+  /** A pasted image keeps its picture from the moment it is sent, before the server's stored copy is read. Every folder. */
+  private syncFolders(): void {
+    const open = new Set(this.folders.directories())
+    for (const [directory, stop] of [...this.stops]) {
+      if (open.has(directory)) continue
+      stop()
+      this.stops.delete(directory)
+    }
+    for (const controller of this.folders.controllers()) {
+      // The workspace path: `controller.directory` is the server's spelling and would duplicate the stream after a sync.
+      const path = controller.folderPath
+      if (!path || this.stops.has(path)) continue
+      this.stops.set(
+        path,
+        controller.observe({
+          event: (ev) => {
+            if (ev.type !== "session.inbox.enqueued") return
+            const item = ev.data?.item
+            if (item?.type === "user" && typeof ev.data?.inboxID === "string") this.cache.seed(ev.data.inboxID, item.payload?.files)
+          },
+        }),
+      )
+    }
   }
 
   private dir(): vscode.Uri {
@@ -81,7 +102,9 @@ export class ImagePreviews implements vscode.Disposable {
   }
 
   dispose(): void {
-    this.stop()
+    this.offFolders()
+    for (const stop of this.stops.values()) stop()
+    this.stops.clear()
     this.cache.clear()
   }
 }
