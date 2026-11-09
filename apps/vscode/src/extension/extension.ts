@@ -8,7 +8,7 @@ import { normalizeModelSelection } from "@occ/core/models"
 import { homedir } from "node:os"
 import { SetupError, connect } from "./connection"
 import { deleteSessionCommand } from "./delete-session"
-import { openGlobalConfigCommand } from "./global-config"
+import { openGlobalConfigCommand, openProjectConfigCommand } from "./global-config"
 import { HostActions } from "./host"
 import { MinWidth } from "./min-width"
 import { createMcpHost } from "./mcp"
@@ -255,6 +255,8 @@ export function activate(context: vscode.ExtensionContext): void {
       await folders.active.dispatch({ type: "mcp", op: "open" })
     }),
     vscode.commands.registerCommand("opencode.openGlobalConfig", () => openGlobalConfigCommand(serverHostname)),
+    // The project config belongs to the folder the chat view shows, so the command reads the active folder when it runs.
+    vscode.commands.registerCommand("opencode.openProjectConfig", () => openProjectConfigCommand(folders.activeDirectoryName, serverHostname)),
     vscode.commands.registerCommand("opencode.reconnect", () => start()),
     vscode.commands.registerCommand("opencode.pairMobileDevice", () =>
       pairMobileCommand({
