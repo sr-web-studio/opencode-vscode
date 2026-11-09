@@ -470,6 +470,21 @@ public class NoticeEngineTest {
   }
 
   @Test
+  public void workerQuestionOpensTheWorkerScreenWhereItIsAnswered() {
+    // The parent's chat shows no child form, so the tap opens the worker screen; the notice names the parent and keeps
+    // the worker's own session in the link, where the phone shows the pending question.
+    settings = new Settings(true, true, true, true, true, false);
+    engine.handle(SERVER, ev(formCreated("frm_9", "ses_work")));
+    assertEquals(1, shown.size());
+    Notice n = shown.get(0);
+    assertEquals(Kind.QUESTION, n.kind);
+    assertEquals("\u2753 Read the logs", n.title);
+    assertEquals("worker of Fix login", n.subText);
+    assertEquals("Colour \u2014 Do you like blue? \u00b7 webapp", n.body);
+    assertEquals("opencode-mobile://session/ses_work?server=my-server", n.deepLink());
+  }
+
+  @Test
   public void turnEndWithAnUnknownSessionIsSkipped() {
     // The event names only the session; without its facts a worker would read as a root "finished".
     engine.handle(SERVER, ev(turn("e1", "session.execution.succeeded", "ses_gone", null)));

@@ -33,7 +33,7 @@
 </Bar>
 
 <div class="chat grow">
-  <App {bridge} />
+  <App {bridge} workerForm />
 </div>
 
 <style>

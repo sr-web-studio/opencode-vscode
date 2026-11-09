@@ -191,8 +191,8 @@ public final class NoticeEngine {
     if (!deps.settings().allows(kind)) return false;
     // A worker's permission or question blocks its parent, so it is announced like any attention request, whatever the
     // worker switch says (the VS Code engine gates attention by the permission/question switches only). Tapping it
-    // opens the worker read-only screen, where a permission is answered; a question's form is not shown there yet,
-    // which matches the VS Code worker tab.
+    // opens the worker screen: the phone shows and answers the worker's own pending permission or question there (the
+    // parent's chat does not show a child's form, and the VS Code worker tab stays transcript-only).
     if (!requestID.isEmpty() && !markSeen("req|" + server.id + "|" + requestID)) {
       log("skip " + kind + " (" + sessionID + "): request already announced");
       return false;
