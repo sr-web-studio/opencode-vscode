@@ -1,5 +1,6 @@
 import * as vscode from "vscode"
 import { Controller } from "@occ/core/controller"
+import { FolderRegistry, folderStorageKey, type FolderEntry } from "@occ/core/folders"
 import { NotificationEngine } from "@occ/core/notifications/engine"
 import type { NoticeCommand } from "@occ/core/notifications/types"
 import { folderName, shortenHome } from "@occ/core/paths"
@@ -25,40 +26,62 @@ import { VOICE_FEED_COMMAND, type VoiceFeed } from "@occ/core/dictation"
 const PASSWORD_KEY = "opencode.serverPassword"
 const PINS_KEY = "opencode.pinnedModels"
 const ENHANCE_MODEL_KEY = "opencode.enhanceModel"
+/** The workspace folder the chat view showed last (a `.code-workspace` can open several). */
+const ACTIVE_FOLDER_KEY = "opencode.activeFolder"
 
 export function activate(context: vscode.ExtensionContext): void {
-  const folder = vscode.workspace.workspaceFolders?.[0]
-  const directory = folder?.uri.fsPath ?? ""
   const output = vscode.window.createOutputChannel("OpenCode", { log: true })
   context.subscriptions.push(output)
 
-  const controller = new Controller({
-    directory,
-    folderName: directory ? folderName(directory) : "",
-    displayPath: shortenHome(directory, homedir()),
-    storage: {
-      get: (key) => context.workspaceState.get(key),
-      set: (key, value) => void context.workspaceState.update(key, value),
+  const workspaceFolders = (): readonly vscode.WorkspaceFolder[] => vscode.workspace.workspaceFolders ?? []
+  const folderEntries = (): FolderEntry[] =>
+    workspaceFolders().map((folder) => ({
+      directory: folder.uri.fsPath,
+      folderName: folder.name || folderName(folder.uri.fsPath),
+      displayPath: shortenHome(folder.uri.fsPath, homedir()),
+    }))
+
+  /*
+   * One controller per workspace folder, all attached to the same server connection, so sessions, notifications,
+   * workers and background shells of every folder keep working. The chat view is bound to the active one.
+   */
+  const folders = new FolderRegistry<Controller>({
+    make: (entry) =>
+      new Controller({
+        directory: entry.directory,
+        folderName: entry.folderName,
+        displayPath: entry.displayPath,
+        storage: {
+          // The first folder keeps the keys used before multi-root support; every other folder has its own.
+          get: (key) => context.workspaceState.get(folderStorageKey(key, entry.directory, entry.primary)),
+          set: (key, value) => void context.workspaceState.update(folderStorageKey(key, entry.directory, entry.primary), value),
+        },
+        onEvent: (ev) => void engine.handle(ev).catch((e: unknown) => output.debug(`Notification engine failed on ${ev.type}: ${e instanceof Error ? e.message : String(e)}`)),
+        // Pins follow the user across windows and machines (Settings Sync keys), and never touch OpenCode config.
+        pins: {
+          get: () => context.globalState.get<string[]>(PINS_KEY, []),
+          set: (pins) => void context.globalState.update(PINS_KEY, pins),
+        },
+        // The "Enhance prompt" model is independent of the session's model and is never written to OpenCode config.
+        enhanceModel: {
+          get: () => normalizeModelSelection(context.globalState.get<unknown>(ENHANCE_MODEL_KEY)),
+          set: (model) => void context.globalState.update(ENHANCE_MODEL_KEY, model),
+        },
+        log: (line) => output.info(line),
+        mcp: createMcpHost((line) => output.info(line)),
+      }),
+    remember: {
+      get: () => context.workspaceState.get<string>(ACTIVE_FOLDER_KEY),
+      set: (directory) => void context.workspaceState.update(ACTIVE_FOLDER_KEY, directory),
     },
-    onEvent: (ev) => void engine.handle(ev).catch((e: unknown) => output.debug(`Notification engine failed on ${ev.type}: ${e instanceof Error ? e.message : String(e)}`)),
-    // Pins follow the user across windows and machines (Settings Sync keys), and never touch OpenCode config.
-    pins: {
-      get: () => context.globalState.get<string[]>(PINS_KEY, []),
-      set: (pins) => void context.globalState.update(PINS_KEY, pins),
-    },
-    // The "Enhance prompt" model is independent of the session's model and is never written to OpenCode config.
-    enhanceModel: {
-      get: () => normalizeModelSelection(context.globalState.get<unknown>(ENHANCE_MODEL_KEY)),
-      set: (model) => void context.globalState.update(ENHANCE_MODEL_KEY, model),
-    },
-    log: (line) => output.info(line),
-    mcp: createMcpHost((line) => output.info(line)),
   })
+  folders.sync(folderEntries())
   context.globalState.setKeysForSync([PINS_KEY, ENHANCE_MODEL_KEY])
+
   // `provider` is created below; dictation text is only posted after a recording starts, long after activation.
   const voice = new Voice(
     context.secrets,
-    (v) => controller.setVoice(v),
+    (v) => folders.setVoice(v),
     (m) => provider.post(m),
     (line) => output.info(line),
     {
@@ -72,42 +95,63 @@ export function activate(context: vscode.ExtensionContext): void {
   // Never in the host smoke test, which must not install anything.
   const companionTimer = setTimeout(() => process.env.OPENCODE_SMOKE || void voice.ensureCompanion(false), 4000)
   context.subscriptions.push({ dispose: () => clearTimeout(companionTimer) })
-  controller.setSettings(readViewSettings())
+  folders.setSettings(readViewSettings())
 
   let terminals!: ShellTerminals
   let workers!: WorkerPanels
-  const images = new ImagePreviews(context.globalStorageUri, controller)
+  const images = new ImagePreviews(context.globalStorageUri, folders)
   void images.cleanup()
   const host: HostActions = new HostActions(
-    directory,
+    () => folders.active.directory,
     () => terminals,
     () => workers,
     () => images,
     () => diffs,
   )
   const diffs = new DiffViews((path) => host.resolvePath(path))
-  terminals = new ShellTerminals(controller, readTerminalSettings)
-  workers = new WorkerPanels(context.extensionUri, controller, () => host)
-  const provider = new ChatViewProvider(context.extensionUri, controller, host)
+  terminals = new ShellTerminals(folders, readTerminalSettings)
+  workers = new WorkerPanels(context.extensionUri, folders, () => host)
+  const provider = new ChatViewProvider(context.extensionUri, folders, host)
 
   /* ---------------------------------------------------------- notifications */
+  const lookupSession = async (id: string) => {
+    for (const controller of folders.controllers()) {
+      const known = controller.sessionMeta(id)
+      if (known) return known
+    }
+    // A child session this window has not fetched yet: any controller can ask the shared client.
+    return folders.active.lookupSession(id)
+  }
+  const lookupShellSession = async (id: string) => {
+    for (const controller of folders.controllers()) {
+      if (!controller.directory) continue
+      const sessionID = await controller.shellSessionID(id)
+      if (sessionID) return sessionID
+    }
+    return undefined
+  }
   const runNotice = async (cmd: NoticeCommand) => {
     if (cmd.type === "open") {
+      // A notice can belong to a folder the view is not showing: switch first, then open the session there.
+      const controller = folders.activateForSession(cmd.sessionID, cmd.directory)
       await vscode.commands.executeCommand(`${VIEW_ID}.focus`)
       await controller.open(cmd.sessionID)
     } else {
+      const controller = folders.controllerAt(cmd.directory ?? "") ?? folders.forSession(cmd.sessionID)
       await controller.dispatch({ type: "permission", sessionID: cmd.sessionID, requestID: cmd.requestID, decision: cmd.decision })
     }
   }
   const notifier = new VscodeNotifier(runNotice, { os: () => readNotificationSettings().os, log: (line) => output.debug(line) })
   const engine = new NotificationEngine({
-    directory,
+    directory: "",
+    // Every workspace folder's sessions notify; the view's active folder only decides what is on screen.
+    directories: () => folders.directories(),
     settings: readNotificationSettings,
-    ui: () => ({ windowFocused: vscode.window.state.focused && provider.visible, visibleSessionID: controller.currentSessionID }),
+    ui: () => ({ windowFocused: vscode.window.state.focused && provider.visible, visibleSessionID: folders.active.currentSessionID }),
     notifier,
-    session: (id) => controller.lookupSession(id),
-    shellSession: (id) => controller.shellSessionID(id),
-    owns: (id) => controller.listsSession(id),
+    session: (id) => lookupSession(id),
+    shellSession: (id) => lookupShellSession(id),
+    owns: (id) => folders.controllers().some((controller) => controller.listsSession(id)),
     log: (line) => output.debug(line),
   })
   notifier.bind(engine)
@@ -117,7 +161,7 @@ export function activate(context: vscode.ExtensionContext): void {
   status.command = "opencode.focus"
   status.name = "OpenCode"
   const paintStatus = () => {
-    const c = controller.snapshot().connection
+    const c = folders.active.snapshot().connection
     const ok = c.status === "connected"
     status.text = ok ? "$(check) OpenCode" : "$(warning) OpenCode"
     const tip = new vscode.MarkdownString()
@@ -127,43 +171,54 @@ export function activate(context: vscode.ExtensionContext): void {
     if (c.message) tip.appendText(`\n\n${c.message}`)
     status.tooltip = tip
   }
-  const unsubStatus = controller.subscribe(paintStatus)
+  let unsubStatus = folders.active.subscribe(paintStatus)
+  const offActiveStatus = folders.onActive(() => {
+    unsubStatus()
+    unsubStatus = folders.active.subscribe(paintStatus)
+  })
   status.show()
 
   /* ------------------------------------------------------------ connection */
   let generation = 0
+  let starting = false
   /** The connected server's host name, for "Open Global Config" (its config is on that computer). */
   let serverHostname: string | undefined
   const start = async (): Promise<void> => {
     const mine = ++generation
-    controller.detach()
+    starting = true
+    folders.detach()
     serverHostname = undefined
-    if (!directory) {
-      controller.setConnection({ status: "setup", reason: "folder", message: "Open a folder to use OpenCode." })
-      return
-    }
-    let delay = 1000
-    while (mine === generation) {
-      controller.setConnection({ status: "connecting" })
-      try {
-        const settings = readConnectionSettings()
-        const password = await context.secrets.get(PASSWORD_KEY)
-        const conn = await connect({ ...settings, password })
-        if (mine !== generation) return
-        serverHostname = conn.hostname
-        controller.setConnection({ status: "connecting", url: conn.url, version: conn.version })
-        controller.attach(conn.client)
+    try {
+      if (workspaceFolders().length === 0) {
+        folders.setConnection({ status: "setup", reason: "folder", message: "Open a folder to use OpenCode." })
         return
-      } catch (e) {
-        if (mine !== generation) return
-        if (e instanceof SetupError) {
-          controller.setConnection({ status: "setup", reason: "cli", message: e.message })
-          return
-        }
-        controller.setConnection({ status: "error", message: e instanceof Error ? e.message : "Could not reach OpenCode" })
-        await new Promise((r) => setTimeout(r, delay))
-        delay = Math.min(delay * 2, 15_000)
       }
+      let delay = 1000
+      while (mine === generation) {
+        folders.setConnection({ status: "connecting" })
+        try {
+          const settings = readConnectionSettings()
+          const password = await context.secrets.get(PASSWORD_KEY)
+          const conn = await connect({ ...settings, password })
+          if (mine !== generation) return
+          serverHostname = conn.hostname
+          folders.setConnection({ status: "connecting", url: conn.url, version: conn.version })
+          // One connection, every folder.
+          folders.attach(conn.client)
+          return
+        } catch (e) {
+          if (mine !== generation) return
+          if (e instanceof SetupError) {
+            folders.setConnection({ status: "setup", reason: "cli", message: e.message })
+            return
+          }
+          folders.setConnection({ status: "error", message: e instanceof Error ? e.message : "Could not reach OpenCode" })
+          await new Promise((r) => setTimeout(r, delay))
+          delay = Math.min(delay * 2, 15_000)
+        }
+      }
+    } finally {
+      if (mine === generation) starting = false
     }
   }
 
@@ -171,6 +226,7 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     status,
     { dispose: unsubStatus },
+    { dispose: offActiveStatus },
     provider,
     terminals,
     workers,
@@ -179,7 +235,7 @@ export function activate(context: vscode.ExtensionContext): void {
     {
       dispose: () => {
         generation++
-        controller.detach()
+        folders.dispose()
       },
     },
     vscode.window.registerWebviewViewProvider(VIEW_ID, provider),
@@ -188,17 +244,17 @@ export function activate(context: vscode.ExtensionContext): void {
       await vscode.commands.executeCommand(`${VIEW_ID}.focus`)
       provider.newSession()
     }),
-    vscode.commands.registerCommand("opencode.deleteSession", () => deleteSessionCommand(controller)),
+    vscode.commands.registerCommand("opencode.deleteSession", () => deleteSessionCommand(folders.active)),
     vscode.commands.registerCommand("opencode.mcps", async () => {
       await vscode.commands.executeCommand(`${VIEW_ID}.focus`)
-      await controller.dispatch({ type: "mcp", op: "open" })
+      await folders.active.dispatch({ type: "mcp", op: "open" })
     }),
     vscode.commands.registerCommand("opencode.openGlobalConfig", () => openGlobalConfigCommand(serverHostname)),
     vscode.commands.registerCommand("opencode.reconnect", () => start()),
     vscode.commands.registerCommand("opencode.pairMobileDevice", () =>
       pairMobileCommand({
-        client: () => (controller.snapshot().connection.status === "connected" ? controller.api : undefined),
-        windowUrl: () => controller.snapshot().connection.url,
+        client: () => (folders.active.snapshot().connection.status === "connected" ? folders.active.api : undefined),
+        windowUrl: () => folders.active.snapshot().connection.url,
         log: (line) => output.info(line),
       }),
     ),
@@ -244,11 +300,25 @@ export function activate(context: vscode.ExtensionContext): void {
       // This is a VS Code setting for the extension, not OpenCode configuration.
       await vscode.workspace.getConfiguration("opencode").update("cliPath", file, vscode.ConfigurationTarget.Global)
     }),
+    // A folder added or removed changes which controllers exist. The connection itself stays: new folders join it.
+    vscode.workspace.onDidChangeWorkspaceFolders(() => {
+      if (workspaceFolders().length === 0) {
+        generation++
+        starting = false
+        folders.detach()
+        folders.setConnection({ status: "setup", reason: "folder", message: "Open a folder to use OpenCode." })
+        folders.sync([])
+        return
+      }
+      folders.sync(folderEntries())
+      // Adding the first folder needs a connection; adding another one joins the existing connection in the registry.
+      if (!folders.connectedClient && !starting) void start()
+    }),
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration("opencode.voice.engine")) void voice.refresh()
       if (e.affectsConfiguration("opencode.voice.localLanguages") || e.affectsConfiguration("opencode.voice.localLanguage") || e.affectsConfiguration("opencode.voice.maxLanguages"))
         voice.syncLanguages()
-      if (affectsView(e)) controller.setSettings(readViewSettings())
+      if (affectsView(e)) folders.setSettings(readViewSettings())
       if (affectsConnection(e)) void start()
     }),
   )

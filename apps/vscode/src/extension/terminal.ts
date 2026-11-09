@@ -1,6 +1,7 @@
 import * as vscode from "vscode"
 import { shortenHome } from "@occ/core/paths"
 import type { Controller } from "@occ/core/controller"
+import type { FolderRegistry } from "@occ/core/folders"
 import type { EventEnvelope } from "@occ/core/api"
 import { ShellPager, type ShellPage, type ShellState } from "@occ/core/shell-pager"
 import { planTerminal, shouldReveal, terminalsToClose, type Slot } from "@occ/core/terminal-slots"
@@ -48,19 +49,38 @@ export class ShellTerminals implements vscode.Disposable {
   private readonly terms: Term[] = []
   /** Shells already mirrored (or deliberately closed). Their progress events do not open anything again. */
   private readonly seen = new Set<string>()
-  private readonly stop: () => void
+  private readonly stops = new Map<string, () => void>()
+  private readonly offFolders: () => void
   private readonly subs: vscode.Disposable[] = []
   private counter = 0
 
   constructor(
-    private readonly controller: Controller,
+    private readonly folders: FolderRegistry<Controller>,
     private readonly settings: () => TerminalSettings,
   ) {
-    this.stop = controller.observe({
-      event: (ev) => this.onEvent(ev),
-      resync: () => void this.reattach(),
-    })
+    this.syncFolders()
+    this.offFolders = folders.onChange(() => this.syncFolders())
     this.subs.push(vscode.window.onDidCloseTerminal((t) => this.forget(t)))
+  }
+
+  /** Follow the event streams of every folder: a shell command of any project gets its terminal. */
+  private syncFolders(): void {
+    const open = new Set(this.folders.directories())
+    for (const [directory, stop] of [...this.stops]) {
+      if (open.has(directory)) continue
+      stop()
+      this.stops.delete(directory)
+    }
+    for (const controller of this.folders.controllers()) {
+      if (!controller.directory || this.stops.has(controller.directory)) continue
+      this.stops.set(
+        controller.directory,
+        controller.observe({
+          event: (ev) => this.onEvent(ev),
+          resync: () => void this.reattach(controller),
+        }),
+      )
+    }
   }
 
   /** A `shell` tool reported its shell id: start mirroring it. */
@@ -78,11 +98,11 @@ export class ShellTerminals implements vscode.Disposable {
   }
 
   /** After a reload or a reconnect: running commands are appended to the session terminal the same way, from the start of their output. */
-  private async reattach(): Promise<void> {
-    const client = this.controller.api
+  private async reattach(controller: Controller): Promise<void> {
+    const client = controller.api
     if (!client || this.settings().reveal === "off") return
     try {
-      const res = await client.shell.list({ location: { directory: this.controller.directory } })
+      const res = await client.shell.list({ location: { directory: controller.directory } })
       for (const info of res.data) {
         if (info.status !== "running" || this.seen.has(info.id)) continue
         this.seen.add(info.id)
@@ -108,9 +128,10 @@ export class ShellTerminals implements vscode.Disposable {
   }
 
   private async open(shellID: string, sessionID: string, reveal: boolean, preserveFocus: boolean): Promise<boolean> {
-    const client = this.controller.api
+    const controller = this.folders.forSession(sessionID)
+    const client = controller.api
     if (!client) return false
-    const location = this.controller.locationOf(sessionID)
+    const location = controller.locationOf(sessionID)
     let info
     try {
       info = (await client.shell.get({ id: shellID, location })).data
@@ -121,7 +142,7 @@ export class ShellTerminals implements vscode.Disposable {
     // From here to the reservation everything is synchronous, so two commands starting together cannot pick the same terminal.
     const mode = this.settings().mode
     const plan = planTerminal(this.terms, mode, sessionID)
-    const term = plan.kind === "reuse" ? this.terms.find((t) => t.id === plan.id)! : this.create(sessionID, plan.slot, mode, info.command)
+    const term = plan.kind === "reuse" ? this.terms.find((t) => t.id === plan.id)! : this.create(sessionID, plan.slot, mode, info.command, controller)
     const run: Run = {
       shellID,
       command: info.command,
@@ -204,7 +225,7 @@ export class ShellTerminals implements vscode.Disposable {
     else term.pending.push(text)
   }
 
-  private create(sessionID: string, slot: number, mode: TerminalSettings["mode"], command: string): Term {
+  private create(sessionID: string, slot: number, mode: TerminalSettings["mode"], command: string, controller: Controller): Term {
     const write = new vscode.EventEmitter<string>()
     const closed = new vscode.EventEmitter<number | void>()
     const id = `t${++this.counter}`
@@ -251,8 +272,7 @@ export class ShellTerminals implements vscode.Disposable {
       },
     }
 
-    const name =
-      mode === "session" ? sessionTerminalName(this.controller.sessionMeta(sessionID)?.title, this.controller.agentOf(sessionID), slot) : terminalName(command, this.controller.agentOf(sessionID))
+    const name = mode === "session" ? sessionTerminalName(controller.sessionMeta(sessionID)?.title, controller.agentOf(sessionID), slot) : terminalName(command, controller.agentOf(sessionID))
     term.terminal = vscode.window.createTerminal({ name, pty })
     this.terms.push(term)
     return term
@@ -289,7 +309,9 @@ export class ShellTerminals implements vscode.Disposable {
   }
 
   dispose(): void {
-    this.stop()
+    this.offFolders()
+    for (const stop of this.stops.values()) stop()
+    this.stops.clear()
     for (const s of this.subs) s.dispose()
     for (const t of this.terms.splice(0)) {
       t.current?.pager?.stop()
