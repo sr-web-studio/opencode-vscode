@@ -75,8 +75,15 @@ describe("focus call sites", () => {
   test("the extension host never reveals or shows the chat view on its own", () => {
     // workers.ts reveals an already open worker tab, and only from a click on a worker row (a webview message), never from state.
     // settings-page.ts reveals its own editor panel, and only from the explicit `opencode.openSettings` command.
+    // sessions-tree.ts reveals its own tree row (the active session), never the chat webview.
     const bad = walk("apps/vscode/src/extension")
-      .filter((f) => f.endsWith(".ts") && !f.endsWith(join("src", "extension", "workers.ts")) && !f.endsWith(join("src", "extension", "settings-page.ts")))
+      .filter(
+        (f) =>
+          f.endsWith(".ts") &&
+          !f.endsWith(join("src", "extension", "workers.ts")) &&
+          !f.endsWith(join("src", "extension", "settings-page.ts")) &&
+          !f.endsWith(join("src", "extension", "sessions-tree.ts")),
+      )
       .flatMap((f) =>
         readFileSync(f, "utf8")
           .split("\n")
@@ -97,8 +104,9 @@ describe("focus call sites", () => {
           .filter(({ l }) => /VIEW_ID\}\.focus/.test(l))
           .map(({ f, l }) => `${f}: ${l.trim()}`),
       )
-    // runNotice (user clicked "Open"), opencode.focus, opencode.newSession, opencode.mcps. Nothing in a state/event path.
-    expect(hits.length).toBe(4)
+    // runNotice (user clicked "Open"), opencode.focus, opencode.newSession, opencode.mcps, and the sessions
+    // sidebar's row command (a click on a session). Nothing in a state/event path.
+    expect(hits.length).toBe(5)
     expect(hits.every((h) => h.startsWith(join("apps", "vscode", "src", "extension", "extension.ts")))).toBe(true)
   })
 })

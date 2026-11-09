@@ -23,6 +23,7 @@ import { ShellTerminals } from "./terminal"
 import { ImagePreviews } from "./images"
 import { DiffViews } from "./diffs"
 import { ChatViewProvider, VIEW_ID } from "./view"
+import { directoryArg, SESSIONS_VIEW_ID, sessionTarget, SessionsTreeProvider } from "./sessions-tree"
 import { WorkerPanels } from "./workers"
 import { Voice } from "./voice"
 import { normalizeServerUrl } from "@occ/core/server-url"
@@ -133,6 +134,18 @@ export function activate(context: vscode.ExtensionContext): void {
   workers = new WorkerPanels(context.extensionUri, folders, () => host)
   const minWidth = new MinWidth((line) => output.debug(line))
   const provider = new ChatViewProvider(context.extensionUri, folders, host, minWidth)
+
+  /* -------------------------------------------------------- sessions sidebar */
+  // The primary-sidebar tree reads the controllers this window already keeps attached, so it never asks the server
+  // for anything of its own. It shows a message with no folder, a flat list with one, and project nodes with several.
+  const sessionsTree = new SessionsTreeProvider(folders)
+  const sessionsView = vscode.window.createTreeView(SESSIONS_VIEW_ID, { treeDataProvider: sessionsTree, showCollapseAll: true })
+  sessionsTree.attach(sessionsView)
+  const syncSessionsMessage = () => {
+    sessionsView.message = sessionsTree.message()
+  }
+  const offSessionsMessage = sessionsTree.onDidChangeTreeData(syncSessionsMessage)
+  syncSessionsMessage()
 
   /* ---------------------------------------------------------- notifications */
   const lookupSession = async (id: string) => {
@@ -250,6 +263,9 @@ export function activate(context: vscode.ExtensionContext): void {
     { dispose: unsubStatus },
     { dispose: offActiveStatus },
     provider,
+    sessionsTree,
+    sessionsView,
+    offSessionsMessage,
     terminals,
     workers,
     images,
@@ -268,7 +284,26 @@ export function activate(context: vscode.ExtensionContext): void {
       await vscode.commands.executeCommand(`${VIEW_ID}.focus`)
       provider.newSession()
     }),
-    vscode.commands.registerCommand("opencode.deleteSession", () => deleteSessionCommand(folders.active)),
+    // A session row (or the row's command) opens the chat on that session in the folder that owns it.
+    vscode.commands.registerCommand("opencode.sessions.open", async (arg?: unknown) => {
+      const target = sessionTarget(arg)
+      if (!target) return
+      const controller = folders.activateForSession(target.sessionID, target.directory)
+      await vscode.commands.executeCommand(`${VIEW_ID}.focus`)
+      await controller.open(target.sessionID)
+    }),
+    // Refresh redraws from the controllers' current state; it never adds server calls of its own.
+    vscode.commands.registerCommand("opencode.sessions.refresh", () => sessionsTree.refresh()),
+    vscode.commands.registerCommand("opencode.sessions.switchFolder", (arg?: unknown) => {
+      const directory = directoryArg(arg)
+      if (directory) folders.setActive(directory)
+    }),
+    // The tree passes the session's folder so a delete from the sidebar acts on the right project.
+    vscode.commands.registerCommand("opencode.deleteSession", (arg?: unknown) => {
+      const directory = directoryArg(arg)
+      if (directory) folders.setActive(directory)
+      return deleteSessionCommand(folders.active)
+    }),
     vscode.commands.registerCommand("opencode.mcps", async () => {
       await vscode.commands.executeCommand(`${VIEW_ID}.focus`)
       await folders.active.dispatch({ type: "mcp", op: "open" })
@@ -277,7 +312,8 @@ export function activate(context: vscode.ExtensionContext): void {
     // The project config belongs to the folder the chat view shows, so the command reads the active folder when it runs.
     vscode.commands.registerCommand("opencode.openProjectConfig", () => openProjectConfigCommand(folders.activeDirectoryName, serverHostname)),
     // The project name belongs to the folder the chat view shows, so the command reads the active folder when it runs.
-    vscode.commands.registerCommand("opencode.renameProject", () => renameProject()),
+    // From the sessions sidebar a project node passes its own directory.
+    vscode.commands.registerCommand("opencode.renameProject", (arg?: unknown) => renameProject(directoryArg(arg))),
     vscode.commands.registerCommand("opencode.reconnect", () => start()),
     vscode.commands.registerCommand("opencode.pairMobileDevice", () =>
       pairMobileCommand({

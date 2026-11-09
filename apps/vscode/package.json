@@ -44,6 +44,13 @@
   ],
   "contributes": {
     "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "opencode-sessions",
+          "title": "OpenCode",
+          "icon": "media/opencode.svg"
+        }
+      ],
       "secondarySidebar": [
         {
           "id": "opencode",
@@ -53,6 +60,12 @@
       ]
     },
     "views": {
+      "opencode-sessions": [
+        {
+          "id": "opencode.sessions",
+          "name": "Sessions"
+        }
+      ],
       "opencode": [
         {
           "type": "webview",
@@ -154,6 +167,22 @@
         "title": "Voice Input",
         "category": "OpenCode",
         "icon": "$(mic)"
+      },
+      {
+        "command": "opencode.sessions.open",
+        "title": "Open Session",
+        "category": "OpenCode"
+      },
+      {
+        "command": "opencode.sessions.refresh",
+        "title": "Refresh Sessions",
+        "category": "OpenCode",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "opencode.sessions.switchFolder",
+        "title": "Switch to This Folder",
+        "category": "OpenCode"
       }
     ],
     "menus": {
@@ -162,6 +191,48 @@
           "command": "opencode.openSettings",
           "when": "view == opencode.chat",
           "group": "navigation@95"
+        },
+        {
+          "command": "opencode.newSession",
+          "when": "view == opencode.sessions",
+          "group": "navigation@1"
+        },
+        {
+          "command": "opencode.sessions.refresh",
+          "when": "view == opencode.sessions",
+          "group": "navigation@2"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "opencode.sessions.open",
+          "when": "view == opencode.sessions && viewItem == session",
+          "group": "1_open@1"
+        },
+        {
+          "command": "opencode.deleteSession",
+          "when": "view == opencode.sessions && viewItem == session",
+          "group": "2_delete@1"
+        },
+        {
+          "command": "opencode.renameProject",
+          "when": "view == opencode.sessions && viewItem == project",
+          "group": "1_edit@1"
+        },
+        {
+          "command": "opencode.sessions.switchFolder",
+          "when": "view == opencode.sessions && viewItem == project",
+          "group": "1_edit@2"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "opencode.sessions.open",
+          "when": "false"
+        },
+        {
+          "command": "opencode.sessions.switchFolder",
+          "when": "false"
         }
       ]
     },

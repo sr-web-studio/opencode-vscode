@@ -139,7 +139,12 @@ describe("wiring", () => {
   })
   test("the chat view's title bar has one gear: the Settings page", () => {
     const view = pkg.contributes.views.opencode[0].id
-    expect(pkg.contributes.menus["view/title"]).toEqual([{ command: "opencode.openSettings", when: `view == ${view}`, group: "navigation@95" }])
+    // The sessions sidebar adds its own title-bar actions; the chat view keeps exactly the one gear.
+    expect(pkg.contributes.menus["view/title"]).toEqual([
+      { command: "opencode.openSettings", when: `view == ${view}`, group: "navigation@95" },
+      { command: "opencode.newSession", when: "view == opencode.sessions", group: "navigation@1" },
+      { command: "opencode.sessions.refresh", when: "view == opencode.sessions", group: "navigation@2" },
+    ])
     const gear = pkg.contributes.commands.find((c: { command: string }) => c.command === "opencode.openSettings")
     expect(gear).toMatchObject({ icon: "$(settings-gear)" })
   })
