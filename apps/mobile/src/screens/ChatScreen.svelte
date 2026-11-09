@@ -49,7 +49,7 @@
   const sub = $derived([model.projectTitle(directory), live.state?.displayPath].filter((s): s is string => !!s).join(" · "))
 </script>
 
-<Bar {title} {sub}>
+<Bar {title} {sub} menu>
   {#snippet actions()}
     <ConnectionPill connection={live.state?.connection} />
   {/snippet}

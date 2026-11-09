@@ -1,0 +1,431 @@
+<script lang="ts">
+  import { tick } from "svelte"
+  import { fade, fly } from "svelte/transition"
+  import Codicon from "@occ/ui/components/Codicon.svelte"
+  import { relativeTime } from "@occ/core/format"
+  import type { ActivityState } from "@occ/core/activity-order"
+  import { buildOverview, filterOverview } from "../lib/overview"
+  import { expandedKey, isExpanded, parseExpanded, setExpanded } from "../lib/drawer-prefs"
+  import { model } from "../model.svelte"
+
+  /** The one list of every project and its root sessions, opened from the top bar. */
+  let query = $state("")
+  let now = $state(Date.now())
+  let panel = $state<HTMLElement>()
+  let expanded = $state(parseExpanded(localStorage.getItem(expandedKey(model.profile?.id ?? ""))))
+
+  const reduce = typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+  const duration = reduce ? 0 : 200
+
+  const groups = $derived(model.overview.data ? buildOverview(model.overview.data, { resolved: model.projectIDs, titles: model.projectTitles }) : [])
+  const shown = $derived(filterOverview(groups, query))
+
+  $effect(() => {
+    const timer = setInterval(() => (now = Date.now()), 30_000)
+    return () => clearInterval(timer)
+  })
+  // Each server remembers its own collapsed projects; switching servers must not carry the old answers over.
+  $effect(() => {
+    const key = expandedKey(model.profile?.id ?? "")
+    let raw: string | null = null
+    try {
+      raw = localStorage.getItem(key)
+    } catch {
+      // Storage blocked: the drawer still works, it just cannot remember this visit.
+    }
+    expanded = parseExpanded(raw)
+  })
+  $effect(() => {
+    if (model.drawerOpen) void tick().then(() => panel?.focus())
+    // Opening the drawer always shows every project; a filter left from last time would hide them without a reason.
+    else query = ""
+  })
+
+  function statusLabel(state: ActivityState): string | undefined {
+    if (state === "running") return "Running"
+    if (state === "waiting") return "Waiting for you"
+    return undefined
+  }
+
+  function statusText(state: ActivityState): string | undefined {
+    if (state === "running") return "Running"
+    if (state === "waiting") return "Waiting for your answer"
+    return undefined
+  }
+
+  function openByDefault(directory: string, state: ActivityState): boolean {
+    return directory === model.currentDirectory || state !== "idle"
+  }
+
+  function toggle(directory: string, open: boolean): void {
+    expanded = setExpanded(expanded, directory, !open)
+    try {
+      localStorage.setItem(expandedKey(model.profile?.id ?? ""), JSON.stringify(expanded))
+    } catch {
+      // The drawer still works for this visit; remembering the toggle is not worth an error.
+    }
+  }
+</script>
+
+{#if model.drawerOpen}
+  <div class="scrim" role="presentation" transition:fade={{ duration: reduce ? 0 : 150 }} onclick={() => model.closeDrawer()}></div>
+  <div
+    class="drawer"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Projects and sessions"
+    tabindex="-1"
+    bind:this={panel}
+    transition:fly={{ x: -340, duration }}
+    onkeydown={(e) => e.key === "Escape" && model.closeDrawer()}
+  >
+    <header class="head">
+      <div class="who">
+        <span class="srv">{model.profile?.name ?? "Server"}</span>
+        <span class="cap">Projects and sessions</span>
+      </div>
+      <button class="iconbtn" onclick={() => model.closeDrawer()} aria-label="Close menu"><Codicon name="close" /></button>
+    </header>
+
+    <div class="search">
+      <Codicon name="search" />
+      <input type="search" bind:value={query} placeholder="Search projects and sessions" aria-label="Search projects and sessions" autocomplete="off" />
+    </div>
+
+    <div class="body">
+      {#if model.overview.error && !model.overview.data}
+        <div class="center">
+          <p class="err">{model.overview.error}</p>
+          <button class="btn" onclick={() => model.overview.retry()}>Try again</button>
+        </div>
+      {:else if !model.overview.data}
+        <div class="center muted"><Codicon name="loading" spin /> Loading projects and sessions…</div>
+      {:else if groups.length === 0}
+        <div class="center">
+          <strong>No projects yet</strong>
+          <p class="muted">Projects appear here after you open a folder with OpenCode on your computer.</p>
+        </div>
+      {:else if shown.length === 0}
+        <div class="center muted">No project or session matches “{query}”.</div>
+      {:else}
+        {#each shown as group (group.directory)}
+          {@const open = query.trim() ? true : isExpanded(expanded, group.directory, openByDefault(group.directory, group.state))}
+          <section class="group">
+            <div class="prow">
+              <button class="pname" onclick={() => model.openProject(group.directory)} aria-label="Open {group.title}">
+                <span class="dot {group.state}" role={group.state === "idle" ? undefined : "img"} aria-label={statusLabel(group.state)} aria-hidden={group.state === "idle" ? "true" : undefined}
+                ></span>
+                <span class="main">
+                  <span class="t">{group.title}</span>
+                  <span class="s">{group.sessions.length} {group.sessions.length === 1 ? "session" : "sessions"}</span>
+                </span>
+              </button>
+              <button class="iconbtn chev" onclick={() => toggle(group.directory, open)} aria-expanded={open} aria-label={open ? `Collapse ${group.title}` : `Expand ${group.title}`}>
+                <Codicon name={open ? "chevron-down" : "chevron-right"} />
+              </button>
+            </div>
+            {#if open}
+              {#if group.sessions.length === 0}
+                <div class="empty">No sessions yet</div>
+              {:else}
+                {#each group.sessions as session (session.id)}
+                  <button class="srow" onclick={() => model.openSession(group.directory, session.id)}>
+                    <span
+                      class="dot {session.state}"
+                      role={session.state === "idle" ? undefined : "img"}
+                      aria-label={statusLabel(session.state)}
+                      aria-hidden={session.state === "idle" ? "true" : undefined}
+                    ></span>
+                    <span class="main">
+                      <span class="t">{session.title}</span>
+                      {#if statusText(session.state)}<span class="s">{statusText(session.state)}</span>{/if}
+                    </span>
+                    <span class="end">{relativeTime(session.last, now)}</span>
+                  </button>
+                {/each}
+              {/if}
+            {/if}
+          </section>
+        {/each}
+      {/if}
+    </div>
+
+    <footer class="foot">
+      <div class="srvname"><Codicon name="server" /> {model.profile?.name ?? "Server"}</div>
+      <div class="fbtns">
+        <button class="fbtn" onclick={() => model.goProjects()}><Codicon name="folder" /> All projects</button>
+        <button class="fbtn" onclick={() => model.openSettings()}><Codicon name="settings-gear" /> Settings</button>
+      </div>
+    </footer>
+  </div>
+{/if}
+
+<style>
+  button {
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    padding: 0;
+    cursor: pointer;
+  }
+  .scrim {
+    position: absolute;
+    z-index: 50;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+  }
+  .drawer {
+    position: absolute;
+    z-index: 51;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: min(86vw, 340px);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: calc(var(--sat) + 4px) 0 calc(var(--sab) + 4px) var(--sal);
+    background: var(--vscode-sideBar-background, var(--vscode-editor-background));
+    color: var(--oc-fg);
+    border-right: 1px solid var(--oc-hairline);
+    box-shadow: 0 0 32px var(--vscode-widget-shadow);
+    outline: none;
+  }
+  .head {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px 4px 16px;
+    min-height: 52px;
+  }
+  .who {
+    flex: 1;
+    min-width: 0;
+  }
+  .srv {
+    display: block;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .cap {
+    display: block;
+    font-size: 0.78em;
+    color: var(--oc-muted);
+  }
+  .iconbtn {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+    border-radius: 8px;
+    font-size: 18px;
+  }
+  .iconbtn:active {
+    background: var(--oc-hover);
+  }
+  .search {
+    flex: none;
+    position: relative;
+    padding: 4px 12px 10px;
+  }
+  .search :global(.codicon) {
+    position: absolute;
+    left: 24px;
+    top: 50%;
+    transform: translateY(-50%);
+    margin-top: -3px;
+    color: var(--oc-muted);
+    pointer-events: none;
+  }
+  .search input {
+    width: 100%;
+    min-height: 44px;
+    padding: 8px 12px 8px 36px;
+    border-radius: 8px;
+    background: var(--vscode-input-background);
+    border: 1px solid var(--vscode-input-border, var(--oc-hairline));
+    color: var(--vscode-input-foreground);
+  }
+  .search input::placeholder {
+    color: var(--vscode-input-placeholderForeground);
+  }
+  .body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  .group {
+    border-bottom: 1px solid var(--oc-hairline);
+  }
+  .prow {
+    display: flex;
+    align-items: center;
+    background: var(--vscode-editor-background);
+  }
+  .pname {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 52px;
+    padding: 8px 0 8px 16px;
+    text-align: left;
+  }
+  .pname:active {
+    background: var(--oc-hover);
+  }
+  .chev {
+    margin-right: 2px;
+  }
+  .main {
+    flex: 1;
+    min-width: 0;
+  }
+  .t {
+    display: block;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .s {
+    display: block;
+    font-size: 0.82em;
+    color: var(--oc-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .srow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 50px;
+    padding: 6px 16px 6px 24px;
+    text-align: left;
+    border-top: 1px solid var(--oc-hairline);
+    content-visibility: auto;
+    contain-intrinsic-size: auto 50px;
+  }
+  .srow:active {
+    background: var(--oc-hover);
+  }
+  .end {
+    flex: none;
+    font-size: 0.8em;
+    color: var(--oc-muted);
+  }
+  .empty {
+    padding: 8px 16px 12px 40px;
+    color: var(--oc-muted);
+    font-size: 0.9em;
+  }
+  .center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    text-align: center;
+    padding: 24px;
+    min-height: 60%;
+  }
+  .center p {
+    margin: 0;
+    max-width: 28em;
+  }
+  .muted {
+    color: var(--oc-muted);
+  }
+  .err {
+    color: var(--oc-error);
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 0 16px;
+    border-radius: 8px;
+    background: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    font-weight: 500;
+  }
+  .foot {
+    flex: none;
+    padding: 10px 12px 4px;
+    border-top: 1px solid var(--oc-hairline);
+    background: var(--vscode-editor-background);
+  }
+  .srvname {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 4px 6px;
+    font-size: 0.82em;
+    color: var(--oc-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .fbtns {
+    display: flex;
+    gap: 6px;
+  }
+  .fbtn {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 44px;
+    border-radius: 8px;
+    border: 1px solid var(--oc-hairline);
+    color: var(--oc-accent);
+  }
+  .fbtn:active {
+    background: var(--oc-hover);
+  }
+  .dot {
+    flex: none;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: transparent;
+  }
+  .dot.idle {
+    width: 6px;
+    height: 6px;
+    margin: 0 2px;
+    background: var(--oc-muted);
+    opacity: 0.35;
+  }
+  .dot.running {
+    background: var(--oc-ok);
+    animation: drawer-pulse 1.4s ease-in-out infinite;
+  }
+  .dot.waiting {
+    background: var(--oc-amber);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--oc-amber) 30%, transparent);
+  }
+  @keyframes drawer-pulse {
+    50% {
+      opacity: 0.35;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .dot.running {
+      animation: none;
+    }
+  }
+</style>

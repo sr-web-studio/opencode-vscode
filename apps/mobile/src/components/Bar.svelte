@@ -4,10 +4,13 @@
   import { model } from "../model.svelte"
 
   /** The top bar of a screen: a back button (the same as Android's), the title, and room for actions. */
-  let { title, sub, back = true, badge, actions }: { title: string; sub?: string; back?: boolean; badge?: string; actions?: Snippet } = $props()
+  let { title, sub, back = true, menu = false, badge, actions }: { title: string; sub?: string; back?: boolean; menu?: boolean; badge?: string; actions?: Snippet } = $props()
 </script>
 
 <header class="bar">
+  {#if menu}
+    <button class="iconbtn" onclick={() => model.openDrawer()} aria-label="Open projects and sessions"><Codicon name="menu" /></button>
+  {/if}
   {#if back}
     <button class="iconbtn" onclick={() => model.pop()} aria-label="Back"><Codicon name="arrow-left" /></button>
   {/if}

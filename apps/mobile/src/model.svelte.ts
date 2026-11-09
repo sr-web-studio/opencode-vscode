@@ -19,7 +19,7 @@ import { enhanceModelKey, parseEnhanceModel, parseViewSettings, patchViewSetting
 import { makeClient, redeemPairing, testConnection } from "./lib/client"
 import { parseDeepLink, routeDeepLink } from "./lib/deep-link"
 import { LinkGate } from "./lib/link-gate"
-import { canPop, directoriesInUse, pop, popKey, push, stackForSession, stackForWorker, type Entry, type Screen } from "./lib/nav"
+import { backAction, canPop, directoriesInUse, pop, popKey, push, stackForSession, stackForWorker, type Entry, type Screen } from "./lib/nav"
 import { DEFAULT_NOTIFY, NO_STATUS, NOTIFY_VERSION, nativeServers, parseNotifySettings, visibleSessionOf, type NotifySettings, type NotifyStatus } from "./lib/notify"
 import {
   askBatteryExemption,
@@ -35,8 +35,9 @@ import {
 import { parsePairingLink } from "./lib/pairing-link"
 import { pickFiles } from "./lib/picker"
 import { ProjectNames } from "./lib/project-names"
-import { projectFolders, type ProjectLike } from "./lib/projects"
-import { launchUrl, onHardwareBack, onResume, onUrlOpen, openInBrowser } from "./lib/platform"
+import { OverviewStore } from "./lib/overview.svelte"
+import { guessHome, projectFolders, type ProjectLike } from "./lib/projects"
+import { launchUrl, onHardwareBack, onPause, onResume, onUrlOpen, openInBrowser } from "./lib/platform"
 import { ProfileStore, type Profile, type ProfileInput } from "./lib/profiles"
 import { secureKV } from "./lib/secure"
 import { REVERT_BUTTON, REVERT_DETAIL, REVERT_TITLE } from "./lib/texts"
@@ -101,6 +102,10 @@ class AppModel {
   ready = $state(false)
   /** The Settings layer is open above the screen stack. */
   settingsOpen = $state(false)
+  /** The project/session drawer slides over the stack; Android back closes it first. */
+  drawerOpen = $state(false)
+  /** The whole server as the drawer lists it: one snapshot and one event stream, not a controller per project. */
+  readonly overview = new OverviewStore()
   /** What the chat looks like on this phone; applied to every open project's controller. */
   viewSettings = $state.raw<ViewSettings>(defaultViewSettings)
   /** Bumped when a saved setting outside `viewSettings` changes (an enhancement model, a reset). */
@@ -148,11 +153,13 @@ class AppModel {
     onHardwareBack(() => this.back())
     onResume(() => {
       this.workspace?.resume()
+      this.overview.resume()
       // Back in front: the session on screen counts as seen again, so its notification goes.
       this.shownSession = ""
       this.syncVisible()
       void this.syncNotify()
     })
+    onPause(() => this.overview.pause())
     onUrlOpen((url) => void this.openLink(url))
     try {
       this.profiles = await this.store.list()
@@ -200,6 +207,7 @@ class AppModel {
   }
 
   openSettings() {
+    this.closeDrawer()
     this.settingsOpen = true
     void this.refreshNotifyStatus()
   }
@@ -241,19 +249,66 @@ class AppModel {
     this.setStack(this.stack.map((e) => (e.key === key ? { key, screen } : e)))
   }
 
-  /** Android back: a dialog first, then the top screen. False at the bottom: the app leaves. */
+  /** Android back: a dialog first, then the drawer, then Settings, then the top screen. False at the bottom: the app leaves. */
   back(): boolean {
-    if (this.modal) {
+    const action = backAction({ modal: !!this.modal, drawer: this.drawerOpen, settings: this.settingsOpen, canPop: canPop(this.stack) })
+    if (action === "modal") {
       this.answer(false)
       return true
     }
-    if (this.settingsOpen) {
+    if (action === "drawer") {
+      this.closeDrawer()
+      return true
+    }
+    if (action === "settings") {
       this.settingsOpen = false
       return true
     }
-    if (!canPop(this.stack)) return false
+    if (action === "exit") return false
     this.pop()
     return true
+  }
+
+  /* ---------------------------------------------------------- drawer */
+
+  /** The folder of the screen the drawer is opened over; its project starts expanded. */
+  get currentDirectory(): string | undefined {
+    const screen = this.top.screen
+    return "directory" in screen ? screen.directory : undefined
+  }
+
+  openDrawer(): void {
+    this.drawerOpen = true
+    this.overview.setDrawerOpen(true)
+  }
+
+  closeDrawer(): void {
+    if (!this.drawerOpen) return
+    this.drawerOpen = false
+    this.overview.setDrawerOpen(false)
+  }
+
+  /** Tap a session in the drawer: close it and open that chat, the same stack a notification tap builds. */
+  openSession(directory: string, sessionID: string): void {
+    this.closeDrawer()
+    this.setStack(stackForSession(directory, nextKey, sessionID))
+  }
+
+  /** Tap a project name in the drawer: close it and show that project's sessions. */
+  openProject(directory: string): void {
+    this.closeDrawer()
+    const screen = this.top.screen
+    if (screen.kind === "sessions" && screen.directory === directory) return
+    this.push({ kind: "sessions", directory })
+  }
+
+  /** "All projects" in the drawer. */
+  goProjects(): void {
+    this.closeDrawer()
+    this.setStack([
+      { key: nextKey(), screen: { kind: "servers" } },
+      { key: nextKey(), screen: { kind: "projects" } },
+    ])
   }
 
   /** Dispose the controllers of projects that no screen shows any more; leave the server when its list is gone. */
@@ -275,6 +330,8 @@ class AppModel {
   }
 
   private closeWorkspace() {
+    this.overview.disconnect()
+    this.closeDrawer()
     for (const dir of this.workspace?.directories ?? []) this.drop(dir)
     this.workspace?.dispose()
     this.workspace = undefined
@@ -334,6 +391,13 @@ class AppModel {
     this.closeWorkspace()
     this.profile = fresh
     this.workspace = new Workspace(makeClient(fresh), (project) => this.makeController(fresh, project))
+    // The drawer's one snapshot and one stream; names go through the same ProjectNames cache as the Projects screen.
+    this.overview.connect(this.workspace.client, {
+      onProjects: (list) => {
+        this.home = guessHome(list.map((project) => project.canonical))
+        void this.learnProjects(list)
+      },
+    })
     if (navigate)
       this.setStack([
         { key: nextKey(), screen: { kind: "servers" } },

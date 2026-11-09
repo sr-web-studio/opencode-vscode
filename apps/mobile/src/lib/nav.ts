@@ -28,6 +28,17 @@ export const pop = (stack: ReadonlyArray<Entry>): Entry[] => (stack.length > 1 ?
 
 export const canPop = (stack: ReadonlyArray<Entry>): boolean => stack.length > 1
 
+/** What Android's back button should close: the dialog, then the drawer, then Settings, then the top screen. */
+export type BackContext = { modal: boolean; drawer: boolean; settings: boolean; canPop: boolean }
+export type BackAction = "modal" | "drawer" | "settings" | "pop" | "exit"
+
+export function backAction(context: BackContext): BackAction {
+  if (context.modal) return "modal"
+  if (context.drawer) return "drawer"
+  if (context.settings) return "settings"
+  return context.canPop ? "pop" : "exit"
+}
+
 /** Remove the top screen only when it is `key`: a screen that closes itself must not close the one that replaced it. */
 export const popKey = (stack: ReadonlyArray<Entry>, key: number): Entry[] => (stack.at(-1)?.key === key ? pop(stack) : [...stack])
 

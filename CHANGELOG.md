@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Android app: one drawer for every project and session.** The menu button (top left) opens a list of all projects and their sessions, the ones that need you or are running first, then the newest, with a moving icon while a session runs. Tap a session to open it.
+
 ## 0.3.13 (preview)
 
 - **Project names from OpenCode.** The folder dropdown shows the name a project has in OpenCode, and **OpenCode: Rename Project…** (also in the dropdown and on the Settings page) renames it; a rename in the browser UI or on the phone shows up live. Only the display name on the server changes, never the folder or the OpenCode config.

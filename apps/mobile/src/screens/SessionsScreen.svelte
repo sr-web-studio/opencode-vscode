@@ -26,7 +26,7 @@
   onMount(() => void model.resolveProject(directory))
 </script>
 
-<Bar {title} sub={st?.displayPath}>
+<Bar {title} sub={st?.displayPath} menu>
   {#snippet actions()}
     <ConnectionPill connection={st?.connection} />
     <button class="iconbtn" onclick={() => void model.renameProject(directory)} aria-label="Rename project" title="Rename project"><Codicon name="edit" /></button>
