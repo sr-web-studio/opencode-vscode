@@ -30,6 +30,7 @@ I'm also working on an Android app with the same UI, for the same always-on setu
 ## Features
 
 - **Chat** with the sessions of the open workspace folder. Compact one-line tool calls with details on click, finished turns folded into "N steps completed", collapsible reasoning.
+- **Sessions sidebar:** an OpenCode icon in the left sidebar lists the sessions of the open folder; with several folders open it shows the folders as projects too. The ones that need you or are running stay on top, then the newest, with a spinning icon while a session runs. Click a session to open it in the chat.
 - **Steer while it works:** a message sent while the agent is busy joins the running turn.
 - **Editor integration:** file paths open in the editor (images too), and edits open as native VS Code diffs.
 - **Terminal:** shell commands the agent runs show up in a read-only VS Code terminal, without stealing focus. Ctrl+C stops the running command, after asking.
@@ -85,6 +86,7 @@ Open Settings and search for **OpenCode**:
 | `opencode.voice.maxLanguages` | How many languages can be active (default 2, up to 5). Languages of the multilingual model cost nothing extra; Bangla is a separate download (about 168 MB). Only one model is loaded at a time. |
 | `opencode.voice.localLanguage` | Deprecated single language (`en` or `bn`); still used while `localLanguages` is not set. |
 | `opencode.voice.languages`, `opencode.voice.model` | Languages and model for the Soniox engine. |
+| **OpenCode: Sessions** (OpenCode icon in the left sidebar) | Lists the sessions of the open folder, or of every folder in a multi-root window (folders as projects), the ones that need you or are running first and then the newest. Click a session to open it in the chat; the title bar has **New Session** and **Refresh Sessions**; right-click a session to open or delete it, and a project to rename it or switch to it. |
 
 ## Android app (beta)
 

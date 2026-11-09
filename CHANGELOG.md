@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Sessions sidebar.** An OpenCode icon in the left sidebar lists the sessions of the folder (and, with several folders, the folders as projects), the ones that need you or are running first, then the newest, with a spinning icon while a session runs. Click one to open it in the chat.
+
 ## 0.3.13 (preview)
 
 - **Project names from OpenCode.** The folder dropdown shows the name a project has in OpenCode, and **OpenCode: Rename Project…** (also in the dropdown and on the Settings page) renames it; a rename in the browser UI or on the phone shows up live. Only the display name on the server changes, never the folder or the OpenCode config.
