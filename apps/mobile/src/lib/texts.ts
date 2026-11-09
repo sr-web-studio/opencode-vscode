@@ -11,6 +11,10 @@ export const REVERT_PROMPT = `${REVERT_TITLE} ${REVERT_DETAIL}`
 export const SETUP_GUIDE_URL = "https://github.com/sr-web-studio/opencode-vscode/blob/main/docs/mobile-setup.md"
 export const SETUP_GUIDE_LABEL = "How to set up the server"
 
+/** Where a phone user reports a problem with the app. */
+export const ISSUES_URL = "https://github.com/sr-web-studio/opencode-vscode/issues"
+export const ISSUES_LABEL = "Report a problem"
+
 /** Empty server list: what to do when no server is saved yet. */
 export const EMPTY_SERVERS_HELP =
   "Add the OpenCode server that runs on your computer. Scan the QR code from “OpenCode: Pair Mobile Device…” in VS Code, or type the computer's address and the server password."

@@ -3,6 +3,9 @@
 ## Unreleased
 
 - **Polish also fixes sentence structure.** Enhance prompt → Polish now splits run-on sentences, reorders clumsy phrasing and joins fragments, besides grammar, spelling and dictation errors, while keeping the order of your ideas.
+- **OpenCode Settings page.** The gear in the chat's title bar (or **OpenCode: Open Settings**) opens one page for every `opencode.*` setting, with search, a reset per setting and live updates. It also shows whether the server password and the voice key are set (never their values), the Enhance prompt model with a reset to the server default, quick actions (pair a phone, reconnect, global config, voice language) and About.
+- **A smaller Enhance prompt menu.** The menu above the prompt box (Polish, Rewrite, model) uses the compact row height of the other pickers and never grows wider than the prompt box; rows stay finger-sized on the phone.
+- **Android app: a full Settings screen.** Transcript text size, how steps, reasoning and the todo list show, the Enhance prompt model per server (with a reset to the server default), notifications and battery, server and pairing shortcuts, and About. "Reset app settings" never deletes servers, sessions or passwords.
 
 ## 0.3.11 (preview)
 
