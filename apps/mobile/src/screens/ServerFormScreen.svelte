@@ -3,8 +3,9 @@
   import Bar from "../components/Bar.svelte"
   import { testConnection } from "../lib/client"
   import { looksLikePairingLink } from "../lib/pairing-link"
-  import { scanQr } from "../lib/platform"
+  import { openInBrowser, scanQr } from "../lib/platform"
   import { hostOf } from "../lib/profiles"
+  import { ADDRESS_HELP, SCAN_HELP, SETUP_GUIDE_LABEL, SETUP_GUIDE_URL } from "../lib/texts"
   import { model } from "../model.svelte"
 
   /** Add a server (URL + password, a scanned QR code, or a pasted pairing link) or edit a saved one. */
@@ -98,7 +99,7 @@
         {#if busy === "scan" || busy === "pair"}<Codicon name="loading" spin />{:else}<Codicon name="device-camera" />{/if}
         Scan QR code
       </button>
-      <p class="muted small">On your computer run “OpenCode: Pair Mobile Device” in VS Code and scan the code it shows.</p>
+      <p class="muted small">{SCAN_HELP}</p>
       <label class="field">
         <span>Or paste the pairing link</span>
         <textarea rows="2" bind:value={link} placeholder="http://192.168.1.10:4096/auth/connect/…" autocapitalize="off" autocomplete="off" spellcheck="false"></textarea>
@@ -114,6 +115,10 @@
     <span>Server address</span>
     <input type="url" inputmode="url" bind:value={url} placeholder="http://192.168.1.10:4096" autocapitalize="off" autocomplete="off" spellcheck="false" />
   </label>
+  <p class="help">
+    {ADDRESS_HELP}
+    <button class="helplink" onclick={() => void openInBrowser(SETUP_GUIDE_URL)}>{SETUP_GUIDE_LABEL}</button>
+  </p>
   <label class="field">
     <span>Password</span>
     <input type="password" bind:value={password} placeholder={existing ? "Leave empty to keep the saved password" : "Server password"} autocomplete="off" />
@@ -150,6 +155,20 @@
   .small {
     font-size: 0.85em;
     margin: 8px 0 14px;
+  }
+  .help {
+    font-size: 0.85em;
+    color: var(--oc-muted);
+    margin: -8px 0 14px;
+  }
+  .helplink {
+    font: inherit;
+    color: var(--vscode-textLink-foreground, #3794ff);
+    background: none;
+    border: 0;
+    padding: 0;
+    text-decoration: underline;
+    cursor: pointer;
   }
   .pairing {
     margin-bottom: 8px;

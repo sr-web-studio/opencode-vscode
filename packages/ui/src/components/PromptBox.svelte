@@ -2,10 +2,11 @@
   import { onMount, tick } from "svelte"
   import { attachmentFromUri, checkBlob, dataUri, droppedFileUris, isImageMime, mimeFromName, modelTakesImages, type Attachment } from "@occ/core/attachments"
   import { mergeDictation } from "@occ/core/dictation"
+  import type { EnhanceMode } from "@occ/core/enhance"
   import { micLabel, micTitle } from "@occ/core/local-voice"
   import { languageCode, languageLabel, languageTitle } from "@occ/core/voice-catalog"
   import { shouldFocusPrompt } from "@occ/core/focus"
-  import { cycleAgent, findModel } from "@occ/core/models"
+  import { cycleAgent, findModel, type ModelSelection } from "@occ/core/models"
   import { promptHeight } from "@occ/core/prompt-height"
   import type { AppState } from "@occ/core/protocol"
   import {
@@ -27,6 +28,7 @@
   import AgentModelPicker from "./AgentModelPicker.svelte"
   import Chip from "./Chip.svelte"
   import Codicon from "./Codicon.svelte"
+  import EnhanceMenu from "./EnhanceMenu.svelte"
   import McpPanel from "./McpPanel.svelte"
   import SlashPopup from "./SlashPopup.svelte"
 
@@ -52,6 +54,19 @@
   let seq = 0
   // The text that a revert put into the box, so Redo only clears it when the user did not change it.
   let restored: string | undefined
+
+  /* -------------------------------------------------------------- enhance */
+
+  // The menu above the button, the original text of the last replacement (for Undo), and a line about a result that
+  // was not applied because the prompt changed meanwhile.
+  let enhanceMenu = $state(false)
+  let undo = $state<{ text: string; mode: EnhanceMode } | undefined>(undefined)
+  let enhanceNotice = $state("")
+  // A failed enhancement, shown under the box like the other errors. Cleared as soon as the user types again.
+  let enhanceError = $state("")
+
+  const enhancing = $derived(app.enhance?.status === "running")
+  const canEnhance = $derived(text.trim().length > 0 && app.connection.status === "connected")
 
   const running = $derived(isRunning(app.view) || (app.target.kind === "session" && app.running.includes(app.target.id)))
   const canSend = $derived((text.trim().length > 0 || files.length > 0) && app.connection.status === "connected" && !app.sending)
@@ -92,6 +107,74 @@
     area?.setSelectionRange(at, at)
     resize()
   }
+
+  /* ------------------------------------------------------------- enhance */
+
+  /** The button: cancel a running enhancement, or open the menu. */
+  function enhanceClick() {
+    if (enhancing) {
+      store.dispatch({ type: "enhanceCancel" })
+      return
+    }
+    if (!canEnhance) return
+    enhanceMenu = !enhanceMenu
+    enhanceNotice = ""
+  }
+
+  function startEnhance(mode: EnhanceMode) {
+    enhanceMenu = false
+    enhanceNotice = ""
+    enhanceError = ""
+    // A new request replaces the text it is based on: an older Undo no longer belongs to the box.
+    undo = undefined
+    store.dispatch({ type: "enhance", mode, text })
+    void tick().then(() => focusGuarded(area))
+  }
+
+  function pickEnhanceModel(model: ModelSelection | undefined) {
+    store.dispatch({ type: "pickEnhanceModel", model })
+    closeEnhance(true)
+  }
+
+  function closeEnhance(refocus: boolean) {
+    enhanceMenu = false
+    if (refocus) void tick().then(() => focusGuarded(area))
+  }
+
+  function undoEnhance() {
+    const original = undo?.text
+    undo = undefined
+    enhanceNotice = ""
+    if (original !== undefined) void setText(original)
+  }
+
+  // A finished call: replace the text only while it is still the text the request was made from. Otherwise the user
+  // changed the prompt meanwhile, and their words win; the notice says why nothing happened.
+  let seenEnhance: string | undefined
+  $effect(() => {
+    const e = app.enhance
+    if (!e || e.status === "running") return
+    const key = `${e.tick}:${e.status}`
+    if (key === seenEnhance) return
+    seenEnhance = key
+    if (e.status === "error") {
+      enhanceError = e.error ?? "Prompt enhancement failed."
+      return
+    }
+    if (e.text === undefined) return
+    if (text !== e.source) {
+      enhanceNotice = "The prompt changed while it was being enhanced, so the result was not applied."
+      return
+    }
+    undo = { text: e.source, mode: e.mode }
+    enhanceNotice = ""
+    void setText(e.text)
+  })
+
+  // A cleared box (sent, a fresh draft) has no text left to undo.
+  $effect(() => {
+    if (text === "" && undo !== undefined) undo = undefined
+  })
 
   /** Accept a row: a command is completed to `/name `, a skill becomes a chip. */
   function accept(s: Suggestion) {
@@ -182,6 +265,9 @@
       const r = mergeDictation(text, shown, m.text)
       text = r.text
       dictation = m.done ? undefined : { id: m.id, shown: r.shown }
+      // Speaking is editing: the text an Undo would restore no longer matches what is in the box.
+      undo = undefined
+      enhanceNotice = ""
       void tick().then(resize)
     }),
   )
@@ -207,12 +293,17 @@
     }
     dictation = undefined
     store.dispatch({ type: "send", text, files: files.map(({ uri, name }) => ({ uri, name })), skills: skills.map(({ id }) => ({ id })) })
+    // Sending ends any enhancement in flight: its result is for the text that just left the box.
+    if (enhancing) store.dispatch({ type: "enhanceCancel" })
     text = ""
     files = []
     skills = []
     note = ""
     hint = ""
     restored = undefined
+    undo = undefined
+    enhanceNotice = ""
+    enhanceError = ""
     void tick().then(() => {
       resize()
       focusGuarded(area)
@@ -261,6 +352,13 @@
     if (e.key === "Escape" && app.mcp.open) {
       e.preventDefault()
       store.dispatch({ type: "mcp", op: "close" })
+      return
+    }
+    if (e.key === "Escape" && enhancing) {
+      // Cancels only the enhancement; it must not also stop the agent.
+      e.preventDefault()
+      e.stopPropagation()
+      store.dispatch({ type: "enhanceCancel" })
       return
     }
     if (e.key === "Enter" && !e.shiftKey && caps.enterSends !== false) {
@@ -396,6 +494,9 @@
     if (tickNow !== undefined && textNow !== undefined) {
       text = textNow
       restored = textNow
+      // A revert put back an earlier prompt: that is the text now, so an older enhancement Undo does not apply.
+      undo = undefined
+      enhanceNotice = ""
     }
   })
   const reverted = $derived(!!app.view.revert)
@@ -422,6 +523,9 @@
       <SlashPopup id={POPUP_ID} {items} index={activeIndex} label={filter !== undefined ? "Skills" : "Slash commands"} empty={skillsEmpty} onpick={accept} onhover={(i) => (active = i)} />
     {/if}
     {#if app.mcp.open}<McpPanel {app} returnTo={area} />{/if}
+    {#if enhanceMenu}
+      <EnhanceMenu {app} onpick={startEnhance} onmodel={pickEnhanceModel} onclose={closeEnhance} />
+    {/if}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="input" class:drag={dragging} {ondragover} ondragleave={() => (dragging = false)} {ondrop}>
       {#if files.length > 0 || skills.length > 0}
@@ -449,6 +553,10 @@
           resize()
           syncCaret()
           hint = ""
+          // Typing is a new prompt: the old text is no longer one click away, and an old notice is stale.
+          undo = undefined
+          enhanceNotice = ""
+          enhanceError = ""
         }}
         onkeyup={syncCaret}
         onclick={syncCaret}
@@ -463,6 +571,18 @@
         aria-autocomplete="list"></textarea>
       <div class="actions">
         <button class="clip muted" onclick={pick} title="Attach files" aria-label="Attach files"><Codicon name="attach" /></button>
+        <!-- Rewrites the prompt box text with one stateless model call. While it runs the button cancels it. -->
+        <button
+          class="spark muted enhance-btn"
+          class:on={enhancing}
+          disabled={!enhancing && !canEnhance}
+          aria-haspopup={enhancing ? undefined : "menu"}
+          aria-expanded={enhancing ? undefined : enhanceMenu}
+          onclick={enhanceClick}
+          title={enhancing ? "Cancel enhancement (Esc)" : "Enhance prompt"}
+          aria-label={enhancing ? "Cancel enhancement" : "Enhance prompt"}
+          >{#if enhancing}<Codicon name="loading" spin />{:else}<Codicon name="sparkle" />{/if}</button
+        >
         <span class="grow"></span>
         <!-- On-device engine: the spoken language. A click switches to the next active language. `mousedown` is not allowed to
            move focus, so the caret stays in the prompt box; the keyboard reaches it with Tab (Enter/Space switch). -->
@@ -500,7 +620,17 @@
     </div>
   </div>
   {#if note}<div class="note err small" role="alert">{note}</div>{/if}
+  {#if enhanceError}<div class="note err small" role="alert">{enhanceError}</div>{/if}
   {#if hint}<div class="note muted small" role="status">{hint}</div>{/if}
+  {#if undo}
+    <div class="note muted small done-line" role="status">
+      <Codicon name="sparkle" />
+      {undo.mode === "polish" ? "Polished" : "Rewritten"}
+      <span>·</span>
+      <button class="undo" onclick={undoEnhance}>Undo</button>
+    </div>
+  {/if}
+  {#if enhanceNotice}<div class="note muted small" role="status">{enhanceNotice}</div>{/if}
   <AgentModelPicker {app} />
 </div>
 
@@ -571,6 +701,29 @@
   .clip:hover {
     color: var(--oc-fg);
     background: var(--oc-hover);
+  }
+  .spark {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2em 0.3em;
+    border-radius: 4px;
+  }
+  .spark:hover:not(:disabled) {
+    color: var(--oc-fg);
+    background: var(--oc-hover);
+  }
+  .spark.on {
+    color: var(--oc-accent);
+  }
+  .done-line {
+    display: flex;
+    align-items: center;
+    gap: 0.35em;
+  }
+  .undo {
+    color: var(--oc-accent);
+    text-decoration: underline;
+    padding: 0 0.1em;
   }
   .lang {
     display: inline-flex;

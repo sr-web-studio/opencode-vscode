@@ -4,13 +4,14 @@ import { SessionFeed } from "./feed"
 import { detectFeatures, isUnsupported } from "./features"
 import { primaryAgents, type ModelSelection } from "./models"
 import { normalizePins, togglePin } from "./pins"
-import { defaultViewSettings, type Action, type AgentSummary, type AppState, type ConnectionState, type PromptRestore, type ViewSettings } from "./protocol"
+import { defaultViewSettings, type Action, type AgentSummary, type AppState, type ConnectionState, type EnhanceState, type PromptRestore, type ViewSettings } from "./protocol"
 import { isRoot, upsertSession } from "./sessions"
 import { isWindowsPath, sameDirectory, withinDirectory } from "./paths"
 import { isRunning } from "./transcript/reducer"
 import { applyRevertEvent, revertFromServer, revertedPrompt } from "./transcript/revert"
 import { toPromptFiles, type PromptFile } from "./attachments"
 import { errorMessage as message, isGone } from "./errors"
+import { buildEnhancePrompt, cleanEnhanced, enhanceError, ENHANCE_UNSUPPORTED, type EnhanceMode } from "./enhance"
 import { NOT_DELETABLE, STOP_FIRST, WAITING_FOR_USER, WORKER_RUNNING } from "./delete-session"
 import { CommandCatalog } from "./commands"
 import { McpManager, type McpHost } from "./mcp"
@@ -28,6 +29,11 @@ export type ControllerOptions = {
   onEvent?: (ev: EventEnvelope) => void
   /** Pinned models. The host keeps them in `globalState`; they are never written to OpenCode config. */
   pins?: { get(): string[]; set(pins: string[]): void }
+  /**
+   * The model "Enhance prompt" uses. Independent of the session's model, kept by the host like the pins and never
+   * written to OpenCode config. `undefined` means the server's default model.
+   */
+  enhanceModel?: { get(): ModelSelection | undefined; set(model: ModelSelection | undefined): void }
   /** Diagnostics for the output channel. Never given secrets or message text. */
   log?: (line: string) => void
   /** What `/mcps` needs from the machine we run on: open a browser, forward a port, ask for a code, confirm. */
@@ -93,6 +99,9 @@ export class Controller {
   private focusTick = 0
   private draftEpoch = 0
   private abort?: AbortController
+  private enhance?: EnhanceState
+  private enhanceTick = 0
+  private enhanceAbort?: AbortController
   private synced = false
   private readonly catalog = new CommandCatalog()
   private readonly mcp = new McpManager({
@@ -180,6 +189,10 @@ export class Controller {
       trimPending: this.feed.trimPending,
       sentTick: this.sentTick,
       restore: this.restore,
+      enhance: this.enhance,
+      enhanceModel: this.validEnhanceModel(),
+      enhanceDefault: this.defaultModel,
+      enhanceModelStale: this.enhanceModelStale(),
       voice: this.voice,
       commands: this.catalog.commands,
       skills: this.catalog.skills,
@@ -395,6 +408,9 @@ export class Controller {
     this.clearQuiet()
     this.abort?.abort()
     this.abort = undefined
+    this.enhanceAbort?.abort()
+    this.enhanceAbort = undefined
+    this.enhance = undefined
     this.client = undefined
     this.mcp.reset()
   }
@@ -447,8 +463,7 @@ export class Controller {
       await this.sync()
       return
     }
-    const dir = ev.location?.directory
-    if (dir && !this.isListed(dir)) return
+    if (!this.belongs(ev)) return
     try {
       await this.apply(ev)
     } finally {
@@ -457,6 +472,21 @@ export class Controller {
       this.opts.onEvent?.(ev)
     }
     for (const o of this.observers) o.event?.(ev)
+  }
+
+  /**
+   * Whether an event is this window's business. Events of another project are ignored, but a session is ours through
+   * its place in the window, not its folder: a worker can move to its own worktree (another folder) and keeps
+   * streaming there, and its folder may be spelled differently than the workspace's.
+   */
+  private belongs(ev: EventEnvelope): boolean {
+    const d = ev.data ?? {}
+    const id = d.sessionID ?? d.form?.sessionID
+    if (id && this.listsSession(id)) return true
+    // A worker this window has not listed yet: its `session.created` names the parent it belongs to.
+    if ((ev.type === "session.created" || ev.type === "session.forked") && typeof d.parentID === "string" && this.listsSession(d.parentID)) return true
+    const dir = ev.location?.directory
+    return !dir || this.isListed(dir)
   }
 
   private async apply(ev: EventEnvelope): Promise<void> {
@@ -468,9 +498,13 @@ export class Controller {
       case "session.forked": {
         if (!this.client) return
         const s = await this.client.session.get({ sessionID: d.sessionID }).catch(() => undefined)
-        if (!s || !this.isListed(s.location?.directory)) return
-        if (isRoot(s)) this.sessions = this.sort(upsertSession(this.sessions, s))
-        else this.children.set(s.id, s)
+        if (!s) return
+        if (isRoot(s)) {
+          if (this.isListed(s.location?.directory)) this.sessions = this.sort(upsertSession(this.sessions, s))
+        } else if (s.parentID && this.listsSession(s.parentID)) {
+          // A worker belongs here through its parent, wherever it runs: it can move to its own worktree.
+          this.children.set(s.id, s)
+        }
         break
       }
       case "session.renamed":
@@ -813,7 +847,7 @@ export class Controller {
 
   async dispatch(action: Action): Promise<void> {
     // Refreshing the popup's lists is not something the user did: it must not wipe an error they have not read yet.
-    if (action.type !== "dismissError" && action.type !== "ready" && action.type !== "loadCommands" && action.type !== "loadSkills") this.error = undefined
+    if (action.type !== "dismissError" && action.type !== "ready" && action.type !== "loadCommands" && action.type !== "loadSkills" && action.type !== "enhanceCancel") this.error = undefined
     try {
       switch (action.type) {
         case "ready":
@@ -864,6 +898,12 @@ export class Controller {
           return await this.pickAgent(action.id)
         case "pickModel":
           return await this.pickModel(action.model)
+        case "enhance":
+          return await this.enhanceText(action.mode, action.text)
+        case "enhanceCancel":
+          return this.enhanceCancel()
+        case "pickEnhanceModel":
+          return this.pickEnhanceModel(action.model)
         case "permission":
           await this.need().permission.reply({ sessionID: action.sessionID, requestID: action.requestID, decision: action.decision })
           return
@@ -1193,6 +1233,76 @@ export class Controller {
     this.sessions = this.sessions.map((s) => (s.id === id ? { ...s, model } : s))
     this.emitNow()
     await this.need().session.switchModel({ sessionID: id, model })
+  }
+
+  /* -------------------------------------------------------------- enhance */
+
+  /** The saved enhancement model, but only while this server still offers it (otherwise the default is used). */
+  private validEnhanceModel(): ModelSelection | undefined {
+    const saved = this.opts.enhanceModel?.get()
+    if (!saved) return undefined
+    return this.models.find((m) => m.id === saved.id && m.providerID === saved.providerID && m.enabled && m.status !== "deprecated") ? saved : undefined
+  }
+
+  /** A saved model this server no longer lists. Before the first sync the list is empty, so nothing is stale yet. */
+  private enhanceModelStale(): boolean {
+    if (!this.opts.enhanceModel?.get() || this.models.length === 0) return false
+    return !this.validEnhanceModel()
+  }
+
+  private pickEnhanceModel(model: ModelSelection | undefined): void {
+    // Only a model this server lists can be chosen; anything else (a hand-edited value) is ignored.
+    if (model && !this.models.some((m) => m.id === model.id && m.providerID === model.providerID && m.enabled && m.status !== "deprecated")) return
+    this.opts.enhanceModel?.set(model)
+    this.emitNow()
+  }
+
+  /**
+   * One stateless call with the prompt box text and a fixed instruction. It never sends files, images or history, and
+   * never touches the session, its agent or its model. The result is ignored when the request was cancelled or a newer
+   * one started; the prompt box decides whether its text still matches `source`.
+   */
+  private async enhanceText(mode: EnhanceMode, text: string): Promise<void> {
+    if (!text.trim()) return
+    this.enhanceAbort?.abort()
+    const abort = new AbortController()
+    this.enhanceAbort = abort
+    const tick = ++this.enhanceTick
+    const model = this.validEnhanceModel()
+    const base = { tick, mode, source: text }
+    this.enhance = { ...base, status: "running" }
+    this.emitNow()
+    const started = Date.now()
+    const label = model ? `${model.providerID}/${model.id}` : "server default"
+    try {
+      const client = this.need()
+      const generate = client.experimental?.generate?.text
+      if (typeof generate !== "function") throw new Error(ENHANCE_UNSUPPORTED)
+      const answer = await generate({ prompt: buildEnhancePrompt(mode, text), model: model ?? null }, { signal: abort.signal })
+      if (abort.signal.aborted || this.enhance?.tick !== tick) return
+      const cleaned = cleanEnhanced(answer?.text ?? "")
+      if (!cleaned) throw new Error("The model returned an empty answer. Try again.")
+      this.enhance = { ...base, status: "done", text: cleaned }
+      this.opts.log?.(`Enhance ${mode} with ${label}: done in ${Date.now() - started} ms`)
+    } catch (e) {
+      if (abort.signal.aborted || this.enhance?.tick !== tick) return
+      const error = enhanceError(e)
+      this.enhance = { ...base, status: "error", error }
+      this.opts.log?.(`Enhance ${mode} with ${label}: failed after ${Date.now() - started} ms (${error})`)
+    } finally {
+      if (this.enhanceAbort === abort) this.enhanceAbort = undefined
+      this.emitNow()
+    }
+  }
+
+  /** Esc or a second click on the button: drop the running request. The prompt box text is never touched. */
+  private enhanceCancel(): void {
+    const abort = this.enhanceAbort
+    if (!abort) return
+    this.enhanceAbort = undefined
+    abort.abort()
+    this.enhance = undefined
+    this.emitNow()
   }
 }
 

@@ -16,7 +16,8 @@ describe("app version and preview label", () => {
   test("package.json is a beta and the Android versionName is the same string", () => {
     expect(pkg.version).toMatch(/-beta/)
     const gradle = readFileSync(join(root, "android/app/build.gradle"), "utf8")
-    expect(/versionName\s+"([^"]+)"/.exec(gradle)?.[1]).toBe(pkg.version)
+    // build.gradle keeps the released versionName in `versionNameBase` (test builds add a suffix to it).
+    expect(/versionNameBase\s*=\s*"([^"]+)"/.exec(gradle)?.[1]).toBe(pkg.version)
     expect(Number(/versionCode\s+(\d+)/.exec(gradle)?.[1])).toBeGreaterThanOrEqual(3)
   })
   test("the app never suggests `opencode pair`", () => {

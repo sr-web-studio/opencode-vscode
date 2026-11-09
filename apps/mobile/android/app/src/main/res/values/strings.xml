@@ -1,7 +1,6 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">OpenCode (unofficial)</string>
-    <string name="title_activity_main">OpenCode (unofficial)</string>
+    <!-- app_name and title_activity_main are set by resValue in build.gradle: a test build names itself. -->
     <string name="package_name">dev.srwebstudio.opencode</string>
     <string name="custom_url_scheme">dev.srwebstudio.opencode</string>
 </resources>

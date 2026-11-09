@@ -57,6 +57,13 @@ export function modelSections(input: ModelQueryInput & { pins: ReadonlyArray<str
 
 export type ModelSelection = { id: string; providerID: string; variant?: string }
 
+/** A stored selection (host storage may be stale or hand-edited), or nothing when it is not a model reference. */
+export function normalizeModelSelection(raw: unknown): ModelSelection | undefined {
+  const o = raw as { id?: unknown; providerID?: unknown; variant?: unknown } | null | undefined
+  if (!o || typeof o.id !== "string" || !o.id || typeof o.providerID !== "string" || !o.providerID) return undefined
+  return { id: o.id, providerID: o.providerID, ...(typeof o.variant === "string" && o.variant ? { variant: o.variant } : {}) }
+}
+
 export const sameModel = (a: ModelSelection | undefined, b: { id: string; providerID: string }) => !!a && a.id === b.id && a.providerID === b.providerID
 
 export function findModel(models: ReadonlyArray<SlimModel>, ref: { id: string; providerID: string } | undefined) {

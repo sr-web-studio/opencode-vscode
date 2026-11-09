@@ -20,9 +20,13 @@ import androidx.core.app.NotificationManagerCompat;
  * tap opens the app, which starts the service (the app in front is allowed to).
  */
 public final class Watchdog extends BroadcastReceiver {
-  public static final String ACTION = "dev.srwebstudio.opencode.notify.WATCHDOG";
   public static final long PERIOD_MS = 15L * 60 * 1000;
   private static final int REQUEST = 7001;
+
+  /** The alarm's action; the app's own package name keeps the test build and the released app apart. */
+  private static String action(Context context) {
+    return context.getPackageName() + ".notify.WATCHDOG";
+  }
 
   /** What a firing alarm does. */
   public enum Decision {
@@ -42,7 +46,7 @@ public final class Watchdog extends BroadcastReceiver {
 
   @Override
   public void onReceive(Context context, Intent intent) {
-    if (intent == null || !ACTION.equals(intent.getAction())) return;
+    if (intent == null || !action(context).equals(intent.getAction())) return;
     Vault vault = new Vault(context);
     boolean enabled = vault.loadSettings().enabled;
     boolean hasServers = !vault.loadProfiles().isEmpty();
@@ -53,7 +57,7 @@ public final class Watchdog extends BroadcastReceiver {
       return;
     }
     schedule(context);
-    if (d == Decision.RESTART && !WatchService.start(context, WatchService.ACTION_WATCHDOG)) {
+    if (d == Decision.RESTART && !WatchService.start(context, WatchService.WATCHDOG_START)) {
       new Notifier(context).postNotWatching();
     }
   }
@@ -75,7 +79,7 @@ public final class Watchdog extends BroadcastReceiver {
   }
 
   private static PendingIntent pending(Context context) {
-    Intent i = new Intent(context, Watchdog.class).setAction(ACTION);
+    Intent i = new Intent(context, Watchdog.class).setAction(action(context));
     return PendingIntent.getBroadcast(context, REQUEST, i, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
   }
 }

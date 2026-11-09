@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.11 (preview)
+
+- **Enhance prompt.** The sparkle button in the prompt box turns a rough or dictated message into a clear prompt: **Polish** fixes grammar, spelling, punctuation and speech-to-text slips while keeping every technical detail, and **Rewrite** turns it into a detailed, well-structured prompt for the agent. The result replaces the text in the box, with **Undo** until you edit or send, and a notice instead of an overwrite if you changed the prompt while it ran. It is one stateless model call (OpenCode 2.2 or newer): only the prompt text is sent, never files, images or session history, and it never changes the session's agent or model. Pick the model for it in the button's menu; by default the server's default model is used.
+- **Pair Mobile Device is clearer.** The address picker now says these are the OpenCode server's addresses, never the phone's; it labels Wi-Fi/LAN, Tailscale, public and container addresses and puts the one this window uses first. The QR panel shows the address, the three steps and a "Phone can't connect?" hint. A new guide, [Connect the Android app](https://github.com/sr-web-studio/opencode-vscode/blob/main/docs/mobile-setup.md), covers the server setup end to end (listen on `0.0.0.0`, port, password, firewall, Tailscale).
+- **A worker keeps streaming after it moves to its own folder.** A worker that moves its session into a worktree (or any other folder) went on working, but its tab, its row in the conversation and its notifications stopped updating until the tab was reopened. Live events now follow the session, not the folder it runs in.
+- **The transcript no longer gives two turns the same list key.** After a compaction dropped earlier turns from the view, a new turn could reuse the key of the one still shown, which froze the conversation until it was reopened.
+
 ## 0.3.10 (preview)
 
 - **Pair Mobile Device:** **OpenCode: Pair Mobile Device…** shows a QR code (LAN or Tailscale address, one-time code valid for 5 minutes) that the Android app scans to connect. It never exposes the server to the internet.

@@ -224,3 +224,28 @@ describe("tool lines", () => {
     expect(summarizeTool(mcp, cwd).label).toBe("fal · list models")
   })
 })
+
+describe("live turn ids stay unique", () => {
+  const step = (id: string, created: number) => ({ type: "session.step.started", created, data: { sessionID: "s", assistantMessageID: id, started: created } }) as any
+  const end = (created: number) => ({ type: "session.execution.succeeded", created, data: { sessionID: "s" } }) as any
+
+  test("a turn after a compaction trim does not reuse an id (a keyed list needs unique keys)", () => {
+    let v = emptyView()
+    v = applyEvent(v, step("msg_1", 1))
+    v = applyEvent(v, end(2))
+    v = applyEvent(v, step("msg_2", 3))
+    v = applyEvent(v, { type: "session.compaction.started", created: 4, data: { reason: "auto" } } as any)
+    v = applyEvent(v, { type: "session.compaction.ended", created: 5, data: { text: "summary" } } as any)
+    // The owner drops the turns the summary replaced (as `SessionFeed.trim` does after a live compaction).
+    v = { ...v, turns: v.turns.slice(v.turns.length - 1) }
+    v = applyEvent(v, end(6))
+    v = applyEvent(v, step("msg_3", 7))
+    const ids = v.turns.map((t) => t.id)
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+
+  test("a live turn has the same id as the history view of it (a reload keeps the key)", () => {
+    const v = applyEvent(applyEvent(emptyView(), step("msg_1", 1)), end(2))
+    expect(v.turns[0]!.id).toBe("turn:msg_1")
+  })
+})

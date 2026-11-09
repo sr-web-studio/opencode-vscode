@@ -1,5 +1,6 @@
 import type { FormInfo, PermissionRequest, SessionInfo, SlimModel, SlimProvider } from "./api"
 import type { ViewTarget } from "./draft"
+import type { EnhanceMode } from "./enhance"
 import type { ModelSelection } from "./models"
 import type { PromptFile } from "./attachments"
 import type { CommandSummary, SkillSummary } from "./commands"
@@ -44,6 +45,21 @@ export type Features = { revert: boolean; rename: boolean }
 
 /** Text to put back into the prompt box (after a revert). `tick` changes with every request. */
 export type PromptRestore = { tick: number; text: string }
+
+/**
+ * The last or running "Enhance prompt" call. `source` is the text the request was made from: the prompt box only
+ * replaces its text when that is still what it shows. `tick` changes with every request.
+ */
+export type EnhanceState = {
+  tick: number
+  status: "running" | "done" | "error"
+  mode: EnhanceMode
+  source: string
+  /** The enhanced prompt (`done`). */
+  text?: string
+  /** A short line for the user (`error`). Never the prompt text. */
+  error?: string
+}
 
 export type AgentSummary = { id: string; name: string; description?: string }
 
@@ -107,6 +123,14 @@ export type AppState = {
   /** Bumped when the user sends a prompt: the transcript jumps to the end. */
   sentTick: number
   restore?: PromptRestore
+  /** The running or last "Enhance prompt" call. */
+  enhance?: EnhanceState
+  /** The model chosen for enhancement, when it still exists on the server. Absent: the server's default model. */
+  enhanceModel?: ModelSelection
+  /** The server's default model, to label "OpenCode default" in the enhancement menu. */
+  enhanceDefault?: ModelSelection
+  /** A saved enhancement model that this server does not offer any more: the default is used instead. */
+  enhanceModelStale?: boolean
   /**
    * Voice input. `engine`: the chosen speech engine. `ready`: a click on the mic can start dictation (local: this
    * computer has the engine; soniox: the user saved a working key, which itself never reaches the webview).
@@ -157,6 +181,11 @@ export type Action =
   | { type: "queued"; inboxID: string; op: "steer" | "cancel" }
   | { type: "pickAgent"; id: string }
   | { type: "pickModel"; model: ModelSelection }
+  /** One stateless call that rewrites `text` (never the session's model or history). */
+  | { type: "enhance"; mode: EnhanceMode; text: string }
+  | { type: "enhanceCancel" }
+  /** The model enhancement uses; `undefined` goes back to the server's default model. Never touches the session. */
+  | { type: "pickEnhanceModel"; model?: ModelSelection }
   | { type: "permission"; sessionID: string; requestID: string; decision: "once" | "always" | "reject" }
   | { type: "formReply"; answer: Record<string, string | number | boolean | string[]> }
   | { type: "formCancel" }
