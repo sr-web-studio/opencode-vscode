@@ -15,6 +15,7 @@ import { createMcpHost } from "./mcp"
 import { VscodeNotifier } from "./notifier"
 import { pairMobileCommand } from "./pair-mobile"
 import { affectsConnection, affectsView, readConnectionSettings, readNotificationSettings, readTerminalSettings, readViewSettings } from "./settings"
+import { registerSettingsPage } from "./settings-page"
 import { ShellTerminals } from "./terminal"
 import { ImagePreviews } from "./images"
 import { DiffViews } from "./diffs"
@@ -242,6 +243,7 @@ export function activate(context: vscode.ExtensionContext): void {
       },
     },
     vscode.window.registerWebviewViewProvider(VIEW_ID, provider),
+    registerSettingsPage(context),
     vscode.commands.registerCommand("opencode.focus", () => vscode.commands.executeCommand(`${VIEW_ID}.focus`)),
     vscode.commands.registerCommand("opencode.newSession", async () => {
       await vscode.commands.executeCommand(`${VIEW_ID}.focus`)
