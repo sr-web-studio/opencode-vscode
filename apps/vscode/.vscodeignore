@@ -4,6 +4,9 @@
 !dist/webview/main.js
 !dist/webview/main.css
 !dist/webview/main.ttf
+!dist/settings/settings.js
+!dist/settings/settings.css
+!dist/settings/settings.ttf
 !media/**
 !package.json
 !README.md

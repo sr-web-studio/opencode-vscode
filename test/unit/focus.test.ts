@@ -74,8 +74,9 @@ describe("focus call sites", () => {
 
   test("the extension host never reveals or shows the chat view on its own", () => {
     // workers.ts reveals an already open worker tab, and only from a click on a worker row (a webview message), never from state.
+    // settings-page.ts reveals its own editor panel, and only from the explicit `opencode.openSettings` command.
     const bad = walk("apps/vscode/src/extension")
-      .filter((f) => f.endsWith(".ts") && !f.endsWith(join("src", "extension", "workers.ts")))
+      .filter((f) => f.endsWith(".ts") && !f.endsWith(join("src", "extension", "workers.ts")) && !f.endsWith(join("src", "extension", "settings-page.ts")))
       .flatMap((f) =>
         readFileSync(f, "utf8")
           .split("\n")
