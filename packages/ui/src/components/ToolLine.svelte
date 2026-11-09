@@ -166,12 +166,18 @@
         {#if images.length > 0}
           <div class="shots">
             {#each images as img, i (i)}
-              {#if filePath}
-                <button class="shot" onclick={() => store.bridge.openFile(filePath ?? "", fileAt)} title={`Open ${img.name ?? line.target}`}>
-                  <img src={img.uri} alt={img.name ?? "Image read by the agent"} loading="lazy" />
-                </button>
+              {#if img.uri}
+                {#if filePath}
+                  <button class="shot" onclick={() => store.bridge.openFile(filePath ?? "", fileAt)} title={`Open ${img.name ?? line.target}`}>
+                    <img src={img.uri} alt={img.name ?? "Image read by the agent"} loading="lazy" />
+                  </button>
+                {:else}
+                  <span class="shot"><img src={img.uri} alt={img.name ?? "Image read by the agent"} loading="lazy" /></span>
+                {/if}
+              {:else if filePath}
+                <button class="link" onclick={() => store.bridge.openFile(filePath ?? "", fileAt)} title={`Open ${img.name ?? line.target}`}>Open picture</button>
               {:else}
-                <span class="shot"><img src={img.uri} alt={img.name ?? "Image read by the agent"} loading="lazy" /></span>
+                <span class="muted">The picture is too large to show here.</span>
               {/if}
             {/each}
           </div>

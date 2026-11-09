@@ -53,6 +53,13 @@ describe("a read of an image", () => {
     expect(rowAction(tool, "/tmp/opencode/occ-test")).toEqual({ kind: "file", path: PATH })
   })
 
+  test("a too-large picture still opens from the row", () => {
+    const big = `data:image/png;base64,${"A".repeat(MAX_INLINE_IMAGE_CHARS)}`
+    const tool = tools(viewFromMessages(history(readContent(big)) as any))[0]!
+    expect(tool.attachments).toEqual([{ mime: "image/png", name: PATH, tooLarge: true }])
+    expect(rowAction(tool, "/tmp/opencode/occ-test")).toEqual({ kind: "file", path: PATH })
+  })
+
   test("an absolute path outside the project is kept as the tool gave it", () => {
     const outside = "/home/me/shots/screen.png"
     const tool = tools(
@@ -84,7 +91,13 @@ describe("toolAttachments", () => {
 
   test("a picture too big to keep inline is left to the file viewer", () => {
     const big = `data:image/png;base64,${"A".repeat(MAX_INLINE_IMAGE_CHARS)}`
-    expect(toolAttachments([{ type: "file", uri: big, mime: "image/png" }])).toBeUndefined()
+    expect(toolAttachments([{ type: "file", uri: big, mime: "image/png", name: PATH }])).toEqual([{ mime: "image/png", name: PATH, tooLarge: true }])
+  })
+
+  test("a picture at the cap keeps its bytes", () => {
+    const header = "data:image/png;base64,"
+    const at = header + "A".repeat(MAX_INLINE_IMAGE_CHARS - header.length)
+    expect(toolAttachments([{ type: "file", uri: at, mime: "image/png" }])).toEqual([{ mime: "image/png", uri: at }])
   })
 
   test("no content is not a list", () => {

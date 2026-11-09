@@ -11,8 +11,10 @@ export type ToolAttachment = {
   mime: string
   /** The path or name the tool read, for the caption. */
   name?: string
-  /** Inline `data:<mime>;base64,…` URI of the bytes. */
-  uri: string
+  /** Inline `data:<mime>;base64,…` URI of the bytes; absent when the picture was too big to keep in the state. */
+  uri?: string
+  /** The picture is over `MAX_INLINE_IMAGE_CHARS`: the state keeps only this marker, and the UI opens the file. */
+  tooLarge?: true
 }
 
 export type ToolItem = {

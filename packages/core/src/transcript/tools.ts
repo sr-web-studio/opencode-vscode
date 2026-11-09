@@ -44,12 +44,16 @@ const str = (v: unknown): string => (typeof v === "string" ? v : "")
 const num = (v: unknown): number | undefined => (typeof v === "number" ? v : undefined)
 const isHttp = (s: string) => /^https?:\/\/\S+$/i.test(s)
 
-/** About 3 MB of base64: a bigger picture is left to the file viewer instead of being kept in every snapshot. */
-export const MAX_INLINE_IMAGE_CHARS = 3_000_000
+/**
+ * About 200 000 characters of base64 (~150 KB): the extension re-posts the whole state to the webview on every
+ * controller emit, so a bigger picture is left to the file viewer instead of riding in every snapshot.
+ */
+export const MAX_INLINE_IMAGE_CHARS = 200_000
 
 /**
  * Image files of a tool result. OpenCode V2's `read` returns a picture as a `file` content part with a `data:` URI
- * (the text part only says "Image read successfully"), so this is the only copy the transcript gets.
+ * (the text part only says "Image read successfully"), so this is the only copy the transcript gets. A picture over
+ * the inline cap keeps a marker without its bytes, and the details open the file instead.
  */
 export function toolAttachments(content: unknown): ToolAttachment[] | undefined {
   if (!Array.isArray(content)) return undefined
@@ -59,8 +63,10 @@ export function toolAttachments(content: unknown): ToolAttachment[] | undefined 
     const part = raw as { type?: unknown; uri?: unknown; mime?: unknown; name?: unknown }
     if (part.type !== "file" || typeof part.uri !== "string" || !part.uri.startsWith("data:")) continue
     const mime = typeof part.mime === "string" ? part.mime : /^data:([^;,]+)/i.exec(part.uri)?.[1]
-    if (!safeImageMime(mime) || part.uri.length > MAX_INLINE_IMAGE_CHARS) continue
-    out.push({ mime, uri: part.uri, name: typeof part.name === "string" && part.name ? part.name : undefined })
+    if (!safeImageMime(mime)) continue
+    const name = typeof part.name === "string" && part.name ? part.name : undefined
+    const base = name ? { mime, name } : { mime }
+    out.push(part.uri.length > MAX_INLINE_IMAGE_CHARS ? { ...base, tooLarge: true } : { ...base, uri: part.uri })
   }
   return out.length > 0 ? out : undefined
 }
