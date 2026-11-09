@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { Workspace, type ProjectInfo } from "../../apps/mobile/src/lib/workspace"
-import { canPop, directoriesInUse, pop, popKey, push, stackForSession, top, type Entry } from "../../apps/mobile/src/lib/nav"
+import { canPop, directoriesInUse, pop, popKey, push, stackForSession, stackForWorker, top, type Entry } from "../../apps/mobile/src/lib/nav"
 
 class FakeController {
   attached = 0
@@ -117,5 +117,19 @@ describe("screen stack", () => {
     expect(names(pop(pop(s)))).toEqual(["servers", "projects"])
     expect(top(s)).toEqual({ kind: "chat", directory: "/a", sessionID: undefined })
     expect(top(stackForSession("/a", keys(), "ses_1"))).toEqual({ kind: "chat", directory: "/a", sessionID: "ses_1" })
+  })
+
+  test("a worker deep link ends at the read-only worker screen, never a chat", () => {
+    const worker = stackForWorker("/a", keys(), "ses_w")
+    expect(names(worker)).toEqual(["servers", "projects", "sessions", "worker"])
+    expect(top(worker)).toEqual({ kind: "worker", directory: "/a", sessionID: "ses_w" })
+  })
+
+  test("a worker with a known parent puts the parent's chat under it", () => {
+    const worker = stackForWorker("/a/worktree", keys(), "ses_w", { directory: "/a", sessionID: "ses_p" })
+    expect(names(worker)).toEqual(["servers", "projects", "sessions", "chat", "worker"])
+    expect(worker[2]?.screen).toEqual({ kind: "sessions", directory: "/a" })
+    expect(worker[3]?.screen).toEqual({ kind: "chat", directory: "/a", sessionID: "ses_p" })
+    expect(top(worker)).toEqual({ kind: "worker", directory: "/a/worktree", sessionID: "ses_w" })
   })
 })

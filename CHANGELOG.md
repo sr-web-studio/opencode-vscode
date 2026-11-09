@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.13 (preview)
+
+- **Project names from OpenCode.** The folder dropdown shows the name a project has in OpenCode, and **OpenCode: Rename Project…** (also in the dropdown and on the Settings page) renames it; a rename in the browser UI or on the phone shows up live. Only the display name on the server changes, never the folder or the OpenCode config.
+- **Android app: project names, and renaming from the phone.** The Projects screen shows the name OpenCode has for each folder's own project (not an older record's name), and a pencil on a project row or in the session list header renames it. A rename in the browser UI or in VS Code updates the phone live while a project is open; the Projects list reloads when you come back to it.
+- **Android app: a worker's question can be answered from its notification.** The worker screen now shows the worker's own pending question and permission, so tapping a worker's question notice leads to a screen where you can answer it; the notice names the parent session. The VS Code worker tab stays transcript-only.
+- **Android app: worker sessions are read-only everywhere.** A notification tap, a deep link or any other route to a child session now opens the read-only worker screen (with the parent's chat under it), never a writable chat; the prompt box can no longer send to a worker.
+- **Android app: worker notifications are off by default.** A worker finishing or failing no longer notifies unless **Workers** is switched on in Settings (existing installs are migrated once). A worker's permission request or question is still announced, because it blocks the parent turn; tapping it opens the worker screen.
+
 ## 0.3.12 (preview)
 
 - **Polish also fixes sentence structure.** Enhance prompt → Polish now splits run-on sentences, reorders clumsy phrasing and joins fragments, besides grammar, spelling and dictation errors, while keeping the order of your ideas.

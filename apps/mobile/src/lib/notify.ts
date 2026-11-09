@@ -14,27 +14,36 @@ export type NotifySettings = {
   workers: boolean
 }
 
-export const DEFAULT_NOTIFY: NotifySettings = { enabled: true, permission: true, question: true, finished: true, failed: true, workers: true }
+/**
+ * The saved shape version. v1 (no `version` field) saved the old default `workers: true`; a file without a version is
+ * therefore read as "workers off", once. The next save writes {@link NOTIFY_VERSION}.
+ */
+export const NOTIFY_VERSION = 2
+
+/** Everything is on by default except worker notifications (a worker ending is background noise on a phone). */
+export const DEFAULT_NOTIFY: NotifySettings = { enabled: true, permission: true, question: true, finished: true, failed: true, workers: false }
 
 export const NOTIFY_KINDS: ReadonlyArray<{ key: Exclude<keyof NotifySettings, "enabled">; title: string; detail: string }> = [
   { key: "permission", title: "Needs permission", detail: "A session asks to run something." },
   { key: "question", title: "Has a question", detail: "A session waits for your answer." },
   { key: "finished", title: "Turn finished", detail: "A session finished what you asked." },
   { key: "failed", title: "Turn failed", detail: "A session stopped with an error." },
-  { key: "workers", title: "Workers", detail: "A worker (child session) finished or failed." },
+  { key: "workers", title: "Workers", detail: "Also notify when a worker (child session) finishes or fails. Off by default." },
 ]
 
-/** Read what was saved; anything missing or of the wrong type keeps its default (everything is on). */
+/** Read what was saved; anything missing or of the wrong type keeps its default. A v1 file keeps its other switches. */
 export function parseNotifySettings(raw: unknown): NotifySettings {
   const o = typeof raw === "object" && raw !== null ? (raw as Record<string, unknown>) : {}
   const pick = (k: keyof NotifySettings) => (typeof o[k] === "boolean" ? (o[k] as boolean) : DEFAULT_NOTIFY[k])
+  // v1 saved `workers: true` because that was the default then; it cannot be told apart from a deliberate choice.
+  const workersSaved = typeof o.version === "number" && o.version >= NOTIFY_VERSION
   return {
     enabled: pick("enabled"),
     permission: pick("permission"),
     question: pick("question"),
     finished: pick("finished"),
     failed: pick("failed"),
-    workers: pick("workers"),
+    workers: workersSaved ? pick("workers") : false,
   }
 }
 

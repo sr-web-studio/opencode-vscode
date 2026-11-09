@@ -21,7 +21,7 @@
   "bugs": {
     "url": "https://github.com/sr-web-studio/opencode-vscode/issues"
   },
-  "version": "0.3.12",
+  "version": "0.3.13",
   "publisher": "sr-web-studio",
   "license": "MIT",
   "repository": {
@@ -97,6 +97,11 @@
       {
         "command": "opencode.openProjectConfig",
         "title": "Open Project Config",
+        "category": "OpenCode"
+      },
+      {
+        "command": "opencode.renameProject",
+        "title": "Rename Project…",
         "category": "OpenCode"
       },
       {

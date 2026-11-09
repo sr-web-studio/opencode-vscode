@@ -1,6 +1,6 @@
 <script lang="ts">
   import { tick } from "svelte"
-  import type { AppState } from "@occ/core/protocol"
+  import type { AppState, FolderInfo } from "@occ/core/protocol"
   import { useStore } from "../context"
   import { focusGuarded } from "../focus"
   import Codicon from "./Codicon.svelte"
@@ -46,6 +46,15 @@
   async function pick(directory: string) {
     await closeList()
     if (directory !== active?.directory) store.dispatch({ type: "switchFolder", directory })
+  }
+
+  /** The name OpenCode knows for the project, else the workspace folder's own name. */
+  const label = (folder: FolderInfo | undefined) => folder?.projectName ?? folder?.name ?? "Folder"
+
+  /** The pencil: the host asks for the new name and saves it on the server. */
+  function rename(folder: FolderInfo) {
+    void closeList(false)
+    store.bridge.renameProject?.(folder.directory)
   }
 
   // The trigger opens on Enter/Space (its native click) and ArrowDown; Escape closes it.
@@ -104,10 +113,10 @@
       aria-haspopup="listbox"
       aria-expanded={open}
       aria-controls={open ? LIST_ID : undefined}
-      title={active?.directory ?? "Switch workspace folder"}
+      title={active ? (active.projectName ? `${active.projectName} — ${active.name} (${active.directory})` : active.directory) : "Switch workspace folder"}
     >
       <Codicon name="folder" />
-      <span class="name">{active?.name ?? "Folder"}</span>
+      <span class="name">{label(active)}</span>
       <span class="muted"><Codicon name="chevron-down" /></span>
     </button>
 
@@ -137,9 +146,23 @@
               onmousemove={() => (index = i)}
             >
               <span class="dot" class:run={folder.busy} class:wait={folder.attention} title={folder.attention ? "Waiting for you" : folder.busy ? "Running" : ""}></span>
-              <span class="t">{folder.name}</span>
+              <span class="t" title={folder.projectName ? `${folder.projectName} (${folder.name})` : folder.name}>{label(folder)}</span>
               {#if folder.active}<span class="check"><Codicon name="check" /></span>{/if}
-              <span class="path muted" title={folder.directory}>{folder.displayPath}</span>
+              <span class="path muted" title={folder.projectName ? `${folder.name} — ${folder.directory}` : folder.directory}>{folder.displayPath}</span>
+              {#if store.bridge.renameProject}
+                <button
+                  class="rename"
+                  title="Rename project…"
+                  aria-label={`Rename the OpenCode project of ${label(folder)}`}
+                  onclick={(e) => {
+                    e.stopPropagation()
+                    rename(folder)
+                  }}
+                  onkeydown={(e) => e.stopPropagation()}
+                >
+                  <Codicon name="edit" />
+                </button>
+              {/if}
             </div>
           {/each}
         </div>
@@ -239,5 +262,16 @@
     color: var(--oc-accent);
     display: inline-flex;
     flex: none;
+  }
+  .rename {
+    display: inline-flex;
+    flex: none;
+    padding: 0.15em;
+    border-radius: 4px;
+    color: var(--oc-muted);
+  }
+  .rename:hover {
+    color: var(--oc-fg);
+    background: var(--oc-hover);
   }
 </style>

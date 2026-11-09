@@ -189,6 +189,10 @@ public final class NoticeEngine {
   private boolean attention(ServerRef server, String fallbackDir, String sessionID, Kind kind, String requestID, Detail detail) throws Exception {
     if (sessionID.isEmpty()) return false;
     if (!deps.settings().allows(kind)) return false;
+    // A worker's permission or question blocks its parent, so it is announced like any attention request, whatever the
+    // worker switch says (the VS Code engine gates attention by the permission/question switches only). Tapping it
+    // opens the worker screen: the phone shows and answers the worker's own pending permission or question there (the
+    // parent's chat does not show a child's form, and the VS Code worker tab stays transcript-only).
     if (!requestID.isEmpty() && !markSeen("req|" + server.id + "|" + requestID)) {
       log("skip " + kind + " (" + sessionID + "): request already announced");
       return false;
@@ -223,7 +227,13 @@ public final class NoticeEngine {
     // The same event twice (a reconnect that replays): the first one stands.
     if (!evID.isEmpty() && !markSeen("evt|" + server.id + "|" + evID)) return;
     SessionMeta meta = lookup(server, sessionID);
-    boolean worker = meta != null && meta.parentID != null;
+    if (meta == null) {
+      // The event carries only the session id. Without the session's facts a worker would be announced as a root
+      // "finished"; stay quiet until a later event (or the cache) can tell what it is.
+      log("skip turn end (" + sessionID + "): session lookup failed, cannot tell a worker from a root");
+      return;
+    }
+    boolean worker = meta.parentID != null;
     Kind kind = worker ? Kind.WORKER : failed ? Kind.FAILED : Kind.FINISHED;
     if (!deps.settings().allows(kind)) {
       log("skip " + kind + " (" + sessionID + "): switched off");

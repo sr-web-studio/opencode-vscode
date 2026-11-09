@@ -29,7 +29,7 @@
       {:else if s.kind === "server-form"}<ServerFormScreen key={entry.key} profileID={s.profileID} />
       {:else if s.kind === "projects"}<ProjectsScreen />
       {:else if s.kind === "sessions"}<SessionsScreen directory={s.directory} />
-      {:else if s.kind === "chat"}<ChatScreen directory={s.directory} sessionID={s.sessionID} draft={s.draft} />
+      {:else if s.kind === "chat"}<ChatScreen screenKey={entry.key} directory={s.directory} sessionID={s.sessionID} draft={s.draft} />
       {:else if s.kind === "file"}<FileScreen directory={s.directory} path={s.path} line={s.line} />
       {:else if s.kind === "diff"}<DiffScreen file={s.file} patches={s.patches} />
       {:else if s.kind === "changes"}<ChangesScreen directory={s.directory} title={s.title} files={s.files} />
