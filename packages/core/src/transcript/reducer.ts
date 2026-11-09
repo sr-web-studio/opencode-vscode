@@ -4,6 +4,7 @@ import { attachmentSource } from "../images"
 import { settledTurn } from "./turn"
 import { applyRevertEvent } from "./revert"
 import { toolErrorText } from "./tool-error"
+import { toolAttachments } from "./tools"
 import { emptyView, type CompactionView, type FileChip, type Outcome, type QueuedMessage, type SessionView, type StepItem, type StepView, type ToolItem, type TurnView } from "./types"
 
 /* ------------------------------------------------------------------ helpers */
@@ -71,6 +72,7 @@ function toolFromHistory(c: any): ToolItem {
     inputText: typeof st.input === "string" ? st.input : undefined,
     metadata: record(st.metadata),
     output: contentText(st.content),
+    attachments: toolAttachments(st.content),
     error: status === "error" ? toolErrorText(errorText(st.error)) : undefined,
     created: c.time?.created,
     completed: c.time?.completed,
@@ -406,6 +408,7 @@ export function applyEvent(view: SessionView, ev: EventEnvelope): SessionView {
           status: "completed",
           output: contentText(d.content),
           metadata: { ...x.metadata, ...record(d.metadata) },
+          attachments: toolAttachments(d.content) ?? x.attachments,
           completed: t,
         })),
       )
@@ -417,6 +420,7 @@ export function applyEvent(view: SessionView, ev: EventEnvelope): SessionView {
           error: toolErrorText(errorText(d.error)) ?? "Failed",
           output: d.content ? contentText(d.content) : x.output,
           metadata: { ...x.metadata, ...record(d.metadata) },
+          attachments: toolAttachments(d.content) ?? x.attachments,
           completed: t,
         })),
       )

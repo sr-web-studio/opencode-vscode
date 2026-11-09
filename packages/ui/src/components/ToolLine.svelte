@@ -59,6 +59,10 @@
   const openDiff = (f: { file?: string }) => store.bridge.openDiff(f.file ?? "", [patchOf(f)])
 
   const action = $derived(rowAction(tool, cwd))
+  /** Images the tool returned with its result (a `read` of a picture), shown in the details. */
+  const images = $derived(tool.attachments ?? [])
+  const filePath = $derived(action.kind === "file" ? action.path : undefined)
+  const fileAt = $derived(action.kind === "file" ? action.line : undefined)
   // A worker row opens its tab only once the child session is known; before that a click shows the details.
   const opensWorker = $derived(action.kind === "worker" && !!childID)
   const hasTarget = $derived(action.kind === "file" || action.kind === "url")
@@ -159,6 +163,19 @@
         {/each}
       {:else if tool.name === "read"}
         <div class="muted">{range}</div>
+        {#if images.length > 0}
+          <div class="shots">
+            {#each images as img, i (i)}
+              {#if filePath}
+                <button class="shot" onclick={() => store.bridge.openFile(filePath ?? "", fileAt)} title={`Open ${img.name ?? line.target}`}>
+                  <img src={img.uri} alt={img.name ?? "Image read by the agent"} loading="lazy" />
+                </button>
+              {:else}
+                <span class="shot"><img src={img.uri} alt={img.name ?? "Image read by the agent"} loading="lazy" /></span>
+              {/if}
+            {/each}
+          </div>
+        {/if}
       {:else if isCode}
         {#if codeText}<pre class="out mono">{headLines(codeText, 24)}</pre>{/if}
         {#if tool.output}<pre class="out mono"><span class="muted">Output</span>{"\n"}{headLines(executeOutput(tool), 14)}</pre>{/if}
@@ -343,6 +360,32 @@
     border-radius: 4px;
     max-height: 16em;
     overflow: auto;
+  }
+  /* Pictures a tool returned (a read of an image): a thumbnail that opens the file viewer. */
+  .shots {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4em;
+    margin-top: 0.3em;
+  }
+  .shot {
+    display: flex;
+    padding: 0;
+    border: 1px solid var(--oc-hairline);
+    border-radius: 4px;
+    overflow: hidden;
+    background: var(--oc-code-bg);
+  }
+  .shot:hover {
+    border-color: var(--oc-accent);
+  }
+  .shot img {
+    display: block;
+    max-width: 100%;
+    max-height: 180px;
+    width: auto;
+    height: auto;
+    object-fit: contain;
   }
   .right {
     margin-left: 0.8em;

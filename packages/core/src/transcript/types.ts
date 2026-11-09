@@ -2,6 +2,19 @@
 
 export type ToolStatus = "streaming" | "running" | "completed" | "error"
 
+/**
+ * A file the tool returned with its result. `read` on an image sends the picture itself as a `data:` URI, so the
+ * transcript can show it without asking the server for the file again (which may be outside the project).
+ */
+export type ToolAttachment = {
+  /** Well-formed `image/*` type. */
+  mime: string
+  /** The path or name the tool read, for the caption. */
+  name?: string
+  /** Inline `data:<mime>;base64,…` URI of the bytes. */
+  uri: string
+}
+
 export type ToolItem = {
   kind: "tool"
   id: string
@@ -11,6 +24,8 @@ export type ToolItem = {
   inputText?: string
   metadata: Record<string, unknown>
   output: string
+  /** Image files of the tool result (V2 sends them as `file` content parts). */
+  attachments?: ToolAttachment[]
   error?: string
   created?: number
   completed?: number
