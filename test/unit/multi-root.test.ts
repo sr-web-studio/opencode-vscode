@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { Controller } from "@occ/core/controller"
 import { FolderRegistry, folderStorageKey, type FolderController, type FolderEntry } from "@occ/core/folders"
 import { NotificationEngine } from "@occ/core/notifications/engine"
 import { defaultNotificationSettings, type Notice, type Notifier } from "@occ/core/notifications/types"
@@ -8,7 +9,10 @@ type Entry = FolderEntry & { primary: boolean }
 
 class FakeController implements FolderController {
   readonly directory: string
+  readonly folderPath: string
   readonly primary: boolean
+  folderName: string
+  displayPath: string
   attached = 0
   detached = 0
   connections: ConnectionState[] = []
@@ -24,6 +28,9 @@ class FakeController implements FolderController {
 
   constructor(entry: Entry) {
     this.directory = entry.directory
+    this.folderPath = entry.directory
+    this.folderName = entry.folderName
+    this.displayPath = entry.displayPath
     this.primary = entry.primary
   }
 
@@ -33,7 +40,6 @@ class FakeController implements FolderController {
   detach(): void {
     this.detached++
   }
-  reconnect(): void {}
   setConnection(connection: ConnectionState): void {
     this.connection = connection
     this.connections.push(connection)
@@ -44,11 +50,21 @@ class FakeController implements FolderController {
   setVoice(voice: AppState["voice"]): void {
     this.voices.push(voice)
   }
+  setFolderInfo(folderName: string, displayPath: string): void {
+    this.folderName = folderName
+    this.displayPath = displayPath
+  }
   snapshot(): AppState {
     return { connection: this.connection, running: this.running, waiting: this.waiting } as unknown as AppState
   }
   listsSession(id: string): boolean {
     return this.sessions.has(id)
+  }
+  isBusy(): boolean {
+    return this.running.some((id) => this.listsSession(id))
+  }
+  isWaiting(): boolean {
+    return this.waiting.some((id) => this.listsSession(id))
   }
   async open(id: string): Promise<void> {
     this.opened.push(id)
@@ -184,12 +200,23 @@ describe("folder registry: one server connection for every folder", () => {
     folders.sync([entry("/a"), entry("/b")])
     const a = folders.controllers()[0]!
     const b = folders.controllers()[1]!
+    a.sessions.add("ses_a")
     a.running = ["ses_a"]
+    b.sessions.add("ses_b")
     b.waiting = ["ses_b"]
     expect(folders.foldersState().map((f) => ({ directory: f.directory, name: f.name, active: f.active, busy: f.busy, attention: f.attention }))).toEqual([
       { directory: "/a", name: "a", active: true, busy: true, attention: false },
       { directory: "/b", name: "b", active: false, busy: false, attention: true },
     ])
+  })
+
+  test("a running or waiting session the folder does not list does not light its dot", () => {
+    const { folders } = registry()
+    folders.sync([entry("/a"), entry("/b")])
+    const a = folders.controllers()[0]!
+    a.running = ["ses_elsewhere"]
+    a.waiting = ["ses_elsewhere"]
+    expect(folders.foldersState()[0]).toMatchObject({ busy: false, attention: false })
   })
 })
 
@@ -242,6 +269,120 @@ describe("folder storage keys", () => {
     expect(folderStorageKey("lastSession", "/b", false)).toBe("lastSession:/b")
     expect(folderStorageKey("lastSession", "", true)).toBe("lastSession")
     expect(folderStorageKey("lastSession", "/a", false)).not.toBe(folderStorageKey("lastSession", "/b", false))
+  })
+})
+
+describe("folder registry: change notifications and disposal", () => {
+  test("onChange fires when a folder is added, removed or renamed, but not on a plain switch", () => {
+    const { folders } = registry()
+    folders.sync([entry("/a")])
+    let changes = 0
+    const off = folders.onChange(() => changes++)
+    folders.sync([entry("/a"), entry("/b")])
+    expect(changes).toBe(1)
+    folders.sync([entry("/a"), { directory: "/b", folderName: "renamed", displayPath: "/b" }])
+    expect(changes).toBe(2)
+    folders.sync([entry("/a")])
+    expect(changes).toBe(3)
+    folders.setActive("/a")
+    expect(changes).toBe(3)
+    off()
+    folders.sync([entry("/a"), entry("/c")])
+    expect(changes).toBe(3)
+  })
+
+  test("renaming a folder in place updates its controller's labels", () => {
+    const { folders } = registry()
+    folders.sync([entry("/a")])
+    const a = folders.active
+    folders.sync([{ directory: "/a", folderName: "renamed", displayPath: "~/renamed" }])
+    expect(folders.active).toBe(a)
+    expect(a.folderName).toBe("renamed")
+    expect(a.displayPath).toBe("~/renamed")
+    expect(folders.foldersState()[0]).toMatchObject({ name: "renamed", displayPath: "~/renamed" })
+  })
+
+  test("re-adding a removed folder makes a fresh controller, attached when the window is connected", () => {
+    const { folders, made } = registry()
+    folders.sync([entry("/a"), entry("/b")])
+    folders.attach({} as never)
+    folders.sync([entry("/a")])
+    expect(made).toHaveLength(2)
+    folders.sync([entry("/a"), entry("/b")])
+    expect(made).toHaveLength(3)
+    expect(made[2]!.attached).toBe(1)
+  })
+
+  test("dispose detaches every controller and clears the listeners", () => {
+    const { folders, made } = registry()
+    folders.sync([entry("/a"), entry("/b")])
+    let active = 0
+    let changes = 0
+    folders.onActive(() => active++)
+    folders.onChange(() => changes++)
+    folders.dispose()
+    expect(made.map((c) => c.detached)).toEqual([1, 1])
+    expect(folders.directories()).toEqual([])
+    expect(folders.controllers()).toEqual([])
+    expect(() => folders.active).toThrow()
+    expect(active).toBe(0)
+    expect(changes).toBe(0)
+  })
+})
+
+describe("folder registry: paths as the workspace and the server spell them", () => {
+  test("controllerAt and setActive match a Windows path with another drive-letter case", () => {
+    const { folders } = registry()
+    folders.sync([entry("d:\\Work\\app"), entry("/other")])
+    const first = folders.controllers()[0]!
+    expect(folders.controllerAt("D:/Work/app")).toBe(first)
+    expect(folders.controllerAt("D:\\Work\\app\\")).toBe(first)
+    folders.setActive("/other")
+    expect(folders.setActive("D:\\Work\\APP")).toBe(true)
+    expect(folders.active).toBe(first)
+  })
+
+  test("a notice directory with a different spelling finds its folder", () => {
+    const { folders } = registry()
+    folders.sync([entry("d:\\Work\\app"), entry("/other")])
+    const first = folders.controllers()[0]!
+    expect(folders.activateForSession("ses_worker", "D:/Work/app")).toBe(first)
+    expect(folders.active).toBe(first)
+  })
+
+  test("nested roots resolve to the deepest folder", () => {
+    const { folders } = registry()
+    folders.sync([entry("/repo"), entry("/repo/packages/app")])
+    const root = folders.controllers()[0]!
+    const app = folders.controllers()[1]!
+    root.sessions.add("ses_shared")
+    app.sessions.add("ses_shared")
+    expect(folders.forSession("ses_shared")).toBe(app)
+    expect(folders.controllerAt("/repo/")).toBe(root)
+    expect(folders.controllerAt("/repo/packages/app")).toBe(app)
+  })
+})
+
+describe("controller busy and attention use only its own sessions", () => {
+  const make = () => new Controller({ directory: "/a", folderName: "a", displayPath: "/a" })
+  const lists = (ctl: Controller, ...ids: string[]) => {
+    ;(ctl as unknown as { sessions: Array<{ id: string }> }).sessions = ids.map((id) => ({ id }))
+  }
+
+  test("a running session this folder does not list is not busy", () => {
+    const ctl = make()
+    ;(ctl as unknown as { running: Set<string> }).running = new Set(["ses_b"])
+    expect(ctl.isBusy()).toBe(false)
+    lists(ctl, "ses_b")
+    expect(ctl.isBusy()).toBe(true)
+  })
+
+  test("a permission for a session this folder does not list is not attention", () => {
+    const ctl = make()
+    ;(ctl as unknown as { permissions: Map<string, unknown[]> }).permissions.set("ses_b", [{}])
+    expect(ctl.isWaiting()).toBe(false)
+    lists(ctl, "ses_b")
+    expect(ctl.isWaiting()).toBe(true)
   })
 })
 

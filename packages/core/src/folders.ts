@@ -1,4 +1,5 @@
 import type { OpenCodeClient } from "./api"
+import { sameDirectory } from "./paths"
 import { defaultViewSettings, type Action, type AppState, type ConnectionState, type FolderInfo, type ViewSettings } from "./protocol"
 
 /**
@@ -6,16 +7,23 @@ import { defaultViewSettings, type Action, type AppState, type ConnectionState, 
  * tests use a small fake.
  */
 export type FolderController = {
+  /** The server's spelling of the folder, which can differ from the workspace path (e.g. `d:` vs `D:`). */
   readonly directory: string
+  /** The workspace path, stable across server syncs: map keys use this, never `directory`. */
+  readonly folderPath: string
   readonly currentSessionID: string | undefined
   attach(client: OpenCodeClient): void
   detach(): void
-  reconnect(opts?: { quiet?: boolean }): void
   setConnection(connection: ConnectionState): void
   setSettings(settings: ViewSettings): void
   setVoice(voice: AppState["voice"]): void
+  setFolderInfo(folderName: string, displayPath: string): void
   snapshot(): AppState
   listsSession(id: string): boolean
+  /** A session this folder lists is executing (cheap: no snapshot). */
+  isBusy(): boolean
+  /** A session this folder lists waits for the user (cheap: no snapshot). */
+  isWaiting(): boolean
   open(id: string): Promise<void>
   dispatch(action: Action): Promise<void>
 }
@@ -64,6 +72,8 @@ export class FolderRegistry<C extends FolderController> {
   sync(folders: readonly FolderEntry[]): void {
     const list = folders.length ? folders.map(({ directory, folderName, displayPath }) => ({ directory, folderName, displayPath })) : [PLACEHOLDER]
     const wanted = new Map(list.map((entry, index) => [entry.directory, { ...entry, primary: index === 0 }]))
+    const nextEntries = folders.map(({ directory, folderName, displayPath }) => ({ directory, folderName, displayPath }))
+    const entriesChanged = !sameEntries(this.entries, nextEntries)
     let controllersChanged = false
 
     for (const [directory, controller] of [...this.byDirectory]) {
@@ -72,10 +82,15 @@ export class FolderRegistry<C extends FolderController> {
       this.byDirectory.delete(directory)
       controllersChanged = true
     }
-    this.entries = folders.map(({ directory, folderName, displayPath }) => ({ directory, folderName, displayPath }))
+    this.entries = nextEntries
 
     for (const [directory, entry] of wanted) {
-      if (this.byDirectory.has(directory)) continue
+      const existing = this.byDirectory.get(directory)
+      if (existing) {
+        // A rename or a different `~` shortening: same folder, same controller.
+        existing.setFolderInfo(entry.folderName, entry.displayPath)
+        continue
+      }
       const controller = this.opts.make(entry)
       this.byDirectory.set(directory, controller)
       controller.setConnection(this.connection)
@@ -91,7 +106,7 @@ export class FolderRegistry<C extends FolderController> {
     const activeChanged = this.setActiveDirectory(next)
     if (activeChanged && next) this.opts.remember?.set(next)
 
-    if (controllersChanged) for (const listener of this.changeListeners) listener()
+    if (controllersChanged || entriesChanged) for (const listener of this.changeListeners) listener()
     if (activeChanged) for (const listener of this.activeListeners) listener()
   }
 
@@ -119,27 +134,32 @@ export class FolderRegistry<C extends FolderController> {
 
   /** Switch the view to a folder. Returns false for an unknown folder. */
   setActive(directory: string): boolean {
-    if (!this.byDirectory.has(directory)) return false
-    const changed = this.setActiveDirectory(directory)
-    if (changed && directory) this.opts.remember?.set(directory)
+    const key = this.resolve(directory)
+    if (!key) return false
+    const changed = this.setActiveDirectory(key)
+    if (changed && key) this.opts.remember?.set(key)
     if (changed) for (const listener of this.activeListeners) listener()
     return changed
   }
 
   /** The controller of one folder, or undefined when the window no longer shows it. */
   controllerAt(directory: string): C | undefined {
-    return directory ? this.byDirectory.get(directory) : undefined
+    const key = this.resolve(directory)
+    return key ? this.byDirectory.get(key) : undefined
   }
 
   /**
    * The controller that lists a session. Used for notifications and links from another folder: the session's owner,
-   * whatever folder the view shows now. Unknown sessions fall back to the active folder.
+   * whatever folder the view shows now. With nested roots the deepest folder wins. Unknown sessions fall back to the
+   * active folder.
    */
   forSession(id: string): C {
+    let owner: C | undefined
     for (const controller of this.byDirectory.values()) {
-      if (controller.directory && controller.listsSession(id)) return controller
+      if (!controller.folderPath || !controller.listsSession(id)) continue
+      if (!owner || controller.folderPath.length > owner.folderPath.length) owner = controller
     }
-    return this.active
+    return owner ?? this.active
   }
 
   /**
@@ -148,21 +168,21 @@ export class FolderRegistry<C extends FolderController> {
    */
   activateForSession(id: string, directory?: string): C {
     const controller = this.controllerAt(directory ?? "") ?? this.forSession(id)
-    if (controller.directory) this.setActive(controller.directory)
+    if (controller.folderPath) this.setActive(controller.folderPath)
     return controller
   }
 
   /** The folder list for the UI. Empty for a window without folders; the dropdown only appears with two or more. */
   foldersState(): FolderInfo[] {
     return this.entries.map((entry) => {
-      const state = this.byDirectory.get(entry.directory)?.snapshot()
+      const controller = this.byDirectory.get(entry.directory)
       return {
         directory: entry.directory,
         name: entry.folderName,
         displayPath: entry.displayPath,
         active: entry.directory === this.activeDirectory,
-        busy: (state?.running.length ?? 0) > 0,
-        attention: (state?.waiting.length ?? 0) > 0,
+        busy: controller?.isBusy() ?? false,
+        attention: controller?.isWaiting() ?? false,
       }
     })
   }
@@ -229,4 +249,24 @@ export class FolderRegistry<C extends FolderController> {
     this.activeDirectory = directory
     return true
   }
+
+  /**
+   * The stored key for a folder path, matching the server's spelling too (`sameDirectory`). With nested roots the
+   * deepest folder wins, so `…/app/packages/ui` does not resolve to `…/app`.
+   */
+  private resolve(directory: string): string | undefined {
+    if (!directory) return undefined
+    if (this.byDirectory.has(directory)) return directory
+    let best: string | undefined
+    for (const candidate of this.byDirectory.keys()) {
+      if (!candidate || !sameDirectory(candidate, directory)) continue
+      if (!best || candidate.length > best.length) best = candidate
+    }
+    return best
+  }
+}
+
+/** The folder list is unchanged: same paths and the same labels, in the same order. */
+function sameEntries(a: readonly FolderEntry[], b: readonly FolderEntry[]): boolean {
+  return a.length === b.length && a.every((entry, i) => entry.directory === b[i]!.directory && entry.folderName === b[i]!.folderName && entry.displayPath === b[i]!.displayPath)
 }

@@ -218,6 +218,8 @@ export type Action =
 /** Messages from the extension host to the webview. */
 export type ToWebview =
   | { type: "state"; state: AppState }
+  /** A light refresh of the folder dropdown (busy/attention dots) when a folder the view is not showing changes. */
+  | { type: "folders"; folders: FolderInfo[] }
   | { type: "command"; name: "newSession" }
   | { type: "picked"; requestID: string; files: PickedFile[] }
   /** The answer to `imageData`: a `data:` URI, or nothing when the image is gone or unreadable. */
