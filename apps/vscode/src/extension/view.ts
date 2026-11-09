@@ -1,8 +1,9 @@
 import * as vscode from "vscode"
 import type { Controller } from "@occ/core/controller"
 import type { FolderRegistry } from "@occ/core/folders"
-import type { AppState, ToHost, ToWebview } from "@occ/core/protocol"
+import type { AppState, ToHost, ToWebview, WebviewMetrics } from "@occ/core/protocol"
 import type { HostActions, Surface } from "./host"
+import type { MinWidth } from "./min-width"
 import { webviewHtml } from "./html"
 
 export const VIEW_ID = "opencode.chat"
@@ -24,6 +25,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     private readonly extensionUri: vscode.Uri,
     private readonly folders: FolderRegistry<Controller>,
     private readonly host: HostActions,
+    private readonly minWidth: MinWidth,
   ) {
     this.offActive = folders.onActive(() => this.bind())
     this.offChange = folders.onChange(() => this.bind())
@@ -36,17 +38,20 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
 
   resolveWebviewView(view: vscode.WebviewView): void {
     this.view = view
+    this.minWidth.noteVisible(view.visible)
     view.webview.options = { enableScripts: true, localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, "dist", "webview")] }
     view.webview.html = webviewHtml(view.webview, this.extensionUri)
 
     this.bind()
     this.subs.push(
-      view.webview.onDidReceiveMessage((m: ToHost) => void this.onMessage(m)),
+      view.webview.onDidReceiveMessage((m: ToHost | WebviewMetrics) => void this.onMessage(m)),
       view.onDidChangeVisibility(() => {
+        this.minWidth.noteVisible(view.visible)
         // A view that was hidden has no live DOM: resend state when it comes back.
         if (view.visible) void this.folders.active.dispatch({ type: "ready" })
       }),
       view.onDidDispose(() => {
+        this.minWidth.noteVisible(false)
         this.unsubscribe?.()
         this.unsubscribe = undefined
         this.clearOthers()
@@ -95,7 +100,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     this.post({ type: "state", state: list.length > 1 ? { ...state, folders: list } : state })
   }
 
-  private async onMessage(m: ToHost): Promise<void> {
+  private async onMessage(m: ToHost | WebviewMetrics): Promise<void> {
+    if (m.type === "viewMetrics") {
+      this.minWidth.metrics(m)
+      return
+    }
     if (m.type === "action") {
       // The registry owns the folder switch; a Controller knows nothing about the window's other folders.
       if (m.action.type === "switchFolder") this.folders.setActive(m.action.directory)

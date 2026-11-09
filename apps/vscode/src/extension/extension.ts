@@ -10,6 +10,7 @@ import { SetupError, connect } from "./connection"
 import { deleteSessionCommand } from "./delete-session"
 import { openGlobalConfigCommand } from "./global-config"
 import { HostActions } from "./host"
+import { MinWidth } from "./min-width"
 import { createMcpHost } from "./mcp"
 import { VscodeNotifier } from "./notifier"
 import { pairMobileCommand } from "./pair-mobile"
@@ -111,7 +112,8 @@ export function activate(context: vscode.ExtensionContext): void {
   const diffs = new DiffViews((path) => host.resolvePath(path))
   terminals = new ShellTerminals(folders, readTerminalSettings)
   workers = new WorkerPanels(context.extensionUri, folders, () => host)
-  const provider = new ChatViewProvider(context.extensionUri, folders, host)
+  const minWidth = new MinWidth((line) => output.debug(line))
+  const provider = new ChatViewProvider(context.extensionUri, folders, host, minWidth)
 
   /* ---------------------------------------------------------- notifications */
   const lookupSession = async (id: string) => {
@@ -232,6 +234,7 @@ export function activate(context: vscode.ExtensionContext): void {
     workers,
     images,
     diffs,
+    minWidth,
     {
       dispose: () => {
         generation++

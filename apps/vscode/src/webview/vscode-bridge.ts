@@ -1,15 +1,24 @@
 import type { HostBridge } from "@occ/ui/bridge"
-import type { HostRequest, PickedFile, ToHost, ToWebview } from "@occ/core/protocol"
+import type { HostRequest, PickedFile, ToHost, ToWebview, WebviewMetrics } from "@occ/core/protocol"
 
 type VsCodeApi = { postMessage(message: unknown): void; getState(): unknown; setState(state: unknown): void }
 declare function acquireVsCodeApi(): VsCodeApi
+
+/** `acquireVsCodeApi` may be called once per webview, and both the bridge and the metrics reporter need it. */
+let sharedApi: VsCodeApi | undefined
+const vsCodeApi = (): VsCodeApi => (sharedApi ??= acquireVsCodeApi())
+
+/** Post the webview's own size and focus to the host. VS Code only; the Android bridge never sends this. */
+export function postViewMetrics(message: WebviewMetrics): void {
+  vsCodeApi().postMessage(message)
+}
 
 /** `HostBridge` for a VS Code webview: messages go over `postMessage`, storage is the webview state. */
 let pickSeq = 0
 let imageSeq = 0
 
 export function createVsCodeBridge(): HostBridge {
-  const api = acquireVsCodeApi()
+  const api = vsCodeApi()
   const post = (message: ToHost) => api.postMessage(message)
   const host = (request: HostRequest) => post({ type: "host", request })
   const read = (): Record<string, unknown> => (api.getState() as Record<string, unknown> | undefined) ?? {}

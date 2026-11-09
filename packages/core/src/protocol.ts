@@ -257,3 +257,18 @@ export type HostRequest =
 
 /** Messages from the webview to the extension host. */
 export type ToHost = { type: "action"; action: Action } | { type: "host"; request: HostRequest }
+
+/**
+ * The VS Code webview's own size and focus, for the host's best-effort minimum width. Deliberately not part of
+ * `ToHost`: only the VS Code webview sends it and only the VS Code host handles it, so the Android bridge and every
+ * shared component stay exactly as they were.
+ */
+export type WebviewMetrics = {
+  type: "viewMetrics"
+  /** The webview's CSS pixel width. */
+  width: number
+  /** The webview document has focus. */
+  focused: boolean
+  /** `screen.availWidth` in CSS pixels, or 0 when the webview could not read it. */
+  screenWidth: number
+}
