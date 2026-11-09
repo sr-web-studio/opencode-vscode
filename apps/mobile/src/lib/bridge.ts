@@ -14,6 +14,8 @@ export type Surface = {
   dispatch(action: Action): Promise<void>
   /** The session on screen, for image and shell lookups. */
   sessionID(): string | undefined
+  /** True when the id names a worker (child session): the UI then opens it read-only. */
+  isWorker?(id: string): boolean
 }
 
 /** The screens and dialogs of the app. Each member answers one thing the editor used to do. */
@@ -50,6 +52,8 @@ export const MOBILE_CAPABILITIES: HostCapabilities = {
 }
 
 export const VOICE_LATER = "Voice comes in the next version"
+/** The phone never types into a worker: its transcript is read-only, like the VS Code worker tab. */
+export const WORKER_READ_ONLY = "A worker session is read-only. Open its parent to send a prompt."
 
 export function createBridge(surface: Surface, host: MobileHost, store: KeyValueStore, capabilities: HostCapabilities = MOBILE_CAPABILITIES): HostBridge {
   const read = (key: string): unknown => {
@@ -73,7 +77,7 @@ export function createBridge(surface: Surface, host: MobileHost, store: KeyValue
       case "showTerminal":
         return host.showTerminal(req.shellID, req.title, req.sessionID ?? surface.sessionID())
       case "openSession":
-        return void (req.readOnly ? host.openWorker(req.id) : surface.dispatch({ type: "openSession", id: req.id }))
+        return void (req.readOnly || surface.isWorker?.(req.id) ? host.openWorker(req.id) : surface.dispatch({ type: "openSession", id: req.id }))
       case "openExternal":
         return host.openExternal(req.url)
       case "notify":
@@ -97,6 +101,13 @@ export function createBridge(surface: Surface, host: MobileHost, store: KeyValue
     }
   }
 
+  /** Actions of the shared UI. A worker never becomes the writable session and never receives a prompt. */
+  function action(a: Action): void {
+    if (a.type === "openSession" && surface.isWorker?.(a.id)) return host.openWorker(a.id)
+    if (a.type === "send" && surface.isWorker?.(surface.sessionID() ?? "")) return host.notify("warning", WORKER_READ_ONLY)
+    void surface.dispatch(a)
+  }
+
   return {
     openFile: (path, line) => host.openFile(path, line),
     imageData: async (ref) => {
@@ -111,7 +122,7 @@ export function createBridge(surface: Surface, host: MobileHost, store: KeyValue
     openChanges: (files, title) => host.openChanges(files, title),
     showTerminal: (shellID, title) => host.showTerminal(shellID, title, surface.sessionID()),
     openSession: (id, options) => {
-      if (options.readOnly) host.openWorker(id)
+      if (options.readOnly || surface.isWorker?.(id)) host.openWorker(id)
       else void surface.dispatch({ type: "openSession", id })
     },
     pickFiles: () => host.pickFiles().catch(() => []),
@@ -137,7 +148,7 @@ export function createBridge(surface: Surface, host: MobileHost, store: KeyValue
     },
     capabilities,
     postToHost(message: ToHost) {
-      if (message.type === "action") void surface.dispatch(message.action)
+      if (message.type === "action") action(message.action)
       else request(message.request)
     },
     onMessage(handler: (message: ToWebview) => void) {

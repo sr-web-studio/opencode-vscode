@@ -14,7 +14,6 @@ import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
 import org.json.JSONArray;
-import org.json.JSONObject;
 
 /**
  * What the service needs to run without the WebView: the server profiles (with their passwords), the switches and the
@@ -70,12 +69,7 @@ public final class Vault {
   }
 
   public synchronized Settings loadSettings() {
-    try {
-      String raw = prefs.getString(K_SETTINGS, null);
-      return raw == null ? Settings.defaults() : Settings.fromJson(new JSONObject(raw));
-    } catch (Exception e) {
-      return Settings.defaults();
-    }
+    return Settings.load(prefs.getString(K_SETTINGS, null));
   }
 
   public synchronized void saveSeen(String serialized) {

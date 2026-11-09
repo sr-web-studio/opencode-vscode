@@ -1,18 +1,41 @@
 import { describe, expect, test } from "bun:test"
-import { DEFAULT_NOTIFY, NO_STATUS, ago, nativeServers, parseNotifySettings, parseStatus, statusLine, visibleSessionOf } from "../../apps/mobile/src/lib/notify"
+import { DEFAULT_NOTIFY, NOTIFY_KINDS, NOTIFY_VERSION, NO_STATUS, ago, nativeServers, parseNotifySettings, parseStatus, statusLine, visibleSessionOf } from "../../apps/mobile/src/lib/notify"
 import { parseDeepLink, routeDeepLink } from "../../apps/mobile/src/lib/deep-link"
 import type { Profile } from "../../apps/mobile/src/lib/profiles"
 
 const profile = (over: Partial<Profile> = {}): Profile => ({ id: "srv-1", name: "Home server", url: "http://192.168.1.10:4096", password: "pw", serverId: "my-server", ...over })
 
 describe("notify settings", () => {
-  test("everything is on by default", () => {
+  test("everything is on by default except worker notifications", () => {
     expect(parseNotifySettings(undefined)).toEqual(DEFAULT_NOTIFY)
-    expect(Object.values(DEFAULT_NOTIFY).every(Boolean)).toBe(true)
+    expect(DEFAULT_NOTIFY.workers).toBe(false)
+    expect(
+      Object.entries(DEFAULT_NOTIFY)
+        .filter(([k]) => k !== "workers")
+        .every(([, v]) => v === true),
+    ).toBe(true)
+  })
+
+  test("the worker switch says it is off by default", () => {
+    expect(NOTIFY_KINDS.find((k) => k.key === "workers")?.detail).toBe("Also notify when a worker (child session) finishes or fails. Off by default.")
+  })
+
+  test("a v1 file's saved worker default reads as off, once", () => {
+    const v1 = parseNotifySettings({ enabled: false, workers: true, finished: false })
+    expect(v1.workers).toBe(false)
+    expect(v1.enabled).toBe(false)
+    expect(v1.finished).toBe(false)
+    expect(v1.permission).toBe(true)
+  })
+
+  test("a v2 file keeps the worker switch the owner turned back on", () => {
+    expect(parseNotifySettings({ version: NOTIFY_VERSION, workers: true }).workers).toBe(true)
+    expect(parseNotifySettings({ version: NOTIFY_VERSION, workers: false }).workers).toBe(false)
+    expect(parseNotifySettings({ version: NOTIFY_VERSION }).workers).toBe(false)
   })
 
   test("keeps saved booleans and ignores junk", () => {
-    const s = parseNotifySettings({ enabled: false, workers: false, finished: "no", extra: 1 })
+    const s = parseNotifySettings({ version: NOTIFY_VERSION, enabled: false, workers: false, finished: "no", extra: 1 })
     expect(s.enabled).toBe(false)
     expect(s.workers).toBe(false)
     expect(s.finished).toBe(true)
