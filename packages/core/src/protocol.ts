@@ -63,6 +63,24 @@ export type EnhanceState = {
 
 export type AgentSummary = { id: string; name: string; description?: string }
 
+/**
+ * One workspace folder of a multi-root window. Only the VS Code host fills `AppState.folders`, and only when the window
+ * has two or more folders; the Android app never does, so its UI is unchanged.
+ */
+export type FolderInfo = {
+  directory: string
+  /** The folder's name in the workspace (the last path segment, or the name given in a `.code-workspace`). */
+  name: string
+  /** `~`-shortened path for the dropdown. */
+  displayPath: string
+  /** The folder the chat view shows. */
+  active: boolean
+  /** A session of this folder is executing. */
+  busy?: boolean
+  /** A session of this folder waits for the user (a permission or a question). */
+  attention?: boolean
+}
+
 /** Everything the UI renders. Plain data: it crosses postMessage (VS Code) or stays in memory (browser). */
 export type AppState = {
   connection: ConnectionState
@@ -71,6 +89,8 @@ export type AppState = {
   folderName: string
   /** `~`-shortened project path for display. */
   displayPath: string
+  /** The workspace folders of a VS Code multi-root window (two or more). Absent in a single-folder window and in the app. */
+  folders?: FolderInfo[]
   target: ViewTarget
   /** Root sessions of this project, newest first. */
   sessions: SessionInfo[]
@@ -149,6 +169,8 @@ export type AppState = {
 
 export type Action =
   | { type: "ready" }
+  /** Handled by the host, not by a Controller: it binds the view to that folder's controller. */
+  | { type: "switchFolder"; directory: string }
   | { type: "openSession"; id: string }
   | { type: "newDraft"; hasText: boolean }
   /** `skills`: skills chosen with `/skills`, sent with this prompt. */

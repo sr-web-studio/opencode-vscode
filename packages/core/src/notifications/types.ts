@@ -33,8 +33,9 @@ export interface Notifier {
   dismiss(id: string): void | Promise<void>
 }
 
-/** What the host should do when the user picks an action. */
-export type NoticeCommand = { type: "open"; sessionID: string } | { type: "permission.reply"; sessionID: string; requestID: string; decision: "once" | "reject" }
+/** What the host should do when the user picks an action. `directory` is the session's folder, for a multi-root window. */
+export type NoticeCommand =
+  { type: "open"; sessionID: string; directory?: string } | { type: "permission.reply"; sessionID: string; requestID: string; decision: "once" | "reject"; directory?: string }
 
 export type NotificationSettings = {
   enabled: boolean

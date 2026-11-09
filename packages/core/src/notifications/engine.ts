@@ -8,6 +8,11 @@ export const COALESCE_MS = 5_000
 export type EngineDeps = {
   /** This window's project directory (the first workspace folder). */
   directory: string
+  /**
+   * Every workspace folder the window shows (VS Code multi-root). Defaults to `[directory]`. A notice for a session of
+   * any of these folders is shown; `owns` still covers a session whose recorded folder is spelled differently.
+   */
+  directories?: () => readonly string[]
   settings: () => NotificationSettings
   ui: () => UiState
   notifier: Notifier
@@ -126,7 +131,8 @@ export class NotificationEngine {
     // a session this window already lists is ours whatever its folder is called.
     const eventDir = ev.location?.directory
     const dir = eventDir ?? meta?.directory
-    const inProject = withinDirectory(eventDir, this.deps.directory) || withinDirectory(meta?.directory, this.deps.directory) || this.deps.owns?.(sessionID) === true
+    const dirs = this.deps.directories?.() ?? [this.deps.directory]
+    const inProject = dirs.some((folder) => withinDirectory(eventDir, folder) || withinDirectory(meta?.directory, folder)) || this.deps.owns?.(sessionID) === true
     if (!inProject) {
       return this.drop(kind, sessionID, `not this project (event folder ${eventDir ? "differs" : "absent"}, session ${meta ? (meta.directory ? "folder differs" : "has no folder") : "not found"})`)
     }
@@ -187,9 +193,9 @@ export class NotificationEngine {
   resolveAction(notice: Notice, actionID: string | undefined): NoticeCommand | undefined {
     const shown = this.shown.get(notice.id)
     if (shown?.notice === notice) this.shown.delete(notice.id)
-    if (actionID === "open") return { type: "open", sessionID: notice.sessionID }
+    if (actionID === "open") return { type: "open", sessionID: notice.sessionID, directory: notice.directory }
     if ((actionID === "allow" || actionID === "deny") && notice.kind === "permission" && notice.requestID) {
-      return { type: "permission.reply", sessionID: notice.sessionID, requestID: notice.requestID, decision: actionID === "allow" ? "once" : "reject" }
+      return { type: "permission.reply", sessionID: notice.sessionID, requestID: notice.requestID, decision: actionID === "allow" ? "once" : "reject", directory: notice.directory }
     }
     return undefined
   }
