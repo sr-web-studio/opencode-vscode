@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Project names from OpenCode.** The folder dropdown shows the name a project has in OpenCode, and **OpenCode: Rename Project…** (also in the dropdown and on the Settings page) renames it; a rename in the browser UI or on the phone shows up live.
+
 ## 0.3.12 (preview)
 
 - **Polish also fixes sentence structure.** Enhance prompt → Polish now splits run-on sentences, reorders clumsy phrasing and joins fragments, besides grammar, spelling and dictation errors, while keeping the order of your ideas.
