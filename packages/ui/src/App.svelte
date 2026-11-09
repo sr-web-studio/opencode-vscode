@@ -11,6 +11,7 @@
   import { Store } from "./store.svelte"
   import Codicon from "./components/Codicon.svelte"
   import EmptyState from "./components/EmptyState.svelte"
+  import FolderSwitcher from "./components/FolderSwitcher.svelte"
   import PromptBox from "./components/PromptBox.svelte"
   import QuestionPrompt from "./components/QuestionPrompt.svelte"
   import SessionSwitcher from "./components/SessionSwitcher.svelte"
@@ -47,6 +48,13 @@
       if (lastEpoch !== -1) draft = ""
       lastEpoch = epoch
     }
+  })
+  // Switching workspace folder shows another controller, so the old folder's draft text must not follow it.
+  let lastFolder: string | undefined
+  $effect(() => {
+    const directory = app?.folders?.find((f) => f.active)?.directory ?? app?.directory ?? ""
+    if (lastFolder !== undefined && directory !== lastFolder) draft = ""
+    lastFolder = directory
   })
 
   const connected = $derived(app?.connection.status === "connected")
@@ -87,6 +95,7 @@
         {#if workerRunning && app.target.kind === "session"}<StopWorkerButton sessionID={app.target.id} running variant="label" />{/if}
       </header>
     {:else}
+      <FolderSwitcher {app} />
       <SessionSwitcher {app} hasDraftText={draft.trim().length > 0}>
         {#snippet extra()}
           {#if shownWorkers > 0 || app.runningShells > 0}
