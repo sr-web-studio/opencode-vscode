@@ -1,9 +1,10 @@
 import { clip, firstLine } from "../format"
+import { safeImageMime } from "../images"
 import { relativeTo } from "../paths"
 import { executeTarget } from "./execute"
 import { firstChangedLine, patchedFiles } from "./patch"
 import { isStoppedCommand } from "./tool-error"
-import type { ToolItem } from "./types"
+import type { ToolAttachment, ToolItem } from "./types"
 
 export type ToolLine = {
   /** Bold label, e.g. `Edit`. */
@@ -42,6 +43,33 @@ const LABELS: Record<string, string> = {
 const str = (v: unknown): string => (typeof v === "string" ? v : "")
 const num = (v: unknown): number | undefined => (typeof v === "number" ? v : undefined)
 const isHttp = (s: string) => /^https?:\/\/\S+$/i.test(s)
+
+/**
+ * About 200 000 characters of base64 (~150 KB): the extension re-posts the whole state to the webview on every
+ * controller emit, so a bigger picture is left to the file viewer instead of riding in every snapshot.
+ */
+export const MAX_INLINE_IMAGE_CHARS = 200_000
+
+/**
+ * Image files of a tool result. OpenCode V2's `read` returns a picture as a `file` content part with a `data:` URI
+ * (the text part only says "Image read successfully"), so this is the only copy the transcript gets. A picture over
+ * the inline cap keeps a marker without its bytes, and the details open the file instead.
+ */
+export function toolAttachments(content: unknown): ToolAttachment[] | undefined {
+  if (!Array.isArray(content)) return undefined
+  const out: ToolAttachment[] = []
+  for (const raw of content) {
+    if (!raw || typeof raw !== "object") continue
+    const part = raw as { type?: unknown; uri?: unknown; mime?: unknown; name?: unknown }
+    if (part.type !== "file" || typeof part.uri !== "string" || !part.uri.startsWith("data:")) continue
+    const mime = typeof part.mime === "string" ? part.mime : /^data:([^;,]+)/i.exec(part.uri)?.[1]
+    if (!safeImageMime(mime)) continue
+    const name = typeof part.name === "string" && part.name ? part.name : undefined
+    const base = name ? { mime, name } : { mime }
+    out.push(part.uri.length > MAX_INLINE_IMAGE_CHARS ? { ...base, tooLarge: true } : { ...base, uri: part.uri })
+  }
+  return out.length > 0 ? out : undefined
+}
 
 /**
  * Line to open a `read` at. OpenCode's `offset` is 1-based (`offset: 95, limit: 40` returns "lines 95-134"), so it is
