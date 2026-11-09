@@ -1,9 +1,10 @@
 import * as vscode from "vscode"
 import { Controller } from "@occ/core/controller"
+import type { EventEnvelope } from "@occ/core/api"
 import { FolderRegistry, folderStorageKey, type FolderEntry } from "@occ/core/folders"
 import { NotificationEngine } from "@occ/core/notifications/engine"
 import type { NoticeCommand } from "@occ/core/notifications/types"
-import { folderName, shortenHome } from "@occ/core/paths"
+import { folderName, sameDirectory, shortenHome } from "@occ/core/paths"
 import { normalizeModelSelection } from "@occ/core/models"
 import { homedir } from "node:os"
 import { SetupError, connect } from "./connection"
@@ -14,6 +15,8 @@ import { MinWidth } from "./min-width"
 import { createMcpHost } from "./mcp"
 import { VscodeNotifier } from "./notifier"
 import { pairMobileCommand } from "./pair-mobile"
+import { ProjectNames } from "./project-names"
+import { renameProjectCommand } from "./rename-project"
 import { affectsConnection, affectsView, readConnectionSettings, readNotificationSettings, readTerminalSettings, readViewSettings } from "./settings"
 import { registerSettingsPage } from "./settings-page"
 import { ShellTerminals } from "./terminal"
@@ -43,6 +46,10 @@ export function activate(context: vscode.ExtensionContext): void {
       displayPath: shortenHome(folder.uri.fsPath, homedir()),
     }))
 
+  /**
+   * `project.updated` reaches every controller (the event has no location); one handler applies it to the folder list.
+   */
+  let applyProjectEvent: (ev: EventEnvelope) => void = () => {}
   /*
    * One controller per workspace folder, all attached to the same server connection, so sessions, notifications,
    * workers and background shells of every folder keep working. The chat view is bound to the active one.
@@ -58,7 +65,10 @@ export function activate(context: vscode.ExtensionContext): void {
           get: (key) => context.workspaceState.get(folderStorageKey(key, entry.directory, entry.primary)),
           set: (key, value) => void context.workspaceState.update(folderStorageKey(key, entry.directory, entry.primary), value),
         },
-        onEvent: (ev) => void engine.handle(ev).catch((e: unknown) => output.debug(`Notification engine failed on ${ev.type}: ${e instanceof Error ? e.message : String(e)}`)),
+        onEvent: (ev) => {
+          applyProjectEvent(ev)
+          void engine.handle(ev).catch((e: unknown) => output.debug(`Notification engine failed on ${ev.type}: ${e instanceof Error ? e.message : String(e)}`))
+        },
         // Pins follow the user across windows and machines (Settings Sync keys), and never touch OpenCode config.
         pins: {
           get: () => context.globalState.get<string[]>(PINS_KEY, []),
@@ -78,6 +88,10 @@ export function activate(context: vscode.ExtensionContext): void {
     },
   })
   folders.sync(folderEntries())
+  // OpenCode's own project names for the folder dropdown and the chat header. Fetched on connect and on a folder add,
+  // and kept current by `project.updated`, so a rename in the browser UI or on the phone shows here live.
+  const projectNames = new ProjectNames(folders, (line) => output.debug(line))
+  applyProjectEvent = (ev) => projectNames.apply(ev)
   context.globalState.setKeysForSync([PINS_KEY, ENHANCE_MODEL_KEY])
 
   // `provider` is created below; dictation text is only posted after a recording starts, long after activation.
@@ -103,12 +117,16 @@ export function activate(context: vscode.ExtensionContext): void {
   let workers!: WorkerPanels
   const images = new ImagePreviews(context.globalStorageUri, folders)
   void images.cleanup()
+  /** The workspace folder's own name, used when OpenCode has no project name for it. */
+  const displayFolderName = (directory: string): string => folderEntries().find((entry) => sameDirectory(entry.directory, directory))?.folderName ?? folderName(directory)
+  const renameProject = (directory?: string) => renameProjectCommand({ folders, projectNames, folderName: displayFolderName, log: (line) => output.info(line) }, directory)
   const host: HostActions = new HostActions(
     () => folders.active.directory,
     () => terminals,
     () => workers,
     () => images,
     () => diffs,
+    (directory) => void renameProject(directory),
   )
   const diffs = new DiffViews((path) => host.resolvePath(path))
   terminals = new ShellTerminals(folders, readTerminalSettings)
@@ -208,6 +226,7 @@ export function activate(context: vscode.ExtensionContext): void {
           folders.setConnection({ status: "connecting", url: conn.url, version: conn.version })
           // One connection, every folder.
           folders.attach(conn.client)
+          void projectNames.refresh(conn.client, folders.directories())
           return
         } catch (e) {
           if (mine !== generation) return
@@ -257,6 +276,8 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("opencode.openGlobalConfig", () => openGlobalConfigCommand(serverHostname)),
     // The project config belongs to the folder the chat view shows, so the command reads the active folder when it runs.
     vscode.commands.registerCommand("opencode.openProjectConfig", () => openProjectConfigCommand(folders.activeDirectoryName, serverHostname)),
+    // The project name belongs to the folder the chat view shows, so the command reads the active folder when it runs.
+    vscode.commands.registerCommand("opencode.renameProject", () => renameProject()),
     vscode.commands.registerCommand("opencode.reconnect", () => start()),
     vscode.commands.registerCommand("opencode.pairMobileDevice", () =>
       pairMobileCommand({
@@ -318,6 +339,7 @@ export function activate(context: vscode.ExtensionContext): void {
         return
       }
       folders.sync(folderEntries())
+      if (folders.connectedClient) void projectNames.refresh(folders.connectedClient, folders.directories())
       // Adding the first folder needs a connection; adding another one joins the existing connection in the registry.
       if (!folders.connectedClient && !starting) void start()
     }),

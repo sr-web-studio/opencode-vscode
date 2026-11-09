@@ -66,6 +66,15 @@ const ACTIONS: ActionRow[] = [
     group: "OpenCode config",
   },
   {
+    id: "renameProject",
+    label: "Rename project…",
+    description: "Change the name OpenCode shows for the chat view's workspace folder, in the browser UI and on the phone. This never renames the folder on disk or changes OpenCode config.",
+    command: "opencode.renameProject",
+    icon: "edit",
+    button: "Rename…",
+    group: "Project",
+  },
+  {
     id: "pairMobile",
     label: "Pair mobile device…",
     description: "Show a QR code and link for the OpenCode (unofficial) Android app.",

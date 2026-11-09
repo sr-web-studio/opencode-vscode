@@ -24,6 +24,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   private readonly subs: vscode.Disposable[] = []
   private readonly offActive: () => void
   private readonly offChange: () => void
+  private readonly offNames: () => void
 
   constructor(
     private readonly extensionUri: vscode.Uri,
@@ -33,6 +34,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   ) {
     this.offActive = folders.onActive(() => this.bind())
     this.offChange = folders.onChange(() => this.bind())
+    // A project name changed (our own rename, the browser UI or the phone): only the labels change, no rebind.
+    this.offNames = folders.onProjectNames(() => this.postState())
   }
 
   /** True when the panel is on screen. Used for notification suppression. */
@@ -113,7 +116,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   /** The folder list is a property of the window, so it is added here to whichever controller's state is posted. */
   private postState(state: AppState = this.folders.active.snapshot()): void {
     const list = this.folders.foldersState()
-    this.post({ type: "state", state: list.length > 1 ? { ...state, folders: list } : state })
+    const projectName = this.folders.projectName(this.folders.active.folderPath)
+    const decorated: AppState = list.length > 1 ? { ...state, folders: list } : state
+    this.post({ type: "state", state: projectName ? { ...decorated, projectName } : decorated })
   }
 
   private async onMessage(m: ToHost | WebviewMetrics): Promise<void> {
@@ -145,6 +150,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     this.foldersTimer = undefined
     this.offActive()
     this.offChange()
+    this.offNames()
     for (const d of this.subs) d.dispose()
   }
 

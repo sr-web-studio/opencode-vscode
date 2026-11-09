@@ -30,6 +30,7 @@ export class HostActions {
     private readonly workers: () => WorkerPanels,
     private readonly images: () => ImagePreviews,
     private readonly diffs: () => DiffViews,
+    private readonly renameProject: (directory: string) => void,
   ) {}
 
   /** Used by the diff views to find a file of the project. */
@@ -54,7 +55,9 @@ export class HostActions {
               ? "Could not open the image"
               : req.type === "openDiff" || req.type === "openChanges"
                 ? "Could not open the diff"
-                : "OpenCode could not do that"
+                : req.type === "renameProject"
+                  ? "Could not rename the project"
+                  : "OpenCode could not do that"
       void vscode.window.showErrorMessage(`${what}: ${e instanceof Error ? e.message : "unknown error"}`)
     }
   }
@@ -101,6 +104,8 @@ export class HostActions {
         return void (await vscode.commands.executeCommand("opencode.reconnect"))
       case "openGlobalConfig":
         return void (await vscode.commands.executeCommand("opencode.openGlobalConfig"))
+      case "renameProject":
+        return this.renameProject(req.directory)
       case "notify": {
         const show = req.level === "error" ? vscode.window.showErrorMessage : req.level === "warning" ? vscode.window.showWarningMessage : vscode.window.showInformationMessage
         void show(req.message)

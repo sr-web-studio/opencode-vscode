@@ -47,6 +47,7 @@ export function createVsCodeBridge(): HostBridge {
     openSession: (id, options) => host({ type: "openSession", id, readOnly: options.readOnly }),
     confirmRevert: (messageID) => host({ type: "confirmRevert", messageID }),
     confirmDeleteSession: (sessionID, title) => host({ type: "confirmDeleteSession", sessionID, title }),
+    renameProject: (directory) => host({ type: "renameProject", directory }),
     pickFiles: () =>
       new Promise<PickedFile[]>((resolve) => {
         const requestID = `pick-${++pickSeq}`
