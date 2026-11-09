@@ -45,9 +45,11 @@
     const id = st.target.id
     return st.sessions.find((s) => s.id === id)?.title?.trim() || st.folderName || "Chat"
   })
+  // The project's OpenCode name and the folder: the header says which project this conversation belongs to.
+  const sub = $derived([model.projectTitle(directory), live.state?.displayPath].filter((s): s is string => !!s).join(" · "))
 </script>
 
-<Bar {title} sub={live.state?.displayPath}>
+<Bar {title} {sub}>
   {#snippet actions()}
     <ConnectionPill connection={live.state?.connection} />
   {/snippet}

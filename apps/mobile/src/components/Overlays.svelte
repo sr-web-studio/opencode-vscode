@@ -1,6 +1,27 @@
 <script lang="ts">
+  import { tick } from "svelte"
   import Codicon from "@occ/ui/components/Codicon.svelte"
   import { model } from "../model.svelte"
+
+  /** The text of an input dialog; reset from the modal each time one opens. */
+  let text = $state("")
+  let inputError = $state<string | undefined>()
+  let field: HTMLInputElement | undefined = $state()
+
+  $effect(() => {
+    const m = model.modal
+    if (!m?.input) return
+    text = m.input.value
+    void tick().then(() => field?.focus())
+  })
+  $effect(() => {
+    const m = model.modal
+    if (!m?.input) {
+      inputError = undefined
+      return
+    }
+    inputError = m.input.validate?.(text)
+  })
 </script>
 
 {#if model.toast}
@@ -25,9 +46,28 @@
     >
       <h2 id="dlg-title">{m.title}</h2>
       {#if m.detail}<p class="muted">{m.detail}</p>{/if}
+      {#if m.input}
+        <label class="field">
+          <span>{m.input.label ?? "Name"}</span>
+          <input
+            bind:this={field}
+            bind:value={text}
+            placeholder={m.input.placeholder}
+            maxlength={m.input.maxLength}
+            aria-invalid={!!inputError}
+            aria-describedby={inputError || m.input.help ? "dlg-help" : undefined}
+            onkeydown={(e) => e.key === "Enter" && !inputError && model.answerInput(text)}
+          />
+        </label>
+        {#if inputError}
+          <p class="err" id="dlg-help">{inputError}</p>
+        {:else if m.input.help}
+          <p class="muted help" id="dlg-help">{m.input.help}</p>
+        {/if}
+      {/if}
       <div class="actions">
         <button class="btn quiet" onclick={() => model.answer(false)}>Cancel</button>
-        <button class="btn" class:danger={m.danger} onclick={() => model.answer(true)}>{m.confirm}</button>
+        <button class="btn" class:danger={m.danger} disabled={!!inputError} onclick={() => (m.input ? model.answerInput(text) : model.answer(true))}>{m.confirm}</button>
       </div>
     </div>
   </div>
@@ -89,6 +129,41 @@
   }
   p {
     margin: 0 0 16px;
+  }
+  .field {
+    display: block;
+    margin: 0 0 6px;
+  }
+  .field > span {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 0.85em;
+    color: var(--oc-muted);
+  }
+  .field input {
+    width: 100%;
+    min-height: 42px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--oc-hairline);
+    background: var(--vscode-input-background);
+    color: var(--vscode-input-foreground);
+    font: inherit;
+  }
+  .field input[aria-invalid="true"] {
+    border-color: var(--oc-error);
+  }
+  .err {
+    margin: 0 0 12px;
+    font-size: 0.85em;
+    color: var(--oc-error);
+  }
+  .help {
+    margin: 0 0 12px;
+    font-size: 0.85em;
+  }
+  .actions button:disabled {
+    opacity: 0.5;
   }
   .actions {
     display: flex;

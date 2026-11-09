@@ -12,6 +12,8 @@ import { folderName, shortenHome } from "@occ/core/paths"
 import type { ModelSelection } from "@occ/core/models"
 import { defaultViewSettings, type ViewSettings } from "@occ/core/protocol"
 import { deleteQuestion, DELETE_BUTTON, DELETE_DETAIL } from "@occ/core/delete-session"
+import { errorMessage } from "@occ/core/errors"
+import { checkProjectName, MAX_PROJECT_NAME, normalizeProjectName } from "@occ/core/project-names"
 import { normalizeServerUrl } from "@occ/core/server-url"
 import { enhanceModelKey, parseEnhanceModel, parseViewSettings, patchViewSettings, resetSettingKeys, VIEW_KEY } from "./lib/app-settings"
 import { makeClient, redeemPairing, testConnection } from "./lib/client"
@@ -32,6 +34,8 @@ import {
 } from "./lib/notify-native"
 import { parsePairingLink } from "./lib/pairing-link"
 import { pickFiles } from "./lib/picker"
+import { ProjectNames } from "./lib/project-names"
+import { projectFolders, type ProjectLike } from "./lib/projects"
 import { launchUrl, onHardwareBack, onResume, onUrlOpen, openInBrowser } from "./lib/platform"
 import { ProfileStore, type Profile, type ProfileInput } from "./lib/profiles"
 import { secureKV } from "./lib/secure"
@@ -40,8 +44,18 @@ import { Workspace, type ProjectInfo } from "./lib/workspace"
 import type { MobileHost } from "./lib/bridge"
 
 export type Toast = { id: number; level: "info" | "warning" | "error"; text: string }
-export type ModalSpec = { title: string; detail?: string; confirm: string; danger?: boolean }
-type Modal = ModalSpec & { resolve: (ok: boolean) => void }
+/** A text field in a dialog: the name dialog and anything like it. */
+export type ModalInput = {
+  value: string
+  label?: string
+  placeholder?: string
+  help?: string
+  maxLength?: number
+  /** A friendly message under the field; the confirm button stays disabled while it is set. */
+  validate?: (value: string) => string | undefined
+}
+export type ModalSpec = { title: string; detail?: string; confirm: string; danger?: boolean; input?: ModalInput }
+type Modal = ModalSpec & { id: number; resolve: (result: boolean | string | undefined) => void }
 export type Problem = { profileID: string; kind: string; message: string }
 
 let keySeq = 0
@@ -98,6 +112,13 @@ class AppModel {
 
   /** The home folder seen in the project list, for `~` in paths. */
   home: string | undefined
+
+  /** OpenCode's project of each folder on this server: the authoritative id and the name (`location.get` + `project.list`). */
+  private projectNames = new ProjectNames({ setProject: (directory, projectID, name) => this.setProject(directory, projectID, name) })
+  /** Folder → authoritative project id, for the project rows. Reactive: a row's title settles when its answer arrives. */
+  projectIDs = $state.raw<ReadonlyMap<string, string>>(new Map())
+  /** Folder → the name OpenCode has for it (undefined: the folder name shows). */
+  projectTitles = $state.raw<ReadonlyMap<string, string | undefined>>(new Map())
 
   private readonly store = new ProfileStore(secureKV)
   private workspace: Workspace<Controller> | undefined
@@ -259,6 +280,15 @@ class AppModel {
     this.workspace = undefined
     this.profile = undefined
     this.viewing.clear()
+    // Names belong to one server: a different server can use the same folders with other projects.
+    this.resetProjectNames()
+  }
+
+  /** Forget every project id and name (a server switch, or leaving the server). */
+  private resetProjectNames(): void {
+    this.projectNames = new ProjectNames({ setProject: (directory, projectID, name) => this.setProject(directory, projectID, name) })
+    this.projectIDs = new Map()
+    this.projectTitles = new Map()
   }
 
   /* ---------------------------------------------------------- servers */
@@ -346,12 +376,107 @@ class AppModel {
   controller(directory: string): Controller {
     const ws = this.workspace
     if (!ws) throw new Error("Not connected to a server.")
-    return ws.acquire({ directory, folderName: folderName(directory), displayPath: shortenHome(directory, this.home) })
+    // The chat shows OpenCode's project name where the folder name would be; the path stays below it.
+    return ws.acquire({ directory, folderName: this.projectTitle(directory) ?? folderName(directory), displayPath: shortenHome(directory, this.home) })
   }
 
   /** Has this project's controller finished its first sync? */
   isSynced(directory: string): boolean {
     return this.synced.has(directory)
+  }
+
+  /** The name OpenCode has for a folder's project, when it has one. */
+  projectTitle(directory: string): string | undefined {
+    return this.projectTitles.get(directory)
+  }
+
+  /**
+   * Learn the project names of a freshly loaded `project.list`: its names first, then each folder's authoritative
+   * project id from `location.get`, a few folders at a time. Every answer updates the rows as it arrives.
+   */
+  async learnProjects(projects: ReadonlyArray<ProjectLike>): Promise<void> {
+    const ws = this.workspace
+    if (!ws) return
+    this.projectNames.applyList(projects)
+    await this.projectNames.resolveAll(ws.client, projectFolders(projects))
+  }
+
+  /** The authoritative project of one folder, fetched on demand (a rename on a folder whose answer is not in yet). */
+  async resolveProject(directory: string): Promise<{ projectID: string; name?: string } | undefined> {
+    const ws = this.workspace
+    if (!ws) return undefined
+    const projectID = await this.projectNames.resolve(ws.client, directory)
+    if (!projectID) return undefined
+    return { projectID, name: this.projectNames.nameOf(directory) }
+  }
+
+  /**
+   * Ask for a project name and save it. The dialog starts with the current name; an empty value gives the folder name
+   * back. This writes only the project's display name on the OpenCode server: the folder on disk and the OpenCode
+   * config files are never touched.
+   */
+  async renameProject(directory: string): Promise<boolean> {
+    const ws = this.workspace
+    if (!ws) {
+      this.notify("warning", "Connect to a server first.")
+      return false
+    }
+    let project: { projectID: string; name?: string } | undefined
+    try {
+      project = await this.resolveProject(directory)
+    } catch (e) {
+      this.notify("error", `Could not find this folder's project: ${errorMessage(e)}`)
+      return false
+    }
+    if (!project) {
+      this.notify("warning", "OpenCode has no project for this folder yet. Start a session in it first.")
+      return false
+    }
+    const current = project.name ?? folderName(directory)
+    const value = await this.ask({
+      title: "Rename project",
+      detail: "The name OpenCode shows for this project in the browser UI and on this phone.",
+      confirm: "Save",
+      input: {
+        value: current,
+        label: "Project name",
+        placeholder: folderName(directory),
+        help: "Leave it empty to use the folder name again.",
+        maxLength: MAX_PROJECT_NAME,
+        validate: (text) => {
+          const check = checkProjectName(text)
+          return check.ok ? undefined : check.error
+        },
+      },
+    })
+    if (value === undefined) return false
+    const check = checkProjectName(value)
+    if (!check.ok || (check.name ?? "") === (project.name ?? "")) return false
+    try {
+      // Only the project's display name on the server changes. The folder on disk and the OpenCode config files stay as
+      // they are.
+      const saved = await ws.client.project.update({ projectID: project.projectID, name: check.name ?? "" })
+      this.projectNames.set(directory, project.projectID, normalizeProjectName(saved?.name) ?? check.name)
+      this.notify("info", check.name ? `Renamed the project to “${check.name}”.` : "The project uses its folder name again.")
+      return true
+    } catch (e) {
+      this.notify("error", `Could not rename the project: ${errorMessage(e)}`)
+      return false
+    }
+  }
+
+  /** A resolved project or a saved name: mirror it for the screens and relabel an open chat of that folder. */
+  private setProject(directory: string, projectID: string | undefined, name: string | undefined): void {
+    if (projectID) {
+      const ids = new Map(this.projectIDs)
+      ids.set(directory, projectID)
+      this.projectIDs = ids
+    }
+    const title = normalizeProjectName(name)
+    const titles = new Map(this.projectTitles)
+    titles.set(directory, title)
+    this.projectTitles = titles
+    this.workspace?.get(directory)?.setFolderInfo(title ?? folderName(directory), shortenHome(directory, this.home))
   }
 
   private makeController(profile: Profile, project: ProjectInfo): Controller {
@@ -395,6 +520,11 @@ class AppModel {
         if (!this.synced.has(project.directory)) this.synced = new Set([...this.synced, project.directory])
       },
       event: (ev: EventEnvelope) => {
+        // A rename in the browser UI or on another phone reaches every open controller's server-wide stream.
+        if (ev.type === "project.updated") {
+          this.projectNames.apply(ev)
+          return
+        }
         if (ev.type !== "session.inbox.enqueued") return
         const item = ev.data?.item
         if (item?.type === "user" && typeof ev.data?.inboxID === "string") cache.seed(ev.data.inboxID, item.payload?.files)
@@ -615,7 +745,15 @@ class AppModel {
   confirm(spec: ModalSpec): Promise<boolean> {
     this.modal?.resolve(false)
     return new Promise((resolve) => {
-      this.modal = { ...spec, resolve }
+      this.modal = { ...spec, id: nextKey(), resolve: (result) => resolve(result === true) }
+    })
+  }
+
+  /** A dialog with one text field. Resolves with the text on Save and undefined on Cancel or back. */
+  ask(spec: ModalSpec & { input: ModalInput }): Promise<string | undefined> {
+    this.modal?.resolve(false)
+    return new Promise((resolve) => {
+      this.modal = { ...spec, id: nextKey(), resolve: (result) => resolve(typeof result === "string" ? result : undefined) }
     })
   }
 
@@ -623,6 +761,13 @@ class AppModel {
     const m = this.modal
     this.modal = undefined
     m?.resolve(ok)
+  }
+
+  /** Save the text of an input dialog (the field's Enter key and the confirm button). */
+  answerInput(value: string) {
+    const m = this.modal
+    this.modal = undefined
+    m?.resolve(value)
   }
 
   /* --------------------------------------------------- the shared UI */

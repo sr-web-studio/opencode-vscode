@@ -1,5 +1,6 @@
-import type { EventEnvelope, SessionInfo } from "./api"
+import type { EventEnvelope, FormInfo, OpenCodeClient, SessionInfo } from "./api"
 import type { Controller } from "./controller"
+import { errorMessage } from "./errors"
 import { SessionFeed } from "./feed"
 import type { Action, AppState } from "./protocol"
 
@@ -13,6 +14,8 @@ const EMIT_MS = 30
 export class WorkerTab {
   private readonly feed: SessionFeed
   private info?: SessionInfo
+  /** This worker's own pending question (a form), if any. Answerable here: the parent's chat does not show it. */
+  private form?: FormInfo
   private listeners = new Set<(s: AppState) => void>()
   private timer?: ReturnType<typeof setTimeout>
   private error?: string
@@ -61,12 +64,39 @@ export class WorkerTab {
       this.emitNow()
       return
     }
+    await this.loadForm(client)
     await this.feed.load(client, this.sessionID)
     this.emitNow()
   }
 
+  /**
+   * The question this worker waits on, from the server (the form list of its folder), so opening the worker after a
+   * notification shows the form at once. A live `form.created` keeps it current. Failures keep what is shown.
+   */
+  private async loadForm(client: OpenCodeClient): Promise<void> {
+    const location = this.controller.locationOf?.(this.sessionID)
+    if (!location) return
+    try {
+      const forms = await client.form.list({ location })
+      this.form = forms.data.find((form) => form.sessionID === this.sessionID)
+    } catch {
+      // An older server without the form list: live events still fill it.
+    }
+  }
+
   private onEvent(ev: EventEnvelope): void {
     const d = ev.data ?? {}
+    // A question for this worker: its form is shown and answered on this screen (the parent's chat does not show it).
+    if (ev.type === "form.created" && d.form?.sessionID === this.sessionID) {
+      this.form = d.form
+      this.emitNow()
+      return
+    }
+    if ((ev.type === "form.replied" || ev.type === "form.cancelled") && d.sessionID === this.sessionID && (!this.form || d.id === this.form.id)) {
+      this.form = undefined
+      this.emitNow()
+      return
+    }
     if (ev.type === "session.renamed" && d.sessionID === this.sessionID && this.info) this.info = { ...this.info, title: d.title }
     if (ev.type === "session.model.selected" && d.sessionID === this.sessionID && this.info) this.info = { ...this.info, model: d.model }
     if (d.sessionID !== this.sessionID || !ev.type.startsWith("session.")) return
@@ -82,7 +112,7 @@ export class WorkerTab {
       view,
       loadingView: this.feed.loading,
       permissions: this.controller.permissionsOf(this.sessionID),
-      form: undefined,
+      form: this.form,
       agent: this.info?.agent,
       model: this.info?.model,
       error: this.error,
@@ -119,6 +149,35 @@ export class WorkerTab {
         // Only this worker's own requests.
         if (action.sessionID === this.sessionID) await this.controller.dispatch(action)
         return
+      case "formReply": {
+        const client = this.controller.api
+        const form = this.form
+        if (!client || !form) return
+        try {
+          // This worker's own form, never the parent's: the reply names the session and the form id explicitly.
+          await client.session.form.reply({ sessionID: this.sessionID, formID: form.id, answer: action.answer })
+          this.form = undefined
+          this.emitNow()
+        } catch (e) {
+          this.error = errorMessage(e)
+          this.emitNow()
+        }
+        return
+      }
+      case "formCancel": {
+        const client = this.controller.api
+        const form = this.form
+        if (!client || !form) return
+        try {
+          await client.session.form.cancel({ sessionID: this.sessionID, formID: form.id })
+          this.form = undefined
+          this.emitNow()
+        } catch (e) {
+          this.error = errorMessage(e)
+          this.emitNow()
+        }
+        return
+      }
       case "stopWorker": {
         // Only this worker itself, never another session. The controller checks that it is a child of the open session.
         if (action.sessionID !== this.sessionID) return

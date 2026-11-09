@@ -23,7 +23,11 @@
   import Transcript from "./components/Transcript.svelte"
   import WorkersRow from "./components/WorkersRow.svelte"
 
-  let { bridge }: { bridge: HostBridge } = $props()
+  /**
+   * `workerForm`: the phone's worker screen shows the worker's own pending question and answers it. The VS Code worker
+   * tab passes nothing and stays transcript-only, as before.
+   */
+  let { bridge, workerForm = false }: { bridge: HostBridge; workerForm?: boolean } = $props()
   // The bridge is fixed for the lifetime of the webview.
   // svelte-ignore state_referenced_locally
   const store = new Store(bridge)
@@ -150,7 +154,9 @@
       </div>
     {/if}
     {#if app.readOnly}
-      <!-- Worker tab: nothing to type into. -->
+      {#if workerForm && app.form}
+        <div class="qwrap"><QuestionPrompt form={app.form} /></div>
+      {/if}
     {:else if app.form}
       <div class="qwrap"><QuestionPrompt form={app.form} /></div>
     {:else}

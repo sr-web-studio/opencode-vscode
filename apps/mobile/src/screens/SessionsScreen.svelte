@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from "svelte"
   import Codicon from "@occ/ui/components/Codicon.svelte"
   import { relativeTime } from "@occ/core/format"
   import { groupSessions, toRows } from "@occ/core/sessions"
@@ -19,11 +20,16 @@
   const groups = $derived(st ? groupSessions(toRows({ sessions: st.sessions, running: new Set(st.running), waiting: new Set(st.waiting) }), query, now) : [])
   const count = $derived(st?.sessions.length ?? 0)
   const failed = $derived(st?.connection.status === "error")
+  const title = $derived(model.projectTitle(directory) ?? st?.folderName ?? directory)
+
+  // Opening the project is the moment to learn its authoritative project: the header and the chat show its name.
+  onMount(() => void model.resolveProject(directory))
 </script>
 
-<Bar title={st?.folderName || directory} sub={st?.displayPath}>
+<Bar {title} sub={st?.displayPath}>
   {#snippet actions()}
     <ConnectionPill connection={st?.connection} />
+    <button class="iconbtn" onclick={() => void model.renameProject(directory)} aria-label="Rename project" title="Rename project"><Codicon name="edit" /></button>
     <button class="iconbtn" onclick={() => model.push({ kind: "chat", directory, draft: true })} aria-label="New session"><Codicon name="add" /></button>
   {/snippet}
 </Bar>
