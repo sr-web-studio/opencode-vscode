@@ -337,12 +337,14 @@ body {
   font-family: var(--vscode-editor-font-family);
   font-size: 13px;
   line-height: 1.5;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   background: var(--vscode-editor-background);
 }
 .screen > .body .source .ln {
   display: flex;
-  min-width: max-content;
+  align-items: flex-start;
+  min-width: 0;
 }
 .screen > .body .source .no {
   flex: none;
@@ -352,10 +354,30 @@ body {
   color: var(--vscode-editorLineNumber-foreground);
   user-select: none;
 }
+/* Long lines wrap at the text column: the gutter stays put and a continuation line starts after it, never under it. */
 .screen > .body .source .tx {
-  white-space: pre;
+  flex: 1;
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
   padding-right: 12px;
 }
 .screen > .body .source .hit {
   background: var(--vscode-list-activeSelectionBackground);
+}
+
+/* Diffs on the phone wrap instead of scrolling sideways: an edit's inline diff and the full diff screen. */
+.screen > .chat .diff,
+.screen > .body .diff {
+  overflow-x: hidden;
+}
+.screen > .chat .diff .row,
+.screen > .body .diff .row {
+  min-width: 0;
+}
+.screen > .chat .diff .code,
+.screen > .body .diff .code {
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
