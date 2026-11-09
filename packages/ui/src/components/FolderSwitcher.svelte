@@ -16,11 +16,16 @@
   const active = $derived(folders.find((f) => f.active) ?? folders[0])
   let open = $state(false)
   let index = $state(0)
+  /** The row the keyboard is on; clamped when a folder disappears while the list is open. */
+  const highlighted = $derived(Math.min(index, Math.max(0, folders.length - 1)))
   let list: HTMLDivElement | undefined = $state()
+  let trigger: HTMLButtonElement | undefined = $state()
+  const LIST_ID = "oc-folders"
+  const optionID = (i: number) => `${LIST_ID}-${i}`
 
-  async function toggle() {
-    open = !open
-    if (!open) return
+  async function openList() {
+    if (open) return
+    open = true
     index = Math.max(
       0,
       folders.findIndex((f) => f.active),
@@ -29,32 +34,60 @@
     focusGuarded(list)
   }
 
-  function pick(directory: string) {
+  async function closeList(refocus = true) {
+    if (!open) return
     open = false
+    if (refocus) {
+      await tick()
+      focusGuarded(trigger)
+    }
+  }
+
+  async function pick(directory: string) {
+    await closeList()
     if (directory !== active?.directory) store.dispatch({ type: "switchFolder", directory })
   }
 
-  function onkey(e: KeyboardEvent) {
+  // The trigger opens on Enter/Space (its native click) and ArrowDown; Escape closes it.
+  function triggerKey(e: KeyboardEvent) {
+    if (e.key === "ArrowDown") {
+      e.preventDefault()
+      void openList()
+    } else if (e.key === "Escape" && open) {
+      e.preventDefault()
+      void closeList()
+    }
+  }
+
+  // Choosing and moving only work while the list is open and focused.
+  function listKey(e: KeyboardEvent) {
     if (e.key === "Escape") {
-      open = false
       e.preventDefault()
+      e.stopPropagation()
+      void closeList()
     } else if (e.key === "ArrowDown") {
+      e.preventDefault()
       index = Math.min(folders.length - 1, index + 1)
-      e.preventDefault()
     } else if (e.key === "ArrowUp") {
+      e.preventDefault()
       index = Math.max(0, index - 1)
+    } else if (e.key === "Home") {
       e.preventDefault()
-    } else if (e.key === "Enter") {
-      const folder = folders[index]
-      if (folder) pick(folder.directory)
+      index = 0
+    } else if (e.key === "End") {
       e.preventDefault()
+      index = Math.max(0, folders.length - 1)
+    } else if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault()
+      const folder = folders[highlighted]
+      if (folder) void pick(folder.directory)
     }
   }
 
   $effect(() => {
     if (!open) return
     const off = (e: MouseEvent) => {
-      if (!(e.target as HTMLElement).closest(".folders")) open = false
+      if (!(e.target as HTMLElement).closest(".folders")) void closeList(false)
     }
     window.addEventListener("mousedown", off)
     return () => window.removeEventListener("mousedown", off)
@@ -63,7 +96,16 @@
 
 {#if folders.length > 1}
   <header class="folders">
-    <button class="current" onclick={toggle} onkeydown={onkey} aria-haspopup="listbox" aria-expanded={open} title="Switch workspace folder">
+    <button
+      bind:this={trigger}
+      class="current"
+      onclick={() => (open ? void closeList() : void openList())}
+      onkeydown={triggerKey}
+      aria-haspopup="listbox"
+      aria-expanded={open}
+      aria-controls={open ? LIST_ID : undefined}
+      title={active?.directory ?? "Switch workspace folder"}
+    >
       <Codicon name="folder" />
       <span class="name">{active?.name ?? "Folder"}</span>
       <span class="muted"><Codicon name="chevron-down" /></span>
@@ -72,9 +114,28 @@
     {#if open}
       <div class="drop" role="presentation">
         <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <div class="list" role="listbox" aria-label="Workspace folders" bind:this={list} tabindex="-1" onkeydown={onkey}>
+        <div
+          class="list"
+          id={LIST_ID}
+          role="listbox"
+          aria-label="Workspace folders"
+          bind:this={list}
+          tabindex="-1"
+          aria-activedescendant={folders.length > 0 ? optionID(highlighted) : undefined}
+          onkeydown={listKey}
+        >
           {#each folders as folder, i (folder.directory)}
-            <div class="row" class:sel={i === index} role="option" aria-selected={folder.active} tabindex="-1" onclick={() => pick(folder.directory)} onmousemove={() => (index = i)}>
+            <div
+              id={optionID(i)}
+              class="row"
+              class:sel={i === highlighted}
+              role="option"
+              aria-selected={i === highlighted}
+              aria-current={folder.active ? "true" : undefined}
+              tabindex="-1"
+              onclick={() => pick(folder.directory)}
+              onmousemove={() => (index = i)}
+            >
               <span class="dot" class:run={folder.busy} class:wait={folder.attention} title={folder.attention ? "Waiting for you" : folder.busy ? "Running" : ""}></span>
               <span class="t">{folder.name}</span>
               {#if folder.active}<span class="check"><Codicon name="check" /></span>{/if}
@@ -92,7 +153,7 @@
     position: relative;
     display: flex;
     align-items: center;
-    padding: 0.2em var(--oc-side);
+    padding: 0.4em var(--oc-side);
     border-bottom: 1px solid var(--oc-hairline);
   }
   .current {
@@ -112,6 +173,7 @@
     background: var(--oc-hover);
   }
   .name {
+    font-weight: 600;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

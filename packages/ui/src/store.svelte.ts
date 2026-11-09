@@ -12,7 +12,10 @@ export class Store {
   constructor(readonly bridge: HostBridge) {
     this.off = bridge.onMessage((m: ToWebview) => {
       if (m.type === "state") this.state = m.state
-      else if (m.type === "command" && m.name === "newSession") this.newSessionTick++
+      else if (m.type === "folders") {
+        // A folder the view is not showing changed: only the dropdown's dots need the update, not the active state.
+        if (this.state) this.state = { ...this.state, folders: m.folders }
+      } else if (m.type === "command" && m.name === "newSession") this.newSessionTick++
       else if (m.type === "dictation") for (const h of this.dictationHandlers) h(m)
     })
     this.dispatch({ type: "ready" })
