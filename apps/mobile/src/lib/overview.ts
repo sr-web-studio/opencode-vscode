@@ -164,6 +164,71 @@ export function filterOverview(groups: ReadonlyArray<OverviewGroup>, query: stri
   return out
 }
 
+/* -------------------------------------------------------------- stable order */
+
+/** The ids the drawer froze when it opened, per list: the projects, and each project's sessions. */
+export type FrozenOrder = {
+  groups: ReadonlyArray<string>
+  sessions: Readonly<Record<string, ReadonlyArray<string>>>
+}
+
+/**
+ * The order a list keeps while the user is looking at it: ids that were already there stay in their old relative
+ * order, ids that are new are inserted where the current shared order puts them, and ids that are gone disappear.
+ *
+ * The shared order decides placement when the drawer opens (and when the search changes); while it stays open no
+ * existing row may jump under the user's finger, however urgent a background turn becomes. A new row may still
+ * appear (it did not exist before), but it slots in rather than reshuffling the rest. The next open sorts afresh.
+ */
+export function stableOrder(previousIds: ReadonlyArray<string>, nextSorted: ReadonlyArray<string>): string[] {
+  const live = new Set(nextSorted)
+  const kept = previousIds.filter((id) => live.has(id))
+  const rank = new Map(nextSorted.map((id, index) => [id, index]))
+  const result = [...kept]
+  const known = new Set(kept)
+  for (const id of nextSorted) {
+    if (known.has(id)) continue
+    const at = result.findIndex((existing) => (rank.get(existing) ?? 0) > (rank.get(id) ?? 0))
+    if (at < 0) result.push(id)
+    else result.splice(at, 0, id)
+    known.add(id)
+  }
+  return result
+}
+
+/** Take the ids of a built list, so live updates can be replayed in that order. */
+export function freezeOrder(groups: ReadonlyArray<OverviewGroup>): FrozenOrder {
+  return {
+    groups: groups.map((group) => group.directory),
+    sessions: Object.fromEntries(groups.map((group) => [group.directory, group.sessions.map((session) => session.id)])),
+  }
+}
+
+/**
+ * `groups` with the rows put back into the frozen order. Titles, states, counts and times still come from `groups`
+ * (they are live); only the sequence is held. A project or session that appeared after the freeze is placed by the
+ * shared order of this build, and one that disappeared is left out.
+ */
+export function applyFrozenOrder(groups: ReadonlyArray<OverviewGroup>, frozen: FrozenOrder): OverviewGroup[] {
+  const byDirectory = new Map(groups.map((group) => [group.directory, group]))
+  const ordered = stableOrder(
+    frozen.groups,
+    groups.map((group) => group.directory),
+  ).flatMap((directory) => {
+    const group = byDirectory.get(directory)
+    return group ? [group] : []
+  })
+  return ordered.map((group) => {
+    const ids = stableOrder(
+      frozen.sessions[group.directory] ?? [],
+      group.sessions.map((session) => session.id),
+    )
+    if (ids.length === group.sessions.length && ids.every((id, index) => id === group.sessions[index]?.id)) return group
+    const byId = new Map(group.sessions.map((session) => [session.id, session]))
+    return { ...group, sessions: ids.flatMap((id) => byId.get(id) ?? []) }
+  })
+}
+
 /* ------------------------------------------------------------- live events */
 
 export type OverviewEventResult = { state: OverviewData; refetch?: boolean }

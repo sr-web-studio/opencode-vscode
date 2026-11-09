@@ -1,11 +1,14 @@
 import { describe, expect, test } from "bun:test"
 import type { SessionInfo } from "@occ/core/api"
 import {
+  applyFrozenOrder,
   applyOverviewEvent,
   buildOverview,
   emptyOverview,
   filterOverview,
+  freezeOrder,
   overviewSets,
+  stableOrder,
   toOverviewSession,
   waitingSessions,
   type OverviewData,
@@ -224,5 +227,55 @@ describe("live events", () => {
     const current = base()
     expect(applyOverviewEvent(current, { type: "server.connected" }).refetch).toBe(true)
     expect(applyOverviewEvent(current, { type: "session.text.delta", data: {} }).state).toBe(current)
+  })
+})
+
+describe("stable order while the drawer is open", () => {
+  test("ids already listed keep their place; new ids slot in by the shared order", () => {
+    expect(stableOrder([], ["a", "b"])).toEqual(["a", "b"])
+    expect(stableOrder(["a", "b", "c"], ["b", "a", "c"])).toEqual(["a", "b", "c"])
+    expect(stableOrder(["a", "b", "c"], ["c", "a"])).toEqual(["a", "c"])
+    expect(stableOrder(["a", "c"], ["a", "b", "c"])).toEqual(["a", "b", "c"])
+    expect(stableOrder(["a", "b"], ["n", "a", "b"])).toEqual(["n", "a", "b"])
+    expect(stableOrder(["a", "b"], ["a", "b", "n"])).toEqual(["a", "b", "n"])
+    expect(stableOrder(["a"], ["n2", "a", "n1"])).toEqual(["n2", "a", "n1"])
+  })
+
+  test("a project that becomes running while open keeps its row; only its dot changes", () => {
+    const projects = [project("a", "/a", 10, "A"), project("b", "/b", 20, "B")]
+    const sessions = [session("s1", "/a", 10), session("s2", "/b", 20)]
+    const before = buildOverview(data({ projects, sessions: rows(...sessions) }))
+    expect(before.map((g) => g.directory)).toEqual(["/b", "/a"])
+    const frozen = freezeOrder(before)
+    const after = buildOverview(data({ projects, sessions: rows(...sessions), running: ["s1"] }))
+    expect(after.map((g) => g.directory)).toEqual(["/a", "/b"])
+    const held = applyFrozenOrder(after, frozen)
+    expect(held.map((g) => g.directory)).toEqual(["/b", "/a"])
+    expect(held.find((g) => g.directory === "/a")?.state).toBe("running")
+  })
+
+  test("a project that appears after the freeze is inserted, and the rest keep their relative order", () => {
+    const before = buildOverview(data({ projects: [project("a", "/a", 10, "A"), project("b", "/b", 20, "B")], sessions: rows(session("s1", "/a", 10), session("s2", "/b", 20)) }))
+    const frozen = freezeOrder(before)
+    const after = buildOverview(
+      data({
+        projects: [project("a", "/a", 10, "A"), project("b", "/b", 20, "B"), project("c", "/c", 30, "C")],
+        sessions: rows(session("s1", "/a", 10), session("s2", "/b", 20), session("s3", "/c", 30)),
+      }),
+    )
+    expect(after.map((g) => g.directory)).toEqual(["/c", "/b", "/a"])
+    expect(applyFrozenOrder(after, frozen).map((g) => g.directory)).toEqual(["/c", "/b", "/a"])
+  })
+
+  test("sessions inside a project are held too: a new one slots in at its position, a removed one disappears", () => {
+    const projects = [project("a", "/a", 1, "A")]
+    const before = buildOverview(data({ projects, sessions: rows(session("s1", "/a", 10, "One"), session("s2", "/a", 5, "Two")) }))
+    expect(before[0]?.sessions.map((s) => s.id)).toEqual(["s1", "s2"])
+    const frozen = freezeOrder(before)
+    const added = buildOverview(data({ projects, sessions: rows(session("s1", "/a", 10, "One"), session("s3", "/a", 7, "Three"), session("s2", "/a", 5, "Two")) }))
+    expect(added[0]?.sessions.map((s) => s.id)).toEqual(["s1", "s3", "s2"])
+    expect(applyFrozenOrder(added, frozen)[0]?.sessions.map((s) => s.id)).toEqual(["s1", "s3", "s2"])
+    const removed = buildOverview(data({ projects, sessions: rows(session("s3", "/a", 7, "Three"), session("s2", "/a", 5, "Two")) }))
+    expect(applyFrozenOrder(removed, frozen)[0]?.sessions.map((s) => s.id)).toEqual(["s3", "s2"])
   })
 })

@@ -1,23 +1,30 @@
 <script lang="ts">
-  import { tick } from "svelte"
+  import { tick, untrack } from "svelte"
   import { fade, fly } from "svelte/transition"
   import Codicon from "@occ/ui/components/Codicon.svelte"
   import { relativeTime } from "@occ/core/format"
   import type { ActivityState } from "@occ/core/activity-order"
-  import { buildOverview, filterOverview } from "../lib/overview"
+  import { applyFrozenOrder, buildOverview, filterOverview, freezeOrder, type FrozenOrder, type OverviewGroup } from "../lib/overview"
   import { expandedKey, isExpanded, parseExpanded, setExpanded } from "../lib/drawer-prefs"
   import { model } from "../model.svelte"
+
+  /** What one opening of the drawer holds still: the row ids, and which projects were open by default then. */
+  type Freeze = { order: FrozenOrder; open: Record<string, boolean> }
 
   /** The one list of every project and its root sessions, opened from the top bar. */
   let query = $state("")
   let now = $state(Date.now())
   let panel = $state<HTMLElement>()
   let expanded = $state(parseExpanded(localStorage.getItem(expandedKey(model.profile?.id ?? ""))))
+  let frozen = $state<Freeze>()
 
   const reduce = typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
   const duration = reduce ? 0 : 200
 
-  const groups = $derived(model.overview.data ? buildOverview(model.overview.data, { resolved: model.projectIDs, titles: model.projectTitles }) : [])
+  const liveGroups = $derived(model.overview.data ? buildOverview(model.overview.data, { resolved: model.projectIDs, titles: model.projectTitles }) : [])
+  /** Only the presence of the first snapshot is tracked: it tells the freeze when there is finally a list to hold. */
+  const hasData = $derived(!!model.overview.data)
+  const groups = $derived(frozen ? applyFrozenOrder(liveGroups, frozen.order) : liveGroups)
   const shown = $derived(filterOverview(groups, query))
 
   $effect(() => {
@@ -40,6 +47,31 @@
     // Opening the drawer always shows every project; a filter left from last time would hide them without a reason.
     else query = ""
   })
+  /**
+   * The shared order decides placement when the drawer opens and when the search changes; while it stays open the
+   * frozen ids keep every row where it was, so a live event never moves a row under the user's finger. New rows are
+   * slotted in at their shared-order position, removed ones disappear, and the next open sorts from scratch.
+   *
+   * `query` and `hasData` are read on purpose (a new search, or the first snapshot arriving, re-takes the order); the
+   * list itself is read untracked, so status updates and new sessions do not re-sort it.
+   */
+  $effect(() => {
+    if (!model.drawerOpen) {
+      frozen = undefined
+      return
+    }
+    void query
+    // Before the first snapshot there is no order to hold; take it as soon as the list exists.
+    if (!hasData) return
+    frozen = untrack(() => freeze(liveGroups))
+  })
+
+  function freeze(list: ReadonlyArray<OverviewGroup>): Freeze {
+    return {
+      order: freezeOrder(list),
+      open: Object.fromEntries(list.map((group) => [group.directory, openByDefault(group.directory, group.state)])),
+    }
+  }
 
   function statusLabel(state: ActivityState): string | undefined {
     if (state === "running") return "Running"
@@ -109,7 +141,7 @@
         <div class="center muted">No project or session matches “{query}”.</div>
       {:else}
         {#each shown as group (group.directory)}
-          {@const open = query.trim() ? true : isExpanded(expanded, group.directory, openByDefault(group.directory, group.state))}
+          {@const open = query.trim() ? true : isExpanded(expanded, group.directory, frozen?.open[group.directory] ?? openByDefault(group.directory, group.state))}
           <section class="group">
             <div class="prow">
               <button class="pname" onclick={() => model.openProject(group.directory)} aria-label="Open {group.title}">
