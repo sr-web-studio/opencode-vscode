@@ -269,4 +269,20 @@ describe("in-process bridge", () => {
     expect(b.capabilities).toEqual(MOBILE_CAPABILITIES)
     expect(MOBILE_CAPABILITIES).toEqual({ voice: false, editConfig: false, mcpSignIn: false, enterSends: false, shellView: "output" })
   })
+
+  test("the pause signal is passed on only when the app supplies one", () => {
+    const plain = createBridge({ subscribe: () => () => {}, dispatch: async () => {}, sessionID: () => undefined }, recordingHost().host, memoryStore())
+    expect(plain.onHidden).toBeUndefined()
+
+    let fired = 0
+    const subscribe = (handler: () => void) => {
+      fired++
+      return () => void fired--
+    }
+    const b = createBridge({ subscribe: () => () => {}, dispatch: async () => {}, sessionID: () => undefined }, recordingHost().host, memoryStore(), MOBILE_CAPABILITIES, subscribe)
+    const off = b.onHidden?.(() => {})
+    expect(fired).toBe(1)
+    off?.()
+    expect(fired).toBe(0)
+  })
 })
