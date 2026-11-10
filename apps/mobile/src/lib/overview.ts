@@ -12,6 +12,7 @@ import { combineActivity, sessionActivity, sortByActivity, type Activity, type A
 import type { EventEnvelope, SessionInfo } from "@occ/core/api"
 import { folderName, sameDirectory, shortenHome } from "@occ/core/paths"
 import { UNTITLED } from "@occ/core/sessions"
+import { stableOrder } from "@occ/core/stable-order"
 import { guessHome, projectRows, type ProjectLike, type ProjectRow } from "./projects"
 
 /** The root session fields the drawer needs; `time` keeps the same names as the server's record. */
@@ -173,30 +174,9 @@ export type FrozenOrder = {
 }
 
 /**
- * The order a list keeps while the user is looking at it: ids that were already there stay in their old relative
- * order, ids that are new are inserted where the current shared order puts them, and ids that are gone disappear.
- *
- * The shared order decides placement when the drawer opens (and when the search changes); while it stays open no
- * existing row may jump under the user's finger, however urgent a background turn becomes. A new row may still
- * appear (it did not exist before), but it slots in rather than reshuffling the rest. The next open sorts afresh.
+ * Take the ids of a built list, so live updates can be replayed in that order. `stableOrder` itself lives in
+ * `@occ/core/stable-order`: the in-chat sessions pane of the editor uses the same rule.
  */
-export function stableOrder(previousIds: ReadonlyArray<string>, nextSorted: ReadonlyArray<string>): string[] {
-  const live = new Set(nextSorted)
-  const kept = previousIds.filter((id) => live.has(id))
-  const rank = new Map(nextSorted.map((id, index) => [id, index]))
-  const result = [...kept]
-  const known = new Set(kept)
-  for (const id of nextSorted) {
-    if (known.has(id)) continue
-    const at = result.findIndex((existing) => (rank.get(existing) ?? 0) > (rank.get(id) ?? 0))
-    if (at < 0) result.push(id)
-    else result.splice(at, 0, id)
-    known.add(id)
-  }
-  return result
-}
-
-/** Take the ids of a built list, so live updates can be replayed in that order. */
 export function freezeOrder(groups: ReadonlyArray<OverviewGroup>): FrozenOrder {
   return {
     groups: groups.map((group) => group.directory),
