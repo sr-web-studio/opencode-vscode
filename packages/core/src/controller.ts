@@ -82,6 +82,8 @@ export class Controller {
     (m) => {
       this.setTranscriptError(m)
     },
+    // A failed transcript load must leave a line in the host's log: the view only says "could not load".
+    (line) => this.opts.log?.(line),
   )
   private observers = new Set<Observer>()
   private shells = new Map<string, { sessionID?: string; running: boolean }>()

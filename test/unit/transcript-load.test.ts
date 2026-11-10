@@ -45,11 +45,25 @@ function server() {
 }
 
 /** A controller whose startup sync runs against `client` (no stream: the test drives sync itself). */
-async function synced(client: any) {
-  const ctl = new Controller({ directory: "/w", folderName: "w", displayPath: "/w" })
+async function synced(client: any, log?: (line: string) => void) {
+  const ctl = new Controller({ directory: "/w", folderName: "w", displayPath: "/w", log })
   ;(ctl as any).client = client
   await ctl.sync()
   return ctl
+}
+
+/** The controller logs more than transcripts (folder sync, session count); these tests only look at the transcript lines. */
+const transcriptLog = (lines: string[]) => (line: string) => {
+  if (line.startsWith("Transcript of ")) lines.push(line)
+}
+
+/** The shape `@opencode/client` throws for a request that never reached the server. */
+function transportError(): Error {
+  return Object.assign(new Error("Transport: fetch failed"), {
+    name: "ClientError",
+    reason: "Transport",
+    cause: new TypeError("fetch failed"),
+  })
 }
 
 describe("a transcript that fails to load", () => {
@@ -144,5 +158,58 @@ describe("a transcript that fails to load", () => {
     await feed.load(client, "ses_b")
     expect(feed.view.turns).toEqual([])
     expect(feed.view.loaded).toBe(true)
+  })
+})
+
+describe("the log of a transcript load", () => {
+  test("a first attempt that fails and a retry that works leave both lines, with the error chain", async () => {
+    const client = server()
+    const { list } = messageListFake(history)
+    let calls = 0
+    client.message.list = async (input: any) => {
+      if (++calls === 1) throw transportError()
+      return list(input)
+    }
+    const lines: string[] = []
+    const ctl = await synced(client, transcriptLog(lines))
+    expect(lines.length).toBe(2)
+    expect(lines[0]).toMatch(/^Transcript of ses_a failed on attempt 1 after \d+ ms: ClientError: Transport: fetch failed \(reason: Transport\) <- TypeError: fetch failed$/)
+    expect(lines[1]).toMatch(/^Transcript of ses_a loaded on attempt 2 after \d+ ms$/)
+    ctl.detach()
+  })
+
+  test("a status error keeps its HTTP status in the line", async () => {
+    const client = server()
+    client.message.list = async () => {
+      throw Object.assign(new Error("500"), { name: "ClientError", reason: "UnexpectedStatus", cause: { status: 500 } })
+    }
+    const lines: string[] = []
+    const ctl = await synced(client, transcriptLog(lines))
+    expect(lines.length).toBe(2)
+    for (const line of lines) expect(line).toContain("(reason: UnexpectedStatus) <- status: 500")
+    expect(lines.some((line) => line.startsWith("Transcript of ses_a loaded"))).toBe(false)
+    ctl.detach()
+  })
+
+  test("a first load that works says nothing", async () => {
+    const lines: string[] = []
+    const ctl = await synced(server(), transcriptLog(lines))
+    expect(lines).toEqual([])
+    ctl.detach()
+  })
+
+  test("opening the session again after a failed load says that the later load worked", async () => {
+    const client = server()
+    const { list } = messageListFake(history)
+    client.message.list = failed
+    const lines: string[] = []
+    const ctl = await synced(client, transcriptLog(lines))
+    expect(lines.filter((line) => line.includes("failed on attempt"))).toHaveLength(2)
+
+    lines.length = 0
+    client.message.list = list
+    await ctl.open("ses_a")
+    expect(lines).toEqual([expect.stringMatching(/^Transcript of ses_a loaded on attempt 1 after \d+ ms$/)])
+    ctl.detach()
   })
 })
