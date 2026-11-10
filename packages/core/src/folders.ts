@@ -26,6 +26,8 @@ export type FolderController = {
   isWaiting(): boolean
   open(id: string): Promise<void>
   dispatch(action: Action): Promise<void>
+  /** The chat view shows this folder (or not): only the folder on screen loads its transcript at startup. */
+  setActive(active: boolean): void
 }
 
 /** A workspace folder the view can show. */
@@ -110,6 +112,8 @@ export class FolderRegistry<C extends FolderController> {
     const next = folders.length === 0 ? "" : keep.has(this.activeDirectory) && this.activeDirectory ? this.activeDirectory : remembered && keep.has(remembered) ? remembered : list[0]!.directory
     const activeChanged = this.setActiveDirectory(next)
     if (activeChanged && next) this.opts.remember?.set(next)
+    // Also for a folder that just joined: a new controller does not know yet whether it is the one on screen.
+    this.applyActive()
 
     if (controllersChanged || entriesChanged) for (const listener of this.changeListeners) listener()
     if (activeChanged) for (const listener of this.activeListeners) listener()
@@ -143,7 +147,10 @@ export class FolderRegistry<C extends FolderController> {
     if (!key) return false
     const changed = this.setActiveDirectory(key)
     if (changed && key) this.opts.remember?.set(key)
-    if (changed) for (const listener of this.activeListeners) listener()
+    if (changed) {
+      this.applyActive()
+      for (const listener of this.activeListeners) listener()
+    }
     return changed
   }
 
@@ -283,6 +290,11 @@ export class FolderRegistry<C extends FolderController> {
     if (directory === this.activeDirectory) return false
     this.activeDirectory = directory
     return true
+  }
+
+  /** Tell every controller whether it is the folder on screen. */
+  private applyActive(): void {
+    for (const [directory, controller] of this.byDirectory) controller.setActive(directory === this.activeDirectory)
   }
 
   /**

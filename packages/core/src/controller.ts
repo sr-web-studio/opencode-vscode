@@ -75,6 +75,12 @@ export class Controller {
   private running = new Set<string>()
   /** The chat view is on screen. The host sets it (`setVisible`); until then a turn end is not treated as seen. */
   private visible = false
+  /**
+   * The chat view shows this folder: the folder registry sets it, and a host with one controller (the phone) leaves it
+   * true. A multi-root window attaches every folder's controller at once; only the one on screen loads its transcript
+   * then, the others when they come on screen.
+   */
+  private active = true
   private permissions = new Map<string, PermissionRequest[]>()
   private forms = new Map<string, FormInfo[]>()
   private readonly feed = new SessionFeed(
@@ -691,8 +697,9 @@ export class Controller {
           typeof remembered === "string" ? remembered : undefined,
         )
       }
-      if (this.target.kind === "session") await this.loadView(this.target.id)
-      else this.children.clear()
+      // A folder in the background has no chat to fill: its transcript is loaded when the view switches to it.
+      if (this.target.kind === "session" && this.active) await this.loadView(this.target.id)
+      else if (this.target.kind !== "session") this.children.clear()
       // A transcript that failed to load keeps its error: the user acts on it, a background refetch does not hide it.
       if (!this.feed.loadError) this.error = undefined
     } catch (e) {
@@ -1037,6 +1044,26 @@ export class Controller {
   setVisible(visible: boolean): void {
     this.visible = visible
     if (visible && this.target.kind === "session") this.markViewed(this.target.id)
+  }
+
+  /**
+   * The chat view switched to this folder (or away from it). Every folder's controller stays attached so sessions,
+   * notifications and running state keep working, but only the folder on screen loads its transcript: nine folders
+   * loading at startup put nine slow requests on the server at once, and a busy server closes one after ten seconds.
+   * A folder that comes on screen loads what it skipped.
+   */
+  setActive(active: boolean): void {
+    if (this.active === active) return
+    this.active = active
+    if (active) void this.loadPendingView()
+  }
+
+  /** The transcript of the session on screen, when this folder never loaded one (it started in the background). */
+  private async loadPendingView(): Promise<void> {
+    const id = this.currentSessionID
+    if (!id || !this.client || this.feed.loading) return
+    if (this.feed.view.loaded && !this.feed.loadError) return
+    await this.loadView(id)
   }
 
   /**
