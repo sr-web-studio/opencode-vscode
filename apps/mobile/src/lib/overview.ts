@@ -11,6 +11,7 @@
 import { combineActivity, sessionActivity, sortByActivity, type Activity, type ActivityState } from "@occ/core/activity-order"
 import type { EventEnvelope, SessionInfo } from "@occ/core/api"
 import { folderName, sameDirectory, shortenHome } from "@occ/core/paths"
+import { combineStatus, sessionStatus, unreadCount, type SessionStatus } from "@occ/core/session-status"
 import { UNTITLED } from "@occ/core/sessions"
 import { stableOrder } from "@occ/core/stable-order"
 import { guessHome, projectRows, type ProjectLike, type ProjectRow } from "./projects"
@@ -21,11 +22,14 @@ export type OverviewSession = {
   title: string
   directory: string
   archived: boolean
+  /** The last turn's result, for the failed/unread status. */
+  outcome?: "succeeded" | "failed" | "interrupted"
   time: {
     created: number
     updated: number
     busy?: number
     idle?: number
+    viewed?: number
   }
 }
 
@@ -41,7 +45,7 @@ export type OverviewData = {
   forms: Record<string, string[]>
 }
 
-export type OverviewSessionRow = OverviewSession & { title: string; state: ActivityState; last: number }
+export type OverviewSessionRow = OverviewSession & { title: string; state: ActivityState; status: SessionStatus; last: number }
 
 export type OverviewGroup = {
   directory: string
@@ -50,8 +54,12 @@ export type OverviewGroup = {
   projectName?: string
   /** Newest activity of the project's sessions and of its own record. */
   last: number
-  /** The highest state among its sessions. */
+  /** The highest state among its sessions, for the shared order. */
   state: ActivityState
+  /** The highest status among its sessions, for the group's icon. */
+  status: SessionStatus
+  /** Sessions whose last turn the user has not seen. */
+  unread: number
   sessions: OverviewSessionRow[]
 }
 
@@ -73,11 +81,13 @@ export function toOverviewSession(session: SessionInfo): OverviewSession {
     title: session.title?.trim() ?? "",
     directory: trimSlash(session.location?.directory ?? ""),
     archived: session.time?.archived !== undefined,
+    outcome: session.outcome,
     time: {
       created: session.time?.created ?? 0,
       updated: session.time?.updated ?? 0,
       busy: session.time?.busy,
       idle: session.time?.idle,
+      viewed: session.time?.viewed,
     },
   }
 }
@@ -99,8 +109,10 @@ export function overviewSets(data: Pick<OverviewData, "running" | "permissions" 
  * One row per project folder, in the shared order. A session belongs to the first project folder with the same path
  * (`sameDirectory`, so spelling and trailing slashes do not split a folder); a session whose folder is not a known
  * project still gets a group named after that folder, so nothing disappears from the drawer.
+ *
+ * `now` is the clock the unread window reads; the caller passes it so this stays pure and a test is deterministic.
  */
-export function buildOverview(data: OverviewData, names: OverviewNames = {}): OverviewGroup[] {
+export function buildOverview(data: OverviewData, names: OverviewNames = {}, now: number = Date.now()): OverviewGroup[] {
   const rows = projectRows(data.projects, "", names.resolved)
   const home = guessHome(data.projects.map((p) => p.canonical))
   const sets = overviewSets(data)
@@ -124,7 +136,7 @@ export function buildOverview(data: OverviewData, names: OverviewNames = {}): Ov
     const ordered = sortByActivity(
       sessions.map((session) => {
         const activity = sessionActivity({ id: session.id, time: session.time }, sets)
-        return { ...session, title: session.title.trim() || UNTITLED, state: activity.state, last: activity.last }
+        return { ...session, title: session.title.trim() || UNTITLED, state: activity.state, status: sessionStatus(session, sets, now), last: activity.last }
       }),
       (session) => ({ state: session.state, last: session.last, title: session.title, id: session.id }),
     )
@@ -141,6 +153,8 @@ export function buildOverview(data: OverviewData, names: OverviewNames = {}): Ov
       projectName: row?.projectName,
       last: combined.last,
       state: combined.state,
+      status: combineStatus(ordered.map((session) => session.status)),
+      unread: unreadCount(ordered.map((session) => session.status)),
       sessions: ordered,
     })
   }
@@ -234,6 +248,12 @@ const touch = (sessions: OverviewSession[], id: string, at: number | undefined, 
   return sessions.map((session) => (session.id === id ? { ...session, time: { ...session.time, ...patch, updated: Math.max(session.time.updated, at) } } : session))
 }
 
+/** A turn ended: its outcome and end stamp land on the row, so the drawer can show failed/unread without a refetch. */
+const settle = (sessions: OverviewSession[], id: string, at: number | undefined, outcome: OverviewSession["outcome"]): OverviewSession[] =>
+  sessions.map((session) =>
+    session.id === id ? { ...session, outcome, time: at ? { ...session.time, idle: at, busy: undefined, updated: Math.max(session.time.updated, at) } : session.time } : session,
+  )
+
 const without = (list: string[], id: string): string[] => (list.includes(id) ? list.filter((entry) => entry !== id) : list)
 const withId = (list: string[], id: string): string[] => (list.includes(id) ? list : [...list, id])
 
@@ -309,7 +329,16 @@ export function applyOverviewEvent(data: OverviewData, ev: EventEnvelope): Overv
     case "session.execution.failed":
     case "session.execution.interrupted": {
       if (!sessionID) return { state: data }
-      return { state: { ...data, running: without(data.running, sessionID), sessions: touch(data.sessions, sessionID, ev.created, { idle: ev.created, busy: undefined }) } }
+      const outcome = ev.type === "session.execution.succeeded" ? "succeeded" : ev.type === "session.execution.failed" ? "failed" : "interrupted"
+      return { state: { ...data, running: without(data.running, sessionID), sessions: settle(data.sessions, sessionID, ev.created, outcome) } }
+    }
+    case "session.viewed": {
+      // A client opened the session: the turn that ended at `idle` is now seen. Merely looking must not move a row,
+      // so `updated` is left alone and only `viewed` moves (never backwards).
+      const idle = typeof d.idle === "number" ? d.idle : undefined
+      if (!sessionID || idle === undefined) return { state: data }
+      const sessions = data.sessions.map((session) => (session.id === sessionID ? { ...session, time: { ...session.time, viewed: Math.max(session.time.viewed ?? 0, idle) } } : session))
+      return { state: { ...data, sessions } }
     }
     case "session.status": {
       if (!sessionID) return { state: data }

@@ -144,6 +144,8 @@ class AppModel {
   /** The session each open project's controller shows (a chat opens "the newest one" without saying which). */
   private readonly viewing = new Map<string, string | undefined>()
   private shownSession = ""
+  /** The app is in front. A backgrounded app has no chat on screen, so turn ends stay unread. */
+  private foreground = true
 
   /* ----------------------------------------------------------- start */
 
@@ -152,14 +154,20 @@ class AppModel {
     this.started = true
     onHardwareBack(() => this.back())
     onResume(() => {
+      this.foreground = true
       this.workspace?.resume()
       this.overview.resume()
       // Back in front: the session on screen counts as seen again, so its notification goes.
       this.shownSession = ""
       this.syncVisible()
+      this.syncOnScreen()
       void this.syncNotify()
     })
-    onPause(() => this.overview.pause())
+    onPause(() => {
+      this.foreground = false
+      this.syncOnScreen()
+      this.overview.pause()
+    })
     onUrlOpen((url) => void this.openLink(url))
     try {
       this.profiles = await this.store.list()
@@ -191,6 +199,7 @@ class AppModel {
     this.settingsOpen = false
     this.settle()
     this.syncVisible()
+    this.syncOnScreen()
   }
 
   push(screen: Screen) {
@@ -209,6 +218,7 @@ class AppModel {
   openSettings() {
     this.closeDrawer()
     this.settingsOpen = true
+    this.syncOnScreen()
     void this.refreshNotifyStatus()
   }
 
@@ -233,6 +243,7 @@ class AppModel {
       this.replace(key, { kind: "worker", directory, sessionID })
       return
     }
+    // The controller marks the turn seen itself (`open`), in the editor and in OpenCode's own UI too.
     await ctl.dispatch({ type: "openSession", id: sessionID })
   }
 
@@ -262,6 +273,7 @@ class AppModel {
     }
     if (action === "settings") {
       this.settingsOpen = false
+      this.syncOnScreen()
       return true
     }
     if (action === "exit") return false
@@ -280,12 +292,16 @@ class AppModel {
   openDrawer(): void {
     this.drawerOpen = true
     this.overview.setDrawerOpen(true)
+    // The drawer covers the chat: a turn that ends now is "New reply", not something the user has read.
+    this.syncOnScreen()
   }
 
   closeDrawer(): void {
     if (!this.drawerOpen) return
     this.drawerOpen = false
     this.overview.setDrawerOpen(false)
+    // The chat is in front again, so whatever ended meanwhile has been seen.
+    this.syncOnScreen()
   }
 
   /** Tap a session in the drawer: close it and open that chat, the same stack a notification tap builds. */
@@ -441,7 +457,10 @@ class AppModel {
     const ws = this.workspace
     if (!ws) throw new Error("Not connected to a server.")
     // The chat shows OpenCode's project name where the folder name would be; the path stays below it.
-    return ws.acquire({ directory, folderName: this.projectTitle(directory) ?? folderName(directory), displayPath: shortenHome(directory, this.home) })
+    const ctl = ws.acquire({ directory, folderName: this.projectTitle(directory) ?? folderName(directory), displayPath: shortenHome(directory, this.home) })
+    // A controller starts "on screen"; fix that for a chat that is not the top screen (or a backgrounded app).
+    this.syncOnScreen()
+    return ctl
   }
 
   /** Has this project's controller finished its first sync? */
@@ -714,6 +733,18 @@ class AppModel {
 
   openNotificationSettings(): void {
     void openNotificationSettings()
+  }
+
+  /**
+   * Tell the controllers which chat is on screen. Only a chat screen in the foreground, with no drawer or Settings
+   * over it, is a look at its session; a turn that ends while something else is in front stays "New reply" in the
+   * drawer.
+   */
+  private syncOnScreen(): void {
+    const top = this.top.screen
+    const covered = this.drawerOpen || this.settingsOpen
+    const directory = this.foreground && !covered && top.kind === "chat" ? top.directory : undefined
+    this.workspace?.showOnScreen(directory)
   }
 
   /** Tell the service which session is on screen (no notification for it) and clear that session's notification. */

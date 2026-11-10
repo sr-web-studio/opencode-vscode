@@ -46,6 +46,7 @@ export function createVsCodeBridge(): HostBridge {
     showTerminal: (shellID, title) => host({ type: "showTerminal", shellID, title }),
     openSession: (id, options) => host({ type: "openSession", id, readOnly: options.readOnly }),
     openSessionInFolder: (sessionID, directory) => host({ type: "openSessionInFolder", sessionID, directory }),
+    renameSession: (sessionID, directory, title) => host({ type: "renameSession", sessionID, directory, title }),
     refreshSessions: () => host({ type: "refreshSessions" }),
     confirmRevert: (messageID) => host({ type: "confirmRevert", messageID }),
     confirmDeleteSession: (sessionID, title, directory) => host({ type: "confirmDeleteSession", sessionID, title, directory }),

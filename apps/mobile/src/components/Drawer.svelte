@@ -4,6 +4,7 @@
   import Codicon from "@occ/ui/components/Codicon.svelte"
   import { relativeTime } from "@occ/core/format"
   import type { ActivityState } from "@occ/core/activity-order"
+  import { statusLabel, type SessionStatus } from "@occ/core/session-status"
   import { applyFrozenOrder, buildOverview, filterOverview, freezeOrder, type FrozenOrder, type OverviewGroup } from "../lib/overview"
   import { expandedKey, isExpanded, parseExpanded, setExpanded } from "../lib/drawer-prefs"
   import { model } from "../model.svelte"
@@ -21,7 +22,7 @@
   const reduce = typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
   const duration = reduce ? 0 : 200
 
-  const liveGroups = $derived(model.overview.data ? buildOverview(model.overview.data, { resolved: model.projectIDs, titles: model.projectTitles }) : [])
+  const liveGroups = $derived(model.overview.data ? buildOverview(model.overview.data, { resolved: model.projectIDs, titles: model.projectTitles }, Date.now()) : [])
   /** Only the presence of the first snapshot is tracked: it tells the freeze when there is finally a list to hold. */
   const hasData = $derived(!!model.overview.data)
   const groups = $derived(frozen ? applyFrozenOrder(liveGroups, frozen.order) : liveGroups)
@@ -73,16 +74,9 @@
     }
   }
 
-  function statusLabel(state: ActivityState): string | undefined {
-    if (state === "running") return "Running"
-    if (state === "waiting") return "Waiting for you"
-    return undefined
-  }
-
-  function statusText(state: ActivityState): string | undefined {
-    if (state === "running") return "Running"
-    if (state === "waiting") return "Waiting for your answer"
-    return undefined
+  /** The second line of a row: the words behind the icon, when there is something to say. */
+  function statusText(status: SessionStatus): string | undefined {
+    return status === "read" ? undefined : statusLabel(status)
   }
 
   function openByDefault(directory: string, state: ActivityState): boolean {
@@ -98,6 +92,16 @@
     }
   }
 </script>
+
+{#snippet stateIcon(status: SessionStatus)}
+  <span class="state {status}">
+    {#if status === "running"}<Codicon name="loading" spin />
+    {:else if status === "waiting"}<Codicon name="bell-dot" />
+    {:else if status === "failed"}<Codicon name="error" />
+    {:else if status === "unread"}<Codicon name="circle-filled" />
+    {:else}<Codicon name="check" />{/if}
+  </span>
+{/snippet}
 
 {#if model.drawerOpen}
   <div class="scrim" role="presentation" transition:fade={{ duration: reduce ? 0 : 150 }} onclick={() => model.closeDrawer()}></div>
@@ -144,11 +148,16 @@
           {@const open = query.trim() ? true : isExpanded(expanded, group.directory, frozen?.open[group.directory] ?? openByDefault(group.directory, group.state))}
           <section class="group">
             <div class="prow">
-              <button class="pname" onclick={() => model.openProject(group.directory)} aria-label="Open {group.title}">
-                <span class="dot {group.state}" role={group.state === "idle" ? undefined : "img"} aria-label={statusLabel(group.state)} aria-hidden={group.state === "idle" ? "true" : undefined}
-                ></span>
+              <button
+                class="pname"
+                onclick={() => model.openProject(group.directory)}
+                aria-label={`Open ${group.title}, ${statusLabel(group.status)}${group.unread > 0 ? `, ${group.unread} unread` : ""}`}
+              >
+                {@render stateIcon(group.status)}
                 <span class="main">
-                  <span class="t">{group.title}</span>
+                  <span class="t"
+                    >{group.title}{#if group.unread > 0}<span class="badge" aria-hidden="true" title={`${group.unread} unread`}>{group.unread}</span>{/if}</span
+                  >
                   <span class="s">{group.sessions.length} {group.sessions.length === 1 ? "session" : "sessions"}</span>
                 </span>
               </button>
@@ -161,16 +170,11 @@
                 <div class="empty">No sessions yet</div>
               {:else}
                 {#each group.sessions as session (session.id)}
-                  <button class="srow" onclick={() => model.openSession(group.directory, session.id)}>
-                    <span
-                      class="dot {session.state}"
-                      role={session.state === "idle" ? undefined : "img"}
-                      aria-label={statusLabel(session.state)}
-                      aria-hidden={session.state === "idle" ? "true" : undefined}
-                    ></span>
+                  <button class="srow" onclick={() => model.openSession(group.directory, session.id)} aria-label={`${session.title}, ${statusLabel(session.status)}`}>
+                    {@render stateIcon(session.status)}
                     <span class="main">
-                      <span class="t">{session.title}</span>
-                      {#if statusText(session.state)}<span class="s">{statusText(session.state)}</span>{/if}
+                      <span class="t" class:unread={session.status === "unread"}>{session.title}</span>
+                      {#if statusText(session.status)}<span class="s">{statusText(session.status)}</span>{/if}
                     </span>
                     <span class="end">{relativeTime(session.last, now)}</span>
                   </button>
@@ -329,6 +333,23 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  .t.unread {
+    font-weight: 700;
+  }
+  .badge {
+    display: inline-block;
+    margin-left: 6px;
+    min-width: 1.4em;
+    padding: 0 0.35em;
+    border-radius: 999px;
+    background: var(--oc-accent);
+    color: var(--vscode-badge-foreground, var(--oc-selected-fg));
+    font-size: 0.78em;
+    font-weight: 600;
+    line-height: 1.4em;
+    text-align: center;
+    vertical-align: middle;
+  }
   .s {
     display: block;
     font-size: 0.82em;
@@ -428,36 +449,22 @@
   .fbtn:active {
     background: var(--oc-hover);
   }
-  .dot {
+  .state {
     flex: none;
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: transparent;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    color: var(--oc-muted);
   }
-  .dot.idle {
-    width: 6px;
-    height: 6px;
-    margin: 0 2px;
-    background: var(--oc-muted);
-    opacity: 0.35;
+  .state.running,
+  .state.unread {
+    color: var(--oc-accent);
   }
-  .dot.running {
-    background: var(--oc-ok);
-    animation: drawer-pulse 1.4s ease-in-out infinite;
+  .state.waiting {
+    color: var(--oc-amber);
   }
-  .dot.waiting {
-    background: var(--oc-amber);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--oc-amber) 30%, transparent);
-  }
-  @keyframes drawer-pulse {
-    50% {
-      opacity: 0.35;
-    }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .dot.running {
-      animation: none;
-    }
+  .state.failed {
+    color: var(--oc-error);
   }
 </style>

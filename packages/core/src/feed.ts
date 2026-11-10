@@ -7,6 +7,41 @@ const isDelta = (type: string) => type === "session.text.delta" || type === "ses
 const message = (e: unknown): string => (e instanceof Error ? e.message : typeof e === "string" ? e : "Request failed")
 
 /**
+ * One line for a failed request: name, message, the client's own `reason`/`status`, and the whole `cause` chain. The
+ * client's transport errors wrap the real one (`ClientError: Transport` with a `TypeError` cause), and a status error
+ * keeps `{ status }` as its cause, so both are worth keeping. Only these fields are read, never headers or a body, so
+ * a token or message text can never reach the log through an unknown cause object.
+ */
+function errorDetail(e: unknown): string {
+  const parts: string[] = []
+  const seen = new Set<unknown>()
+  let cur: unknown = e
+  for (let depth = 0; depth < 6 && cur !== undefined && cur !== null && !seen.has(cur); depth++) {
+    seen.add(cur)
+    if (cur instanceof Error) {
+      const o = cur as Error & { reason?: unknown; status?: unknown; cause?: unknown }
+      const extra: string[] = []
+      if (typeof o.reason === "string") extra.push(`reason: ${o.reason}`)
+      if (typeof o.status === "number") extra.push(`status: ${o.status}`)
+      parts.push(`${o.name || "Error"}: ${o.message}${extra.length ? ` (${extra.join(", ")})` : ""}`)
+      cur = o.cause
+      continue
+    }
+    if (typeof cur === "object") {
+      const o = cur as { status?: unknown; message?: unknown; cause?: unknown }
+      if (typeof o.status === "number") parts.push(`status: ${o.status}`)
+      else if (typeof o.message === "string") parts.push(o.message)
+      else parts.push("[cause object]")
+      cur = o.cause
+      continue
+    }
+    parts.push(String(cur))
+    cur = undefined
+  }
+  return parts.length ? parts.join(" <- ") : "unknown error"
+}
+
+/**
  * The transcript of one session: loaded from history (since the last compaction), then kept current by live events.
  * Used for the main session of a window and for read-only worker tabs, so both load and stream the same way.
  *
@@ -35,11 +70,15 @@ export class SessionFeed {
   private stash: TurnView[] = []
   private token = 0
   private buffered: EventEnvelope[] = []
+  /** The session whose last load failed, so the load that finally succeeds says so in the log. */
+  private failedSession?: string
 
   constructor(
     /** `immediate` asks for a prompt redraw (loading state changes); otherwise the owner may batch. */
     private readonly changed: (immediate: boolean) => void,
     private readonly failed: (message: string) => void,
+    /** Diagnostics for the host's output channel: why a load failed, and when a retry or a later load worked. */
+    private readonly log?: (line: string) => void,
   ) {}
 
   private fetcher(client: OpenCodeClient, sessionID: string): FetchPage {
@@ -81,18 +120,35 @@ export class SessionFeed {
     const token = this.token
     this.loading = true
     this.changed(true)
+    const started = Date.now()
+    let attempts = 0
+    /** One attempt, with the time it took: a stalled request is what a failure log has to show. */
+    const once = async () => {
+      attempts++
+      const at = Date.now()
+      const result = await this.attempt(client, sessionID)
+      return { result, ms: Date.now() - at }
+    }
     try {
-      let result = await this.attempt(client, sessionID)
+      let { result, ms } = await once()
       if (token !== this.token) return
+      if ("error" in result) this.log?.(`Transcript of ${sessionID} failed on attempt ${attempts} after ${ms} ms: ${errorDetail(result.error)}`)
       if ("error" in result || (result.chunk.messages.length === 0 && !result.chunk.hasMore)) {
-        const again = await this.attempt(client, sessionID)
+        const again = await once()
         if (token !== this.token) return
-        if (!("error" in again)) result = again
+        if ("error" in again.result) this.log?.(`Transcript of ${sessionID} failed on attempt ${attempts} after ${again.ms} ms: ${errorDetail(again.result.error)}`)
+        else {
+          this.logLoaded(sessionID, attempts, Date.now() - started)
+          result = again.result
+        }
+      } else {
+        this.logLoaded(sessionID, attempts, Date.now() - started)
       }
       if ("error" in result) {
         // An empty transcript with no reason looks like an empty session: keep what was shown, and say what happened.
+        this.failedSession = sessionID
         this.view = previous ? { ...previous, loaded: true } : { ...emptyView(), loaded: true }
-        this.loadError = `Could not load the session: ${result.error}`
+        this.loadError = `Could not load the session: ${message(result.error)}`
         this.failed(this.loadError)
         return
       }
@@ -101,6 +157,7 @@ export class SessionFeed {
       this.view = view
       this.sessionID = sessionID
       this.loadError = undefined
+      this.failedSession = undefined
       this.history = result.chunk.state
       this.historyMore = result.chunk.hasMore
       this.hasEarlier = result.chunk.hasMore
@@ -113,8 +170,14 @@ export class SessionFeed {
     }
   }
 
+  /** A successful load is only worth a line when it was not the first try (a retry, or a later load after a failure). */
+  private logLoaded(sessionID: string, attempts: number, ms: number): void {
+    if (attempts === 1 && this.failedSession !== sessionID) return
+    this.log?.(`Transcript of ${sessionID} loaded on attempt ${attempts} after ${ms} ms`)
+  }
+
   /** One attempt at the first chunk and the inbox. Never throws: the caller decides whether to try again. */
-  private async attempt(client: OpenCodeClient, sessionID: string): Promise<{ chunk: Chunk; inbox: unknown[] } | { error: string }> {
+  private async attempt(client: OpenCodeClient, sessionID: string): Promise<{ chunk: Chunk; inbox: unknown[] } | { error: unknown }> {
     try {
       // Queued prompts live in the session inbox, not in the message list, until they are delivered.
       const [chunk, inbox] = await Promise.all([
@@ -125,7 +188,7 @@ export class SessionFeed {
       ])
       return { chunk, inbox: inbox as unknown[] }
     } catch (e) {
-      return { error: message(e) }
+      return { error: e }
     }
   }
 
@@ -144,6 +207,7 @@ export class SessionFeed {
     const token = this.token
     this.loadingEarlier = true
     this.changed(true)
+    const started = Date.now()
     try {
       const chunk = await loadChunk(this.fetcher(client, sessionID), this.history)
       if (token !== this.token) return
@@ -153,6 +217,7 @@ export class SessionFeed {
       this.hasEarlier = chunk.hasMore
       this.earlierTick++
     } catch (e) {
+      this.log?.(`Transcript of ${sessionID} failed to load earlier messages after ${Date.now() - started} ms: ${errorDetail(e)}`)
       if (token === this.token) this.failed(`Could not load earlier messages: ${message(e)}`)
     } finally {
       if (token === this.token) {

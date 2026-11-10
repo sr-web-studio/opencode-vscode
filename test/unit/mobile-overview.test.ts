@@ -23,16 +23,20 @@ const project = (id: string, canonical: string, updated: number, name?: string):
   time: { created: 1, updated, active: updated },
 })
 
-const session = (id: string, directory: string, updated: number, title?: string, over: Partial<SessionInfo["time"]> = {}): SessionInfo =>
+const session = (id: string, directory: string, updated: number, title?: string, over: Partial<SessionInfo["time"]> = {}, outcome?: SessionInfo["outcome"]): SessionInfo =>
   ({
     id,
     projectID: "p",
     title,
     location: { directory },
+    outcome,
     time: { created: updated, updated, ...over },
   }) as SessionInfo
 
 const data = (over: Partial<OverviewData> = {}): OverviewData => ({ ...emptyOverview(), ...over })
+
+/** The clock the status tests read: just after the fixtures' stamps, so their turns are inside the unread window. */
+const NOW = 100
 
 const waitingFor = (ids: string[]): Record<string, string[]> => Object.fromEntries(ids.map((id) => [id, ["request"]]))
 
@@ -156,6 +160,30 @@ describe("waiting and running derivation", () => {
   })
 })
 
+describe("status and unread", () => {
+  test("a row's status comes from the outcome and the view stamp; the group shows the highest", () => {
+    const groups = buildOverview(
+      data({
+        projects: [project("a", "/work/app", 1)],
+        sessions: rows(
+          session("fail", "/work/app", 40, "Fail", { idle: 40 }, "failed"),
+          session("new", "/work/app", 30, "New", { idle: 30 }, "succeeded"),
+          session("seen", "/work/app", 20, "Seen", { idle: 20, viewed: 20 }, "succeeded"),
+        ),
+      }),
+      {},
+      NOW,
+    )
+    expect(groups[0]?.sessions.map((s) => [s.id, s.status])).toEqual([
+      ["fail", "failed"],
+      ["new", "unread"],
+      ["seen", "read"],
+    ])
+    expect(groups[0]?.status).toBe("failed")
+    expect(groups[0]?.unread).toBe(1)
+  })
+})
+
 describe("live events", () => {
   const base = () =>
     data({
@@ -193,6 +221,35 @@ describe("live events", () => {
     expect(done.state.running).toEqual([])
     expect(done.state.sessions[0]?.time.updated).toBe(40)
     expect(done.state.sessions[0]?.time.busy).toBeUndefined()
+  })
+
+  test("a finished turn records its outcome and idle stamp, so the row can show failed or unread", () => {
+    const done = applyOverviewEvent(base(), { type: "session.execution.succeeded", created: 40, data: { sessionID: "s1" } })
+    expect(done.state.sessions[0]?.outcome).toBe("succeeded")
+    expect(done.state.sessions[0]?.time.idle).toBe(40)
+    expect(buildOverview(done.state, {}, NOW)[0]?.sessions[0]?.status).toBe("unread")
+    const failed = applyOverviewEvent(base(), { type: "session.execution.failed", created: 40, data: { sessionID: "s1" } })
+    expect(failed.state.sessions[0]?.outcome).toBe("failed")
+    expect(buildOverview(failed.state, {}, NOW)[0]?.sessions[0]?.status).toBe("failed")
+    const stopped = applyOverviewEvent(base(), { type: "session.execution.interrupted", created: 40, data: { sessionID: "s1" } })
+    expect(stopped.state.sessions[0]?.outcome).toBe("interrupted")
+    expect(buildOverview(stopped.state, {}, NOW)[0]?.sessions[0]?.status).toBe("unread")
+  })
+
+  test("session.viewed marks the finished turn seen without moving the row or its activity stamp", () => {
+    const done = applyOverviewEvent(base(), { type: "session.execution.succeeded", created: 40, data: { sessionID: "s1" } })
+    expect(buildOverview(done.state, {}, NOW)[0]?.sessions[0]?.status).toBe("unread")
+    const updated = done.state.sessions[0]!.time.updated
+    const viewed = applyOverviewEvent(done.state, { type: "session.viewed", data: { sessionID: "s1", idle: 40 } })
+    expect(viewed.state.sessions[0]?.time.viewed).toBe(40)
+    expect(viewed.state.sessions[0]?.time.updated).toBe(updated)
+    expect(buildOverview(viewed.state, {}, NOW)[0]?.sessions[0]?.status).toBe("read")
+    // A late view stamp never moves `viewed` backwards.
+    const stale = applyOverviewEvent(viewed.state, { type: "session.viewed", data: { sessionID: "s1", idle: 20 } })
+    expect(stale.state.sessions[0]?.time.viewed).toBe(40)
+    // Without an idle stamp there is nothing to mark, and the state object is reused.
+    const missing = applyOverviewEvent(done.state, { type: "session.viewed", data: { sessionID: "s1" } })
+    expect(missing.state).toBe(done.state)
   })
 
   test("session.status busy/retry runs, idle stops; session.idle stops too", () => {

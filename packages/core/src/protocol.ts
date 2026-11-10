@@ -84,7 +84,7 @@ export type FolderInfo = {
 }
 
 /** One root session of a folder, as the in-chat sessions pane lists it. Light: no transcript, cost or tokens. */
-export type FolderSession = { id: string; title?: string; time: SessionInfo["time"] }
+export type FolderSession = { id: string; title?: string; time: SessionInfo["time"]; outcome?: SessionInfo["outcome"] }
 
 /**
  * The root sessions of one workspace folder. Posted separately from `AppState` so the main state stays small: the
@@ -271,6 +271,11 @@ export type HostRequest =
   | { type: "confirmDeleteSession"; sessionID: string; title?: string; directory?: string }
   /** The sessions pane picked a session of any folder: the host switches folders first, then opens it there. */
   | { type: "openSessionInFolder"; sessionID: string; directory?: string }
+  /**
+   * A session row's pencil: rename it in the folder that owns it, without switching the chat there. The directory
+   * comes from the row, so a row that moved folders in the meantime cannot rename the wrong session.
+   */
+  | { type: "renameSession"; sessionID: string; directory: string; title: string }
   /** The sessions pane's refresh: re-post the lists the controllers already hold, never a server call. */
   | { type: "refreshSessions" }
   | { type: "openExternal"; url: string }

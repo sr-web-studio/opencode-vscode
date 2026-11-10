@@ -10,6 +10,7 @@ import { combineActivity, sessionActivity, sortByActivity, type ActivityState } 
 import { relativeTime } from "./format"
 import { sameDirectory } from "./paths"
 import type { AppState, FolderSessions } from "./protocol"
+import { combineStatus, sessionStatus, unreadCount, type SessionStatus } from "./session-status"
 import { UNTITLED } from "./sessions"
 import { stableOrder } from "./stable-order"
 
@@ -18,7 +19,9 @@ export type PaneSession = {
   id: string
   title?: string
   parentID?: string
-  time: { created: number; updated: number; busy?: number; idle?: number; archived?: number }
+  /** The last turn's result, when the record carries one (the active folder's sessions do). */
+  outcome?: "succeeded" | "failed" | "interrupted"
+  time: { created: number; updated: number; busy?: number; idle?: number; viewed?: number; archived?: number }
 }
 
 /** One workspace folder's live data, as the registry and its controller already hold it. */
@@ -38,6 +41,8 @@ export type PaneFolder = {
   currentID?: string
   /** The controller has loaded its session list at least once. */
   loaded: boolean
+  /** Include this folder's archived sessions too (the active folder, while "Show archived" is on). */
+  includeArchived?: boolean
 }
 
 /** A session row: title, live state, last activity and the short relative time. */
@@ -47,6 +52,10 @@ export type PaneRow = {
   directory: string
   title: string
   state: ActivityState
+  /** What the row's icon says; the order still uses `state`. */
+  status: SessionStatus
+  /** Archived on the server: dimmed, and only listed while "Show archived" is on. */
+  archived: boolean
   /** Last activity in ms since the epoch, for the shared order and the tooltip. */
   updated: number
   /** Short relative time after the title (`5m`, `2h`, `3d`). */
@@ -61,6 +70,10 @@ export type PaneProject = {
   directory: string
   name: string
   state: ActivityState
+  /** The highest status among its sessions, for the group's icon. */
+  status: SessionStatus
+  /** Sessions the user has not seen the last turn of. */
+  unread: number
   /** Newest activity among the project's sessions, in ms since the epoch. */
   last: number
   /** The folder the chat view shows. */
@@ -74,7 +87,20 @@ export type PaneProject = {
 export type PaneLayout = { kind: "empty" } | { kind: "sessions"; sessions: PaneRow[] } | { kind: "projects"; projects: PaneProject[] }
 
 /** The parts of `AppState` the pane reads for the active folder. */
-export type PaneState = Pick<AppState, "folders" | "directory" | "folderName" | "projectName" | "sessions" | "running" | "waiting" | "target" | "sessionsLoaded">
+export type PaneState = Pick<AppState, "folders" | "directory" | "folderName" | "projectName" | "sessions" | "archived" | "showArchived" | "running" | "waiting" | "target" | "sessionsLoaded">
+
+/**
+ * The active folder's controller keeps the server's root list, which carries archived sessions too; the archived page
+ * adds the same rows. "Show archived" must still list every session once.
+ */
+function uniqueSessions(sessions: readonly PaneSession[]): PaneSession[] {
+  const seen = new Set<string>()
+  return sessions.filter((session) => {
+    if (seen.has(session.id)) return false
+    seen.add(session.id)
+    return true
+  })
+}
 
 /**
  * The pane's folder inputs from the webview's state: the active folder comes from `AppState` (fresh, with the
@@ -82,6 +108,8 @@ export type PaneState = Pick<AppState, "folders" | "directory" | "folderName" | 
  */
 export function paneFolders(state: PaneState, folderSessions: readonly FolderSessions[]): PaneFolder[] {
   const currentID = state.target.kind === "session" ? state.target.id : undefined
+  // "Show archived" is a property of the active folder's controller; other folders keep their light list as posted.
+  const activeSessions = state.showArchived ? uniqueSessions([...state.sessions, ...state.archived]) : state.sessions
   const list = state.folders ?? []
   if (list.length <= 1) {
     return [
@@ -90,11 +118,12 @@ export function paneFolders(state: PaneState, folderSessions: readonly FolderSes
         name: state.folderName,
         projectName: state.projectName,
         active: true,
-        sessions: state.sessions,
+        sessions: activeSessions,
         running: new Set(state.running),
         waiting: new Set(state.waiting),
         currentID,
         loaded: state.sessionsLoaded,
+        includeArchived: state.showArchived,
       },
     ]
   }
@@ -105,11 +134,12 @@ export function paneFolders(state: PaneState, folderSessions: readonly FolderSes
         name: folder.name,
         projectName: folder.projectName,
         active: true,
-        sessions: state.sessions,
+        sessions: activeSessions,
         running: new Set(state.running),
         waiting: new Set(state.waiting),
         currentID,
         loaded: state.sessionsLoaded,
+        includeArchived: state.showArchived,
       }
     }
     const light = folderSessions.find((entry) => sameDirectory(entry.directory, folder.directory))
@@ -131,8 +161,8 @@ function sessionRows(folder: PaneFolder, now: number): PaneRow[] {
   const sets = { running: folder.running, waiting: folder.waiting }
   const currentID = folder.active ? folder.currentID : undefined
   const rows = folder.sessions
-    // The pane lists root sessions only, and never the archived ones.
-    .filter((session) => !session.parentID && session.time.archived === undefined)
+    // The pane lists root sessions only. Archived ones stay hidden until "Show archived".
+    .filter((session) => !session.parentID && (folder.includeArchived || session.time.archived === undefined))
     .map((session): PaneRow => {
       const activity = sessionActivity(session, sets)
       return {
@@ -141,6 +171,8 @@ function sessionRows(folder: PaneFolder, now: number): PaneRow[] {
         directory: folder.directory,
         title: session.title?.trim() || UNTITLED,
         state: activity.state,
+        status: sessionStatus(session, sets, now),
+        archived: session.time.archived !== undefined,
         updated: activity.last,
         description: relativeTime(activity.last, now),
         current: session.id === currentID,
@@ -159,6 +191,8 @@ function projectRows(folders: readonly PaneFolder[], now: number): PaneProject[]
       directory: folder.directory,
       name: folder.projectName?.trim() || folder.name || folder.directory,
       state: activity.state,
+      status: combineStatus(sessions.map((session) => session.status)),
+      unread: unreadCount(sessions.map((session) => session.status)),
       last: activity.last,
       active: folder.active,
       expanded: folder.active,

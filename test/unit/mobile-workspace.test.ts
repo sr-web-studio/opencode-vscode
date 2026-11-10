@@ -6,6 +6,8 @@ class FakeController {
   attached = 0
   detached = 0
   reconnected = 0
+  /** The last visibility the workspace set (`true` when it never did). */
+  visible?: boolean
   constructor(readonly project: ProjectInfo) {}
   attach() {
     this.attached++
@@ -15,6 +17,9 @@ class FakeController {
   }
   reconnect() {
     this.reconnected++
+  }
+  setVisible(visible: boolean) {
+    this.visible = visible
   }
 }
 
@@ -54,6 +59,19 @@ describe("workspace: one live controller per open project", () => {
     ws.resume()
     ws.resume()
     expect([a.reconnected, b.reconnected]).toEqual([2, 2])
+  })
+
+  test("only the chat on screen is visible to its controller", () => {
+    const ws = new Workspace(client, (p) => new FakeController(p))
+    const a = ws.acquire(info("/a"))
+    const b = ws.acquire(info("/b"))
+    ws.showOnScreen("/a")
+    expect([a.visible, b.visible]).toEqual([true, false])
+    ws.showOnScreen("/b")
+    expect([a.visible, b.visible]).toEqual([false, true])
+    // No chat on screen (the drawer, another screen, the app in the background): nobody is visible.
+    ws.showOnScreen(undefined)
+    expect([a.visible, b.visible]).toEqual([false, false])
   })
 
   test("dispose detaches everything and refuses new projects", () => {
