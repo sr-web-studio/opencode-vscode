@@ -8,6 +8,7 @@ out/
 .env
 .env.*
 !.env.example
+google-play-key.json
 # Signing material and store credentials never live in the repo
 *.jks
 *.keystore
