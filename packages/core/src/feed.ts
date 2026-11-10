@@ -1,5 +1,5 @@
 import type { EventEnvelope, OpenCodeClient } from "./api"
-import { loadChunk, initialHistory, type FetchPage, type HistoryState, type RawMessage } from "./history"
+import { loadChunk, initialHistory, type Chunk, type FetchPage, type HistoryState, type RawMessage } from "./history"
 import { applyEvent, prependView, queuedFromInbox, viewFromMessages } from "./transcript/reducer"
 import { emptyView, type SessionView, type TurnView } from "./transcript/types"
 
@@ -23,8 +23,12 @@ export class SessionFeed {
   earlierTick = 0
   /** A live compaction ended and the turns before it are still shown: the owner trims them when the user is at the end. */
   trimPending = false
+  /** Why the last load of this session failed, if it did. A view that failed to load is retried by the next open. */
+  loadError?: string
 
   private history: HistoryState = initialHistory
+  /** The session the view belongs to, so a failed reload can keep its transcript and another session's is never shown. */
+  private sessionID?: string
   /** Whether the server has older messages than the loaded history (separate from turns that were only trimmed from the view). */
   private historyMore = false
   /** Turns trimmed after a live compaction, oldest first. "Show earlier messages" puts them back before it fetches anything. */
@@ -54,6 +58,8 @@ export class SessionFeed {
     this.stash = []
     this.history = initialHistory
     this.buffered = []
+    this.sessionID = undefined
+    this.loadError = undefined
   }
 
   /** A session that was just created: nothing to load, events fill it. */
@@ -62,11 +68,53 @@ export class SessionFeed {
     this.view = { ...emptyView(), loaded: true }
   }
 
+  /**
+   * Load the transcript of a session, with one second attempt. A multi-root window syncs every folder at once, and a
+   * single stalled request must not leave an empty transcript on screen for a session that has messages. An empty
+   * answer is retried too: a session starts with the prompt that created it, so an empty history is never the whole
+   * story.
+   */
   async load(client: OpenCodeClient, sessionID: string): Promise<void> {
+    // Reloading the session on screen keeps its transcript when the load fails; another session starts blank.
+    const previous = this.sessionID === sessionID ? this.view : undefined
     this.reset()
     const token = this.token
     this.loading = true
     this.changed(true)
+    try {
+      let result = await this.attempt(client, sessionID)
+      if (token !== this.token) return
+      if ("error" in result || (result.chunk.messages.length === 0 && !result.chunk.hasMore)) {
+        const again = await this.attempt(client, sessionID)
+        if (token !== this.token) return
+        if (!("error" in again)) result = again
+      }
+      if ("error" in result) {
+        // An empty transcript with no reason looks like an empty session: keep what was shown, and say what happened.
+        this.view = previous ? { ...previous, loaded: true } : { ...emptyView(), loaded: true }
+        this.loadError = `Could not load the session: ${result.error}`
+        this.failed(this.loadError)
+        return
+      }
+      let view: SessionView = { ...viewFromMessages(result.chunk.messages as never), queued: queuedFromInbox(result.inbox) }
+      for (const ev of this.buffered) if (!isDelta(ev.type)) view = applyEvent(view, ev)
+      this.view = view
+      this.sessionID = sessionID
+      this.loadError = undefined
+      this.history = result.chunk.state
+      this.historyMore = result.chunk.hasMore
+      this.hasEarlier = result.chunk.hasMore
+    } finally {
+      if (token === this.token) {
+        this.loading = false
+        this.buffered = []
+        this.changed(true)
+      }
+    }
+  }
+
+  /** One attempt at the first chunk and the inbox. Never throws: the caller decides whether to try again. */
+  private async attempt(client: OpenCodeClient, sessionID: string): Promise<{ chunk: Chunk; inbox: unknown[] } | { error: string }> {
     try {
       // Queued prompts live in the session inbox, not in the message list, until they are delivered.
       const [chunk, inbox] = await Promise.all([
@@ -75,23 +123,9 @@ export class SessionFeed {
           .then(() => client.session.inbox.list({ sessionID }))
           .catch(() => []),
       ])
-      if (token !== this.token) return
-      let view: SessionView = { ...viewFromMessages(chunk.messages as never), queued: queuedFromInbox(inbox as unknown[]) }
-      for (const ev of this.buffered) if (!isDelta(ev.type)) view = applyEvent(view, ev)
-      this.view = view
-      this.history = chunk.state
-      this.historyMore = chunk.hasMore
-      this.hasEarlier = chunk.hasMore
+      return { chunk, inbox: inbox as unknown[] }
     } catch (e) {
-      if (token !== this.token) return
-      this.view = { ...emptyView(), loaded: true }
-      this.failed(`Could not load the session: ${message(e)}`)
-    } finally {
-      if (token === this.token) {
-        this.loading = false
-        this.buffered = []
-        this.changed(true)
-      }
+      return { error: message(e) }
     }
   }
 
