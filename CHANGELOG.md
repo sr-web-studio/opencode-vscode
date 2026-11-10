@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.14 (preview)
 
 - **A session no longer shows "No messages yet." when its transcript failed to load.** The transcript is fetched once more, a failed reload keeps what is on screen, the reason stays visible, and opening the session again retries.
 - **Sessions inside the chat, and nowhere else.** The folder and session dropdowns at the top of the chat are gone; the sessions list beside it (the title-bar toggle, **OpenCode: Toggle Sessions**) now does everything they did. It opens by itself in a wide view and stays as you left it. It lists the open folder's sessions; with several folders open it shows one collapsible group per project, the active one expanded, named as OpenCode names it, with a pencil to rename the project. Every row and project header says what it needs with an icon and its words: a bell for a question or permission, a spinner while it runs, a red mark for a failed turn, a dot and a count for replies you have not read, a check when it is read. Opening a session marks its last finished turn as read on the server, so the dot clears everywhere; a turn from more than a day ago never counts as new. The current session is highlighted, and the archive button shows or hides archived sessions. Click a row to open it in the folder that owns it, its pencil (or F2) renames the session, its trash deletes it after the usual confirmation, and the search filters. Rows keep their place while the pane is open; the next open sorts again.
