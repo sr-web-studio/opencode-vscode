@@ -37,3 +37,21 @@ export function setExpanded(map: ExpandedMap, directory: string, open: boolean):
 export function expandedKey(profileID: string): string {
   return `occ.drawer.expanded.${profileID}`
 }
+
+/**
+ * Whether the drawer reveals the projects without sessions. Remembered per saved server like the expansion answers,
+ * because the useful projects of one server say nothing about another's.
+ */
+export function showEmptyKey(profileID: string): string {
+  return `occ.drawer.empty.${profileID}`
+}
+
+/** Read the saved switch: only the exact value the drawer writes counts, anything else is "hidden". */
+export function parseShowEmpty(raw: string | null | undefined): boolean {
+  return raw === "1"
+}
+
+/** The value to store for the switch. */
+export function serializeShowEmpty(show: boolean): string {
+  return show ? "1" : "0"
+}

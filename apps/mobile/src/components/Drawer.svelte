@@ -5,8 +5,8 @@
   import { relativeTime } from "@occ/core/format"
   import type { ActivityState } from "@occ/core/activity-order"
   import { statusLabel, type SessionStatus } from "@occ/core/session-status"
-  import { applyFrozenOrder, buildOverview, filterOverview, freezeOrder, type FrozenOrder, type OverviewGroup } from "../lib/overview"
-  import { expandedKey, isExpanded, parseExpanded, setExpanded } from "../lib/drawer-prefs"
+  import { applyFrozenOrder, buildOverview, filterOverview, freezeOrder, splitEmptyProjects, type FrozenOrder, type OverviewGroup } from "../lib/overview"
+  import { expandedKey, isExpanded, parseExpanded, parseShowEmpty, serializeShowEmpty, setExpanded, showEmptyKey } from "../lib/drawer-prefs"
   import { model } from "../model.svelte"
 
   /** What one opening of the drawer holds still: the row ids, and which projects were open by default then. */
@@ -17,16 +17,23 @@
   let now = $state(Date.now())
   let panel = $state<HTMLElement>()
   let expanded = $state(parseExpanded(localStorage.getItem(expandedKey(model.profile?.id ?? ""))))
+  let showEmpty = $state(parseShowEmpty(localStorage.getItem(showEmptyKey(model.profile?.id ?? ""))))
+  /** The session whose action row is open; one at a time, so a tap never lands on a hidden control. */
+  let actionsFor = $state<string>()
+  /** Archived sessions are the exception, not the rule: hidden on every start, like the editor's sessions pane. */
+  let showArchived = $state(false)
   let frozen = $state<Freeze>()
 
   const reduce = typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
   const duration = reduce ? 0 : 200
 
-  const liveGroups = $derived(model.overview.data ? buildOverview(model.overview.data, { resolved: model.projectIDs, titles: model.projectTitles }, Date.now()) : [])
+  const liveGroups = $derived(model.overview.data ? buildOverview(model.overview.data, { resolved: model.projectIDs, titles: model.projectTitles }, Date.now(), { archived: showArchived }) : [])
   /** Only the presence of the first snapshot is tracked: it tells the freeze when there is finally a list to hold. */
   const hasData = $derived(!!model.overview.data)
   const groups = $derived(frozen ? applyFrozenOrder(liveGroups, frozen.order) : liveGroups)
-  const shown = $derived(filterOverview(groups, query))
+  const matched = $derived(filterOverview(groups, query))
+  /** A search looks everywhere; without one the folders with no sessions wait behind the toggle at the end. */
+  const split = $derived(query.trim() ? { listed: matched, empty: [] as OverviewGroup[] } : splitEmptyProjects(matched, model.currentDirectory))
 
   $effect(() => {
     const timer = setInterval(() => (now = Date.now()), 30_000)
@@ -43,10 +50,24 @@
     }
     expanded = parseExpanded(raw)
   })
+  // Same for the empty-project switch: what one server's list needs says nothing about another's.
+  $effect(() => {
+    const key = showEmptyKey(model.profile?.id ?? "")
+    let raw: string | null = null
+    try {
+      raw = localStorage.getItem(key)
+    } catch {
+      // Storage blocked: the switch still works for this visit.
+    }
+    showEmpty = parseShowEmpty(raw)
+  })
   $effect(() => {
     if (model.drawerOpen) void tick().then(() => panel?.focus())
     // Opening the drawer always shows every project; a filter left from last time would hide them without a reason.
-    else query = ""
+    else {
+      query = ""
+      actionsFor = undefined
+    }
   })
   /**
    * The shared order decides placement when the drawer opens and when the search changes; while it stays open the
@@ -79,6 +100,14 @@
     return status === "read" ? undefined : statusLabel(status)
   }
 
+  /** A project's second line: how many sessions it has, and the folder it is, so two same-named projects can be told apart. */
+  function subtitle(group: OverviewGroup): string {
+    if (group.sessionCount === 0) return `No sessions · ${group.path}`
+    if (group.sessions.length === 0) return `No active sessions · ${group.path}`
+    const n = group.sessions.length
+    return `${n} ${n === 1 ? "session" : "sessions"} · ${group.path}`
+  }
+
   function openByDefault(directory: string, state: ActivityState): boolean {
     return directory === model.currentDirectory || state !== "idle"
   }
@@ -91,6 +120,16 @@
       // The drawer still works for this visit; remembering the toggle is not worth an error.
     }
   }
+
+  /** Reveal or hide the projects without sessions; the answer is remembered for this server. */
+  function toggleEmpty(): void {
+    showEmpty = !showEmpty
+    try {
+      localStorage.setItem(showEmptyKey(model.profile?.id ?? ""), serializeShowEmpty(showEmpty))
+    } catch {
+      // The switch still works for this visit.
+    }
+  }
 </script>
 
 {#snippet stateIcon(status: SessionStatus)}
@@ -101,6 +140,80 @@
     {:else if status === "unread"}<Codicon name="circle-filled" />
     {:else}<Codicon name="check" />{/if}
   </span>
+{/snippet}
+
+{#snippet project(group: OverviewGroup)}
+  {@const open = query.trim() ? true : isExpanded(expanded, group.directory, frozen?.open[group.directory] ?? openByDefault(group.directory, group.state))}
+  <section class="group">
+    <div class="prow">
+      <button
+        class="pname"
+        onclick={() => toggle(group.directory, open)}
+        aria-expanded={open}
+        aria-label={`${open ? "Collapse" : "Expand"} ${group.title}, ${group.sessions.length === 0 ? "no sessions" : statusLabel(group.status)}${group.unread > 0 ? `, ${group.unread} unread` : ""}`}
+      >
+        {#if group.sessions.length === 0}
+          <!-- A check means "read", which says nothing about a project with no sessions: the folder is what it is. -->
+          <span class="state folder"><Codicon name="folder" /></span>
+        {:else}
+          {@render stateIcon(group.status)}
+        {/if}
+        <span class="main">
+          <span class="t"
+            >{group.title}{#if group.unread > 0}<span class="badge" aria-hidden="true" title={`${group.unread} unread`}>{group.unread}</span>{/if}</span
+          >
+          <span class="s">{subtitle(group)}</span>
+        </span>
+      </button>
+      <span class="end">{group.last ? relativeTime(group.last, now) : ""}</span>
+      <button class="iconbtn" onclick={() => model.newSession(group.directory)} aria-label={`New session in ${group.title}`} title="New session"><Codicon name="add" /></button>
+      <button class="iconbtn" onclick={() => void model.renameProject(group.directory)} aria-label={`Rename ${group.title}`} title="Rename project"><Codicon name="edit" /></button>
+    </div>
+    {#if open}
+      {#if group.sessions.length === 0}
+        <div class="empty">{group.sessionCount === 0 ? "No sessions yet" : "No active sessions"}</div>
+      {:else}
+        {#each group.sessions as session (session.id)}
+          <div class="srow-wrap" class:archived={session.archived}>
+            <button class="srow" onclick={() => model.openSession(group.directory, session.id)} aria-label={`${session.title}, ${statusLabel(session.status)}${session.archived ? ", archived" : ""}`}>
+              {@render stateIcon(session.status)}
+              <span class="main">
+                <span class="t" class:unread={session.status === "unread"}>{session.title}</span>
+                {#if statusText(session.status)}<span class="s">{statusText(session.status)}</span>{/if}
+              </span>
+              <span class="end">{relativeTime(session.last, now)}</span>
+            </button>
+            <button
+              class="iconbtn more"
+              onclick={() => (actionsFor = actionsFor === session.id ? undefined : session.id)}
+              aria-expanded={actionsFor === session.id}
+              aria-label={`Actions for ${session.title}`}><Codicon name="kebab-vertical" /></button
+            >
+          </div>
+          {#if actionsFor === session.id}
+            <div class="rowactions">
+              <button
+                class="abtn"
+                onclick={() => {
+                  actionsFor = undefined
+                  void model.renameSession(session.id, session.title)
+                }}><Codicon name="edit" /> Rename</button
+              >
+              {#if session.state === "idle"}
+                <button
+                  class="abtn danger"
+                  onclick={() => {
+                    actionsFor = undefined
+                    void model.deleteSession(group.directory, session.id, session.title)
+                  }}><Codicon name="trash" /> Delete</button
+                >
+              {/if}
+            </div>
+          {/if}
+        {/each}
+      {/if}
+    {/if}
+  </section>
 {/snippet}
 
 {#if model.drawerOpen}
@@ -120,6 +233,17 @@
         <span class="srv">{model.profile?.name ?? "Server"}</span>
         <span class="cap">Projects and sessions</span>
       </div>
+      <button class="iconbtn" onclick={() => model.refreshOverview()} aria-label="Refresh projects and sessions" title="Refresh">
+        <Codicon name={model.overview.loading ? "loading" : "refresh"} spin={model.overview.loading} />
+      </button>
+      <button
+        class="iconbtn"
+        class:on={showArchived}
+        onclick={() => (showArchived = !showArchived)}
+        aria-pressed={showArchived}
+        aria-label={showArchived ? "Hide archived sessions" : "Show archived sessions"}
+        title={showArchived ? "Hide archived sessions" : "Show archived sessions"}><Codicon name="archive" /></button
+      >
       <button class="iconbtn" onclick={() => model.closeDrawer()} aria-label="Close menu"><Codicon name="close" /></button>
     </header>
 
@@ -141,55 +265,29 @@
           <strong>No projects yet</strong>
           <p class="muted">Projects appear here after you open a folder with OpenCode on your computer.</p>
         </div>
-      {:else if shown.length === 0}
+      {:else if matched.length === 0}
         <div class="center muted">No project or session matches “{query}”.</div>
       {:else}
-        {#each shown as group (group.directory)}
-          {@const open = query.trim() ? true : isExpanded(expanded, group.directory, frozen?.open[group.directory] ?? openByDefault(group.directory, group.state))}
-          <section class="group">
-            <div class="prow">
-              <button
-                class="pname"
-                onclick={() => model.openProject(group.directory)}
-                aria-label={`Open ${group.title}, ${statusLabel(group.status)}${group.unread > 0 ? `, ${group.unread} unread` : ""}`}
-              >
-                {@render stateIcon(group.status)}
-                <span class="main">
-                  <span class="t"
-                    >{group.title}{#if group.unread > 0}<span class="badge" aria-hidden="true" title={`${group.unread} unread`}>{group.unread}</span>{/if}</span
-                  >
-                  <span class="s">{group.sessions.length} {group.sessions.length === 1 ? "session" : "sessions"}</span>
-                </span>
-              </button>
-              <button class="iconbtn chev" onclick={() => toggle(group.directory, open)} aria-expanded={open} aria-label={open ? `Collapse ${group.title}` : `Expand ${group.title}`}>
-                <Codicon name={open ? "chevron-down" : "chevron-right"} />
-              </button>
-            </div>
-            {#if open}
-              {#if group.sessions.length === 0}
-                <div class="empty">No sessions yet</div>
-              {:else}
-                {#each group.sessions as session (session.id)}
-                  <button class="srow" onclick={() => model.openSession(group.directory, session.id)} aria-label={`${session.title}, ${statusLabel(session.status)}`}>
-                    {@render stateIcon(session.status)}
-                    <span class="main">
-                      <span class="t" class:unread={session.status === "unread"}>{session.title}</span>
-                      {#if statusText(session.status)}<span class="s">{statusText(session.status)}</span>{/if}
-                    </span>
-                    <span class="end">{relativeTime(session.last, now)}</span>
-                  </button>
-                {/each}
-              {/if}
-            {/if}
-          </section>
+        {#each split.listed as group (group.directory)}
+          {@render project(group)}
         {/each}
+        {#if !query.trim() && split.empty.length > 0}
+          <button class="emptyrow" onclick={toggleEmpty} aria-expanded={showEmpty}>
+            <Codicon name={showEmpty ? "chevron-down" : "chevron-right"} />
+            <span>{showEmpty ? "Hide empty projects" : `Show empty projects (${split.empty.length})`}</span>
+          </button>
+          {#if showEmpty}
+            {#each split.empty as group (group.directory)}
+              {@render project(group)}
+            {/each}
+          {/if}
+        {/if}
       {/if}
     </div>
 
     <footer class="foot">
       <div class="srvname"><Codicon name="server" /> {model.profile?.name ?? "Server"}</div>
       <div class="fbtns">
-        <button class="fbtn" onclick={() => model.goProjects()}><Codicon name="folder" /> All projects</button>
         <button class="fbtn" onclick={() => model.openSettings()}><Codicon name="settings-gear" /> Settings</button>
       </div>
     </footer>
@@ -265,6 +363,11 @@
   .iconbtn:active {
     background: var(--oc-hover);
   }
+  /* The archive switch has no label, so its pressed state must be visible. */
+  .iconbtn.on {
+    color: var(--vscode-textLink-foreground);
+    background: var(--vscode-list-activeSelectionBackground);
+  }
   .search {
     flex: none;
     position: relative;
@@ -319,9 +422,6 @@
   .pname:active {
     background: var(--oc-hover);
   }
-  .chev {
-    margin-right: 2px;
-  }
   .main {
     flex: 1;
     min-width: 0;
@@ -358,19 +458,71 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .srow {
+  .srow-wrap {
     display: flex;
     align-items: center;
-    gap: 10px;
-    width: 100%;
-    min-height: 50px;
-    padding: 6px 16px 6px 24px;
-    text-align: left;
     border-top: 1px solid var(--oc-hairline);
     content-visibility: auto;
     contain-intrinsic-size: auto 50px;
   }
+  .srow {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 50px;
+    padding: 6px 4px 6px 24px;
+    text-align: left;
+  }
   .srow:active {
+    background: var(--oc-hover);
+  }
+  .more {
+    min-width: 44px;
+    color: var(--oc-muted);
+  }
+  /* The archived rows are still there, but they are history: dimmed like the editor's pane does. */
+  .srow-wrap.archived .t,
+  .srow-wrap.archived .end,
+  .srow-wrap.archived .state {
+    opacity: 0.6;
+  }
+  /* A session's actions, one tap below its row: labelled buttons beat a long-press or a swipe nobody discovers. */
+  .rowactions {
+    display: flex;
+    gap: 6px;
+    padding: 0 12px 8px 40px;
+  }
+  .abtn {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 44px;
+    border-radius: 8px;
+    border: 1px solid var(--oc-hairline);
+    color: var(--oc-accent);
+  }
+  .abtn.danger {
+    color: var(--oc-error);
+  }
+  .abtn:active {
+    background: var(--oc-hover);
+  }
+  .emptyrow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 48px;
+    padding: 6px 16px;
+    text-align: left;
+    color: var(--oc-muted);
+    font-size: 0.9em;
+  }
+  .emptyrow:active {
     background: var(--oc-hover);
   }
   .end {
@@ -455,6 +607,10 @@
     align-items: center;
     justify-content: center;
     width: 16px;
+    color: var(--oc-muted);
+  }
+  /* A project with no sessions keeps its folder icon, never a check that would read as "seen". */
+  .state.folder {
     color: var(--oc-muted);
   }
   .state.running,

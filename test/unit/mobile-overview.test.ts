@@ -9,6 +9,7 @@ import {
   filterOverview,
   freezeOrder,
   overviewSets,
+  splitEmptyProjects,
   toOverviewSession,
   waitingSessions,
   type OverviewData,
@@ -75,14 +76,16 @@ describe("overview grouping", () => {
     expect(groups[0]?.sessions.map((s) => s.id)).toEqual(["s1"])
   })
 
-  test("an archived session is not a drawer row", () => {
-    const groups = buildOverview(
-      data({
-        projects: [project("a", "/work/app", 1)],
-        sessions: rows(session("old", "/work/app", 10, "Old", { archived: 10 }), session("new", "/work/app", 5, "New")),
-      }),
-    )
-    expect(groups[0]?.sessions.map((s) => s.id)).toEqual(["new"])
+  test("an archived session is hidden until the drawer's archive switch is on; it still counts for the empty-project rule", () => {
+    const overview = data({
+      projects: [project("a", "/work/app", 1)],
+      sessions: rows(session("old", "/work/app", 10, "Old", { archived: 10 }), session("new", "/work/app", 5, "New")),
+    })
+    const hidden = buildOverview(overview)
+    expect(hidden[0]?.sessions.map((s) => s.id)).toEqual(["new"])
+    expect(hidden[0]?.sessionCount).toBe(2)
+    const shown = buildOverview(overview, {}, NOW, { archived: true })
+    expect(shown[0]?.sessions.map((s) => s.id)).toEqual(["old", "new"])
   })
 
   test("the authoritative project name from the Projects screen wins over the list's fallback", () => {
@@ -145,6 +148,32 @@ describe("overview order", () => {
     expect(bySession[0]?.sessions.map((s) => s.id)).toEqual(["s1"])
     expect(bySession[1]?.sessions.map((s) => s.id)).toEqual(["s3"])
     expect(filterOverview(groups, "zzz")).toEqual([])
+  })
+})
+
+describe("empty projects behind the drawer's toggle", () => {
+  const groups = () =>
+    buildOverview(
+      data({
+        projects: [project("a", "/work/full", 10, "Full"), project("b", "/work/empty", 5, "Empty"), project("c", "/work/archived", 1, "Archived only")],
+        sessions: rows(session("s1", "/work/full", 10, "One"), session("s2", "/work/archived", 3, "Old", { archived: 3 })),
+      }),
+    )
+
+  test("only projects with a root session are listed by default", () => {
+    const split = splitEmptyProjects(groups())
+    expect(split.listed.map((g) => g.directory)).toEqual(["/work/full", "/work/archived"])
+    expect(split.empty.map((g) => g.directory)).toEqual(["/work/empty"])
+  })
+
+  test("a project with only archived sessions is not empty: it has history", () => {
+    expect(splitEmptyProjects(groups()).empty.map((g) => g.directory)).not.toContain("/work/archived")
+  })
+
+  test("the folder of the screen the drawer is open over is always listed", () => {
+    const split = splitEmptyProjects(groups(), "/work/empty/")
+    expect(split.listed.map((g) => g.directory)).toEqual(["/work/full", "/work/empty", "/work/archived"])
+    expect(split.empty).toEqual([])
   })
 })
 
