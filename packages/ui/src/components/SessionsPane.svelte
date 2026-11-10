@@ -1,6 +1,5 @@
 <script lang="ts">
   import { tick, untrack } from "svelte"
-  import { sameDirectory } from "@occ/core/paths"
   import type { AppState } from "@occ/core/protocol"
   import { statusLabel, unreadCount, type SessionStatus } from "@occ/core/session-status"
   import { applyPaneOrder, buildPane, filterPane, freezePane, PANE_WIDTH, paneFolders, type FrozenPane, type PaneProject, type PaneRow } from "@occ/core/sessions-pane"
@@ -98,17 +97,16 @@
   }
 
   /**
-   * Rename a session from the pane. The chat's own folder renames directly; a session of another folder needs the
-   * chat to move there first, because the controller of the folder it belongs to is the one that talks to the server.
+   * Rename a session from the pane. The host renames it in the folder that owns the row, without switching the chat
+   * there, so a row that moved folders meanwhile can never rename whatever the chat had opened instead.
    */
   function rename(row: PaneRow, title: string): void {
     const value = title.trim()
     if (!value || value === row.title) return
-    if (sameDirectory(row.directory, app.directory)) {
-      store.dispatch({ type: "rename", id: row.id, title: value })
+    if (store.bridge.renameSession) {
+      store.bridge.renameSession(row.id, row.directory, value)
       return
     }
-    store.dispatch({ type: "switchFolder", directory: row.directory })
     store.dispatch({ type: "rename", id: row.id, title: value })
   }
 
