@@ -78,7 +78,7 @@ export class Controller {
   private readonly feed = new SessionFeed(
     (immediate) => (immediate ? this.emitNow() : this.emit()),
     (m) => {
-      this.error = m
+      this.setTranscriptError(m)
     },
   )
   private observers = new Set<Observer>()
@@ -95,6 +95,8 @@ export class Controller {
   private draftAgent?: string
   private draftModel?: ModelSelection
   private error?: string
+  /** The error the transcript load left on screen, so the next successful load can take it away again. */
+  private transcriptError?: string
   private sending = false
   private focusTick = 0
   private draftEpoch = 0
@@ -664,7 +666,8 @@ export class Controller {
       }
       if (this.target.kind === "session") await this.loadView(this.target.id)
       else this.children.clear()
-      this.error = undefined
+      // A transcript that failed to load keeps its error: the user acts on it, a background refetch does not hide it.
+      if (!this.feed.loadError) this.error = undefined
     } catch (e) {
       this.setConnection({ ...this.connection, status: "error", message: message(e) })
     }
@@ -824,10 +827,23 @@ export class Controller {
     this.children.clear()
     await this.feed.load(client, id)
     if (this.currentSessionID !== id) return
+    // The transcript's error lives exactly as long as its load: shown while it fails, gone once the session loads.
+    this.setTranscriptError(this.feed.loadError)
     await Promise.all([this.loadChildren(client, id), this.loadRevert(client, id)])
     await this.refreshChildRunning(client)
     this.unhideRunning()
     this.emitNow()
+  }
+
+  /**
+   * Show or take away the transcript's own error. Other errors (a failed send, an MCP action) are left alone: only the
+   * message this method put on screen is taken away again.
+   */
+  private setTranscriptError(text: string | undefined): void {
+    if (text === this.transcriptError) return
+    if (text) this.error = text
+    else if (this.error === this.transcriptError) this.error = undefined
+    this.transcriptError = text
   }
 
   /** A session that was left with a staged rollback shows its bar again (`Session.Info.revert`). */
@@ -972,7 +988,9 @@ export class Controller {
   }
 
   async open(id: string): Promise<void> {
-    if (this.target.kind === "session" && this.target.id === id && this.feed.view.loaded) return
+    // A load that failed is retried: its empty view must not pass for an empty session (the session on screen would
+    // stay blank for as long as the window lives).
+    if (this.target.kind === "session" && this.target.id === id && this.feed.view.loaded && !this.feed.loadError) return
     this.target = { kind: "session", id }
     this.opts.storage?.set(LAST_SESSION_KEY, id)
     await this.loadView(id)
