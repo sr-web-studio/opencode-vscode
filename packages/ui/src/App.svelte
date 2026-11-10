@@ -14,7 +14,6 @@
   import { Store } from "./store.svelte"
   import Codicon from "./components/Codicon.svelte"
   import EmptyState from "./components/EmptyState.svelte"
-  import FolderSwitcher from "./components/FolderSwitcher.svelte"
   import PromptBox from "./components/PromptBox.svelte"
   import QuestionPrompt from "./components/QuestionPrompt.svelte"
   import SessionSwitcher from "./components/SessionSwitcher.svelte"
@@ -67,8 +66,15 @@
   /** The in-chat sessions list is a VS Code feature; the phone's own drawer replaces it. */
   const paneCapable = $derived(store.bridge.capabilities?.sessionsPane !== false)
   const paneAvailable = $derived(paneCapable && !!app && !app.readOnly)
-  let paneOpen = $state(store.bridge.storage.get<boolean>("sessionsPane") ?? false)
   let shellWidth = $state(typeof window === "undefined" ? 900 : window.innerWidth)
+  /**
+   * The pane is the only session list now, so a wide view opens it on its own until the user says otherwise: a view
+   * that has never been toggled (`sessionsPane` unset) starts open when it has room for the column, and closed when it
+   * would cover the chat (the header button then opens the overlay). A remembered answer always wins.
+   */
+  const rememberedPane = store.bridge.storage.get<boolean>("sessionsPane")
+  // svelte-ignore state_referenced_locally
+  let paneOpen = $state(rememberedPane ?? paneMode(shellWidth) === "wide")
   let lastSessionsTick = 0
   const paneVisible = $derived(paneAvailable && paneOpen)
   const overlay = $derived(paneMode(shellWidth) === "overlay")
@@ -190,8 +196,7 @@
             {#if workerRunning && app.target.kind === "session"}<StopWorkerButton sessionID={app.target.id} running variant="label" />{/if}
           </header>
         {:else}
-          <FolderSwitcher {app} />
-          <SessionSwitcher {app} hasDraftText={draft.text.trim().length > 0}>
+          <SessionSwitcher {app} hasDraftText={draft.text.trim().length > 0} {paneCapable} {paneOpen} showProject={paneCapable} onTogglePane={() => setPane(!paneOpen)}>
             {#snippet extra()}
               {#if shownWorkers > 0 || app.runningShells > 0}
                 <WorkersRow workers={app.workers} hidden={app.hiddenWorkers} models={app.models} shells={app.runningShells} />
