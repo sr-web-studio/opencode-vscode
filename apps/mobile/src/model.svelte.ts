@@ -234,6 +234,20 @@ class AppModel {
       return
     }
     await ctl.dispatch({ type: "openSession", id: sessionID })
+    this.markViewed(ctl, sessionID)
+  }
+
+  /**
+   * Tell the server the session's last finished turn has been seen (`session.view`), so "unread" clears here, in VS
+   * Code and in OpenCode's own UI. `idle` is the end of the last turn; the server keeps the newest one.
+   */
+  private markViewed(ctl: Controller, sessionID: string): void {
+    const session = ctl.snapshot().sessions.find((s) => s.id === sessionID) ?? ctl.snapshot().archived.find((s) => s.id === sessionID)
+    const idle = session?.time.idle
+    if (!idle || (session.time.viewed ?? 0) >= idle) return
+    void this.client.session.view({ sessionID, idle }).catch(() => {
+      // A view stamp is a convenience: failing to record it must not interrupt opening the session.
+    })
   }
 
   private async sessionParent(sessionID: string): Promise<string | undefined> {
