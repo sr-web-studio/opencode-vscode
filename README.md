@@ -96,6 +96,7 @@ A separate Android app, **OpenCode (unofficial)** for phones, lists all your pro
 - **Beta.** Download the APK from the latest `mobile-v…-beta` pre-release on [GitHub Releases](https://github.com/sr-web-studio/opencode-vscode/releases) and install it on your phone (Android 7.0 or newer; allow installing apps from your browser or file manager). It is not in the Play Store yet.
 - **Connect:** the phone needs an OpenCode server that listens on your network with a password. Then run **OpenCode: Pair Mobile Device…** in VS Code and scan the QR code in the app, or type the computer's address and the server password.
 - **Setup guide:** [Connect the Android app to your OpenCode server](https://github.com/sr-web-studio/opencode-vscode/blob/main/docs/mobile-setup.md) — run the server, find its address, firewall and Tailscale, troubleshooting, security.
+- **Privacy:** the app talks only to your server. The [privacy policy](https://github.com/sr-web-studio/opencode-vscode/blob/main/docs/privacy.md) says what it keeps on the phone, what it sends, and the one Google component (the QR scanner) that reports diagnostics to Google.
 - Like the extension, it is not affiliated with the OpenCode team.
 
 ## Privacy
