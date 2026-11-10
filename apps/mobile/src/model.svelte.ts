@@ -218,6 +218,7 @@ class AppModel {
   openSettings() {
     this.closeDrawer()
     this.settingsOpen = true
+    this.syncOnScreen()
     void this.refreshNotifyStatus()
   }
 
@@ -272,6 +273,7 @@ class AppModel {
     }
     if (action === "settings") {
       this.settingsOpen = false
+      this.syncOnScreen()
       return true
     }
     if (action === "exit") return false
@@ -290,12 +292,16 @@ class AppModel {
   openDrawer(): void {
     this.drawerOpen = true
     this.overview.setDrawerOpen(true)
+    // The drawer covers the chat: a turn that ends now is "New reply", not something the user has read.
+    this.syncOnScreen()
   }
 
   closeDrawer(): void {
     if (!this.drawerOpen) return
     this.drawerOpen = false
     this.overview.setDrawerOpen(false)
+    // The chat is in front again, so whatever ended meanwhile has been seen.
+    this.syncOnScreen()
   }
 
   /** Tap a session in the drawer: close it and open that chat, the same stack a notification tap builds. */
@@ -730,12 +736,14 @@ class AppModel {
   }
 
   /**
-   * Tell the controllers which chat is on screen. Only a chat screen in the foreground is a look at its session; a
-   * turn that ends while the drawer, another screen or the background is in front stays "New reply" in the drawer.
+   * Tell the controllers which chat is on screen. Only a chat screen in the foreground, with no drawer or Settings
+   * over it, is a look at its session; a turn that ends while something else is in front stays "New reply" in the
+   * drawer.
    */
   private syncOnScreen(): void {
     const top = this.top.screen
-    const directory = this.foreground && top.kind === "chat" ? top.directory : undefined
+    const covered = this.drawerOpen || this.settingsOpen
+    const directory = this.foreground && !covered && top.kind === "chat" ? top.directory : undefined
     this.workspace?.showOnScreen(directory)
   }
 
