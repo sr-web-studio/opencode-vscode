@@ -297,6 +297,19 @@ describe("folder registry: a session belongs to its own folder", () => {
     expect(folders.activateForSession("ses_worker", "/b")).toBe(b)
     expect(folders.active.directory).toBe("/b")
   })
+
+  test("a rename goes to the folder named by the row, and the chat does not switch there", async () => {
+    const { folders } = registry()
+    folders.sync([entry("/a"), entry("/b")])
+    const [a, b] = folders.controllers()
+    b!.sessions.add("ses_b")
+    // The host resolves the row's directory first, then the owner of the session: no switch-then-rename race.
+    const controller = folders.controllerAt("/b") ?? folders.forSession("ses_b")
+    await controller.dispatch({ type: "rename", id: "ses_b", title: "New name" })
+    expect(b!.actions).toEqual([{ type: "rename", id: "ses_b", title: "New name" }])
+    expect(a!.actions).toEqual([])
+    expect(folders.active.directory).toBe("/a")
+  })
 })
 
 describe("folder storage keys", () => {
