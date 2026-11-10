@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- **Sessions sidebar.** An OpenCode icon in the left sidebar lists the sessions of the folder (and, with several folders, the folders as projects), the ones that need you or are running first, then the newest, with a spinning icon while a session runs. Click one to open it in the chat; right-click to delete it (after the usual confirmation) or to rename a project.
+- **Sessions inside the chat.** A title-bar toggle (**OpenCode: Toggle Sessions**) opens a sessions list beside the chat, an overlay when the view is narrow, instead of the old left-sidebar tree. It lists the open folder's sessions; with several folders open it shows one collapsible group per project, the active one expanded, named as OpenCode names it. The ones that need you or are running stay on top, then the newest, with a spinning icon while a session runs and the current session highlighted. Click a session to open it in the folder that owns it, use the row's trash icon to delete it (after the usual confirmation) and the pencil to rename a project. Search, refresh from the lists the window already holds, and new session are in the pane's header. Rows keep their place while the pane is open; the next open sorts again.
 - **Android app: one drawer for every project and session.** The menu button (top left) opens a list of all projects and their sessions, the ones that need you or are running first, then the newest, with a moving icon while a session runs. Tap a session to open it. While the drawer is open, rows stay in place so a tap never lands on the wrong one; the next open sorts again.
 
 ## 0.3.13 (preview)
