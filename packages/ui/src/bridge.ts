@@ -85,6 +85,11 @@ export interface HostBridge {
   /** Show a transient message in the host's own UI. */
   notify(level: "info" | "warning" | "error", message: string): void
   storage: BridgeStorage
+  /**
+   * The host is about to go to the background (the phone's pause, a window being hidden): save what is pending. Optional;
+   * the UI also listens to `visibilitychange`, `pagehide` and `blur`. Returns the unsubscribe function.
+   */
+  onHidden?(handler: () => void): () => void
   /** What this host cannot do. Omitted: everything. */
   capabilities?: HostCapabilities
   /** Send a raw message to the host (actions, requests). */

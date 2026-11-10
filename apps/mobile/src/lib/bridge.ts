@@ -57,7 +57,14 @@ export const VOICE_LATER = "Voice comes in the next version"
 /** The phone never types into a worker: its transcript is read-only, like the VS Code worker tab. */
 export const WORKER_READ_ONLY = "A worker session is read-only. Open its parent to send a prompt."
 
-export function createBridge(surface: Surface, host: MobileHost, store: KeyValueStore, capabilities: HostCapabilities = MOBILE_CAPABILITIES): HostBridge {
+export function createBridge(
+  surface: Surface,
+  host: MobileHost,
+  store: KeyValueStore,
+  capabilities: HostCapabilities = MOBILE_CAPABILITIES,
+  /** The app went to the background (Android's pause): a moment to save what is pending. */
+  onHidden?: (handler: () => void) => () => void,
+): HostBridge {
   const read = (key: string): unknown => {
     try {
       const raw = store.getItem(`occ.ui.${key}`)
@@ -149,6 +156,8 @@ export function createBridge(surface: Surface, host: MobileHost, store: KeyValue
       },
     },
     capabilities,
+    // Omitted entirely when the shell has no such signal, so the UI falls back to the DOM events.
+    ...(onHidden ? { onHidden } : {}),
     postToHost(message: ToHost) {
       if (message.type === "action") action(message.action)
       else request(message.request)
