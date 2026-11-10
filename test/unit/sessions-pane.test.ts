@@ -306,6 +306,19 @@ describe("pane folder inputs", () => {
     expect(folders[1]!.running.size).toBe(0)
     expect(folders[1]!.waiting.size).toBe(0)
   })
+
+  test("another folder's status reads its light record, outcome included", () => {
+    const failed = { ...session("broke", now - 2 * m), outcome: "failed" as const, time: { created: now - 2 * m, updated: now - 2 * m, idle: now - 2 * m } }
+    // No view stamp and a turn older than the window: an upgrade must not light up the whole history.
+    const old = { ...session("old", now - 2 * d), outcome: "succeeded" as const, time: { created: now - 2 * d, updated: now - 2 * d, idle: now - 2 * d } }
+    const fresh = { ...session("fresh", now - m), outcome: "succeeded" as const, time: { created: now - m, updated: now - m, idle: now - m } }
+    const folders = paneFolders(state({ folders: [folderInfo("/p", "p", { active: true }), folderInfo("/q", "q")] }), [light("/q", [failed, old, fresh])])
+    expect(rows(buildPane(folders, now)).map((row) => [row.id, row.status])).toEqual([
+      ["fresh", "unread"],
+      ["broke", "failed"],
+      ["old", "read"],
+    ])
+  })
 })
 
 describe("pane search", () => {

@@ -73,6 +73,8 @@ export class Controller {
   private showArchived = false
   private sessionsLoaded = false
   private running = new Set<string>()
+  /** The chat view is on screen. The host sets it (`setVisible`); until then a turn end is not treated as seen. */
+  private visible = false
   private permissions = new Map<string, PermissionRequest[]>()
   private forms = new Map<string, FormInfo[]>()
   private readonly feed = new SessionFeed(
@@ -569,6 +571,21 @@ export class Controller {
       case "session.unarchived":
         await this.loadSessions()
         break
+      case "session.viewed": {
+        // Any client opened the session: its last turn is seen everywhere. `updated` does not move.
+        const idle = typeof d.idle === "number" ? d.idle : undefined
+        if (idle) this.applyViewed(d.sessionID, idle)
+        break
+      }
+      case "session.idle": {
+        // The turn's end stamp, as the server stores it. Keeping it here means the unread rule and the `session.view`
+        // call that follows agree on the same moment.
+        const at = ev.created
+        if (!at) break
+        this.sessions = this.sessions.map((s) => (s.id === d.sessionID && (s.time.idle ?? 0) < at ? { ...s, time: { ...s.time, idle: at } } : s))
+        if (d.sessionID === this.currentSessionID && this.visible) this.markViewed(d.sessionID, at)
+        break
+      }
       case "session.agent.selected":
         this.sessions = this.sessions.map((s) => (s.id === d.sessionID ? { ...s, agent: d.agent } : s))
         break
@@ -587,14 +604,22 @@ export class Controller {
       case "session.execution.interrupted": {
         this.running.delete(d.sessionID)
         this.touch(d.sessionID, ev.created)
+        const outcome = ev.type === "session.execution.succeeded" ? "succeeded" : ev.type === "session.execution.failed" ? "failed" : "interrupted"
+        // The root record keeps the turn's result and end stamp, so the pane can say "New reply" or "Failed" without
+        // waiting for a list reload (`session.idle` carries the same stamp).
+        const ended = (s: SessionInfo): SessionInfo => (s.id === d.sessionID ? { ...s, outcome, time: { ...s.time, idle: ev.created ?? s.time.idle } } : s)
+        this.sessions = this.sessions.map(ended)
+        this.archived = this.archived.map(ended)
         const child = this.children.get(d.sessionID)
-        if (child) {
-          const outcome = ev.type === "session.execution.succeeded" ? "succeeded" : ev.type === "session.execution.failed" ? "failed" : "interrupted"
-          this.children.set(child.id, { ...child, outcome })
-        }
+        if (child) this.children.set(child.id, { ...child, outcome })
         // A turn ended: the server's shell list is the truth. A lost `shell.exited`/`shell.deleted` (a stalled stream)
         // must not leave the terminal badge counting a command that is gone.
-        if (d.sessionID === this.currentSessionID) this.refreshShells()
+        if (d.sessionID === this.currentSessionID) {
+          this.refreshShells()
+          // The user is looking at this session: the turn that just ended is already seen. `session.idle` usually
+          // carries the exact stamp; this is the fallback when a server sends only the execution event.
+          if (this.visible) this.markViewed(d.sessionID, ev.created)
+        }
         break
       }
       case "permission.asked":
@@ -990,10 +1015,51 @@ export class Controller {
   async open(id: string): Promise<void> {
     // A load that failed is retried: its empty view must not pass for an empty session (the session on screen would
     // stay blank for as long as the window lives).
-    if (this.target.kind === "session" && this.target.id === id && this.feed.view.loaded && !this.feed.loadError) return
+    if (this.target.kind === "session" && this.target.id === id && this.feed.view.loaded && !this.feed.loadError) {
+      // The same session again (a row clicked, a link followed): the user is looking at it, whatever ended since.
+      this.markViewed(id)
+      return
+    }
     this.target = { kind: "session", id }
     this.opts.storage?.set(LAST_SESSION_KEY, id)
     await this.loadView(id)
+    this.markViewed(id)
+  }
+
+  /**
+   * The chat view went on or off screen (VS Code's `onDidChangeVisibility`, the phone's pause/resume). Coming back is
+   * a look at the session on screen, so a turn that finished while the view was hidden stops being "New reply". Also
+   * called on every bind, so a folder switched back to marks what finished in the meantime. `markViewed` itself is a
+   * no-op when the last turn is already seen.
+   */
+  setVisible(visible: boolean): void {
+    this.visible = visible
+    if (visible && this.target.kind === "session") this.markViewed(this.target.id)
+  }
+
+  /**
+   * Tell the server the session's last finished turn has been seen (`session.view`), so "unread" clears in every
+   * client: the editor, the phone's drawer and OpenCode's own UI. Best effort, and never twice for the same turn: a
+   * view stamp must not interrupt opening the transcript or an incoming event.
+   */
+  private markViewed(id: string, idle?: number): void {
+    const client = this.client
+    if (!client) return
+    const session = this.sessions.find((s) => s.id === id) ?? this.archived.find((s) => s.id === id)
+    const at = idle ?? session?.time.idle
+    if (!at || (session && (session.time.viewed ?? 0) >= at)) return
+    this.applyViewed(id, at)
+    // The row clears now, not on the server's `session.viewed` echo: the pane and the drawer read the controller.
+    this.emit()
+    void client.session.view({ sessionID: id, idle: at }).catch(() => undefined)
+  }
+
+  /** Record a view stamp locally (never backwards), so the row clears without waiting for the event or a reload. */
+  private applyViewed(id: string | undefined, idle: number): void {
+    if (!id) return
+    const seen = (s: SessionInfo): SessionInfo => (s.id === id && (s.time.viewed ?? 0) < idle ? { ...s, time: { ...s.time, viewed: idle } } : s)
+    this.sessions = this.sessions.map(seen)
+    this.archived = this.archived.map(seen)
   }
 
   private openDraft() {

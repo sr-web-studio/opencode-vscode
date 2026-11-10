@@ -171,7 +171,7 @@ function sessionRows(folder: PaneFolder, now: number): PaneRow[] {
         directory: folder.directory,
         title: session.title?.trim() || UNTITLED,
         state: activity.state,
-        status: sessionStatus(session, sets),
+        status: sessionStatus(session, sets, now),
         archived: session.time.archived !== undefined,
         updated: activity.last,
         description: relativeTime(activity.last, now),

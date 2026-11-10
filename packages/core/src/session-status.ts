@@ -14,19 +14,23 @@
  *   5. `read`    — everything else: seen, or nothing finished yet.
  *
  * "Looked at" compares the server's `time.viewed` (the client's `session.view` call) with `time.idle` (the end of the
- * last turn). A missing `viewed` means the session was never opened by any client; a `viewed` before `idle` means the
- * turn that ended afterwards has not been seen. `activity-order` deliberately ignores `viewed`, so marking a session
- * read never moves a row.
+ * last turn). A missing `viewed` means no client has opened the session since view stamps existed: its turn counts as
+ * seen once it ended more than `UNREAD_WINDOW_MS` ago, so the first run after an upgrade does not light up the whole
+ * history. A `viewed` before `idle` means the turn that ended afterwards has not been seen, at any age.
+ * `activity-order` deliberately ignores `viewed`, so marking a session read never moves a row.
  *
  * A record without an `outcome` is an older server (or a session that never finished a turn): it reads as `read`
  * rather than inventing a state. `failed` and `unread` are only "new" states; once seen they fall back to `read`.
  *
- * Pure: no client, no DOM, no clock.
+ * Pure: no client, no DOM, no clock. The caller passes `now`.
  */
 import type { SessionInfo } from "./api"
 import type { ActivitySets } from "./activity-order"
 
 export type SessionStatus = "waiting" | "running" | "failed" | "unread" | "read"
+
+/** How old a turn may be and still count as new when no client has a `viewed` stamp for its session. */
+export const UNREAD_WINDOW_MS = 24 * 60 * 60 * 1000
 
 /** What a status reads from a session record. `time` keeps the server's own field names. */
 export type StatusSession = {
@@ -40,26 +44,27 @@ export const STATUS_RANK: Record<SessionStatus, number> = { waiting: 0, running:
 
 /**
  * The user has seen the last finished turn: `viewed` is at or after `idle`. A session with no finished turn has
- * nothing to read, so it counts as seen.
+ * nothing to read, so it counts as seen. With no `viewed` stamp at all, a turn older than `UNREAD_WINDOW_MS` counts as
+ * seen too: view stamps arrived with this feature, and every older session would otherwise start as "New reply".
  */
-export function isSeen(time: Pick<SessionInfo["time"], "idle" | "viewed">): boolean {
+export function isSeen(time: Pick<SessionInfo["time"], "idle" | "viewed">, now: number): boolean {
   if (time.idle === undefined) return true
-  if (time.viewed === undefined) return false
+  if (time.viewed === undefined) return now - time.idle > UNREAD_WINDOW_MS
   return time.viewed >= time.idle
 }
 
 /** The last turn finished successfully (or was interrupted) and no client has opened the session since. */
-export function isUnread(session: StatusSession): boolean {
-  if (session.time.idle === undefined || isSeen(session.time)) return false
+export function isUnread(session: StatusSession, now: number): boolean {
+  if (session.time.idle === undefined || isSeen(session.time, now)) return false
   return session.outcome === "succeeded" || session.outcome === "interrupted"
 }
 
 /** The one status of a root session. Waiting and running come from the live sets the controller publishes. */
-export function sessionStatus(session: StatusSession, sets: ActivitySets): SessionStatus {
+export function sessionStatus(session: StatusSession, sets: ActivitySets, now: number): SessionStatus {
   if (sets.waiting.has(session.id)) return "waiting"
   if (sets.running.has(session.id)) return "running"
-  if (session.outcome === "failed" && session.time.idle !== undefined && !isSeen(session.time)) return "failed"
-  if (isUnread(session)) return "unread"
+  if (session.outcome === "failed" && session.time.idle !== undefined && !isSeen(session.time, now)) return "failed"
+  if (isUnread(session, now)) return "unread"
   return "read"
 }
 
