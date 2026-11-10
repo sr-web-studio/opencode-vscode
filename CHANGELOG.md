@@ -4,6 +4,10 @@
 
 - **Sessions sidebar.** An OpenCode icon in the left sidebar lists the sessions of the folder (and, with several folders, the folders as projects), the ones that need you or are running first, then the newest, with a spinning icon while a session runs. Click one to open it in the chat; right-click to delete it (after the usual confirmation) or to rename a project.
 - **Android app: one drawer for every project and session.** The menu button (top left) opens a list of all projects and their sessions, the ones that need you or are running first, then the newest, with a moving icon while a session runs. Tap a session to open it. While the drawer is open, rows stay in place so a tap never lands on the wrong one; the next open sorts again.
+- **An attached picture is a card with its name.** A picture in the prompt box now shows its preview above and its file name under it, so two screenshots that look alike can be told apart. The remove button stays finger-sized on the phone.
+- **An unsent prompt survives the view closing.** The text, pictures and skills in the prompt box are saved as you type and come back after VS Code destroys a hidden view, after a reload, and after the phone app returns from the background. Every folder and every session keeps its own draft; if the attached pictures are too large for the saved copy (over 2 MB in all), they are left out and a notice says so. Starting a new session starts with an empty box.
+- **ArrowUp brings back earlier prompts.** With an empty prompt box, Up walks back through the prompts sent in this session and Down walks forward again; typing or attaching anything ends the walk. In a multi-line draft, Up only walks once the caret is on the first line and Down once it is on the last, so moving through the text is never interrupted.
+- **The Enhance prompt menu reads better.** Polish and Rewrite each say what they do on one line, and Rewrite now turns a message into a clear, detailed prompt for the agent, or a sharper question when that is what was asked, instead of padding it into a task.
 
 ## 0.3.13 (preview)
 
