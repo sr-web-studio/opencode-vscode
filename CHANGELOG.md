@@ -3,6 +3,7 @@
 ## Unreleased
 
 - **A window with several folders opens its chat without a transcript error.** At startup only the folder on screen loads its transcript; the other folders load theirs when you switch to them. A request the server closed without an answer is retried after a short pause (twice, with a longer pause before the last try).
+- **Android app: the drawer is the only project and session list.** The Projects and Sessions screens are gone: from the drawer you rename a project or a session, start a session in a project, show archived sessions, refresh the list and delete a stopped session after a confirmation, and projects with no sessions wait behind a **Show empty projects** toggle. The app opens the chat you last used on that server, or the drawer when there is none.
 
 ## 0.3.14 (preview)
 
