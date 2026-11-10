@@ -109,8 +109,10 @@ export function overviewSets(data: Pick<OverviewData, "running" | "permissions" 
  * One row per project folder, in the shared order. A session belongs to the first project folder with the same path
  * (`sameDirectory`, so spelling and trailing slashes do not split a folder); a session whose folder is not a known
  * project still gets a group named after that folder, so nothing disappears from the drawer.
+ *
+ * `now` is the clock the unread window reads; the caller passes it so this stays pure and a test is deterministic.
  */
-export function buildOverview(data: OverviewData, names: OverviewNames = {}): OverviewGroup[] {
+export function buildOverview(data: OverviewData, names: OverviewNames = {}, now: number = Date.now()): OverviewGroup[] {
   const rows = projectRows(data.projects, "", names.resolved)
   const home = guessHome(data.projects.map((p) => p.canonical))
   const sets = overviewSets(data)
@@ -134,7 +136,7 @@ export function buildOverview(data: OverviewData, names: OverviewNames = {}): Ov
     const ordered = sortByActivity(
       sessions.map((session) => {
         const activity = sessionActivity({ id: session.id, time: session.time }, sets)
-        return { ...session, title: session.title.trim() || UNTITLED, state: activity.state, status: sessionStatus(session, sets), last: activity.last }
+        return { ...session, title: session.title.trim() || UNTITLED, state: activity.state, status: sessionStatus(session, sets, now), last: activity.last }
       }),
       (session) => ({ state: session.state, last: session.last, title: session.title, id: session.id }),
     )

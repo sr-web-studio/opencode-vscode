@@ -22,7 +22,7 @@
   const reduce = typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
   const duration = reduce ? 0 : 200
 
-  const liveGroups = $derived(model.overview.data ? buildOverview(model.overview.data, { resolved: model.projectIDs, titles: model.projectTitles }) : [])
+  const liveGroups = $derived(model.overview.data ? buildOverview(model.overview.data, { resolved: model.projectIDs, titles: model.projectTitles }, Date.now()) : [])
   /** Only the presence of the first snapshot is tracked: it tells the freeze when there is finally a list to hold. */
   const hasData = $derived(!!model.overview.data)
   const groups = $derived(frozen ? applyFrozenOrder(liveGroups, frozen.order) : liveGroups)

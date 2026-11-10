@@ -10,6 +10,8 @@ export type Lifecycle = {
   attach(client: OpenCodeClient): void
   detach(): void
   reconnect(opts?: { quiet?: boolean }): void
+  /** The project's chat is on screen (or is not): a turn that ends while it is on screen is seen as it lands. */
+  setVisible(visible: boolean): void
 }
 
 export class Workspace<C extends Lifecycle> {
@@ -60,6 +62,14 @@ export class Workspace<C extends Lifecycle> {
    */
   resume(): void {
     for (const c of this.open.values()) c.reconnect({ quiet: true })
+  }
+
+  /**
+   * Only one chat can be on screen: `directory` names it, or undefined when no chat is (the drawer, another screen,
+   * the app in the background). Every other project is told it is off screen, so a turn ending there stays unread.
+   */
+  showOnScreen(directory: string | undefined): void {
+    for (const [dir, c] of this.open) c.setVisible(dir === directory)
   }
 
   dispose(): void {

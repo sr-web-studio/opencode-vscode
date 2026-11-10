@@ -45,7 +45,7 @@
     const s = st
     if (!s) return new Map<string, SessionStatus>()
     const sets = { running: new Set(s.running), waiting: new Set(s.waiting) }
-    return new Map([...s.sessions, ...s.archived].map((session) => [session.id, sessionStatus(session, sets)]))
+    return new Map([...s.sessions, ...s.archived].map((session) => [session.id, sessionStatus(session, sets, now)]))
   })
   /** Sessions the server lists for this folder, archived ones included (the switch hides those). */
   const count = $derived(st?.sessions.length ?? 0)
