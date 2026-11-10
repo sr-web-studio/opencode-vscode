@@ -1,6 +1,5 @@
 import * as vscode from "vscode"
 import { mimeFromName } from "@occ/core/attachments"
-import { confirmDelete } from "@occ/core/delete-session"
 import { isAbsolutePath } from "@occ/core/paths"
 import type { HostRequest, PickedFile, ToWebview } from "@occ/core/protocol"
 import type { WorkerPanels } from "./workers"
@@ -88,7 +87,7 @@ export class HostActions {
       case "confirmRevert":
         return this.confirmRevert(req.messageID, surface)
       case "confirmDeleteSession":
-        return this.confirmDeleteSession(req.sessionID, req.title, surface)
+        return this.confirmDeleteSession(req.sessionID, req.directory)
       case "openExternal": {
         // Only web links leave VS Code; anything else (file:, command:) is ignored.
         if (/^https?:\/\//i.test(req.url)) await vscode.env.openExternal(vscode.Uri.parse(req.url))
@@ -163,8 +162,12 @@ export class HostActions {
     if (pick === revert) surface.act({ type: "revert", messageID })
   }
 
-  /** The modal of the trash icon. Cancel, Escape and a closed dialog do nothing: only "Delete" runs the action. */
-  private async confirmDeleteSession(sessionID: string, title: string | undefined, surface: Surface): Promise<void> {
-    if (await confirmDelete((message, options, ...buttons) => vscode.window.showWarningMessage(message, options, ...buttons), title)) surface.act({ type: "deleteSession", sessionID })
+  /**
+   * The trash icon of a session row (the switcher or the sessions pane). `opencode.deleteSession` owns the modal and
+   * the refusal rules, so every way of deleting a session asks the same question; `directory` names the folder that
+   * owns a pane row, which is not always the folder the chat shows.
+   */
+  private async confirmDeleteSession(sessionID: string, directory: string | undefined): Promise<void> {
+    await vscode.commands.executeCommand("opencode.deleteSession", { sessionID, directory })
   }
 }

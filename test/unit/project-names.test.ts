@@ -153,9 +153,9 @@ describe("the rename command is wired into VS Code", () => {
     expect(pkg.contributes.commands.find((command) => command.command === "opencode.renameProject")).toMatchObject({ title: "Rename Project…", category: "OpenCode" })
   })
 
-  test("the extension registers it for the chat view's active folder, or a project node's own folder", () => {
+  test("the extension registers it for the chat view's active folder, or a project group's own folder", () => {
     const src = readFileSync("apps/vscode/src/extension/extension.ts", "utf8")
-    // The sessions sidebar passes a project node's directory; the palette passes nothing and keeps the active folder.
+    // The sessions pane's pencil passes a project group's directory; the palette passes nothing and keeps the active folder.
     expect(src).toContain(`registerCommand("opencode.renameProject", (arg?: unknown) => renameProject(directoryArg(arg)))`)
     expect(src).toContain("projectNames.refresh(conn.client, folders.directories())")
   })
