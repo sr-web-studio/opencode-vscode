@@ -71,6 +71,8 @@ function state(over: Partial<PaneState> = {}): PaneState {
     folderName: "p",
     projectName: undefined,
     sessions: [],
+    archived: [],
+    showArchived: false,
     running: [],
     waiting: [],
     target: { kind: "draft" },
@@ -179,6 +181,64 @@ describe("sessions pane layout", () => {
   })
 })
 
+describe("pane status and archive", () => {
+  test("a row's icon comes from the outcome and the view stamp; the order still uses the activity state", () => {
+    const layout = buildPane(
+      [
+        folder("/p", {
+          active: true,
+          sessions: [
+            session("waiting", now - 10 * h, { title: "Blocked" }),
+            session("failed", now - 5 * h, { title: "Failed", time: { created: now - 5 * h, updated: now - 5 * h, idle: now - 5 * h }, outcome: "failed" }),
+            session("unread", now - h, { title: "New", time: { created: now - h, updated: now - h, idle: now - h }, outcome: "succeeded" }),
+            session("read", now, { title: "Read", time: { created: now, updated: now, idle: now, viewed: now }, outcome: "succeeded" }),
+          ],
+          waiting: new Set(["waiting"]),
+        }),
+      ],
+      now,
+    )
+    expect(rows(layout).map((row) => row.id)).toEqual(["waiting", "read", "unread", "failed"])
+    expect(rows(layout).map((row) => row.status)).toEqual(["waiting", "read", "unread", "failed"])
+    expect(rows(layout).map((row) => row.state)).toEqual(["waiting", "idle", "idle", "idle"])
+  })
+
+  test("a project shows its most urgent status and counts only unread sessions", () => {
+    const layout = buildPane(
+      [
+        folder("/a", {
+          name: "a",
+          sessions: [
+            session("fail", now - h, { time: { created: now - h, updated: now - h, idle: now - h }, outcome: "failed" }),
+            session("new1", now - 2 * h, { time: { created: now - 2 * h, updated: now - 2 * h, idle: now - 2 * h }, outcome: "succeeded" }),
+            session("new2", now - 3 * h, { time: { created: now - 3 * h, updated: now - 3 * h, idle: now - 3 * h }, outcome: "interrupted" }),
+            session("seen", now - 4 * h, { time: { created: now - 4 * h, updated: now - 4 * h, idle: now - 4 * h, viewed: now - 4 * h }, outcome: "succeeded" }),
+          ],
+        }),
+        folder("/b", { name: "b" }),
+      ],
+      now,
+    )
+    const [first, second] = projects(layout)
+    expect(first!.directory).toBe("/a")
+    expect(first!.status).toBe("failed")
+    expect(first!.unread).toBe(2)
+    expect(second!.status).toBe("read")
+    expect(second!.unread).toBe(0)
+  })
+
+  test("archived sessions stay out until the folder includes them, then they are marked", () => {
+    const old = session("old", now - h, { title: "Old", time: { created: now - h, updated: now - h, archived: now - h } })
+    const live = session("live", now, { title: "Live" })
+    expect(rows(buildPane([folder("/p", { sessions: [old, live] })], now)).map((row) => row.id)).toEqual(["live"])
+    const shown = buildPane([folder("/p", { sessions: [old, live], includeArchived: true })], now)
+    expect(rows(shown).map((row) => [row.id, row.archived])).toEqual([
+      ["live", false],
+      ["old", true],
+    ])
+  })
+})
+
 describe("pane folder inputs", () => {
   const light = (directory: string, sessions: PaneSession[], over: Partial<FolderSessions> = {}): FolderSessions => ({
     directory,
@@ -195,6 +255,31 @@ describe("pane folder inputs", () => {
     expect(folders[0]).toMatchObject({ directory: "/p", name: "p", projectName: "Project", active: true, currentID: "a", loaded: true })
     expect([...folders[0]!.running]).toEqual(["a"])
     expect(folders[0]!.sessions.map((s) => s.id)).toEqual(["a"])
+  })
+
+  test("Show archived merges the active folder's archived list and leaves other folders alone", () => {
+    const folders = paneFolders(
+      state({
+        folders: [folderInfo("/p", "p", { active: true }), folderInfo("/q", "q")],
+        sessions: [fullSession("live", now)],
+        archived: [fullSession("old", now - h)],
+        showArchived: true,
+      }),
+      [light("/q", [session("other", now)])],
+    )
+    expect(folders[0]!.sessions.map((s) => s.id)).toEqual(["live", "old"])
+    expect(folders[0]!.includeArchived).toBe(true)
+    expect(folders[1]!.sessions.map((s) => s.id)).toEqual(["other"])
+    expect(folders[1]!.includeArchived).toBeUndefined()
+  })
+
+  test("Show archived lists a session once when the root list already carries it", () => {
+    // The server's root list includes archived sessions; the archived page then answers with the same record.
+    const old = { ...fullSession("old", now - h), time: { created: now - h, updated: now - h, archived: now - h } }
+    const folders = paneFolders(state({ sessions: [fullSession("live", now), old], archived: [old], showArchived: true }), [])
+    expect(folders[0]!.sessions.map((s) => s.id)).toEqual(["live", "old"])
+    const shown = rows(buildPane(folders, now)).map((row) => row.id)
+    expect(shown).toEqual(["live", "old"])
   })
 
   test("multi-root: the active folder is fresh from the app state, the others from the light message", () => {
@@ -412,7 +497,10 @@ describe("sessions pane wiring", () => {
   test("the pane's own controls: status icons, current row, keyboard and labels", () => {
     expect(pane).toContain(`<Codicon name="loading" spin />`)
     expect(pane).toContain(`<Codicon name="bell-dot" />`)
-    expect(pane).toContain(`<Codicon name="comment-discussion" />`)
+    expect(pane).toContain(`<Codicon name="error" />`)
+    expect(pane).toContain(`<Codicon name="circle-filled" />`)
+    expect(pane).toContain(`<Codicon name="check" />`)
+    expect(pane).toContain("statusLabel(row.status)")
     expect(pane).toContain("class:current={row.current}")
     expect(pane).toContain(`tabindex="0"`)
     expect(pane).toContain(`e.key === "ArrowDown"`)
