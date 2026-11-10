@@ -1,11 +1,15 @@
-import type { Action, AppState, ToWebview } from "@occ/core/protocol"
+import type { Action, AppState, FolderSessions, ToWebview } from "@occ/core/protocol"
 import type { HostBridge } from "./bridge"
 
 /** Reactive view of the host's state plus a typed `dispatch`. One per webview. */
 export class Store {
   state = $state.raw<AppState | undefined>(undefined)
+  /** The root sessions of every folder, for the in-chat sessions pane (VS Code multi-root windows). */
+  folderSessions = $state.raw<FolderSessions[]>([])
   /** Bumped by the host command `newSession`; App reacts by asking for a draft. */
   newSessionTick = $state(0)
+  /** Bumped by the host command `toggleSessions`; App flips the sessions pane and remembers it. */
+  sessionsTick = $state(0)
   private off: () => void
   private dictationHandlers = new Set<(m: Extract<ToWebview, { type: "dictation" }>) => void>()
 
@@ -15,7 +19,9 @@ export class Store {
       else if (m.type === "folders") {
         // A folder the view is not showing changed: only the dropdown's dots need the update, not the active state.
         if (this.state) this.state = { ...this.state, folders: m.folders }
-      } else if (m.type === "command" && m.name === "newSession") this.newSessionTick++
+      } else if (m.type === "folderSessions") this.folderSessions = m.folders
+      else if (m.type === "command" && m.name === "newSession") this.newSessionTick++
+      else if (m.type === "command" && m.name === "toggleSessions") this.sessionsTick++
       else if (m.type === "dictation") for (const h of this.dictationHandlers) h(m)
     })
     this.dispatch({ type: "ready" })
