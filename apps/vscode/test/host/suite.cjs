@@ -21,14 +21,12 @@ exports.run = async function run() {
     "opencode.openGlobalConfig",
     "opencode.deleteSession",
     "opencode.pairMobileDevice",
-    "opencode.sessions.open",
-    "opencode.sessions.refresh",
-    "opencode.sessions.switchFolder",
+    "opencode.toggleSessions",
   ]) {
     assert.ok(commands.includes(id), `command ${id} is registered`)
   }
   await vscode.commands.executeCommand("opencode.focus")
   await vscode.commands.executeCommand("opencode.newSession")
-  await vscode.commands.executeCommand("opencode.sessions.refresh")
+  await vscode.commands.executeCommand("opencode.toggleSessions")
   console.log("host smoke test passed")
 }

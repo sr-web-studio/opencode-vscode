@@ -22,6 +22,11 @@ export interface HostCapabilities {
   enterSends?: boolean
   /** What a shell block offers: a terminal that mirrors the command (default), or a screen with its output. */
   shellView?: "terminal" | "output"
+  /**
+   * The sessions pane inside the chat (VS Code's title-bar toggle). Default true; the phone says false because its own
+   * drawer already lists every project and session.
+   */
+  sessionsPane?: boolean
 }
 
 /**
@@ -51,8 +56,18 @@ export interface HostBridge {
   pickFiles(): Promise<PickedFile[]>
   /** Ask for confirmation in the host's own UI (a VS Code modal), then revert. */
   confirmRevert(messageID: string): void
-  /** Ask for confirmation in the host's own UI (a VS Code modal), then delete the session on the server. */
-  confirmDeleteSession(sessionID: string, title: string): void
+  /**
+   * Ask for confirmation in the host's own UI (a VS Code modal), then delete the session on the server. `directory`
+   * names the folder that owns the session when it is not the folder the chat shows (the sessions pane lists them all).
+   */
+  confirmDeleteSession(sessionID: string, title: string, directory?: string): void
+  /**
+   * Open a session of any folder: the host switches the chat to that folder first. The sessions pane uses this; hosts
+   * without the pane leave it out.
+   */
+  openSessionInFolder?(sessionID: string, directory?: string): void
+  /** The sessions pane's refresh: re-post the lists the host already holds. Hosts without the pane leave it out. */
+  refreshSessions?(): void
   /**
    * Rename an OpenCode project (its display name on the server, not the folder on disk). The host asks for the name
    * and saves it; hosts without a project list (the phone) leave this out. VS Code shows it in the folder dropdown.

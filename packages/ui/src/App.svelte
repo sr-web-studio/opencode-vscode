@@ -8,6 +8,7 @@
   import { showEmptyState } from "@occ/core/draft"
   import { modelLabel, modelTitle } from "@occ/core/workers"
   import { visibleWorkers } from "@occ/core/worker-hidden"
+  import { paneMode } from "@occ/core/sessions-pane"
   import type { HostBridge } from "./bridge"
   import { provideStore, provideTranscript } from "./context"
   import { Store } from "./store.svelte"
@@ -17,6 +18,7 @@
   import PromptBox from "./components/PromptBox.svelte"
   import QuestionPrompt from "./components/QuestionPrompt.svelte"
   import SessionSwitcher from "./components/SessionSwitcher.svelte"
+  import SessionsPane from "./components/SessionsPane.svelte"
   import StopWorkerButton from "./components/StopWorkerButton.svelte"
   import Setup from "./components/Setup.svelte"
   import TodoBar from "./components/TodoBar.svelte"
@@ -45,6 +47,38 @@
   let lastEpoch = -1
   let lastEpochFolder: string | undefined
   let lastTick = 0
+
+  /* ------------------------------------------------------- sessions pane */
+
+  /** The in-chat sessions list is a VS Code feature; the phone's own drawer replaces it. */
+  const paneCapable = $derived(store.bridge.capabilities?.sessionsPane !== false)
+  const paneAvailable = $derived(paneCapable && !!app && !app.readOnly)
+  let paneOpen = $state(store.bridge.storage.get<boolean>("sessionsPane") ?? false)
+  let shellWidth = $state(typeof window === "undefined" ? 900 : window.innerWidth)
+  let lastSessionsTick = 0
+  const paneVisible = $derived(paneAvailable && paneOpen)
+  const overlay = $derived(paneMode(shellWidth) === "overlay")
+
+  function setPane(open: boolean): void {
+    paneOpen = open
+    store.bridge.storage.set("sessionsPane", open)
+  }
+  // The title-bar button is a host command; the webview owns the open/closed state and remembers it per window.
+  $effect(() => {
+    const tick = store.sessionsTick
+    if (tick === lastSessionsTick) return
+    lastSessionsTick = tick
+    setPane(!paneOpen)
+  })
+  // Escape closes the pane; in overlay mode that is also the only way to dismiss it from the keyboard.
+  $effect(() => {
+    if (!paneVisible || !overlay) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setPane(false)
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  })
 
   /**
    * The draft key: the workspace folder when the host sends the list, otherwise the controller's directory. Both are
@@ -117,51 +151,58 @@
   {:else if !connected && app.connection.status !== "disconnected"}
     <Setup connection={app.connection} />
   {:else}
-    {#if app.readOnly}
-      <header class="wtitle">
-        <Codicon name="robot" />
-        <span class="wname">{app.workerTitle ?? "Worker"}</span>
-        {#if workerModel}<span class="wmodel muted small" title={modelTitle(app.model)}>{workerModel}</span>{/if}
-        <span class="muted small wro">Read-only</span>
-        {#if workerRunning && app.target.kind === "session"}<StopWorkerButton sessionID={app.target.id} running variant="label" />{/if}
-      </header>
-    {:else}
-      <FolderSwitcher {app} />
-      <SessionSwitcher {app} hasDraftText={draft.text.trim().length > 0}>
-        {#snippet extra()}
-          {#if shownWorkers > 0 || app.runningShells > 0}
-            <WorkersRow workers={app.workers} hidden={app.hiddenWorkers} models={app.models} shells={app.runningShells} />
-          {/if}
-        {/snippet}
-      </SessionSwitcher>
-    {/if}
-    {#if app.connection.status === "disconnected"}
-      <div class="banner muted">Connection lost. Reconnecting…</div>
-    {/if}
-    {#if empty}
-      <EmptyState folderName={app.projectName ?? app.folderName} displayPath={app.displayPath} onsuggest={suggest} />
-    {:else}
-      <Transcript {app}>
-        {#if todos && !app.form && !app.readOnly}
-          <TodoBar summary={todos} defaultExpanded={app.settings.todoDefaultExpanded} />
-        {/if}
-      </Transcript>
-    {/if}
-    {#if app.error}
-      <div class="error err" role="alert">
-        <span>{app.error}</span>
-        <button class="muted" onclick={() => store.dispatch({ type: "dismissError" })} aria-label="Dismiss"><Codicon name="close" /></button>
-      </div>
-    {/if}
-    {#if app.readOnly}
-      {#if workerForm && app.form}
-        <div class="qwrap"><QuestionPrompt form={app.form} /></div>
+    <div class="shell" bind:clientWidth={shellWidth}>
+      {#if paneVisible}
+        <SessionsPane {app} {overlay} onclose={() => setPane(false)} />
       {/if}
-    {:else if app.form}
-      <div class="qwrap"><QuestionPrompt form={app.form} /></div>
-    {:else}
-      <PromptBox bind:this={prompt} {app} folder={draftKey} bind:text={draft.text} bind:files={draft.files} bind:skills={draft.skills} />
-    {/if}
+      <div class="chat">
+        {#if app.readOnly}
+          <header class="wtitle">
+            <Codicon name="robot" />
+            <span class="wname">{app.workerTitle ?? "Worker"}</span>
+            {#if workerModel}<span class="wmodel muted small" title={modelTitle(app.model)}>{workerModel}</span>{/if}
+            <span class="muted small wro">Read-only</span>
+            {#if workerRunning && app.target.kind === "session"}<StopWorkerButton sessionID={app.target.id} running variant="label" />{/if}
+          </header>
+        {:else}
+          <FolderSwitcher {app} />
+          <SessionSwitcher {app} hasDraftText={draft.text.trim().length > 0}>
+            {#snippet extra()}
+              {#if shownWorkers > 0 || app.runningShells > 0}
+                <WorkersRow workers={app.workers} hidden={app.hiddenWorkers} models={app.models} shells={app.runningShells} />
+              {/if}
+            {/snippet}
+          </SessionSwitcher>
+        {/if}
+        {#if app.connection.status === "disconnected"}
+          <div class="banner muted">Connection lost. Reconnecting…</div>
+        {/if}
+        {#if empty}
+          <EmptyState folderName={app.projectName ?? app.folderName} displayPath={app.displayPath} onsuggest={suggest} />
+        {:else}
+          <Transcript {app}>
+            {#if todos && !app.form && !app.readOnly}
+              <TodoBar summary={todos} defaultExpanded={app.settings.todoDefaultExpanded} />
+            {/if}
+          </Transcript>
+        {/if}
+        {#if app.error}
+          <div class="error err" role="alert">
+            <span>{app.error}</span>
+            <button class="muted" onclick={() => store.dispatch({ type: "dismissError" })} aria-label="Dismiss"><Codicon name="close" /></button>
+          </div>
+        {/if}
+        {#if app.readOnly}
+          {#if workerForm && app.form}
+            <div class="qwrap"><QuestionPrompt form={app.form} /></div>
+          {/if}
+        {:else if app.form}
+          <div class="qwrap"><QuestionPrompt form={app.form} /></div>
+        {:else}
+          <PromptBox bind:this={prompt} {app} folder={draftKey} bind:text={draft.text} bind:files={draft.files} bind:skills={draft.skills} />
+        {/if}
+      </div>
+    </div>
   {/if}
 </div>
 
@@ -175,6 +216,22 @@
   }
   .boot {
     padding: 1em;
+  }
+  /* The chat and, when open, the sessions pane side by side. In a narrow view the pane overlays instead. */
+  .shell {
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: row;
+    position: relative;
+  }
+  .chat {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
   }
   .banner {
     font-size: 0.9em;

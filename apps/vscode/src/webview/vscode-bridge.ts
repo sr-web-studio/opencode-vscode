@@ -45,8 +45,10 @@ export function createVsCodeBridge(): HostBridge {
     openChanges: (files, title) => host({ type: "openChanges", files, title }),
     showTerminal: (shellID, title) => host({ type: "showTerminal", shellID, title }),
     openSession: (id, options) => host({ type: "openSession", id, readOnly: options.readOnly }),
+    openSessionInFolder: (sessionID, directory) => host({ type: "openSessionInFolder", sessionID, directory }),
+    refreshSessions: () => host({ type: "refreshSessions" }),
     confirmRevert: (messageID) => host({ type: "confirmRevert", messageID }),
-    confirmDeleteSession: (sessionID, title) => host({ type: "confirmDeleteSession", sessionID, title }),
+    confirmDeleteSession: (sessionID, title, directory) => host({ type: "confirmDeleteSession", sessionID, title, directory }),
     renameProject: (directory) => host({ type: "renameProject", directory }),
     pickFiles: () =>
       new Promise<PickedFile[]>((resolve) => {
@@ -68,6 +70,8 @@ export function createVsCodeBridge(): HostBridge {
     notify: (level, message) => host({ type: "notify", level, message }),
     voice: () => host({ type: "voice" }),
     voiceLanguage: () => host({ type: "voiceLanguage" }),
+    // The chat view has a title-bar toggle for its own sessions pane; the phone uses its drawer instead.
+    capabilities: { sessionsPane: true },
     storage: {
       get: <T>(key: string) => read()[key] as T | undefined,
       set: (key, value) => api.setState({ ...read(), [key]: value }),

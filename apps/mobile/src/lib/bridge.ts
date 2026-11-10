@@ -49,6 +49,8 @@ export const MOBILE_CAPABILITIES: HostCapabilities = {
   mcpSignIn: false,
   enterSends: false,
   shellView: "output",
+  // The phone's own drawer already lists every project and session; the chat keeps its full width.
+  sessionsPane: false,
 }
 
 export const VOICE_LATER = "Voice comes in the next version"

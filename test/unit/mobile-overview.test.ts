@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import type { SessionInfo } from "@occ/core/api"
+import { stableOrder } from "@occ/core/stable-order"
 import {
   applyFrozenOrder,
   applyOverviewEvent,
@@ -8,7 +9,6 @@ import {
   filterOverview,
   freezeOrder,
   overviewSets,
-  stableOrder,
   toOverviewSession,
   waitingSessions,
   type OverviewData,
