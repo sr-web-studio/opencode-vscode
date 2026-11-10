@@ -1,8 +1,7 @@
 <script lang="ts">
   import "./app.css"
   import { onDestroy } from "svelte"
-  import type { Attachment } from "@occ/core/attachments"
-  import { isWindowsPath } from "@occ/core/paths"
+  import { emptyPromptDraft, draftFolderKey as folderDraftKey, draftTargetKey, loadDraft, type PromptDraft } from "@occ/core/prompt-draft"
   import { todoBar } from "@occ/core/todo"
   import { isRunning } from "@occ/core/transcript/reducer"
   import { showEmptyState } from "@occ/core/draft"
@@ -10,6 +9,7 @@
   import { visibleWorkers } from "@occ/core/worker-hidden"
   import type { HostBridge } from "./bridge"
   import { provideStore, provideTranscript } from "./context"
+  import { DraftWriter } from "./draft-persist"
   import { Store } from "./store.svelte"
   import Codicon from "./components/Codicon.svelte"
   import EmptyState from "./components/EmptyState.svelte"
@@ -32,12 +32,26 @@
   // svelte-ignore state_referenced_locally
   const store = new Store(bridge)
   provideStore(store)
-  onDestroy(() => store.dispose())
+  // Drafts outlive the webview: VS Code destroys a hidden view's DOM, and the phone can be sent to the background.
+  // svelte-ignore state_referenced_locally
+  const draftWriter = new DraftWriter(bridge.storage)
+  const stopDraftFlush = draftWriter.listen()
+  // A phone host knows exactly when the app goes away; the DOM events above are only a guess there.
+  // svelte-ignore state_referenced_locally
+  const stopHiddenFlush = bridge.onHidden?.(() => draftWriter.flush()) ?? (() => {})
+  onDestroy(() => {
+    stopHiddenFlush()
+    stopDraftFlush()
+    draftWriter.dispose()
+    store.dispose()
+  })
 
   const app = $derived(store.state)
+  /** Shown once, when a saved draft was too large to keep its attached pictures. */
+  const DRAFT_IMAGES_DROPPED = "Some attached images were too large to keep in the saved prompt, so they were not restored. Attach them again."
   /** One prompt per folder: text, attachments and skills travel together and come back when the folder does. */
-  type FolderDraft = { text: string; files: Attachment[]; skills: Array<{ id: string; name: string }> }
-  const emptyDraft = (): FolderDraft => ({ text: "", files: [], skills: [] })
+  type FolderDraft = PromptDraft
+  const emptyDraft = emptyPromptDraft
   const drafts = new Map<string, FolderDraft>()
   let draft = $state<FolderDraft>(emptyDraft())
   let draftKey = $state("")
@@ -51,10 +65,7 @@
    * normalised, because the server may respell a single folder (`d:` vs `D:`) without the folder changing.
    */
   function draftFolderKey(state: typeof app): string {
-    const directory = state?.folders?.find((f) => f.active)?.directory ?? state?.directory ?? ""
-    if (!directory) return ""
-    const slashed = directory.replace(/\\/g, "/").replace(/\/+$/, "")
-    return isWindowsPath(directory) ? slashed.toLowerCase() : slashed
+    return folderDraftKey(state?.folders?.find((f) => f.active)?.directory ?? state?.directory ?? "")
   }
 
   // `+` from the title bar: the host asks, we know whether the draft has text.
@@ -70,10 +81,17 @@
     if (key === draftKey) return
     if (draftKey) drafts.set(draftKey, { text: draft.text, files: [...draft.files], skills: [...draft.skills] })
     const saved = drafts.get(key)
-    draft = saved ? { text: saved.text, files: [...saved.files], skills: [...saved.skills] } : emptyDraft()
+    if (saved) {
+      draft = { text: saved.text, files: [...saved.files], skills: [...saved.skills] }
+    } else {
+      // Not seen in this webview yet: the host store may still have it from before the view was destroyed.
+      const restored = loadDraft(store.bridge.storage, key, draftTargetKey(app?.target))
+      draft = restored ? restored.draft : emptyDraft()
+      if (restored?.dropped) store.bridge.notify("warning", DRAFT_IMAGES_DROPPED)
+    }
     draftKey = key
   })
-  // A fresh draft clears the prompt text of the folder on screen. A folder switch is not a fresh draft.
+  // A fresh draft clears the prompt of the folder on screen. A folder switch is not a fresh draft.
   $effect(() => {
     const epoch = app?.draftEpoch ?? 0
     const key = draftKey
@@ -83,9 +101,16 @@
       return
     }
     if (epoch !== lastEpoch) {
-      if (lastEpoch !== -1) draft.text = ""
+      if (lastEpoch !== -1) draft = emptyDraft()
       lastEpoch = epoch
     }
+  })
+  // Keep the host's copy in step with the box: debounced while typing, at once when the folder or target changes.
+  $effect(() => {
+    const key = draftKey
+    const target = draftTargetKey(app?.target)
+    if (!key || !target) return
+    draftWriter.save(key, target, draft)
   })
 
   const connected = $derived(app?.connection.status === "connected")
