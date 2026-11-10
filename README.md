@@ -11,7 +11,7 @@ A chat panel for [OpenCode](https://opencode.ai) V2 in the VS Code sidebar. Your
 <p align="center"><em>The OpenCode panel in VS Code.</em></p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/sr-web-studio/opencode-vscode/main/docs/images/mobile-sessions.png" width="260" alt="Sessions list in the Android app">
+  <img src="https://raw.githubusercontent.com/sr-web-studio/opencode-vscode/main/docs/images/mobile-sessions.png" width="260" alt="Drawer with every project and its sessions in the Android app">
   <img src="https://raw.githubusercontent.com/sr-web-studio/opencode-vscode/main/docs/images/mobile-chat.png" width="260" alt="Chat with an agent in the Android app">
 </p>
 
@@ -90,12 +90,13 @@ Open Settings and search for **OpenCode**:
 
 ## Android app (beta)
 
-A separate Android app, **OpenCode (unofficial)** for phones, lists all your projects and their sessions on the same OpenCode server, with chat, diffs, command output and notifications when a session needs you or finishes.
+A separate Android app, **OpenCode (unofficial)** for phones, keeps every project and its sessions in one drawer on the same OpenCode server, with chat, diffs, command output and notifications when a session needs you or finishes.
 
 - **Not shipped with this extension.** Installing the extension never installs anything on your phone. The app is a separate APK.
 - **Beta.** Download the APK from the latest `mobile-v…-beta` pre-release on [GitHub Releases](https://github.com/sr-web-studio/opencode-vscode/releases) and install it on your phone (Android 7.0 or newer; allow installing apps from your browser or file manager). It is not in the Play Store yet.
 - **Connect:** the phone needs an OpenCode server that listens on your network with a password. Then run **OpenCode: Pair Mobile Device…** in VS Code and scan the QR code in the app, or type the computer's address and the server password.
 - **Setup guide:** [Connect the Android app to your OpenCode server](https://github.com/sr-web-studio/opencode-vscode/blob/main/docs/mobile-setup.md) — run the server, find its address, firewall and Tailscale, troubleshooting, security.
+- **Privacy:** the app talks only to your server. The [privacy policy](https://github.com/sr-web-studio/opencode-vscode/blob/main/docs/privacy.md) says what it keeps on the phone, what it sends, and the one Google component (the QR scanner) that reports diagnostics to Google.
 - Like the extension, it is not affiliated with the OpenCode team.
 
 ## Privacy

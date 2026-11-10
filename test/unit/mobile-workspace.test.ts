@@ -95,9 +95,9 @@ describe("screen stack", () => {
     const k = keys()
     let s: Entry[] = [{ key: k(), screen: { kind: "servers" } }]
     expect(canPop(s)).toBe(false)
-    s = push(s, { kind: "projects" }, k())
-    s = push(s, { kind: "sessions", directory: "/a" }, k())
-    expect(names(s)).toEqual(["servers", "projects", "sessions"])
+    s = push(s, { kind: "chat", directory: "/a" }, k())
+    s = push(s, { kind: "file", directory: "/a", path: "a.ts" }, k())
+    expect(names(s)).toEqual(["servers", "chat", "file"])
     s = pop(pop(s))
     expect(names(pop(s))).toEqual(["servers"])
     expect(top(s)).toEqual({ kind: "servers" })
@@ -106,48 +106,49 @@ describe("screen stack", () => {
   test("popKey closes only the screen that asked, not the one on top of it now", () => {
     const k = keys()
     let s: Entry[] = [{ key: k(), screen: { kind: "servers" } }]
-    s = push(s, { kind: "projects" }, 10)
-    s = push(s, { kind: "sessions", directory: "/a" }, 11)
-    expect(names(popKey(s, 10))).toEqual(["servers", "projects", "sessions"])
-    expect(names(popKey(s, 11))).toEqual(["servers", "projects"])
+    s = push(s, { kind: "chat", directory: "/a" }, 10)
+    s = push(s, { kind: "file", directory: "/a", path: "a.ts" }, 11)
+    expect(names(popKey(s, 10))).toEqual(["servers", "chat", "file"])
+    expect(names(popKey(s, 11))).toEqual(["servers", "chat"])
   })
 
   test("the folders still in use are those of the screens on the stack", () => {
     const k = keys()
-    let s: Entry[] = [
-      { key: k(), screen: { kind: "servers" } },
-      { key: k(), screen: { kind: "projects" } },
-    ]
+    let s: Entry[] = [{ key: k(), screen: { kind: "servers" } }]
     expect([...directoriesInUse(s)]).toEqual([])
-    s = push(s, { kind: "sessions", directory: "/a" }, k())
     s = push(s, { kind: "chat", directory: "/a" }, k())
     s = push(s, { kind: "worker", directory: "/a", sessionID: "ses_w" }, k())
+    s = push(s, { kind: "file", directory: "/a", path: "a.ts" }, k())
     expect([...directoriesInUse(s)]).toEqual(["/a"])
-    // Going back to the project list closes the project: its controller is disposed by the caller.
-    s = s.slice(0, 2)
+    // Going back to the server list closes the project: its controller is disposed by the caller.
+    s = s.slice(0, 1)
     expect(directoriesInUse(s).size).toBe(0)
   })
 
   test("a deep link builds the whole path, so back walks out step by step", () => {
     const s = stackForSession("/a", keys())
-    expect(names(s)).toEqual(["servers", "projects", "sessions", "chat"])
-    expect(new Set(s.map((e) => e.key)).size).toBe(4)
-    expect(names(pop(pop(s)))).toEqual(["servers", "projects"])
+    expect(names(s)).toEqual(["chat"])
+    expect(new Set(s.map((e) => e.key)).size).toBe(1)
     expect(top(s)).toEqual({ kind: "chat", directory: "/a", sessionID: undefined })
     expect(top(stackForSession("/a", keys(), "ses_1"))).toEqual({ kind: "chat", directory: "/a", sessionID: "ses_1" })
   })
 
+  test("with more than one saved server the server list sits under the chat, so back reaches it", () => {
+    const s = stackForSession("/a", keys(), "ses_1", true)
+    expect(names(s)).toEqual(["servers", "chat"])
+    expect(names(pop(s))).toEqual(["servers"])
+  })
+
   test("a worker deep link ends at the read-only worker screen, never a chat", () => {
     const worker = stackForWorker("/a", keys(), "ses_w")
-    expect(names(worker)).toEqual(["servers", "projects", "sessions", "worker"])
+    expect(names(worker)).toEqual(["chat", "worker"])
     expect(top(worker)).toEqual({ kind: "worker", directory: "/a", sessionID: "ses_w" })
   })
 
   test("a worker with a known parent puts the parent's chat under it", () => {
-    const worker = stackForWorker("/a/worktree", keys(), "ses_w", { directory: "/a", sessionID: "ses_p" })
-    expect(names(worker)).toEqual(["servers", "projects", "sessions", "chat", "worker"])
-    expect(worker[2]?.screen).toEqual({ kind: "sessions", directory: "/a" })
-    expect(worker[3]?.screen).toEqual({ kind: "chat", directory: "/a", sessionID: "ses_p" })
+    const worker = stackForWorker("/a/worktree", keys(), "ses_w", { directory: "/a", sessionID: "ses_p" }, true)
+    expect(names(worker)).toEqual(["servers", "chat", "worker"])
+    expect(worker[1]?.screen).toEqual({ kind: "chat", directory: "/a", sessionID: "ses_p" })
     expect(top(worker)).toEqual({ kind: "worker", directory: "/a/worktree", sessionID: "ses_w" })
   })
 })

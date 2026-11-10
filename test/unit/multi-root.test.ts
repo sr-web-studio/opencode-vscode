@@ -72,6 +72,10 @@ class FakeController implements FolderController {
   async dispatch(action: Action): Promise<void> {
     this.actions.push(action)
   }
+  active: boolean | undefined
+  setActive(active: boolean): void {
+    this.active = active
+  }
 }
 
 const entry = (directory: string): FolderEntry => ({ directory, folderName: directory.split("/").pop() || directory, displayPath: directory })

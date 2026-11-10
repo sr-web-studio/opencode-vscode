@@ -95,7 +95,7 @@ describe("session on screen", () => {
 
   test("a worker screen shows the worker; other screens show nothing", () => {
     expect(visibleSessionOf({ kind: "worker", directory: "/p", sessionID: "ses_w" }, { "/p": "ses_root" })).toBe("ses_w")
-    expect(visibleSessionOf({ kind: "sessions", directory: "/p" }, { "/p": "ses_root" })).toBeUndefined()
+    expect(visibleSessionOf({ kind: "file", directory: "/p" }, { "/p": "ses_root" })).toBeUndefined()
     expect(visibleSessionOf({ kind: "servers" }, {})).toBeUndefined()
     expect(visibleSessionOf(undefined, {})).toBeUndefined()
   })

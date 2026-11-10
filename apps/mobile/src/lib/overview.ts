@@ -60,8 +60,13 @@ export type OverviewGroup = {
   status: SessionStatus
   /** Sessions whose last turn the user has not seen. */
   unread: number
+  /** Every root session of the folder, archived ones included; `sessions` holds the ones the drawer shows. */
+  sessionCount: number
   sessions: OverviewSessionRow[]
 }
+
+/** What the drawer shows: `sessions` (the visible rows) and whether to include archived ones. */
+export type OverviewOptions = { archived?: boolean }
 
 export type OverviewNames = {
   /** Folder → the project id `location.get` returned (the Projects screen's map). */
@@ -111,18 +116,24 @@ export function overviewSets(data: Pick<OverviewData, "running" | "permissions" 
  * project still gets a group named after that folder, so nothing disappears from the drawer.
  *
  * `now` is the clock the unread window reads; the caller passes it so this stays pure and a test is deterministic.
+ *
+ * Archived sessions are left out unless `options.archived` is set (the drawer's archive switch); `sessionCount` still
+ * counts them, so a project that only has archived sessions is not mistaken for an empty folder.
  */
-export function buildOverview(data: OverviewData, names: OverviewNames = {}, now: number = Date.now()): OverviewGroup[] {
+export function buildOverview(data: OverviewData, names: OverviewNames = {}, now: number = Date.now(), options: OverviewOptions = {}): OverviewGroup[] {
   const rows = projectRows(data.projects, "", names.resolved)
   const home = guessHome(data.projects.map((p) => p.canonical))
   const sets = overviewSets(data)
   const byFolder = new Map<string, OverviewSession[]>()
+  const totals = new Map<string, number>()
   const rowOf = (directory: string): ProjectRow | undefined => rows.find((row) => sameDirectory(row.directory, directory))
   const folderOf = (directory: string): string => rowOf(directory)?.directory ?? trimSlash(directory)
 
   for (const session of data.sessions) {
-    if (session.archived || !session.directory) continue
+    if (!session.directory) continue
     const folder = folderOf(session.directory)
+    totals.set(folder, (totals.get(folder) ?? 0) + 1)
+    if (session.archived && !options.archived) continue
     const list = byFolder.get(folder)
     if (list) list.push(session)
     else byFolder.set(folder, [session])
@@ -155,6 +166,7 @@ export function buildOverview(data: OverviewData, names: OverviewNames = {}, now
       state: combined.state,
       status: combineStatus(ordered.map((session) => session.status)),
       unread: unreadCount(ordered.map((session) => session.status)),
+      sessionCount: totals.get(directory) ?? 0,
       sessions: ordered,
     })
   }
@@ -177,6 +189,23 @@ export function filterOverview(groups: ReadonlyArray<OverviewGroup>, query: stri
     if (projectHit || sessions.length > 0) out.push({ ...group, sessions })
   }
   return out
+}
+
+/**
+ * The drawer's default list and the projects behind its "Show empty projects (N)" row. A project is listed when it has
+ * at least one root session (archived ones count, a running or waiting one obviously does) or when it is the folder of
+ * the screen the drawer is open over. A server lists every folder it ever saw, so without this the useful projects
+ * drown in one-time folders.
+ */
+export function splitEmptyProjects(groups: ReadonlyArray<OverviewGroup>, currentDirectory?: string): { listed: OverviewGroup[]; empty: OverviewGroup[] } {
+  const listed: OverviewGroup[] = []
+  const empty: OverviewGroup[] = []
+  for (const group of groups) {
+    const current = !!currentDirectory && sameDirectory(group.directory, currentDirectory)
+    if (group.sessionCount > 0 || current) listed.push(group)
+    else empty.push(group)
+  }
+  return { listed, empty }
 }
 
 /* -------------------------------------------------------------- stable order */

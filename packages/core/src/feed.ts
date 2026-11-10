@@ -41,6 +41,30 @@ function errorDetail(e: unknown): string {
   return parts.length ? parts.join(" <- ") : "unknown error"
 }
 
+/** Attempts at one transcript load: two for any failure, three when the request never got an answer. */
+export const MAX_ATTEMPTS = 2
+export const MAX_TRANSPORT_ATTEMPTS = 3
+
+/**
+ * How long to wait before retry `attempt` (1-based): a server that is busy enough to stall a request needs a moment,
+ * and another request sent at once only adds to its work. Doubles per attempt, capped.
+ */
+export const retryDelay = (attempt: number): number => Math.min(750 * 2 ** (attempt - 1), 3000)
+
+/**
+ * The request never reached the server or the connection died before an answer (`ClientError` with `reason:
+ * "Transport"`, wrapping a socket error). Worth retrying: the same request usually works a moment later. A status
+ * error (404 for a deleted session, 500) is not: the answer would not change.
+ */
+export function isTransportError(e: unknown): boolean {
+  let cur: unknown = e
+  for (let depth = 0; depth < 6 && cur !== undefined && cur !== null; depth++) {
+    if (typeof cur === "object" && (cur as { reason?: unknown }).reason === "Transport") return true
+    cur = (cur as { cause?: unknown }).cause
+  }
+  return false
+}
+
 /**
  * The transcript of one session: loaded from history (since the last compaction), then kept current by live events.
  * Used for the main session of a window and for read-only worker tabs, so both load and stream the same way.
@@ -79,6 +103,8 @@ export class SessionFeed {
     private readonly failed: (message: string) => void,
     /** Diagnostics for the host's output channel: why a load failed, and when a retry or a later load worked. */
     private readonly log?: (line: string) => void,
+    /** The pause before a retry. Tests replace it, so a retry does not cost a real second. */
+    private readonly sleep: (ms: number) => Promise<void> = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   ) {}
 
   private fetcher(client: OpenCodeClient, sessionID: string): FetchPage {
@@ -108,10 +134,10 @@ export class SessionFeed {
   }
 
   /**
-   * Load the transcript of a session, with one second attempt. A multi-root window syncs every folder at once, and a
-   * single stalled request must not leave an empty transcript on screen for a session that has messages. An empty
-   * answer is retried too: a session starts with the prompt that created it, so an empty history is never the whole
-   * story.
+   * Load the transcript of a session, retrying a failed attempt after a short pause. A multi-root window syncs every
+   * folder at once and the server can be busy with agent work, so a single stalled request must not leave an empty
+   * transcript on screen for a session that has messages. A transport error gets two more tries, anything else one;
+   * an empty answer is retried too, because a session starts with the prompt that created it.
    */
   async load(client: OpenCodeClient, sessionID: string): Promise<void> {
     // Reloading the session on screen keeps its transcript when the load fails; another session starts blank.
@@ -121,29 +147,9 @@ export class SessionFeed {
     this.loading = true
     this.changed(true)
     const started = Date.now()
-    let attempts = 0
-    /** One attempt, with the time it took: a stalled request is what a failure log has to show. */
-    const once = async () => {
-      attempts++
-      const at = Date.now()
-      const result = await this.attempt(client, sessionID)
-      return { result, ms: Date.now() - at }
-    }
     try {
-      let { result, ms } = await once()
-      if (token !== this.token) return
-      if ("error" in result) this.log?.(`Transcript of ${sessionID} failed on attempt ${attempts} after ${ms} ms: ${errorDetail(result.error)}`)
-      if ("error" in result || (result.chunk.messages.length === 0 && !result.chunk.hasMore)) {
-        const again = await once()
-        if (token !== this.token) return
-        if ("error" in again.result) this.log?.(`Transcript of ${sessionID} failed on attempt ${attempts} after ${again.ms} ms: ${errorDetail(again.result.error)}`)
-        else {
-          this.logLoaded(sessionID, attempts, Date.now() - started)
-          result = again.result
-        }
-      } else {
-        this.logLoaded(sessionID, attempts, Date.now() - started)
-      }
+      const result = await this.loadAttempts(client, sessionID, token, started)
+      if (!result || token !== this.token) return
       if ("error" in result) {
         // An empty transcript with no reason looks like an empty session: keep what was shown, and say what happened.
         this.failedSession = sessionID
@@ -167,6 +173,39 @@ export class SessionFeed {
         this.buffered = []
         this.changed(true)
       }
+    }
+  }
+
+  /**
+   * The attempts at the first chunk and the inbox. Returns undefined when the session changed under the load (the
+   * caller then drops the result). A transport error buys a third attempt; every other failure or an empty answer
+   * stops after the second.
+   */
+  private async loadAttempts(client: OpenCodeClient, sessionID: string, token: number, started: number): Promise<{ chunk: Chunk; inbox: unknown[] } | { error: unknown } | undefined> {
+    let attempts = 0
+    let allowed = MAX_ATTEMPTS
+    for (;;) {
+      if (attempts > 0) {
+        await this.sleep(retryDelay(attempts))
+        if (token !== this.token) return undefined
+      }
+      attempts++
+      const at = Date.now()
+      const result = await this.attempt(client, sessionID)
+      const ms = Date.now() - at
+      if (token !== this.token) return undefined
+      if ("error" in result) {
+        this.log?.(`Transcript of ${sessionID} failed on attempt ${attempts} after ${ms} ms: ${errorDetail(result.error)}`)
+        if (isTransportError(result.error)) allowed = MAX_TRANSPORT_ATTEMPTS
+        if (attempts >= allowed) return result
+        continue
+      }
+      if (result.chunk.messages.length > 0 || result.chunk.hasMore) {
+        this.logLoaded(sessionID, attempts, Date.now() - started)
+        return result
+      }
+      // An empty history is never the whole story for a session that has a prompt: ask once more.
+      if (attempts >= allowed) return result
     }
   }
 

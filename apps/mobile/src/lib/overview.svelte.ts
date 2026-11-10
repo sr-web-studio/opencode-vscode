@@ -190,7 +190,8 @@ export class OverviewStore {
       this.hooks.onProjects?.(projects)
       this.current = {
         projects,
-        sessions: sessions.map(toOverviewSession).filter((session) => !session.archived),
+        // Archived sessions stay in the snapshot: the drawer's archive switch decides whether to show them.
+        sessions: sessions.map(toOverviewSession),
         running: Object.keys(active),
         permissions: pending.permissions,
         forms: pending.forms,

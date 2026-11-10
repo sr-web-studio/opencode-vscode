@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { expandedKey, isExpanded, parseExpanded, setExpanded } from "../../apps/mobile/src/lib/drawer-prefs"
+import { expandedKey, isExpanded, parseExpanded, parseShowEmpty, serializeShowEmpty, setExpanded, showEmptyKey } from "../../apps/mobile/src/lib/drawer-prefs"
 import { backAction } from "../../apps/mobile/src/lib/nav"
 
 describe("drawer expansion memory", () => {
@@ -19,6 +19,16 @@ describe("drawer expansion memory", () => {
 
   test("the key is per saved server", () => {
     expect(expandedKey("srv-1")).toBe("occ.drawer.expanded.srv-1")
+    expect(showEmptyKey("srv-1")).toBe("occ.drawer.empty.srv-1")
+  })
+
+  test("the empty-project switch is remembered and read back", () => {
+    expect(parseShowEmpty(serializeShowEmpty(true))).toBe(true)
+    expect(parseShowEmpty(serializeShowEmpty(false))).toBe(false)
+    // Anything else (a stale or hand-edited value) is "hidden", never a surprise reveal.
+    expect(parseShowEmpty(null)).toBe(false)
+    expect(parseShowEmpty("true")).toBe(false)
+    expect(parseShowEmpty("1")).toBe(true)
   })
 })
 
