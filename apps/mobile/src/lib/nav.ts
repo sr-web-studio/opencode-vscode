@@ -2,14 +2,18 @@
  * The screen stack. Pure: it only moves entries around, so the rules (what back does, which projects are still open)
  * are tested without a DOM. Every screen that belongs to a project carries its folder; a project's controller lives
  * exactly as long as some screen of that folder is on the stack.
+ *
+ * There is no project or session list screen: the drawer is the only list. The stack is therefore a chat (or the empty
+ * home state) with the saved-server list under it only when this phone has more than one server, so back walks out to
+ * that list instead of leaving the app.
  */
 import type { ImageRef } from "@occ/core/images"
 
 export type Screen =
   | { kind: "servers" }
   | { kind: "server-form"; profileID?: string }
-  | { kind: "projects" }
-  | { kind: "sessions"; directory: string }
+  /** No project to open: the drawer (or the server list) is where the owner picks one. */
+  | { kind: "home" }
   /** `sessionID`: open this session when the chat appears. `draft`: start a new session. Neither: the newest one. */
   | { kind: "chat"; directory: string; sessionID?: string; draft?: boolean }
   | { kind: "file"; directory: string; path: string; line?: number }
@@ -51,28 +55,22 @@ export function directoriesInUse(stack: ReadonlyArray<Entry>): Set<string> {
   return out
 }
 
-/** The stack for "open this session of this project": server list at the bottom so back walks out step by step. */
-export function stackForSession(directory: string, keys: () => number, sessionID?: string): Entry[] {
-  return [
-    { key: keys(), screen: { kind: "servers" } },
-    { key: keys(), screen: { kind: "projects" } },
-    { key: keys(), screen: { kind: "sessions", directory } },
-    { key: keys(), screen: { kind: "chat", directory, sessionID } },
-  ]
+/** The saved-server list at the bottom, only when there is more than one server to come back to. */
+const base = (keys: () => number, servers: boolean): Entry[] => (servers ? [{ key: keys(), screen: { kind: "servers" } }] : [])
+
+/** The stack for "open this session of this project". */
+export function stackForSession(directory: string, keys: () => number, sessionID?: string, servers = false): Entry[] {
+  return [...base(keys, servers), { key: keys(), screen: { kind: "chat", directory, sessionID } }]
 }
 
 /**
  * The stack for "open this worker": a worker is read-only, so it never becomes a chat. When the parent is known its
  * chat sits under the worker screen, so back returns to the conversation the worker belongs to; without the parent the
- * worker opens straight from the project's session list.
+ * worker's own folder's chat is the way back, and the drawer in it lists every other project.
  */
-export function stackForWorker(directory: string, keys: () => number, sessionID: string, parent?: { directory: string; sessionID: string }): Entry[] {
-  const stack: Entry[] = [
-    { key: keys(), screen: { kind: "servers" } },
-    { key: keys(), screen: { kind: "projects" } },
-    { key: keys(), screen: { kind: "sessions", directory: parent?.directory ?? directory } },
-  ]
-  if (parent) stack.push({ key: keys(), screen: { kind: "chat", directory: parent.directory, sessionID: parent.sessionID } })
+export function stackForWorker(directory: string, keys: () => number, sessionID: string, parent?: { directory: string; sessionID: string }, servers = false): Entry[] {
+  const stack = base(keys, servers)
+  stack.push(parent ? { key: keys(), screen: { kind: "chat", directory: parent.directory, sessionID: parent.sessionID } } : { key: keys(), screen: { kind: "chat", directory } })
   stack.push({ key: keys(), screen: { kind: "worker", directory, sessionID } })
   return stack
 }

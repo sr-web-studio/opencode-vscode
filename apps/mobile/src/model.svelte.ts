@@ -19,6 +19,7 @@ import { enhanceModelKey, parseEnhanceModel, parseViewSettings, patchViewSetting
 import { makeClient, redeemPairing, testConnection } from "./lib/client"
 import { parseDeepLink, routeDeepLink } from "./lib/deep-link"
 import { LinkGate } from "./lib/link-gate"
+import { chooseLanding, lastUsedKey, parseLastUsed } from "./lib/landing"
 import { backAction, canPop, directoriesInUse, pop, popKey, push, stackForSession, stackForWorker, type Entry, type Screen } from "./lib/nav"
 import { DEFAULT_NOTIFY, NO_STATUS, NOTIFY_VERSION, nativeServers, parseNotifySettings, visibleSessionOf, type NotifySettings, type NotifyStatus } from "./lib/notify"
 import {
@@ -35,6 +36,7 @@ import {
 import { parsePairingLink } from "./lib/pairing-link"
 import { pickFiles } from "./lib/picker"
 import { ProjectNames } from "./lib/project-names"
+import { buildOverview } from "./lib/overview"
 import { OverviewStore } from "./lib/overview.svelte"
 import { guessHome, projectFolders, type ProjectLike } from "./lib/projects"
 import { launchUrl, onHardwareBack, onPause, onResume, onUrlOpen, openInBrowser } from "./lib/platform"
@@ -129,6 +131,8 @@ class AppModel {
   private workspace: Workspace<Controller> | undefined
   /** Project folders whose controller finished a sync (reactive: a chat screen waits for it before opening a session). */
   private synced = $state.raw<ReadonlySet<string>>(new Set())
+  /** Resolvers waiting for a folder's first sync (a drawer action on a project that has no chat open). */
+  private readonly syncedWaiters = new Map<string, Array<() => void>>()
   private readonly caches = new Map<string, ImageCache>()
   private toastTimer: ReturnType<typeof setTimeout> | undefined
   private markProfilesLoaded: () => void = () => {}
@@ -307,31 +311,104 @@ class AppModel {
   /** Tap a session in the drawer: close it and open that chat, the same stack a notification tap builds. */
   openSession(directory: string, sessionID: string): void {
     this.closeDrawer()
-    this.setStack(stackForSession(directory, nextKey, sessionID))
+    this.setStack(stackForSession(directory, nextKey, sessionID, this.serversInStack))
   }
 
-  /** Tap a project name in the drawer: close it and show that project's sessions. */
-  openProject(directory: string): void {
+  /** `+` on a project in the drawer: close it and start a new session in that folder. */
+  newSession(directory: string): void {
     this.closeDrawer()
-    const screen = this.top.screen
-    if (screen.kind === "sessions" && screen.directory === directory) return
-    this.push({ kind: "sessions", directory })
+    this.setStack(this.chatEntries({ kind: "chat", directory, draft: true }))
   }
 
-  /** "All projects" in the drawer. */
-  goProjects(): void {
-    this.closeDrawer()
-    this.setStack([
-      { key: nextKey(), screen: { kind: "servers" } },
-      { key: nextKey(), screen: { kind: "projects" } },
-    ])
+  /** The drawer's refresh: ask for a fresh snapshot of every project and root session. */
+  refreshOverview(): void {
+    this.overview.retry()
+  }
+
+  /**
+   * Rename a session from the drawer. It writes only the title on the server, so the open controllers and the drawer
+   * both pick it up from the `session.renamed` event.
+   */
+  async renameSession(sessionID: string, current: string): Promise<void> {
+    const value = await this.ask({
+      title: "Rename session",
+      detail: "The name shown in the drawer, in OpenCode's own UI and in every other client.",
+      confirm: "Save",
+      input: { value: current, label: "Session name", placeholder: "Session name", maxLength: 200 },
+    })
+    if (value === undefined) return
+    const title = value.trim()
+    if (!title || title === current) return
+    try {
+      await this.client.session.update({ sessionID, title })
+      this.notify("info", "Session renamed.")
+    } catch (e) {
+      this.notify("error", `Could not rename the session: ${errorMessage(e)}`)
+    }
+  }
+
+  /**
+   * Delete a session from the drawer, after the usual confirmation. The controller of that folder does the work, so
+   * its guards apply: only a stopped, answered root session without a running worker can go. The controller is created
+   * on demand and dropped again by `settle` when no screen of that folder is open.
+   */
+  async deleteSession(directory: string, sessionID: string, title: string): Promise<void> {
+    const ok = await this.confirm({ title: deleteQuestion(title), detail: DELETE_DETAIL, confirm: DELETE_BUTTON, danger: true })
+    if (!ok) return
+    try {
+      const ctl = this.controller(directory)
+      if (!(await this.whenSynced(directory))) {
+        this.notify("warning", "That project is still loading. Try again in a moment.")
+        return
+      }
+      await ctl.dispatch({ type: "deleteSession", sessionID })
+    } catch (e) {
+      this.notify("error", `Could not delete the session: ${errorMessage(e)}`)
+    } finally {
+      this.settle()
+    }
+  }
+
+  /** The saved-server list belongs under the chat only when there is more than one server to go back to. */
+  private get serversInStack(): boolean {
+    return this.profiles.length > 1
+  }
+
+  private chatEntries(screen: Screen): Entry[] {
+    return [...this.baseEntries(), { key: nextKey(), screen }]
+  }
+
+  private baseEntries(): Entry[] {
+    return this.serversInStack ? [{ key: nextKey(), screen: { kind: "servers" } }] : []
+  }
+
+  /**
+   * Where a fresh connection opens: the chat last used on that server, else the most active project's chat with the
+   * drawer over it, else the empty state that points at the drawer. The overview is only awaited when nothing was
+   * remembered, because the remembered chat can report its own connection.
+   */
+  private async land(): Promise<void> {
+    const profile = this.profile
+    if (!profile) return
+    const last = parseLastUsed(readJSON(lastUsedKey(profile.id)))
+    if (!last) await this.overview.refresh()
+    const groups = this.overview.data ? buildOverview(this.overview.data, { resolved: this.projectIDs, titles: this.projectTitles }, Date.now()) : []
+    const landing = chooseLanding(groups, last)
+    if (landing.kind === "empty") {
+      this.setStack(this.chatEntries({ kind: "home" }))
+      return
+    }
+    this.setStack(stackForSession(landing.directory, nextKey, landing.sessionID, this.serversInStack))
+    // No remembered chat: the drawer is how the owner picks one, so show it over the project's chat.
+    if (!last) this.openDrawer()
   }
 
   /** Dispose the controllers of projects that no screen shows any more; leave the server when its list is gone. */
   private settle() {
     const ws = this.workspace
     if (!ws) return
-    if (!this.stack.some((e) => e.screen.kind === "projects")) {
+    // `home` keeps the server connected (the drawer lives on it) even though no folder is open.
+    if (!this.stack.some((e) => "directory" in e.screen || e.screen.kind === "home")) {
       this.closeWorkspace()
       return
     }
@@ -341,6 +418,12 @@ class AppModel {
   private drop(dir: string) {
     this.viewing.delete(dir)
     this.synced = new Set([...this.synced].filter((d) => d !== dir))
+    // A dialog waiting for this folder's first sync must not hang once the folder is closed.
+    const waiters = this.syncedWaiters.get(dir)
+    if (waiters) {
+      this.syncedWaiters.delete(dir)
+      for (const done of waiters) done()
+    }
     this.caches.get(dir)?.clear()
     this.caches.delete(dir)
   }
@@ -382,12 +465,12 @@ class AppModel {
   }
 
   /**
-   * Test the server, then open its project list. `navigate: false` keeps the screens as they are (a deep link builds its
+   * Test the server, then open its last chat. `navigate: false` keeps the screens as they are (a deep link builds its
    * own). Returns false when the server cannot be used; `problem` says why and the server list shows it.
    */
   async connect(profile: Profile, navigate = true): Promise<boolean> {
     if (this.workspace && this.profile?.id === profile.id) {
-      if (navigate) this.setStack([this.stack[0]!, { key: nextKey(), screen: { kind: "projects" } }])
+      if (navigate) await this.land()
       return true
     }
     this.connecting = profile.id
@@ -407,18 +490,14 @@ class AppModel {
     this.closeWorkspace()
     this.profile = fresh
     this.workspace = new Workspace(makeClient(fresh), (project) => this.makeController(fresh, project))
-    // The drawer's one snapshot and one stream; names go through the same ProjectNames cache as the Projects screen.
+    // The drawer's one snapshot and one stream; names go through the same ProjectNames cache the drawer reads.
     this.overview.connect(this.workspace.client, {
       onProjects: (list) => {
         this.home = guessHome(list.map((project) => project.canonical))
         void this.learnProjects(list)
       },
     })
-    if (navigate)
-      this.setStack([
-        { key: nextKey(), screen: { kind: "servers" } },
-        { key: nextKey(), screen: { kind: "projects" } },
-      ])
+    if (navigate) await this.land()
     return true
   }
 
@@ -466,6 +545,27 @@ class AppModel {
   /** Has this project's controller finished its first sync? */
   isSynced(directory: string): boolean {
     return this.synced.has(directory)
+  }
+
+  /** Wait for a folder's controller to know its sessions, so a drawer action has the server's own guards to work with. */
+  private whenSynced(directory: string): Promise<boolean> {
+    if (this.synced.has(directory)) return Promise.resolve(true)
+    return new Promise((resolve) => {
+      const done = (): void => {
+        clearTimeout(timer)
+        resolve(this.synced.has(directory))
+      }
+      // A server that never answers must not leave the dialog hanging; the caller says to try again.
+      const timer = setTimeout(() => {
+        const list = this.syncedWaiters.get(directory)
+        const at = list?.indexOf(done) ?? -1
+        if (list && at >= 0) list.splice(at, 1)
+        resolve(false)
+      }, 10_000)
+      const list = this.syncedWaiters.get(directory)
+      if (list) list.push(done)
+      else this.syncedWaiters.set(directory, [done])
+    })
   }
 
   /** The name OpenCode has for a folder's project, when it has one. */
@@ -600,7 +700,13 @@ class AppModel {
     })
     ctl.observe({
       resync: () => {
-        if (!this.synced.has(project.directory)) this.synced = new Set([...this.synced, project.directory])
+        if (this.synced.has(project.directory)) return
+        this.synced = new Set([...this.synced, project.directory])
+        const waiters = this.syncedWaiters.get(project.directory)
+        if (waiters) {
+          this.syncedWaiters.delete(project.directory)
+          for (const done of waiters) done()
+        }
       },
       event: (ev: EventEnvelope) => {
         // A rename in the browser UI or on another phone reaches every open controller's server-wide stream.
@@ -750,6 +856,7 @@ class AppModel {
   /** Tell the service which session is on screen (no notification for it) and clear that session's notification. */
   private syncVisible(): void {
     const top = this.top.screen as { kind: string; directory?: string; sessionID?: string }
+    this.rememberLastUsed()
     const sessionID = visibleSessionOf(top, Object.fromEntries(this.viewing))
     const serverId = this.profile?.serverId
     const key = serverId && sessionID ? `${serverId}|${sessionID}` : ""
@@ -757,6 +864,15 @@ class AppModel {
     this.shownSession = key
     void setVisibleSession(serverId, sessionID)
     if (serverId && sessionID) void clearSessionNotification(serverId, sessionID)
+  }
+
+  /** Remember the chat on screen for this server, so the next start (or a server switch back) opens it again. */
+  private rememberLastUsed(): void {
+    const id = this.profile?.id
+    const top = this.top.screen
+    if (!id || top.kind !== "chat") return
+    const sessionID = this.viewing.get(top.directory) ?? top.sessionID
+    writeJSON(lastUsedKey(id), { directory: top.directory, sessionID })
   }
 
   /* -------------------------------------------------------- deep link */
@@ -804,7 +920,7 @@ class AppModel {
     }
     const directory = info?.location?.directory
     if (!directory) {
-      this.setStack([...bottom(), { key: nextKey(), screen: { kind: "projects" } }])
+      await this.land()
       this.notify("warning", `That session was not found on ${route.profile.name}. It may have been deleted.`)
       return false
     }
@@ -817,10 +933,10 @@ class AppModel {
         parentDirectory = undefined
       }
       const parent = parentDirectory ? { directory: parentDirectory, sessionID: info.parentID } : undefined
-      this.setStack(stackForWorker(directory, nextKey, link.sessionID, parent))
+      this.setStack(stackForWorker(directory, nextKey, link.sessionID, parent, this.serversInStack))
       return true
     }
-    this.setStack(stackForSession(directory, nextKey, link.sessionID))
+    this.setStack(stackForSession(directory, nextKey, link.sessionID, this.serversInStack))
     return true
   }
 

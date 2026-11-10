@@ -7,12 +7,11 @@
   import ChatScreen from "./screens/ChatScreen.svelte"
   import DiffScreen from "./screens/DiffScreen.svelte"
   import FileScreen from "./screens/FileScreen.svelte"
+  import HomeScreen from "./screens/HomeScreen.svelte"
   import ImageScreen from "./screens/ImageScreen.svelte"
-  import ProjectsScreen from "./screens/ProjectsScreen.svelte"
   import ServerFormScreen from "./screens/ServerFormScreen.svelte"
   import ServersScreen from "./screens/ServersScreen.svelte"
   import SettingsScreen from "./screens/SettingsScreen.svelte"
-  import SessionsScreen from "./screens/SessionsScreen.svelte"
   import ShellScreen from "./screens/ShellScreen.svelte"
   import WorkerScreen from "./screens/WorkerScreen.svelte"
 
@@ -28,8 +27,7 @@
     <div class="screen" class:under={i < model.stack.length - 1} inert={i < model.stack.length - 1 || model.drawerOpen || undefined}>
       {#if s.kind === "servers"}<ServersScreen />
       {:else if s.kind === "server-form"}<ServerFormScreen key={entry.key} profileID={s.profileID} />
-      {:else if s.kind === "projects"}<ProjectsScreen />
-      {:else if s.kind === "sessions"}<SessionsScreen directory={s.directory} />
+      {:else if s.kind === "home"}<HomeScreen />
       {:else if s.kind === "chat"}<ChatScreen screenKey={entry.key} directory={s.directory} sessionID={s.sessionID} draft={s.draft} />
       {:else if s.kind === "file"}<FileScreen directory={s.directory} path={s.path} line={s.line} />
       {:else if s.kind === "diff"}<DiffScreen file={s.file} patches={s.patches} />
