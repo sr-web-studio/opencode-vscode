@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **A window with several folders opens its chat without a transcript error.** At startup only the folder on screen loads its transcript; the other folders load theirs when you switch to them. A request the server closed without an answer is retried after a short pause (twice, with a longer pause before the last try).
+
 ## 0.3.14 (preview)
 
 - **A session no longer shows "No messages yet." when its transcript failed to load.** The transcript is fetched once more, a failed reload keeps what is on screen, the reason stays visible, and opening the session again retries.
