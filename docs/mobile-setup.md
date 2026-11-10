@@ -189,6 +189,7 @@ OPENCODE_PASSWORD="choose-a-strong-password" opencode serve --hostname 0.0.0.0 -
 - Never forward port 4096 on your router and never expose it to the internet.
 - `service.json` stores the password in plain text on that computer. Do not commit it or share it.
 - Changing the password signs out every connected client, including the phone; enter the new password in the app.
+- What the app stores on the phone and what it sends to the server is in the [privacy policy](privacy.md).
 
 ---
 
