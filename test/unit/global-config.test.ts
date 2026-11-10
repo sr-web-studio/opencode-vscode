@@ -137,11 +137,16 @@ describe("wiring", () => {
     expect(pkg.contributes.menus["view/title"]).not.toContainEqual(expect.objectContaining({ command: "opencode.openGlobalConfig" }))
     expect(pkg.contributes.menus.commandPalette ?? []).not.toContainEqual(expect.objectContaining({ command: "opencode.openGlobalConfig", when: "false" }))
   })
-  test("the chat view's title bar has one gear: the Settings page", () => {
+  test("the chat view's title bar has the sessions toggle before the one gear: the Settings page", () => {
     const view = pkg.contributes.views.opencode[0].id
-    expect(pkg.contributes.menus["view/title"]).toEqual([{ command: "opencode.openSettings", when: `view == ${view}`, group: "navigation@95" }])
+    expect(pkg.contributes.menus["view/title"]).toEqual([
+      { command: "opencode.toggleSessions", when: `view == ${view}`, group: "navigation@90" },
+      { command: "opencode.openSettings", when: `view == ${view}`, group: "navigation@95" },
+    ])
     const gear = pkg.contributes.commands.find((c: { command: string }) => c.command === "opencode.openSettings")
     expect(gear).toMatchObject({ icon: "$(settings-gear)" })
+    const toggle = pkg.contributes.commands.find((c: { command: string }) => c.command === "opencode.toggleSessions")
+    expect(toggle).toMatchObject({ title: "Toggle Sessions", category: "OpenCode", icon: "$(layout-sidebar-left)" })
   })
   test("the MCP panel button posts the host request, and the host routes it to the command", () => {
     expect(readFileSync("packages/ui/src/components/McpPanel.svelte", "utf8")).toContain(`request: { type: "openGlobalConfig" }`)

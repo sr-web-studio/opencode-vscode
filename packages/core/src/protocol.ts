@@ -83,6 +83,22 @@ export type FolderInfo = {
   attention?: boolean
 }
 
+/** One root session of a folder, as the in-chat sessions pane lists it. Light: no transcript, cost or tokens. */
+export type FolderSession = { id: string; title?: string; time: SessionInfo["time"]; outcome?: SessionInfo["outcome"] }
+
+/**
+ * The root sessions of one workspace folder. Posted separately from `AppState` so the main state stays small: the
+ * pane needs every folder's list in a multi-root window, and only VS Code has one.
+ */
+export type FolderSessions = {
+  directory: string
+  sessions: FolderSession[]
+  running: string[]
+  waiting: string[]
+  /** The folder's controller loaded its session list at least once. */
+  loaded: boolean
+}
+
 /** Everything the UI renders. Plain data: it crosses postMessage (VS Code) or stays in memory (browser). */
 export type AppState = {
   connection: ConnectionState
@@ -224,7 +240,9 @@ export type ToWebview =
   | { type: "state"; state: AppState }
   /** A light refresh of the folder dropdown (busy/attention dots) when a folder the view is not showing changes. */
   | { type: "folders"; folders: FolderInfo[] }
-  | { type: "command"; name: "newSession" }
+  /** The root sessions of every folder, for the in-chat sessions pane (multi-root windows). */
+  | { type: "folderSessions"; folders: FolderSessions[] }
+  | { type: "command"; name: "newSession" | "toggleSessions" }
   | { type: "picked"; requestID: string; files: PickedFile[] }
   /** The answer to `imageData`: a `data:` URI, or nothing when the image is gone or unreadable. */
   | { type: "image"; requestID: string; dataUri?: string }
@@ -250,7 +268,16 @@ export type HostRequest =
   | { type: "pickFiles"; requestID: string }
   | { type: "confirmRevert"; messageID: string }
   /** The trash icon of a session row: the host shows a modal, and only "Delete" runs the `deleteSession` action. */
-  | { type: "confirmDeleteSession"; sessionID: string; title?: string }
+  | { type: "confirmDeleteSession"; sessionID: string; title?: string; directory?: string }
+  /** The sessions pane picked a session of any folder: the host switches folders first, then opens it there. */
+  | { type: "openSessionInFolder"; sessionID: string; directory?: string }
+  /**
+   * A session row's pencil: rename it in the folder that owns it, without switching the chat there. The directory
+   * comes from the row, so a row that moved folders in the meantime cannot rename the wrong session.
+   */
+  | { type: "renameSession"; sessionID: string; directory: string; title: string }
+  /** The sessions pane's refresh: re-post the lists the controllers already hold, never a server call. */
+  | { type: "refreshSessions" }
   | { type: "openExternal"; url: string }
   | { type: "setCliPath" }
   | { type: "voice" }

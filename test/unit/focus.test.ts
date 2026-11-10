@@ -97,8 +97,9 @@ describe("focus call sites", () => {
           .filter(({ l }) => /VIEW_ID\}\.focus/.test(l))
           .map(({ f, l }) => `${f}: ${l.trim()}`),
       )
-    // runNotice (user clicked "Open"), opencode.focus, opencode.newSession, opencode.mcps. Nothing in a state/event path.
-    expect(hits.length).toBe(4)
+    // runNotice (user clicked "Open"), opencode.focus, opencode.newSession, opencode.mcps, and the sessions
+    // pane's title-bar toggle. Nothing in a state/event path.
+    expect(hits.length).toBe(5)
     expect(hits.every((h) => h.startsWith(join("apps", "vscode", "src", "extension", "extension.ts")))).toBe(true)
   })
 })

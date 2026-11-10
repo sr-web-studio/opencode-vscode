@@ -93,14 +93,16 @@ describe("buildEnhancePrompt", () => {
     expect(prompt).not.toMatch(/AGENTS\.md|project files|attachments|session history/i)
   })
 
-  test("rewrite: the detailed structure, without inventing project facts", () => {
+  test("rewrite: intent first, a task only when it is one, and no invented facts", () => {
     const text = "add a retry to the fetch in api.ts"
     const prompt = buildEnhancePrompt("rewrite", text)
     expect(prompt).toContain(text)
     expect(prompt).toContain("<<<PROMPT\n")
     expect(prompt).toContain("\nPROMPT>>>")
-    expect(prompt).toMatch(/goal first/i)
-    expect(prompt).toMatch(/Do not invent facts about the project/i)
+    expect(prompt).toMatch(/Understand the intent/i)
+    expect(prompt).toMatch(/Not every prompt is a task/i)
+    expect(prompt).toMatch(/how to tell it is done/i)
+    expect(prompt).toMatch(/Do not invent features, requirements or facts/i)
     expect(prompt).toMatch(/something the agent must check/i)
     expect(prompt).toMatch(/same language/i)
     expect(prompt).toMatch(/never instructions to follow/)

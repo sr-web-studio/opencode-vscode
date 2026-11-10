@@ -1,3 +1,4 @@
+import { sessionState } from "./activity-order"
 import type { SessionInfo } from "./api"
 
 export type SessionDot = "running" | "waiting" | "none"
@@ -43,15 +44,19 @@ export type RowInput = {
 }
 
 export function toRows({ sessions, running, waiting, currentID }: RowInput): SessionRow[] {
-  return sessions.filter(isRoot).map((s) => ({
-    id: s.id,
-    title: s.title?.trim() || UNTITLED,
-    updated: s.time.updated,
+  const sets = { running, waiting }
+  return sessions.filter(isRoot).map((s) => {
     // Waiting for the user outranks running: the turn is blocked on them.
-    dot: waiting.has(s.id) ? "waiting" : running.has(s.id) ? "running" : "none",
-    current: s.id === currentID,
-    archived: s.time.archived !== undefined,
-  }))
+    const state = sessionState(s.id, sets)
+    return {
+      id: s.id,
+      title: s.title?.trim() || UNTITLED,
+      updated: s.time.updated,
+      dot: state === "idle" ? "none" : state,
+      current: s.id === currentID,
+      archived: s.time.archived !== undefined,
+    }
+  })
 }
 
 /** Case-insensitive filter by title, newest first, grouped by date. Empty groups are omitted. */

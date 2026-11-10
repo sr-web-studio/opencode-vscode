@@ -264,9 +264,25 @@ describe("in-process bridge", () => {
     expect(b.storage.get("bad")).toBeUndefined()
   })
 
-  test("capabilities: no mic, no config editor, no MCP sign-in; Enter adds a line; shell output screen", () => {
+  test("capabilities: no mic, no config editor, no MCP sign-in; Enter adds a line; shell output screen; no in-chat sessions pane", () => {
     const b = createBridge({ subscribe: () => () => {}, dispatch: async () => {}, sessionID: () => undefined }, recordingHost().host, memoryStore())
     expect(b.capabilities).toEqual(MOBILE_CAPABILITIES)
-    expect(MOBILE_CAPABILITIES).toEqual({ voice: false, editConfig: false, mcpSignIn: false, enterSends: false, shellView: "output" })
+    expect(MOBILE_CAPABILITIES).toEqual({ voice: false, editConfig: false, mcpSignIn: false, enterSends: false, shellView: "output", sessionsPane: false })
+  })
+
+  test("the pause signal is passed on only when the app supplies one", () => {
+    const plain = createBridge({ subscribe: () => () => {}, dispatch: async () => {}, sessionID: () => undefined }, recordingHost().host, memoryStore())
+    expect(plain.onHidden).toBeUndefined()
+
+    let fired = 0
+    const subscribe = (handler: () => void) => {
+      fired++
+      return () => void fired--
+    }
+    const b = createBridge({ subscribe: () => () => {}, dispatch: async () => {}, sessionID: () => undefined }, recordingHost().host, memoryStore(), MOBILE_CAPABILITIES, subscribe)
+    const off = b.onHidden?.(() => {})
+    expect(fired).toBe(1)
+    off?.()
+    expect(fired).toBe(0)
   })
 })

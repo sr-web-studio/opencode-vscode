@@ -3,6 +3,7 @@
   import Bar from "../components/Bar.svelte"
   import ConnectionPill from "../components/ConnectionPill.svelte"
   import { createBridge } from "../lib/bridge"
+  import { onPause } from "../lib/platform"
   import { liveState } from "../lib/live.svelte"
   import { model } from "../model.svelte"
 
@@ -27,6 +28,9 @@
     // svelte-ignore state_referenced_locally
     model.hostFor(directory),
     localStorage,
+    undefined,
+    // Android tells us when the app is paused; the draft is saved then, before the system may kill the view.
+    (handler) => onPause(handler),
   )
 
   // The controller's first sync picks the newest session; ask for ours only after it, or the sync would undo it.
@@ -49,7 +53,7 @@
   const sub = $derived([model.projectTitle(directory), live.state?.displayPath].filter((s): s is string => !!s).join(" · "))
 </script>
 
-<Bar {title} {sub}>
+<Bar {title} {sub} menu>
   {#snippet actions()}
     <ConnectionPill connection={live.state?.connection} />
   {/snippet}

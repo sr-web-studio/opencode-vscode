@@ -21,7 +21,7 @@
   "bugs": {
     "url": "https://github.com/sr-web-studio/opencode-vscode/issues"
   },
-  "version": "0.3.13",
+  "version": "0.3.14",
   "publisher": "sr-web-studio",
   "license": "MIT",
   "repository": {
@@ -154,10 +154,21 @@
         "title": "Voice Input",
         "category": "OpenCode",
         "icon": "$(mic)"
+      },
+      {
+        "command": "opencode.toggleSessions",
+        "title": "Toggle Sessions",
+        "category": "OpenCode",
+        "icon": "$(layout-sidebar-left)"
       }
     ],
     "menus": {
       "view/title": [
+        {
+          "command": "opencode.toggleSessions",
+          "when": "view == opencode.chat",
+          "group": "navigation@90"
+        },
         {
           "command": "opencode.openSettings",
           "when": "view == opencode.chat",

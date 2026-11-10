@@ -3,6 +3,7 @@ import { Controller } from "@occ/core/controller"
 import { confirmDelete, deletableSessions, DELETE_DETAIL, deleteQuestion } from "@occ/core/delete-session"
 import { WorkerTab } from "@occ/core/worker-tab"
 import { isGone } from "@occ/core/errors"
+import { chooseDeleteTarget } from "../../apps/vscode/src/extension/delete-session-target"
 
 const session = (id: string, extra: Record<string, unknown> = {}) => ({
   id,
@@ -250,6 +251,44 @@ describe("deletableSessions (the command's list)", () => {
       waiting: ["c"],
     } as any
     expect(deletableSessions(state).map((s) => s.id)).toEqual(["a", "d"])
+  })
+})
+
+describe("chooseDeleteTarget (the sidebar row's decision)", () => {
+  const state = (over: Record<string, unknown> = {}) =>
+    ({
+      sessions: [session("a", { title: "Alpha" }), session("b"), session("c")],
+      archived: [session("old", { time: { created: 1, updated: 1, archived: 2 } })],
+      running: [] as string[],
+      waiting: [] as string[],
+      ...over,
+    }) as any
+
+  test("no id: the Command Palette picks, as before", () => {
+    expect(chooseDeleteTarget(state())).toEqual({ kind: "pick" })
+    expect(chooseDeleteTarget(state(), "")).toEqual({ kind: "pick" })
+  })
+
+  test("a stopped root session is the target, so the row is confirmed without a second picker", () => {
+    expect(chooseDeleteTarget(state(), "a")).toMatchObject({ kind: "target", session: { id: "a" } })
+  })
+
+  test("an archived stopped root session is a target too", () => {
+    expect(chooseDeleteTarget(state(), "old")).toMatchObject({ kind: "target", session: { id: "old" } })
+  })
+
+  test("running and waiting sessions are refused with their own reason", () => {
+    expect(chooseDeleteTarget(state({ running: ["b"] }), "b")).toEqual({ kind: "running" })
+    expect(chooseDeleteTarget(state({ waiting: ["c"] }), "c")).toEqual({ kind: "waiting" })
+  })
+
+  test("waiting outranks running, as in the shared order", () => {
+    expect(chooseDeleteTarget(state({ running: ["c"], waiting: ["c"] }), "c")).toEqual({ kind: "waiting" })
+  })
+
+  test("a worker in the session list is refused; an unknown id is gone", () => {
+    expect(chooseDeleteTarget(state({ sessions: [session("kid", { parentID: "a" })] }), "kid")).toEqual({ kind: "worker" })
+    expect(chooseDeleteTarget(state(), "nope")).toEqual({ kind: "gone" })
   })
 })
 

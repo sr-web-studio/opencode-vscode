@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte"
+  import Drawer from "./components/Drawer.svelte"
   import Overlays from "./components/Overlays.svelte"
   import { model } from "./model.svelte"
   import ChangesScreen from "./screens/ChangesScreen.svelte"
@@ -24,7 +25,7 @@
   <!-- Every screen of the stack stays mounted: the one below keeps its scroll position and its unsent text. -->
   {#each model.stack as entry, i (entry.key)}
     {@const s = entry.screen}
-    <div class="screen" class:under={i < model.stack.length - 1} inert={i < model.stack.length - 1 || undefined}>
+    <div class="screen" class:under={i < model.stack.length - 1} inert={i < model.stack.length - 1 || model.drawerOpen || undefined}>
       {#if s.kind === "servers"}<ServersScreen />
       {:else if s.kind === "server-form"}<ServerFormScreen key={entry.key} profileID={s.profileID} />
       {:else if s.kind === "projects"}<ProjectsScreen />
@@ -43,6 +44,7 @@
   {#if model.settingsOpen}
     <div class="screen"><SettingsScreen /></div>
   {/if}
+  <Drawer />
 {/if}
 
 <Overlays />

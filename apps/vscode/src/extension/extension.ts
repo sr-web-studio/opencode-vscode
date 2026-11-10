@@ -23,6 +23,7 @@ import { ShellTerminals } from "./terminal"
 import { ImagePreviews } from "./images"
 import { DiffViews } from "./diffs"
 import { ChatViewProvider, VIEW_ID } from "./view"
+import { directoryArg, sessionTarget } from "./session-target"
 import { WorkerPanels } from "./workers"
 import { Voice } from "./voice"
 import { normalizeServerUrl } from "@occ/core/server-url"
@@ -268,7 +269,19 @@ export function activate(context: vscode.ExtensionContext): void {
       await vscode.commands.executeCommand(`${VIEW_ID}.focus`)
       provider.newSession()
     }),
-    vscode.commands.registerCommand("opencode.deleteSession", () => deleteSessionCommand(folders.active)),
+    // The title-bar button of the chat view: the webview opens or closes its own sessions pane and remembers it.
+    vscode.commands.registerCommand("opencode.toggleSessions", async () => {
+      await vscode.commands.executeCommand(`${VIEW_ID}.focus`)
+      provider.toggleSessions()
+    }),
+    // The sessions pane names its session and folder; the palette passes nothing and acts on the active folder.
+    // Deleting does not switch the chat's folder: the folder's own controller does the work.
+    vscode.commands.registerCommand("opencode.deleteSession", (arg?: unknown) => {
+      const target = sessionTarget(arg)
+      const directory = target?.directory ?? directoryArg(arg)
+      const controller = (directory ? folders.controllerAt(directory) : undefined) ?? (target ? folders.forSession(target.sessionID) : folders.active)
+      return deleteSessionCommand(controller, target?.sessionID)
+    }),
     vscode.commands.registerCommand("opencode.mcps", async () => {
       await vscode.commands.executeCommand(`${VIEW_ID}.focus`)
       await folders.active.dispatch({ type: "mcp", op: "open" })
@@ -277,7 +290,8 @@ export function activate(context: vscode.ExtensionContext): void {
     // The project config belongs to the folder the chat view shows, so the command reads the active folder when it runs.
     vscode.commands.registerCommand("opencode.openProjectConfig", () => openProjectConfigCommand(folders.activeDirectoryName, serverHostname)),
     // The project name belongs to the folder the chat view shows, so the command reads the active folder when it runs.
-    vscode.commands.registerCommand("opencode.renameProject", () => renameProject()),
+    // The sessions pane's pencil passes that folder's directory.
+    vscode.commands.registerCommand("opencode.renameProject", (arg?: unknown) => renameProject(directoryArg(arg))),
     vscode.commands.registerCommand("opencode.reconnect", () => start()),
     vscode.commands.registerCommand("opencode.pairMobileDevice", () =>
       pairMobileCommand({

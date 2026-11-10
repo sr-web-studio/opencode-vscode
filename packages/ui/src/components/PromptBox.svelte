@@ -8,6 +8,7 @@
   import { shouldFocusPrompt } from "@occ/core/focus"
   import { cycleAgent, findModel, type ModelSelection } from "@occ/core/models"
   import { promptHeight } from "@occ/core/prompt-height"
+  import { promptHistory, recallNewer, recallOlder } from "@occ/core/prompt-history"
   import type { AppState } from "@occ/core/protocol"
   import {
     applySuggestion,
@@ -57,6 +58,27 @@
   let seq = 0
   // The text that a revert put into the box, so Redo only clears it when the user did not change it.
   let restored: string | undefined
+
+  /* ------------------------------------------------------------ history */
+
+  // Walking back through this session's prompts with the up arrow. `-1` is not walking; `recallText` is what the walk
+  // last put in the box, so any edit (typing, dictation, an enhancement) ends it and the text becomes the draft.
+  let recall = $state(-1)
+  let recallText = $state("")
+  const history = $derived(app.target.kind === "session" ? promptHistory(app.view) : [])
+
+  $effect(() => {
+    if (recall >= 0 && text !== recallText) recall = -1
+  })
+  // Another session (or a fresh draft) has another history.
+  const targetKey = $derived(app.target.kind === "session" ? `session:${app.target.id}` : "draft")
+  let seenTarget: string | undefined
+  $effect(() => {
+    const now = targetKey
+    if (seenTarget === now) return
+    seenTarget = now
+    recall = -1
+  })
 
   /* -------------------------------------------------------------- enhance */
 
@@ -109,6 +131,46 @@
     await tick()
     area?.setSelectionRange(at, at)
     resize()
+  }
+
+  /* ------------------------------------------------------------- history */
+
+  /** The caret sits on the first (or last) line, so the arrow keys may step through the history instead of the text. */
+  const onFirstLine = () => !text.slice(0, area?.selectionStart ?? 0).includes("\n")
+  const onLastLine = () => !text.slice(area?.selectionEnd ?? text.length).includes("\n")
+
+  function showRecall(step: { index: number; text: string }) {
+    recall = step.index
+    recallText = step.text
+    void setText(step.text)
+  }
+
+  /**
+   * ArrowUp: in an untouched empty box it starts walking back through this session's prompts. While walking it goes
+   * one prompt older, but only with the caret on the first line, so the arrows still move inside a multi-line prompt.
+   * At the oldest prompt it does nothing.
+   */
+  function historyBack(): boolean {
+    if (recall < 0) {
+      if (text !== "" || files.length > 0 || skills.length > 0) return false
+      if (!area || area.selectionStart !== 0 || area.selectionEnd !== 0) return false
+      const step = recallOlder(history, -1)
+      if (!step) return false
+      showRecall(step)
+      return true
+    }
+    if (!onFirstLine()) return false
+    const step = recallOlder(history, recall)
+    if (step) showRecall(step)
+    return true
+  }
+
+  /** ArrowDown while walking: one prompt newer with the caret on the last line, and finally back to the empty box. */
+  function historyForward(): boolean {
+    if (recall < 0) return false
+    if (!onLastLine()) return false
+    showRecall(recallNewer(history, recall))
+    return true
   }
 
   /* ------------------------------------------------------------- enhance */
@@ -345,6 +407,13 @@
       e.preventDefault()
       return
     }
+    // Up/Down recall this session's prompts. Plain keys only, and the popups above keep their own arrow keys.
+    if ((e.key === "ArrowUp" || e.key === "ArrowDown") && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
+      if (e.key === "ArrowUp" ? historyBack() : historyForward()) {
+        e.preventDefault()
+        return
+      }
+    }
     if (popup && e.key === "Escape") {
       // Closes the popup only: it must not also stop the agent.
       e.preventDefault()
@@ -381,6 +450,13 @@
 
   /* ----------------------------------------------------------- attachments */
 
+  /** A local id no attachment in the box uses: a restored draft brings ids from before the reload. */
+  function nextId(): string {
+    let id = `a${++seq}`
+    while (files.some((f) => f.id === id)) id = `a${++seq}`
+    return id
+  }
+
   function add(a: Attachment) {
     if (files.some((f) => f.uri === a.uri)) return
     files = [...files, a]
@@ -390,7 +466,7 @@
 
   async function pick() {
     const picked = await store.bridge.pickFiles()
-    for (const p of picked) add(attachmentFromUri(`a${++seq}`, p.uri, p.name, p.mime ?? mimeFromName(p.name)))
+    for (const p of picked) add(attachmentFromUri(nextId(), p.uri, p.name, p.mime ?? mimeFromName(p.name)))
     void tick().then(() => focusGuarded(area))
   }
 
@@ -408,7 +484,7 @@
         const b64 = result.slice(result.indexOf(",") + 1)
         const mime = file.type || "application/octet-stream"
         const name = file.name || `pasted.${mime.split("/")[1]?.split("+")[0] ?? "bin"}`
-        add(attachmentFromUri(`a${++seq}`, dataUri(mime, b64), name, mime))
+        add(attachmentFromUri(nextId(), dataUri(mime, b64), name, mime))
         resolve()
       }
       reader.onerror = () => {
@@ -446,7 +522,7 @@
       resourceUrls: dt.getData("resourceurls"),
       text: dt.getData("text/plain"),
     })
-    for (const uri of uris) add(attachmentFromUri(`a${++seq}`, uri, undefined, mimeFromName(uri)))
+    for (const uri of uris) add(attachmentFromUri(nextId(), uri, undefined, mimeFromName(uri)))
     if (uris.length === 0) for (const f of [...dt.files]) void readBlob(f)
   }
 
@@ -538,6 +614,7 @@
     enhanceError = ""
     dismissedFor = undefined
     dictation = undefined
+    recall = -1
   })
 </script>
 

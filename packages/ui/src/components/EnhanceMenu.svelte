@@ -120,17 +120,25 @@
       class:sel={index === 0}
       role="menuitem"
       tabindex="-1"
-      title="Fix grammar, spelling, sentence structure and dictation errors"
+      title="Polish: fix grammar, spelling, sentence structure and dictation errors"
       onclick={() => choose("polish")}
       onmousemove={() => (index = 0)}
     >
       <span class="n">Polish</span>
-      <span class="d muted wrap">Fix grammar, spelling, sentence structure and dictation errors</span>
+      <span class="d muted">Fix grammar, spelling and structure</span>
     </div>
     <!-- svelte-ignore a11y_click_events_have_key_events -->
-    <div class="row" class:sel={index === 1} role="menuitem" tabindex="-1" title="A detailed, clear prompt for the agent" onclick={() => choose("rewrite")} onmousemove={() => (index = 1)}>
+    <div
+      class="row"
+      class:sel={index === 1}
+      role="menuitem"
+      tabindex="-1"
+      title="Rewrite: turn it into a clear, detailed prompt for the agent"
+      onclick={() => choose("rewrite")}
+      onmousemove={() => (index = 1)}
+    >
       <span class="n">Rewrite</span>
-      <span class="d muted wrap">A detailed, clear prompt for the agent</span>
+      <span class="d muted">Turn it into a clear, detailed prompt</span>
     </div>
     <div class="sep"></div>
     <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -233,14 +241,6 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-  /* Polish and Rewrite must say what they do in full, so their description wraps onto a second line instead of
-     ending in an ellipsis; the row only grows when the text really needs it. */
-  .d.wrap {
-    white-space: normal;
-    text-overflow: clip;
-    overflow: visible;
-    line-height: 1.35;
   }
   .mark {
     flex: none;

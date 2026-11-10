@@ -1,7 +1,7 @@
 import * as vscode from "vscode"
 import type { Controller } from "@occ/core/controller"
 import type { FolderRegistry } from "@occ/core/folders"
-import type { AppState, ToHost, ToWebview, WebviewMetrics } from "@occ/core/protocol"
+import type { AppState, FolderSessions, ToHost, ToWebview, WebviewMetrics } from "@occ/core/protocol"
 import type { HostActions, Surface } from "./host"
 import type { MinWidth } from "./min-width"
 import { webviewHtml } from "./html"
@@ -21,6 +21,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   /** State streams of the folders the view is not showing, so the dropdown's busy/attention dots stay live. */
   private readonly others = new Map<string, () => void>()
   private foldersTimer?: ReturnType<typeof setTimeout>
+  /** The sessions pane's per-folder list is throttled on its own, so a busy folder cannot flood the webview. */
+  private sessionsTimer?: ReturnType<typeof setTimeout>
   private readonly subs: vscode.Disposable[] = []
   private readonly offActive: () => void
   private readonly offChange: () => void
@@ -54,6 +56,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       view.webview.onDidReceiveMessage((m: ToHost | WebviewMetrics) => void this.onMessage(m)),
       view.onDidChangeVisibility(() => {
         this.minWidth.noteVisible(view.visible)
+        this.syncVisible()
         // A view that was hidden has no live DOM: resend state when it comes back.
         if (view.visible) void this.folders.active.dispatch({ type: "ready" })
       }),
@@ -63,6 +66,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         this.unsubscribe = undefined
         this.clearOthers()
         this.view = undefined
+        // No view: no folder is on screen, so no turn ends "seen".
+        this.syncVisible()
       }),
     )
   }
@@ -77,10 +82,29 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     else this.folders.active.newDraft(false)
   }
 
+  /** The title-bar button: the webview owns whether its pane is open and remembers it. */
+  toggleSessions(): void {
+    if (this.view) this.post({ type: "command", name: "toggleSessions" })
+  }
+
   private bind(): void {
     this.unsubscribe?.()
-    this.unsubscribe = this.folders.active.subscribe((state) => this.postState(state))
+    this.unsubscribe = this.folders.active.subscribe((state) => {
+      this.postState(state)
+      this.scheduleFolderSessions()
+    })
     this.watchOthers()
+    this.postFolderSessions()
+    this.syncVisible()
+  }
+
+  /**
+   * Tell the controllers which of them is on screen. Only the active folder's chat can be looked at; a turn that ends
+   * in a background folder stays "New reply" until the user switches there or opens it.
+   */
+  private syncVisible(): void {
+    const active = this.folders.active
+    for (const controller of this.folders.controllers()) controller.setVisible(controller === active && this.visible)
   }
 
   /** Every folder but the active one: a change there only refreshes the dropdown (busy/attention dots). */
@@ -98,7 +122,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       if (!path || path === active || this.others.has(path)) continue
       this.others.set(
         path,
-        controller.subscribe(() => this.postFolders()),
+        controller.subscribe(() => {
+          this.postFolders()
+          this.scheduleFolderSessions()
+        }),
       )
     }
   }
@@ -111,6 +138,36 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       const list = this.folders.foldersState()
       if (list.length > 1) this.post({ type: "folders", folders: list })
     }, FOLDERS_THROTTLE_MS)
+  }
+
+  private scheduleFolderSessions(): void {
+    if (this.sessionsTimer) return
+    this.sessionsTimer = setTimeout(() => {
+      this.sessionsTimer = undefined
+      this.postFolderSessions()
+    }, FOLDERS_THROTTLE_MS)
+  }
+
+  /**
+   * The sessions pane needs every folder's root sessions, not only the active one's `AppState`. It is a separate,
+   * light message so the main state stays small; the controllers already hold the lists, so this never asks the server.
+   */
+  private postFolderSessions(): void {
+    const list = this.folders.foldersState()
+    if (list.length <= 1) return
+    const folders: FolderSessions[] = list.map((folder) => {
+      const state = this.folders.controllerAt(folder.directory)?.snapshot()
+      return {
+        directory: folder.directory,
+        sessions: (state?.sessions ?? [])
+          .filter((session) => !session.parentID && session.time.archived === undefined)
+          .map((session) => ({ id: session.id, title: session.title, time: session.time, outcome: session.outcome })),
+        running: state?.running ?? [],
+        waiting: state?.waiting ?? [],
+        loaded: state?.sessionsLoaded ?? false,
+      }
+    })
+    this.post({ type: "folderSessions", folders })
   }
 
   /** The folder list is a property of the window, so it is added here to whichever controller's state is posted. */
@@ -130,7 +187,28 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       // The registry owns the folder switch; a Controller knows nothing about the window's other folders.
       if (m.action.type === "switchFolder") this.folders.setActive(m.action.directory)
       else await this.folders.active.dispatch(m.action)
-    } else await this.host.handle(m.request, this.surfaceFor(this.folders.active))
+      return
+    }
+    // The sessions pane's refresh: re-post what the controllers already hold, never a server call.
+    if (m.request.type === "refreshSessions") {
+      this.postState()
+      this.postFolderSessions()
+      return
+    }
+    // A session of any folder: switch the chat to its folder first, like a notification click does.
+    if (m.request.type === "openSessionInFolder") {
+      const controller = this.folders.activateForSession(m.request.sessionID, m.request.directory)
+      await controller.open(m.request.sessionID)
+      return
+    }
+    // A session row's pencil: rename it where it lives, so a row that moved folders meanwhile cannot rename another
+    // session (the old switch-then-rename pair could land on whatever the chat had opened in the meantime).
+    if (m.request.type === "renameSession") {
+      const controller = this.folders.controllerAt(m.request.directory) ?? this.folders.forSession(m.request.sessionID)
+      await controller.dispatch({ type: "rename", id: m.request.sessionID, title: m.request.title })
+      return
+    }
+    await this.host.handle(m.request, this.surfaceFor(this.folders.active))
   }
 
   /** Bind the host's effects to the controller that was active when the request arrived (a modal can outlive a switch). */
@@ -148,6 +226,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     this.clearOthers()
     if (this.foldersTimer) clearTimeout(this.foldersTimer)
     this.foldersTimer = undefined
+    if (this.sessionsTimer) clearTimeout(this.sessionsTimer)
+    this.sessionsTimer = undefined
     this.offActive()
     this.offChange()
     this.offNames()
