@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **The sessions list shows projects as folders, with their sessions under them.** In a window with several folders, each project header now carries a folder icon (open while its group is open) and its session count, and the sessions are indented under it. A project's aggregated status stays at the end of its header, so a collapsed project still shows that it needs you, is running or failed. The Android drawer uses the same folder icon and shows each project's status at the end of its header too.
+- **A session whose workers are still running says so.** When a session's own turn has finished but a worker it started is still working, the row shows a worker icon and "Worker running" (or "N workers running") instead of looking finished; its project header shows the same icon. The row keeps its place in the list, because the session itself is idle. This works in the VS Code sessions pane and in the Android drawer.
+- **Start a new session in any project from the list.** Each project header has its own `+` (VS Code sessions pane and Android drawer), which opens a new draft in that folder. In VS Code a single-folder window gets a **New session** row at the top of the list, and the pane header's own `+` is gone.
+
 ## 0.3.17 (preview)
 
 - **Wide tables scroll inside their own box.** A table wider than the chat no longer cuts off its last columns or makes the whole conversation scroll sideways (VS Code and the Android app).

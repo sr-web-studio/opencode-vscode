@@ -95,6 +95,8 @@ export type FolderSessions = {
   sessions: FolderSession[]
   running: string[]
   waiting: string[]
+  /** Root session id → how many of its workers (child sessions) are running now. */
+  workerRunning: Record<string, number>
   /** The folder's controller loaded its session list at least once. */
   loaded: boolean
 }
@@ -119,6 +121,11 @@ export type AppState = {
   sessionsLoaded: boolean
   running: string[]
   waiting: string[]
+  /**
+   * Root session id → how many of its workers (child sessions) are running now. A parent whose own turn is idle but
+   * whose workers still run looks finished otherwise; the sessions pane and the drawer show it separately.
+   */
+  workerRunning: Record<string, number>
   /** Current session's transcript (empty for a draft). */
   view: SessionView
   loadingView: boolean
@@ -271,6 +278,11 @@ export type HostRequest =
   | { type: "confirmDeleteSession"; sessionID: string; title?: string; directory?: string }
   /** The sessions pane picked a session of any folder: the host switches folders first, then opens it there. */
   | { type: "openSessionInFolder"; sessionID: string; directory?: string }
+  /**
+   * A project header's `+`: start a new draft session in that folder. The host switches the chat to the folder first,
+   * so the draft lands there and not in whichever folder happened to be active.
+   */
+  | { type: "newSessionIn"; directory: string }
   /**
    * A session row's pencil: rename it in the folder that owns it, without switching the chat there. The directory
    * comes from the row, so a row that moved folders in the meantime cannot rename the wrong session.

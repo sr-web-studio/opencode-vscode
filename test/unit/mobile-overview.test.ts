@@ -213,6 +213,39 @@ describe("status and unread", () => {
   })
 })
 
+describe("worker indicator", () => {
+  test("a running child counts on its parent row and group; an idle parent stays idle and keeps its place", () => {
+    const groups = buildOverview(
+      data({
+        projects: [project("a", "/work/app", 1)],
+        sessions: rows(session("parent", "/work/app", 10, "Parent"), session("newer", "/work/app", 20, "Newer")),
+        children: [
+          { id: "kid1", parentID: "parent" },
+          { id: "kid2", parentID: "parent" },
+          { id: "other", parentID: "newer" },
+        ],
+        running: ["kid1", "kid2"],
+      }),
+    )
+    expect(groups[0]?.sessions.map((s) => [s.id, s.state, s.workers])).toEqual([
+      ["newer", "idle", 0],
+      ["parent", "idle", 2],
+    ])
+    expect(groups[0]?.workers).toBe(2)
+    expect(groups[0]?.state).toBe("idle")
+  })
+
+  test("created/deleted events keep the children list, and a parent's deletion drops its children", () => {
+    const base = data({ sessions: [toOverviewSession(session("parent", "/work/app", 10))] })
+    const created = applyOverviewEvent(base, { type: "session.created", data: { sessionID: "kid", parentID: "parent" } })
+    expect(created.state.children).toEqual([{ id: "kid", parentID: "parent" }])
+    const started = applyOverviewEvent(created.state, { type: "session.execution.started", created: 20, data: { sessionID: "kid" } })
+    expect(buildOverview(started.state)[0]?.sessions[0]?.workers).toBe(1)
+    const deleted = applyOverviewEvent(started.state, { type: "session.deleted", data: { sessionID: "parent" } })
+    expect(deleted.state.children).toEqual([])
+  })
+})
+
 describe("live events", () => {
   const base = () =>
     data({

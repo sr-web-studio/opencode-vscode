@@ -41,6 +41,7 @@ function folder(directory: string, over: Partial<Omit<PaneFolder, "directory">> 
     sessions: [],
     running: new Set(),
     waiting: new Set(),
+    workers: new Map(),
     loaded: true,
     ...over,
   }
@@ -75,6 +76,7 @@ function state(over: Partial<PaneState> = {}): PaneState {
     showArchived: false,
     running: [],
     waiting: [],
+    workerRunning: {},
     target: { kind: "draft" },
     sessionsLoaded: true,
     ...over,
@@ -245,6 +247,7 @@ describe("pane folder inputs", () => {
     sessions,
     running: [],
     waiting: [],
+    workerRunning: {},
     loaded: true,
     ...over,
   })
@@ -318,6 +321,30 @@ describe("pane folder inputs", () => {
       ["broke", "failed"],
       ["old", "read"],
     ])
+  })
+
+  test("a root's running workers reach its row without changing its state or its place", () => {
+    const folders = paneFolders(
+      state({
+        sessions: [fullSession("a", now), fullSession("b", now + m)],
+        running: ["kid"],
+        workerRunning: { a: 2 },
+        target: { kind: "session", id: "b" },
+      }),
+      [],
+    )
+    const layout = buildPane(folders, now)
+    expect(rows(layout).map((row) => [row.id, row.state, row.workers])).toEqual([
+      ["b", "idle", 0],
+      ["a", "idle", 2],
+    ])
+  })
+
+  test("a project header sums its sessions' workers, read from the light message too", () => {
+    const folders = paneFolders(state({ folders: [folderInfo("/p", "p", { active: true }), folderInfo("/q", "q")] }), [light("/q", [session("q1", now)], { running: ["k"], workerRunning: { q1: 1 } })])
+    const [project] = projects(buildPane(folders, now))
+    expect(project).toMatchObject({ directory: "/q", workers: 1 })
+    expect(project?.sessions[0]).toMatchObject({ id: "q1", workers: 1 })
   })
 })
 
@@ -522,6 +549,43 @@ describe("sessions pane wiring", () => {
     expect(pane).toContain(`aria-label={rowLabel(row)}`)
     expect(pane).toContain(`row.current ? "current session" : undefined`)
     expect(app).toContain(`e.key === "Escape"`)
+  })
+
+  test("a project's + starts a draft there through the host; the pane header's + is gone", () => {
+    expect(protocol).toContain(`{ type: "newSessionIn"; directory: string }`)
+    expect(vscodeBridge).toContain(`newSessionIn: (directory) => host({ type: "newSessionIn", directory })`)
+    expect(view).toMatch(/if \(m\.request\.type === "newSessionIn"\)/)
+    expect(view).toMatch(/this\.folders\.setActive\(controller\.folderPath\)/)
+    expect(view).toMatch(/await controller\.dispatch\(\{ type: "newDraft", hasText: false \}\)/)
+    expect(pane).toContain("store.bridge.newSessionIn(project.directory)")
+    expect(pane).toContain(`aria-label="New session in {project.name}"`)
+    expect(pane).not.toMatch(/class="icon" onclick=\{newSession\}/)
+    expect(pane).toContain(`<span class="text">New session</span>`)
+  })
+
+  test("the pane and the drawer show running workers with the shared label and icon", () => {
+    expect(protocol).toContain("workerRunning: Record<string, number>")
+    expect(view).toContain("workerRunning: state?.workerRunning ?? {}")
+    expect(pane).toContain(`<Codicon name="organization" />`)
+    expect(pane).toContain("workerLabel(row.workers)")
+    expect(pane).toContain("workerLabel(project.workers)")
+    const drawer = readFileSync("apps/mobile/src/components/Drawer.svelte", "utf8")
+    expect(drawer).toContain(`<Codicon name="organization" />`)
+    expect(drawer).toContain("workerLabel(session.workers)")
+  })
+
+  test("a project shows its folder, its status beside it, and its count only while collapsed", () => {
+    expect(pane).toContain(`<Codicon name={open ? "folder-opened" : "folder"} />`)
+    expect(pane).toContain(`<span class="folder"><Codicon name="folder-opened" /></span>`)
+    expect(pane).toContain(`{#if !open && project.sessions.length > 0}<span class="count muted"`)
+    // A running project that also has running workers shows the worker icon, not both spinners.
+    expect(pane).toContain(`{#if project.sessions.length > 0 && !(project.status === "running" && project.workers > 0)}{@render statusIcon(project.status)}{/if}`)
+    // The header actions take room from the name only while hovered or focused, so every status signal stays visible.
+    expect(pane).toContain(`<div class="pactions">`)
+    expect(pane).toContain(`max-width: 4.5em`)
+    expect(pane).toContain(`.phead:hover .pactions,`)
+    expect(pane).toContain(`.phead:focus-within .pactions {`)
+    expect(pane).not.toContain("margin-left: auto")
   })
 
   test("the order freezes only once every folder has its list", () => {

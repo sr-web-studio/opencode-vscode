@@ -14,6 +14,7 @@ import { folderName, sameDirectory, shortenHome } from "@occ/core/paths"
 import { combineStatus, sessionStatus, unreadCount, type SessionStatus } from "@occ/core/session-status"
 import { UNTITLED } from "@occ/core/sessions"
 import { stableOrder } from "@occ/core/stable-order"
+import { runningWorkers } from "@occ/core/worker-activity"
 import { guessHome, projectRows, type ProjectLike, type ProjectRow } from "./projects"
 
 /** The root session fields the drawer needs; `time` keeps the same names as the server's record. */
@@ -33,10 +34,18 @@ export type OverviewSession = {
   }
 }
 
+/** A child session (worker) as the drawer needs it: its id and the root session it belongs to. */
+export type OverviewChild = { id: string; parentID: string }
+
 /** Everything the drawer derives its rows from, kept as plain data so it is easy to copy and test. */
 export type OverviewData = {
   projects: ProjectLike[]
   sessions: OverviewSession[]
+  /**
+   * Children (workers) of the root sessions. They are never drawer rows: the drawer only counts the running ones on
+   * the parent. `session.list` without `parentID` answers both, so the store keeps them apart.
+   */
+  children: OverviewChild[]
   /** Ids of turns running now, from `session.active()` and the execution events. */
   running: string[]
   /** Session id → ids of its open permission requests. */
@@ -45,7 +54,7 @@ export type OverviewData = {
   forms: Record<string, string[]>
 }
 
-export type OverviewSessionRow = OverviewSession & { title: string; state: ActivityState; status: SessionStatus; last: number }
+export type OverviewSessionRow = OverviewSession & { title: string; state: ActivityState; status: SessionStatus; last: number; workers: number }
 
 export type OverviewGroup = {
   directory: string
@@ -58,6 +67,8 @@ export type OverviewGroup = {
   state: ActivityState
   /** The highest status among its sessions, for the group's icon. */
   status: SessionStatus
+  /** Running workers of all its sessions, for the group's own indicator. */
+  workers: number
   /** Sessions whose last turn the user has not seen. */
   unread: number
   /** Every root session of the folder, archived ones included; `sessions` holds the ones the drawer shows. */
@@ -77,7 +88,7 @@ export type OverviewNames = {
 
 const trimSlash = (p: string): string => (p.length > 1 ? p.replace(/[\\/]+$/, "") : p)
 
-export const emptyOverview = (): OverviewData => ({ projects: [], sessions: [], running: [], permissions: {}, forms: {} })
+export const emptyOverview = (): OverviewData => ({ projects: [], sessions: [], children: [], running: [], permissions: {}, forms: {} })
 
 /** One root session as the drawer keeps it. */
 export function toOverviewSession(session: SessionInfo): OverviewSession {
@@ -124,6 +135,11 @@ export function buildOverview(data: OverviewData, names: OverviewNames = {}, now
   const rows = projectRows(data.projects, "", names.resolved)
   const home = guessHome(data.projects.map((p) => p.canonical))
   const sets = overviewSets(data)
+  const workers = runningWorkers(
+    data.sessions.map((session) => session.id),
+    data.children,
+    sets.running,
+  )
   const byFolder = new Map<string, OverviewSession[]>()
   const totals = new Map<string, number>()
   const rowOf = (directory: string): ProjectRow | undefined => rows.find((row) => sameDirectory(row.directory, directory))
@@ -147,7 +163,7 @@ export function buildOverview(data: OverviewData, names: OverviewNames = {}, now
     const ordered = sortByActivity(
       sessions.map((session) => {
         const activity = sessionActivity({ id: session.id, time: session.time }, sets)
-        return { ...session, title: session.title.trim() || UNTITLED, state: activity.state, status: sessionStatus(session, sets, now), last: activity.last }
+        return { ...session, title: session.title.trim() || UNTITLED, state: activity.state, status: sessionStatus(session, sets, now), last: activity.last, workers: workers.get(session.id) ?? 0 }
       }),
       (session) => ({ state: session.state, last: session.last, title: session.title, id: session.id }),
     )
@@ -165,6 +181,7 @@ export function buildOverview(data: OverviewData, names: OverviewNames = {}, now
       last: combined.last,
       state: combined.state,
       status: combineStatus(ordered.map((session) => session.status)),
+      workers: ordered.reduce((count, session) => count + session.workers, 0),
       unread: unreadCount(ordered.map((session) => session.status)),
       sessionCount: totals.get(directory) ?? 0,
       sessions: ordered,
@@ -308,8 +325,12 @@ export function applyOverviewEvent(data: OverviewData, ev: EventEnvelope): Overv
       return { state: data, refetch: true }
     case "session.created":
     case "session.forked": {
-      // Children are workers, not drawer rows.
-      if (d.parentID || !sessionID) return { state: data }
+      // Children are workers, not drawer rows: only their parent's running count needs them.
+      if (typeof d.parentID === "string" && sessionID) {
+        if (data.children.some((child) => child.id === sessionID)) return { state: data }
+        return { state: { ...data, children: [...data.children, { id: sessionID, parentID: d.parentID }] } }
+      }
+      if (!sessionID) return { state: data }
       if (data.sessions.some((session) => session.id === sessionID)) return { state: data }
       const directory = eventDirectory(ev)
       if (!directory) return { state: data }
@@ -334,6 +355,7 @@ export function applyOverviewEvent(data: OverviewData, ev: EventEnvelope): Overv
         state: {
           ...data,
           sessions: data.sessions.filter((session) => session.id !== sessionID),
+          children: data.children.filter((child) => child.id !== sessionID && child.parentID !== sessionID),
           running: without(data.running, sessionID),
           permissions: withoutSession(data.permissions, sessionID),
           forms: withoutSession(data.forms, sessionID),
