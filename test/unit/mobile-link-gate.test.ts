@@ -7,7 +7,7 @@ const LINK = "opencode-mobile://session/ses_abc?server=box"
 const box: Profile = { id: "p1", name: "Box", url: "http://box:4096", password: "x", serverId: "box" }
 
 /** The model's start-up with fakes: `appUrlOpen` and `getLaunchUrl` deliver the launch link, profiles load later. */
-function harness(saved: Profile[], opts: { now?: () => number } = {}) {
+function harness(saved: Profile[], opts: { now?: () => number; hold?: Promise<void> } = {}) {
   const opened: string[] = []
   const toasts: string[] = []
   let profiles: Profile[] = []
@@ -23,7 +23,7 @@ function harness(saved: Profile[], opts: { now?: () => number } = {}) {
         toasts.push(route.kind)
         return false
       }
-      await Promise.resolve() // connect + session lookup
+      await opts.hold // a test can keep the route (connect + session lookup) in flight
       opened.push(link.sessionID)
       return true
     },
@@ -51,6 +51,23 @@ describe("LinkGate: deep links on a cold start", () => {
     await Promise.all([early, launch])
     expect(h.opened).toEqual(["ses_abc"])
     expect(h.toasts).toEqual([])
+  })
+
+  test("cold: the second delivery waits for the route the first one is still running", async () => {
+    let release!: () => void
+    const hold = new Promise<void>((resolve) => (release = resolve))
+    const h = harness([box], { hold })
+    const early = h.gate.open(LINK) // appUrlOpen, before the profiles are loaded
+    h.loadProfiles()
+    let launchDone = false
+    const launch = h.gate.open(LINK).then(() => (launchDone = true)) // init(): getLaunchUrl, same link
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    expect(launchDone).toBe(false) // the start screen stays up until the session is on the stack
+    expect(h.opened).toEqual([])
+    release()
+    await Promise.all([early, launch])
+    expect(launchDone).toBe(true)
+    expect(h.opened).toEqual(["ses_abc"])
   })
 
   test("warm: one link, one open", async () => {

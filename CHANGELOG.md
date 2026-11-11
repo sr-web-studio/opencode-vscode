@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Android app: a notification opens its session straight away.** Opening the app from a notification goes straight to the session without showing the server list first.
+
 ## 0.3.17 (preview)
 
 - **Wide tables scroll inside their own box.** A table wider than the chat no longer cuts off its last columns or makes the whole conversation scroll sideways (VS Code and the Android app).

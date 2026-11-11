@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte"
+  import Codicon from "@occ/ui/components/Codicon.svelte"
   import Drawer from "./components/Drawer.svelte"
   import Overlays from "./components/Overlays.svelte"
   import { model } from "./model.svelte"
@@ -19,7 +20,8 @@
 </script>
 
 {#if !model.ready}
-  <div class="screen"><div class="center muted">Loading…</div></div>
+  <!-- A launch link or the last server is being opened: nothing of the saved-server list shows before the chat. -->
+  <div class="screen"><div class="center muted"><Codicon name="loading" spin /> Opening…</div></div>
 {:else}
   <!-- Every screen of the stack stays mounted: the one below keeps its scroll position and its unsent text. -->
   {#each model.stack as entry, i (entry.key)}

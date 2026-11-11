@@ -21,6 +21,7 @@ import { parseDeepLink, routeDeepLink } from "./lib/deep-link"
 import { LinkGate } from "./lib/link-gate"
 import { chooseLanding, lastUsedKey, parseLastUsed } from "./lib/landing"
 import { backAction, canPop, directoriesInUse, pop, popKey, push, stackForSession, stackForWorker, type Entry, type Screen } from "./lib/nav"
+import { settleWithin, startIntent } from "./lib/start"
 import { DEFAULT_NOTIFY, NO_STATUS, NOTIFY_VERSION, nativeServers, parseNotifySettings, visibleSessionOf, type NotifySettings, type NotifyStatus } from "./lib/notify"
 import {
   askBatteryExemption,
@@ -182,14 +183,20 @@ class AppModel {
     this.viewSettings = parseViewSettings(readJSON(VIEW_KEY))
     this.notifySettings = parseNotifySettings(readJSON(NOTIFY_KEY))
     void this.syncNotify()
-    const launch = await launchUrl()
-    this.ready = true
-    if (launch && parseDeepLink(launch)) {
-      await this.openLink(launch)
-      return
+    // The saved-server list is the bottom of the stack, not the first screen: keep the neutral start screen until the
+    // launch link or the last server is resolved, or the list (with its addresses) would flash before the chat.
+    try {
+      await settleWithin(this.start())
+    } finally {
+      this.ready = true
     }
-    const last = this.profiles.find((p) => p.id === this.activeID)
-    if (last) await this.connect(last)
+  }
+
+  /** Open what a cold start asks for: the session of the launch link, else the chat of the server used last. */
+  private async start(): Promise<void> {
+    const intent = startIntent(await launchUrl(), this.profiles, this.activeID)
+    if (intent.kind === "link") await this.openLink(intent.raw)
+    else if (intent.kind === "reconnect") await this.connect(intent.profile)
   }
 
   /* ------------------------------------------------------------ stack */
