@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.16 (preview)
 
 - **Closing VS Code or a command terminal no longer asks to stop a running command.** The command keeps running on the server; Ctrl+C in the terminal still stops it after asking.
 
