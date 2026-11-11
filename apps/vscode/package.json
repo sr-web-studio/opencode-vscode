@@ -305,7 +305,7 @@
             "One terminal per session, named `OpenCode: <session title>`. Every command is appended as its own block. A command that starts while another one of the session is still running gets an extra terminal (`#2`), which later commands reuse.",
             "A new terminal for every command, named `OpenCode: <command>`."
           ],
-          "markdownDescription": "How shell commands are shown in terminals. Ctrl+C in a terminal stops only the command that is running, after asking."
+          "markdownDescription": "How shell commands are shown in terminals. Ctrl+C in a terminal stops only the command that is running, after asking. Closing a terminal never stops the command: it keeps running on the server."
         },
         "opencode.terminal.maxOpen": {
           "type": "number",
