@@ -134,6 +134,7 @@ export function activate(context: vscode.ExtensionContext): void {
     () => images,
     () => diffs,
     (directory) => void renameProject(directory),
+    (directory) => folders.controllerAt(directory),
   )
   const diffs = new DiffViews((path) => host.resolvePath(path))
   terminals = new ShellTerminals(folders, readTerminalSettings)
