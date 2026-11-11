@@ -151,10 +151,12 @@
         class="pname"
         onclick={() => toggle(group.directory, open)}
         aria-expanded={open}
-        aria-label={`${open ? "Collapse" : "Expand"} ${group.title}, ${group.sessions.length === 0 ? "no sessions" : statusLabel(group.status)}${group.workers > 0 ? `, ${workerLabel(group.workers)}` : ""}${group.unread > 0 ? `, ${group.unread} unread` : ""}`}
+        aria-label={`${open ? "Collapse" : "Expand"} ${group.title}, ${group.sessions.length === 0 ? "no sessions" : statusLabel(group.status)}${group.workers > 0 ? `, ${workerLabel(group.workers)}` : ""}${group.sessions.length > 0 ? `, ${group.sessions.length} sessions` : ""}${group.unread > 0 ? `, ${group.unread} unread` : ""}`}
       >
-        <!-- The folder says what the row is; the aggregated status sits at the end, so a collapsed project keeps it. -->
+        <!-- The folder says what the row is; its status and workers sit beside it, leaving the name the rest. -->
         <span class="state folder"><Codicon name={open ? "folder-opened" : "folder"} /></span>
+        {#if group.sessions.length > 0 && !(group.status === "running" && group.workers > 0)}{@render stateIcon(group.status)}{/if}
+        {#if group.workers > 0}<span class="workers" title={workerLabel(group.workers)} aria-hidden="true"><Codicon name="organization" /></span>{/if}
         <span class="main">
           <span class="t"
             >{group.title}{#if group.unread > 0}<span class="badge" aria-hidden="true" title={`${group.unread} unread`}>{group.unread}</span>{/if}</span
@@ -163,8 +165,6 @@
         </span>
       </button>
       <span class="end">{group.last ? relativeTime(group.last, now) : ""}</span>
-      {#if group.sessions.length > 0}{@render stateIcon(group.status)}{/if}
-      {#if group.workers > 0}<span class="workers" title={workerLabel(group.workers)} aria-hidden="true"><Codicon name="organization" /></span>{/if}
       <button class="iconbtn" onclick={() => model.newSession(group.directory)} aria-label={`New session in ${group.title}`} title="New session"><Codicon name="add" /></button>
       <button class="iconbtn" onclick={() => void model.renameProject(group.directory)} aria-label={`Rename ${group.title}`} title="Rename project"><Codicon name="edit" /></button>
     </div>
@@ -418,6 +418,8 @@
   .prow {
     display: flex;
     align-items: center;
+    gap: 6px;
+    padding-right: 4px;
     background: var(--vscode-editor-background);
   }
   .pname {
@@ -425,10 +427,15 @@
     min-width: 0;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 6px;
     min-height: 52px;
-    padding: 8px 0 8px 16px;
+    padding: 8px 0 8px 12px;
     text-align: left;
+  }
+  /* The two project actions keep a 40 px touch target without crowding the name. */
+  .prow .iconbtn {
+    min-width: 40px;
+    min-height: 40px;
   }
   .pname:active {
     background: var(--oc-hover);
@@ -449,7 +456,7 @@
   }
   .badge {
     display: inline-block;
-    margin-left: 6px;
+    margin-left: 4px;
     min-width: 1.4em;
     padding: 0 0.35em;
     border-radius: 999px;
