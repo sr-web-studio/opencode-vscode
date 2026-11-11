@@ -35,6 +35,11 @@ export type ControllerOptions = {
    * written to OpenCode config. `undefined` means the server's default model.
    */
   enhanceModel?: { get(): ModelSelection | undefined; set(model: ModelSelection | undefined): void }
+  /**
+   * Wait this long after `server.connected` before `sync()`, while this folder is not the one on screen. A multi-root
+   * window otherwise sends every folder's session list, catalog and shell list in one burst on every reconnect.
+   */
+  syncStaggerMs?: number
   /** Diagnostics for the output channel. Never given secrets or message text. */
   log?: (line: string) => void
   /** What `/mcps` needs from the machine we run on: open a browser, forward a port, ask for a code, confirm. */
@@ -609,6 +614,10 @@ export class Controller {
   async onEvent(ev: EventEnvelope): Promise<void> {
     if (ev.type === "server.connected") {
       this.setConnection({ ...this.connection, status: "connected", message: undefined })
+      // The folder on screen loads first; the others wait their turn, so a reconnect does not open a dozen requests
+      // per folder at the same instant. The connection shows as connected meanwhile.
+      const stagger = this.active ? 0 : (this.opts.syncStaggerMs ?? 0)
+      if (stagger > 0) await new Promise((r) => setTimeout(r, stagger))
       await this.sync()
       return
     }

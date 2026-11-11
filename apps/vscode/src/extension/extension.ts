@@ -34,6 +34,8 @@ const PINS_KEY = "opencode.pinnedModels"
 const ENHANCE_MODEL_KEY = "opencode.enhanceModel"
 /** The workspace folder the chat view showed last (a `.code-workspace` can open several). */
 const ACTIVE_FOLDER_KEY = "opencode.activeFolder"
+/** Gap between two background folders' startup sync: 11 folders then take ~1 s instead of firing together. */
+const SYNC_STAGGER_MS = 120
 
 export function activate(context: vscode.ExtensionContext): void {
   const output = vscode.window.createOutputChannel("OpenCode", { log: true })
@@ -56,11 +58,14 @@ export function activate(context: vscode.ExtensionContext): void {
    * workers and background shells of every folder keep working. The chat view is bound to the active one.
    */
   const folders = new FolderRegistry<Controller>({
-    make: (entry) =>
-      new Controller({
+    make: (entry) => {
+      // Position in the window, so the folders that wait are spread out. The folder on screen syncs at once.
+      const index = folderEntries().findIndex((folder) => folder.directory === entry.directory)
+      return new Controller({
         directory: entry.directory,
         folderName: entry.folderName,
         displayPath: entry.displayPath,
+        syncStaggerMs: Math.max(0, index) * SYNC_STAGGER_MS,
         storage: {
           // The first folder keeps the keys used before multi-root support; every other folder has its own.
           get: (key) => context.workspaceState.get(folderStorageKey(key, entry.directory, entry.primary)),
@@ -82,7 +87,8 @@ export function activate(context: vscode.ExtensionContext): void {
         },
         log: (line) => output.info(line),
         mcp: createMcpHost((line) => output.info(line)),
-      }),
+      })
+    },
     remember: {
       get: () => context.workspaceState.get<string>(ACTIVE_FOLDER_KEY),
       set: (directory) => void context.workspaceState.update(ACTIVE_FOLDER_KEY, directory),

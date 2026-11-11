@@ -35,6 +35,32 @@ async function ready() {
 
 const status = (ctl: Controller) => ctl.snapshot().connection.status
 
+describe("startup sync of a multi-root window", () => {
+  const connected = { type: "server.connected", data: {} } as any
+
+  test("the folder on screen syncs at once", async () => {
+    const ctl = new Controller({ directory: "/w", folderName: "w", displayPath: "/w", syncStaggerMs: 60 })
+    ;(ctl as any).client = server()
+    ctl.setActive(true)
+    await ctl.onEvent(connected)
+    expect(ctl.snapshot().sessions.map((s) => s.id)).toEqual(["ses_a", "ses_b"])
+    ctl.detach()
+  })
+
+  test("a background folder waits its turn, and still syncs", async () => {
+    const ctl = new Controller({ directory: "/w", folderName: "w", displayPath: "/w", syncStaggerMs: 60 })
+    ;(ctl as any).client = server()
+    ctl.setActive(false)
+    const pending = ctl.onEvent(connected)
+    // Connected, but the session list is not requested yet.
+    expect(status(ctl)).toBe("connected")
+    expect(ctl.snapshot().sessions).toEqual([])
+    await pending
+    expect(ctl.snapshot().sessions.map((s) => s.id)).toEqual(["ses_a", "ses_b"])
+    ctl.detach()
+  })
+})
+
 afterEach(() => setSystemTime())
 
 describe("a quiet (resume) reconnect", () => {
