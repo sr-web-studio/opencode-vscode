@@ -6,12 +6,14 @@
  * shared activity order) and what was remembered for that server.
  */
 import { sameDirectory } from "@occ/core/paths"
+import { UNTITLED } from "@occ/core/sessions"
 import type { OverviewGroup } from "./overview"
 
 /** The chat that was last on screen for one saved server. */
 export type LastUsed = { directory: string; sessionID?: string }
 
-export type Landing = { kind: "chat"; directory: string; sessionID?: string } | { kind: "empty" }
+/** `title` is the remembered session's name, so the chat header is right before the controller has synced. */
+export type Landing = { kind: "chat"; directory: string; sessionID?: string; title?: string } | { kind: "empty" }
 
 /** The localStorage key of one saved server's last chat. */
 export function lastUsedKey(profileID: string): string {
@@ -36,8 +38,10 @@ export function parseLastUsed(raw: unknown): LastUsed | undefined {
 export function chooseLanding(groups: ReadonlyArray<OverviewGroup>, last?: LastUsed): Landing {
   if (last) {
     const group = groups.find((entry) => sameDirectory(entry.directory, last.directory))
-    const sessionID = last.sessionID && group?.sessions.some((session) => session.id === last.sessionID) ? last.sessionID : undefined
-    return { kind: "chat", directory: group?.directory ?? last.directory, sessionID }
+    const session = last.sessionID ? group?.sessions.find((entry) => entry.id === last.sessionID) : undefined
+    // The drawer's placeholder is not a name: without one the chat header falls back to the folder, as it does later.
+    const title = session?.title.trim()
+    return { kind: "chat", directory: group?.directory ?? last.directory, sessionID: session?.id, title: title && title !== UNTITLED ? title : undefined }
   }
   const active = groups.find((group) => group.sessions.length > 0) ?? groups[0]
   return active ? { kind: "chat", directory: active.directory } : { kind: "empty" }

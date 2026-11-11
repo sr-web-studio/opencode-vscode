@@ -1,5 +1,6 @@
 <script lang="ts">
   import App from "@occ/ui/App.svelte"
+  import Codicon from "@occ/ui/components/Codicon.svelte"
   import Bar from "../components/Bar.svelte"
   import ConnectionPill from "../components/ConnectionPill.svelte"
   import { createBridge } from "../lib/bridge"
@@ -12,7 +13,7 @@
    * an in-process bridge. The controller belongs to the project (not to this screen), and is disposed when the last screen
    * of the project closes.
    */
-  let { directory, sessionID, draft, screenKey }: { directory: string; sessionID?: string; draft?: boolean; screenKey: number } = $props()
+  let { directory, sessionID, draft, title: titleHint, screenKey }: { directory: string; sessionID?: string; draft?: boolean; title?: string; screenKey: number } = $props()
 
   // svelte-ignore state_referenced_locally
   const ctl = model.controller(directory)
@@ -42,8 +43,24 @@
     else if (draft) void ctl.dispatch({ type: "newDraft", hasText: false })
   })
 
+  /**
+   * The shared chat renders only once the controller is on the session this screen asked for. Before that its target is
+   * the remembered or newest session, or a draft, and a draft would flash "New session" and the empty state first.
+   */
+  const onTarget = $derived.by(() => {
+    if (!sessionID) return true
+    const st = live.state
+    return st?.target.kind === "session" && st.target.id === sessionID
+  })
+
   const title = $derived.by(() => {
     const st = live.state
+    const shown = st?.target.kind === "session" ? st.target.id : undefined
+    if (sessionID) {
+      // Until the controller is on the session, the name the caller knew (a link, the drawer, the last start) is right.
+      if (shown !== sessionID) return titleHint ?? "Chat"
+      return st?.sessions.find((s) => s.id === sessionID)?.title?.trim() || titleHint || st?.folderName || "Chat"
+    }
     if (!st) return "Chat"
     if (st.target.kind === "draft") return "New session"
     const id = st.target.id
@@ -59,9 +76,15 @@
   {/snippet}
 </Bar>
 
-<div class="chat grow">
-  <App {bridge} />
-</div>
+{#if onTarget}
+  <div class="chat grow">
+    <App {bridge} />
+  </div>
+{:else}
+  <div class="body">
+    <div class="center muted"><Codicon name="loading" spin /> Loading…</div>
+  </div>
+{/if}
 
 <style>
   .grow {
