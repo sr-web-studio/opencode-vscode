@@ -226,7 +226,8 @@ added there.
 ## Known limitations
 
 - **No interactive stdin.** Agent shell commands run through a non-interactive API that captures output
-  to a file. The terminal mirror can show live output and stop the command, but cannot send keystrokes
+  to a file. The terminal mirror can show live output and stop the command after a confirmation, but
+  closing the terminal never stops it. It cannot send keystrokes
   such as `y` / `n`. Persistent PTY routes exist but the agent's use of them is not documented.
 - **The event stream does not replay.** A client that was offline misses events. It re-reads state when
   it reconnects, and the Android service re-announces open permission and question requests, but a turn
