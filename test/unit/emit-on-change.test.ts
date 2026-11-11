@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { Controller } from "@occ/core/controller"
-import type { AppState, SessionInfo } from "@occ/core/protocol"
+import type { SessionInfo } from "@occ/core/api"
+import type { AppState } from "@occ/core/protocol"
 
 /**
  * In a multi-root window every folder's controller sees every frame of the stream. A frame that changes nothing this
