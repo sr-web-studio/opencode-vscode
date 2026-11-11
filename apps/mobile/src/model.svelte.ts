@@ -15,9 +15,11 @@ import { deleteQuestion, DELETE_BUTTON, DELETE_DETAIL } from "@occ/core/delete-s
 import { errorMessage } from "@occ/core/errors"
 import { checkProjectName, MAX_PROJECT_NAME, normalizeProjectName } from "@occ/core/project-names"
 import { normalizeServerUrl } from "@occ/core/server-url"
+import type { ExportFormat } from "@occ/core/session-export"
 import { enhanceModelKey, parseEnhanceModel, parseViewSettings, patchViewSettings, resetSettingKeys, VIEW_KEY } from "./lib/app-settings"
 import { makeClient, redeemPairing, testConnection } from "./lib/client"
 import { parseDeepLink, routeDeepLink } from "./lib/deep-link"
+import { saveExport } from "./lib/export-file"
 import { LinkGate } from "./lib/link-gate"
 import { chooseLanding, lastUsedKey, parseLastUsed } from "./lib/landing"
 import { backAction, canPop, directoriesInUse, pop, popKey, push, stackForSession, stackForWorker, type Entry, type Screen } from "./lib/nav"
@@ -992,6 +994,40 @@ class AppModel {
 
   /* --------------------------------------------------- the shared UI */
 
+  /** `/export`: choose Markdown or JSON, then share the file. A running session exports what is there so far. */
+  private async exportSession(directory: string): Promise<void> {
+    const controller = this.workspace?.get(directory)
+    if (!controller?.currentSessionID) {
+      this.notify("info", "Nothing to export yet.")
+      return
+    }
+    const format = await this.chooseExportFormat()
+    if (!format) return
+    try {
+      const file = await controller.exportSession(format)
+      const saved = await saveExport(file.filename, file.content, format === "json" ? "application/json" : "text/markdown")
+      const note = saved.how === "share" ? `Exported ${file.filename}.` : saved.how === "documents" ? `Saved ${file.filename} to Documents.` : `Downloaded ${file.filename}.`
+      this.notify("info", file.running ? `${note} The session is still running, so the file holds what was written so far.` : note)
+    } catch (e) {
+      this.notify("error", `Could not export the session: ${errorMessage(e)}`)
+    }
+  }
+
+  /**
+   * The phone's modal has one confirm button, so the two formats are two questions. The first says how to reach JSON;
+   * cancelling both leaves nothing exported.
+   */
+  private async chooseExportFormat(): Promise<ExportFormat | undefined> {
+    const markdown = await this.confirm({
+      title: "Export session",
+      detail: "Markdown is a readable transcript. Choose Cancel to export as JSON instead.",
+      confirm: "Markdown",
+    })
+    if (markdown) return "markdown"
+    const json = await this.confirm({ title: "Export session", detail: "Export the full session data as JSON?", confirm: "JSON" })
+    return json ? "json" : undefined
+  }
+
   /** What the editor did for the VS Code UI, as this app's screens. */
   hostFor(directory: string): MobileHost {
     return {
@@ -1007,6 +1043,7 @@ class AppModel {
         if (picked.problems.length > 0) this.notify("warning", picked.problems.join(" "))
         return picked.files
       },
+      exportSession: () => void this.exportSession(directory),
       confirmRevert: () => this.confirm({ title: REVERT_TITLE, detail: REVERT_DETAIL, confirm: REVERT_BUTTON, danger: true }),
       confirmDeleteSession: (title) => this.confirm({ title: deleteQuestion(title), detail: DELETE_DETAIL, confirm: DELETE_BUTTON, danger: true }),
       openExternal: (url) => void openInBrowser(url),
