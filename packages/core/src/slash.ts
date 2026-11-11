@@ -12,6 +12,7 @@ export const CLIENT_COMMANDS = [
   { name: "undo", description: "Revert your last prompt and its file changes" },
   { name: "redo", description: "Bring back what /undo removed" },
   { name: "fork", description: "Continue in a new session with this history" },
+  { name: "export", description: "Save this session as Markdown or JSON" },
   { name: "skills", description: "Attach a skill to your next prompt" },
 ] as const
 
@@ -109,6 +110,8 @@ export function commandBlock(name: ClientCommandName, ctx: CommandContext): stri
       return ctx.hasSession ? undefined : "Nothing to compact yet. Send a message first."
     case "fork":
       return ctx.hasSession ? undefined : "Nothing to fork yet."
+    case "export":
+      return ctx.hasSession ? undefined : "Nothing to export yet."
     case "undo":
       if (!ctx.canRevert) return "This OpenCode server cannot undo (it needs version 2.2 or newer)."
       if (!ctx.undoTarget) return "Nothing to undo yet."

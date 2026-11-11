@@ -1,4 +1,4 @@
-import type { EventEnvelope, FormInfo, OpenCodeClient, PermissionRequest, SessionInfo, SlimModel } from "./api"
+import type { EventEnvelope, FormInfo, OpenCodeClient, PermissionRequest, SessionInfo, SessionMessageInfo, SlimModel } from "./api"
 import { initialTarget, planNewSession, type ViewTarget } from "./draft"
 import { SessionFeed } from "./feed"
 import { detectFeatures, isUnsupported } from "./features"
@@ -16,6 +16,7 @@ import { NOT_DELETABLE, STOP_FIRST, WAITING_FOR_USER, WORKER_RUNNING } from "./d
 import { CommandCatalog } from "./commands"
 import { McpManager, type McpHost } from "./mcp"
 import { commandBlock, isClientCommand, isEmptySession, parseSlash } from "./slash"
+import { exportFileName, exportJson, exportMarkdown, type ExportFormat } from "./session-export"
 import { deriveWorkers, type ChildSession, type Worker } from "./workers"
 import { addHidden, clearable, forgetSession, normalizeHidden, pruneHidden, removeHidden, type HiddenWorkers } from "./worker-hidden"
 import { runningWorkers } from "./worker-activity"
@@ -59,6 +60,8 @@ const LAST_SESSION_KEY = "lastSession"
 export const RESUME_QUIET_MS = 5000
 const HIDDEN_WORKERS_KEY = "hiddenWorkers"
 const CHILD_PAGE = 200
+/** `/export` reads the whole history in pages; 200 is the same size the transcript uses for a chunk. */
+const EXPORT_PAGE = 200
 
 /**
  * State for one project. It talks to the server only through the root `@opencode/client` API and keeps no
@@ -1388,6 +1391,37 @@ export class Controller {
     }
     this.sessions = this.sort(upsertSession(this.sessions, { ...created, location: created.location ?? { directory: this.dir } } as SessionInfo))
     await this.open(created.id)
+  }
+
+  /**
+   * `/export`: the session on screen as a file. Read-only — no prompt, no server state change. The hosts own the
+   * format question and the save; this only reads the session and its whole history and builds the text. A running
+   * session exports what has been written so far, like OpenCode's own export.
+   */
+  async exportSession(format: ExportFormat): Promise<{ filename: string; content: string; running: boolean }> {
+    const id = this.currentSessionID
+    if (!id) throw new Error("Nothing to export yet.")
+    const client = this.need()
+    const info = await client.session.get({ sessionID: id })
+    const messages = await this.allMessages(client, id)
+    const modelName = (model: { id?: string; providerID?: string }): string | undefined => this.models.find((m) => m.providerID === model.providerID && m.modelID === model.id)?.name
+    const content = format === "json" ? exportJson(info, messages) : exportMarkdown(info, messages, { modelName })
+    return { filename: exportFileName(info, format), content, running: this.running.has(id) }
+  }
+
+  /**
+   * Every message of a session, oldest first. `message.list` pages with a cursor; the first page asks for `asc` and the
+   * later ones only pass the cursor (the server refuses an order together with a cursor), which keeps that order.
+   */
+  private async allMessages(client: OpenCodeClient, sessionID: string): Promise<SessionMessageInfo[]> {
+    const out: SessionMessageInfo[] = []
+    let cursor: string | undefined
+    for (;;) {
+      const page = cursor ? await client.message.list({ sessionID, cursor, limit: EXPORT_PAGE }) : await client.message.list({ sessionID, order: "asc", limit: EXPORT_PAGE })
+      out.push(...page.data)
+      cursor = page.cursor.next ?? undefined
+      if (!cursor) return out
+    }
   }
 
   private async mcpAction(action: Extract<Action, { type: "mcp" }>): Promise<void> {

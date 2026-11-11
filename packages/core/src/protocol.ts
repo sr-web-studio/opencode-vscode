@@ -279,6 +279,8 @@ export type HostRequest =
   | { type: "showTerminal"; shellID: string; title?: string; sessionID?: string }
   | { type: "openSession"; id: string; readOnly: boolean }
   | { type: "pickFiles"; requestID: string }
+  /** `/export`: the host asks for the format and saves the current session (read-only). */
+  | { type: "exportSession" }
   | { type: "confirmRevert"; messageID: string }
   /** The trash icon of a session row: the host shows a modal, and only "Delete" runs the `deleteSession` action. */
   | { type: "confirmDeleteSession"; sessionID: string; title?: string; directory?: string }
