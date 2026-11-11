@@ -8,6 +8,7 @@ import type { ImageRef } from "./images"
 import type { McpState } from "./mcp"
 import type { VoiceEngine } from "./dictation"
 import type { SessionView } from "./transcript/types"
+import type { StatePatch } from "./state-post"
 import type { Worker } from "./workers"
 
 export type ConnectionState = {
@@ -245,6 +246,11 @@ export type Action =
 /** Messages from the extension host to the webview. */
 export type ToWebview =
   | { type: "state"; state: AppState }
+  /**
+   * What changed since the last state post (see `state-post.ts`). A host that has no full state yet, or that cannot
+   * apply a patch, gets a `state` message instead.
+   */
+  | { type: "statePatch"; patch: StatePatch }
   /** A light refresh of the folder dropdown (busy/attention dots) when a folder the view is not showing changes. */
   | { type: "folders"; folders: FolderInfo[] }
   /** The root sessions of every folder, for the in-chat sessions pane (multi-root windows). */

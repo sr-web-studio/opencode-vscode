@@ -87,6 +87,30 @@ describe("ShellPager", () => {
     }
   })
 
+  test("checks the state every few polls, not every one: the drain is free, the state is a request", async () => {
+    let states = 0
+    let rounds = 0
+    const source = {
+      state: async (): Promise<ShellState> => {
+        states++
+        return { status: "running" }
+      },
+      output: async (): Promise<ShellPage> => ({ output: "", cursor: 0, size: 0 }),
+    }
+    const out = collect()
+    const holder: { pager?: ShellPager } = {}
+    holder.pager = new ShellPager(source, out.sink, {
+      sleep: async () => {
+        rounds++
+        if (rounds >= 8) holder.pager?.stop()
+      },
+    })
+    await holder.pager.run()
+    // Nine polls (rounds 0..8): the state is read on round 0 and round 4 only.
+    expect(rounds).toBe(8)
+    expect(states).toBe(2)
+  })
+
   test("stop() ends polling without reporting an exit", async () => {
     const shell = fakeShell({ chunks: ["x"], exitAt: 99 })
     const out = collect()

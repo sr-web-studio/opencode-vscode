@@ -11,6 +11,7 @@ import {
   freezePane,
   paneFolders,
   paneMode,
+  PaneMemo,
   type PaneFolder,
   type PaneLayout,
   type PaneProject,
@@ -348,6 +349,57 @@ describe("pane folder inputs", () => {
   })
 })
 
+describe("pane memo", () => {
+  /** A single-folder window posts no light list; keep one empty array so its reference is stable like a message's. */
+  const none: FolderSessions[] = []
+
+  test("the same inputs return the very same rows and layout", () => {
+    const memo = new PaneMemo()
+    const current = state({ sessions: [fullSession("a", now, "A")], target: { kind: "session", id: "a" } })
+    const first = memo.build(current, none, now)
+    const second = memo.build(current, none, now)
+    expect(second.layout).toBe(first.layout)
+    expect(second.folders).toBe(first.folders)
+    expect(rows(second.layout).map((row) => row.id)).toEqual(["a"])
+  })
+
+  test("a transcript delta replaces the state but no pane input, so the rows are not rebuilt", () => {
+    const memo = new PaneMemo()
+    const current = state({ sessions: [fullSession("a", now, "A")] })
+    const first = memo.build(current, none, now)
+    // The reducer hands out a new state object and keeps every field the pane reads by reference.
+    const next: PaneState = { ...current }
+    expect(memo.build(next, none, now).layout).toBe(first.layout)
+  })
+
+  test("a live change rebuilds the rows", () => {
+    const memo = new PaneMemo()
+    const first = memo.build(state({ sessions: [fullSession("a", now, "A")] }), none, now)
+    const next = memo.build(state({ sessions: [fullSession("a", now, "A")], running: ["a"] }), none, now)
+    expect(next.layout).not.toBe(first.layout)
+    expect(rows(next.layout)[0]!.state).toBe("running")
+  })
+
+  test("a new light folder list rebuilds the rows", () => {
+    const memo = new PaneMemo()
+    const folders = [folderInfo("/p", "p", { active: true }), folderInfo("/q", "q")]
+    const first = memo.build(state({ folders }), none, now)
+    const light: FolderSessions = { directory: "/q", sessions: [session("q1", now)], running: [], waiting: [], workerRunning: {}, loaded: true }
+    const next = memo.build(state({ folders }), [light], now)
+    expect(next.layout).not.toBe(first.layout)
+    expect(rows(next.layout).map((row) => row.id)).toContain("q1")
+  })
+
+  test("the relative-time tick rebuilds the rows", () => {
+    const memo = new PaneMemo()
+    const current = state({ sessions: [fullSession("a", now - 5 * m, "A")] })
+    const first = memo.build(current, none, now)
+    const later = memo.build(current, none, now + m)
+    expect(later.layout).not.toBe(first.layout)
+    expect(rows(later.layout)[0]!.description).toBe("6m")
+  })
+})
+
 describe("pane search", () => {
   const flat = buildPane(
     [
@@ -486,8 +538,9 @@ describe("sessions pane wiring", () => {
     expect(view).toContain(`this.post({ type: "folderSessions", folders })`)
     // Only a multi-root window needs it; a single folder already arrives in the app state.
     expect(view).toMatch(/if \(list\.length <= 1\) return/)
-    // The lists come from the controllers the window already holds, never from a new server call.
-    expect(view).toMatch(/controllerAt\(folder\.directory\)\?\.snapshot\(\)/)
+    // The lists come from the light summary of the controllers the window already holds, never from a new server call.
+    expect(view).toMatch(/const controller = this\.folders\.controllerAt\(folder\.directory\)/)
+    expect(view).toMatch(/const summary = controller\?\.folderSessions\(\)/)
   })
 
   test("the host throttles the folder lists on their own timer", () => {
@@ -565,7 +618,7 @@ describe("sessions pane wiring", () => {
 
   test("the pane and the drawer show running workers with the shared label and icon", () => {
     expect(protocol).toContain("workerRunning: Record<string, number>")
-    expect(view).toContain("workerRunning: state?.workerRunning ?? {}")
+    expect(view).toContain("workerRunning: summary?.workerRunning ?? {}")
     expect(pane).toContain(`<Codicon name="organization" />`)
     expect(pane).toContain("workerLabel(row.workers)")
     expect(pane).toContain("workerLabel(project.workers)")

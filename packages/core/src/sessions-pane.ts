@@ -227,6 +227,42 @@ export function buildPane(folders: readonly PaneFolder[], now: number): PaneLayo
 }
 
 /**
+ * The pane's inputs are immutable and shared: a state patch keeps every field the event did not touch, and the light
+ * `folderSessions` message is only replaced when it really changed. So comparing those references is enough to know
+ * that rebuilding the rows would produce the same rows — and a transcript delta, which replaces none of them, then
+ * costs no row objects at all.
+ */
+export class PaneMemo {
+  private key: unknown[] = []
+  private folders: PaneFolder[] = []
+  private layout: PaneLayout = { kind: "empty" }
+
+  build(state: PaneState, folderSessions: readonly FolderSessions[], now: number): { folders: PaneFolder[]; layout: PaneLayout } {
+    const key = [
+      state.directory,
+      state.folderName,
+      state.projectName,
+      state.folders,
+      state.sessions,
+      state.archived,
+      state.showArchived,
+      state.sessionsLoaded,
+      state.running,
+      state.waiting,
+      state.workerRunning,
+      state.target,
+      folderSessions,
+      now,
+    ]
+    if (key.length === this.key.length && key.every((value, i) => value === this.key[i])) return { folders: this.folders, layout: this.layout }
+    this.key = key
+    this.folders = paneFolders(state, folderSessions)
+    this.layout = buildPane(this.folders, now)
+    return { folders: this.folders, layout: this.layout }
+  }
+}
+
+/**
  * Keep the rows that match `query`, case-insensitively. A project stays when its name matches (with all its
  * sessions); otherwise only its matching sessions stay. An empty query keeps everything.
  */

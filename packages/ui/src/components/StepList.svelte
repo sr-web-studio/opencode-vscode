@@ -19,7 +19,7 @@
           <Reasoning text={item.text} mode={settings.showReasoning} streaming={item.streaming} />
         {/if}
       {:else if item.text.trim()}
-        <div class="text"><Markdown text={item.text} /></div>
+        <div class="text"><Markdown text={item.text} streaming={item.streaming} /></div>
       {/if}
     {/each}
     {#if step.error}<div class="err">{step.error}</div>{/if}
