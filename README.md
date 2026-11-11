@@ -23,7 +23,7 @@ I'm a big OpenCode fan. I run OpenCode as a service on a machine that is on 24/7
 
 What I badly missed was the VS Code editor around it: opening files, native diffs, the terminal, all next to the chat. So I built this extension for myself, and it now helps me every day. Maybe it helps you too.
 
-I'm also working on an Android app with the same UI, for the same always-on setup. It is **not part of this extension**: it is a separate APK, available as a **beta** from [GitHub Releases](https://github.com/sr-web-studio/opencode-vscode/releases) (see [Android app (beta)](#android-app-beta)).
+I'm also working on an Android app with the same UI, for the same always-on setup. It is **not part of this extension**: it is a separate app, available as a **beta** from Google Play testing or [GitHub Releases](https://github.com/sr-web-studio/opencode-vscode/releases) (see [Android app (beta)](#android-app-beta)).
 
 **Preview:** this is an early release. Please report problems in [Issues](https://github.com/sr-web-studio/opencode-vscode/issues).
 
@@ -92,8 +92,9 @@ Open Settings and search for **OpenCode**:
 
 A separate Android app, **OpenCode (unofficial)** for phones, keeps every project and its sessions in one drawer on the same OpenCode server, with chat, diffs, command output and notifications when a session needs you or finishes. Each project shows a folder icon and its status at the end of the header, its sessions sit under it, a project's `+` starts a new session there, and a session whose workers still run says so on a second line.
 
-- **Not shipped with this extension.** Installing the extension never installs anything on your phone. The app is a separate APK.
-- **Beta.** Download the APK from the latest `mobile-v…-beta` pre-release on [GitHub Releases](https://github.com/sr-web-studio/opencode-vscode/releases) and install it on your phone (Android 7.0 or newer; allow installing apps from your browser or file manager). It is not in the Play Store yet.
+- **Not shipped with this extension.** Installing the extension never installs anything on your phone. The app is a separate install.
+- **Beta on Google Play.** Join the [testers group](https://groups.google.com/g/opencode-unofficial-testers), then open the [testing page](https://play.google.com/apps/testing/dev.srwebstudio.opencode), choose **Become a tester** and install the app from [Google Play](https://play.google.com/store/apps/details?id=dev.srwebstudio.opencode). Updates arrive through the Play Store. The Play app and the GitHub APK are signed differently: uninstall one before installing the other.
+- **Or the APK from GitHub.** Download it from the latest `mobile-v…-beta` pre-release on [GitHub Releases](https://github.com/sr-web-studio/opencode-vscode/releases) and install it on your phone (Android 7.0 or newer; allow installing apps from your browser or file manager).
 - **Connect:** the phone needs an OpenCode server that listens on your network with a password. Then run **OpenCode: Pair Mobile Device…** in VS Code and scan the QR code in the app, or type the computer's address and the server password.
 - **Setup guide:** [Connect the Android app to your OpenCode server](https://github.com/sr-web-studio/opencode-vscode/blob/main/docs/mobile-setup.md) — run the server, find its address, firewall and Tailscale, troubleshooting, security.
 - **Privacy:** the app talks only to your server. The [privacy policy](https://github.com/sr-web-studio/opencode-vscode/blob/main/docs/privacy.md) says what it keeps on the phone, what it sends, and the one Google component (the QR scanner) that reports diagnostics to Google.
