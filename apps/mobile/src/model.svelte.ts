@@ -391,21 +391,22 @@ class AppModel {
 
   /**
    * Where a fresh connection opens: the chat last used on that server, else the most active project's chat with the
-   * drawer over it, else the empty state that points at the drawer. The overview is only awaited when nothing was
-   * remembered, because the remembered chat can report its own connection.
+   * drawer over it, else the empty state that points at the drawer. The overview is awaited when nothing was
+   * remembered, and when the remembered session's row is not known yet: without its id the chat would open on a draft
+   * ("New session") and only then switch to the session. The refresh joins the one `connect` already started.
    */
   private async land(): Promise<void> {
     const profile = this.profile
     if (!profile) return
     const last = parseLastUsed(readJSON(lastUsedKey(profile.id)))
-    if (!last) await this.overview.refresh()
+    if (!last || !this.overview.data) await this.overview.refresh()
     const groups = this.overview.data ? buildOverview(this.overview.data, { resolved: this.projectIDs, titles: this.projectTitles }, Date.now()) : []
     const landing = chooseLanding(groups, last)
     if (landing.kind === "empty") {
       this.setStack(this.chatEntries({ kind: "home" }))
       return
     }
-    this.setStack(stackForSession(landing.directory, nextKey, landing.sessionID, this.serversInStack))
+    this.setStack(stackForSession(landing.directory, nextKey, landing.sessionID, this.serversInStack, landing.title))
     // No remembered chat: the drawer is how the owner picks one, so show it over the project's chat.
     if (!last) this.openDrawer()
   }
@@ -919,7 +920,7 @@ class AppModel {
       this.notify("error", this.problem?.message ?? "Could not connect to the server.")
       return false
     }
-    let info: { location?: { directory?: string }; parentID?: string } | undefined
+    let info: { title?: string; location?: { directory?: string }; parentID?: string } | undefined
     try {
       info = await this.client.session.get({ sessionID: link.sessionID })
     } catch {
@@ -943,7 +944,8 @@ class AppModel {
       this.setStack(stackForWorker(directory, nextKey, link.sessionID, parent, this.serversInStack))
       return true
     }
-    this.setStack(stackForSession(directory, nextKey, link.sessionID, this.serversInStack))
+    // The link already knows the session's name: the chat header is right before this project's controller has synced.
+    this.setStack(stackForSession(directory, nextKey, link.sessionID, this.serversInStack, info?.title))
     return true
   }
 

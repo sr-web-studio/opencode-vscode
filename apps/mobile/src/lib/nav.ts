@@ -14,8 +14,12 @@ export type Screen =
   | { kind: "server-form"; profileID?: string }
   /** No project to open: the drawer (or the server list) is where the owner picks one. */
   | { kind: "home" }
-  /** `sessionID`: open this session when the chat appears. `draft`: start a new session. Neither: the newest one. */
-  | { kind: "chat"; directory: string; sessionID?: string; draft?: boolean }
+  /**
+   * `sessionID`: open this session when the chat appears. `draft`: start a new session. Neither: the newest one.
+   * `title`: the session's name when it is already known (a link or the drawer), so the header is right before the
+   * project's controller has synced.
+   */
+  | { kind: "chat"; directory: string; sessionID?: string; draft?: boolean; title?: string }
   | { kind: "file"; directory: string; path: string; line?: number }
   | { kind: "diff"; directory: string; file: string; patches: string[] }
   | { kind: "changes"; directory: string; title: string; files: Array<{ file: string; patches: string[] }> }
@@ -59,8 +63,8 @@ export function directoriesInUse(stack: ReadonlyArray<Entry>): Set<string> {
 const base = (keys: () => number, servers: boolean): Entry[] => (servers ? [{ key: keys(), screen: { kind: "servers" } }] : [])
 
 /** The stack for "open this session of this project". */
-export function stackForSession(directory: string, keys: () => number, sessionID?: string, servers = false): Entry[] {
-  return [...base(keys, servers), { key: keys(), screen: { kind: "chat", directory, sessionID } }]
+export function stackForSession(directory: string, keys: () => number, sessionID?: string, servers = false, title?: string): Entry[] {
+  return [...base(keys, servers), { key: keys(), screen: { kind: "chat", directory, sessionID, title } }]
 }
 
 /**

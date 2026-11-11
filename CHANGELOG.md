@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- **Android app: a notification opens its session straight away.** Opening the app from a notification goes straight to the session without showing the server list first.
+- **Android app: a notification opens its session straight away.** Opening the app from a notification goes straight to the session without showing the server list first, and the chat carries that session's name from its first frame with a short "Loading…" until its messages arrive, so no empty "New session" screen appears on the way.
 
 ## 0.3.17 (preview)
 
