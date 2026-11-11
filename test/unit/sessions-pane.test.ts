@@ -580,8 +580,9 @@ describe("sessions pane wiring", () => {
     expect(pane).toContain(`{#if !open && project.sessions.length > 0}<span class="count muted"`)
     // A running project that also has running workers shows the worker icon, not both spinners.
     expect(pane).toContain(`{#if project.sessions.length > 0 && !(project.status === "running" && project.workers > 0)}{@render statusIcon(project.status)}{/if}`)
-    // The header actions overlay the trailing edge and appear on hover or keyboard focus, so the name keeps the room.
+    // The header actions take room from the name only while hovered or focused, so every status signal stays visible.
     expect(pane).toContain(`<div class="pactions">`)
+    expect(pane).toContain(`max-width: 4.5em`)
     expect(pane).toContain(`.phead:hover .pactions,`)
     expect(pane).toContain(`.phead:focus-within .pactions {`)
     expect(pane).not.toContain("margin-left: auto")

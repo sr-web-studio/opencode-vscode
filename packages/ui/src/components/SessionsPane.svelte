@@ -475,7 +475,6 @@
     margin-bottom: 0.15em;
   }
   .phead {
-    position: relative;
     display: flex;
     align-items: center;
     gap: 0.1em;
@@ -544,27 +543,28 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  /* Project actions overlay the header's trailing edge only while it is hovered or focused: at 240 px the name needs
-     the room, and VS Code tree rows reveal their toolbar the same way. The buttons stay tabbable, so focus reveals them. */
+  /* Project actions take their room from the name only while the header is hovered or focused: at rest the name gets
+     the full width, and while they show the name shrinks with an ellipsis so the status, worker icon, badge and count
+     stay visible. The buttons stay tabbable, so focus reveals them. */
   .pactions {
-    position: absolute;
-    right: 0.25em;
-    top: 50%;
-    transform: translateY(-50%);
     display: flex;
     align-items: center;
     gap: 0.1em;
-    padding-left: 0.5em;
-    border-radius: 4px;
-    background: var(--vscode-sideBar-background, var(--vscode-editor-background));
+    flex: none;
+    max-width: 0;
+    padding-left: 0.4em;
+    overflow: hidden;
     opacity: 0;
     pointer-events: none;
+    transition:
+      max-width 120ms ease,
+      opacity 120ms ease;
   }
   .phead:hover .pactions,
   .phead:focus-within .pactions {
+    max-width: 4.5em;
     opacity: 1;
     pointer-events: auto;
-    background: var(--oc-hover);
   }
   .row {
     display: flex;
