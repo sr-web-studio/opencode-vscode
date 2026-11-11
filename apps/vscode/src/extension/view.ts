@@ -99,7 +99,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       this.scheduleFolderSessions()
     })
     this.watchOthers()
-    this.postFolderSessions()
+    // The pane's per-folder lists are not part of the click: the transcript request goes first, the pane fills after.
+    this.scheduleFolderSessions()
     this.syncVisible()
   }
 

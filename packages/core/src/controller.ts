@@ -82,6 +82,8 @@ export class Controller {
    * then, the others when they come on screen.
    */
   private active = true
+  /** A session the host is opening right now, so `setActive`'s own load does not race it with the remembered one. */
+  private opening?: string
   private permissions = new Map<string, PermissionRequest[]>()
   private forms = new Map<string, FormInfo[]>()
   private readonly feed = new SessionFeed(
@@ -1169,10 +1171,15 @@ export class Controller {
       this.markViewed(id)
       return
     }
-    this.target = { kind: "session", id }
-    this.opts.storage?.set(LAST_SESSION_KEY, id)
-    await this.loadView(id)
-    this.markViewed(id)
+    this.opening = id
+    try {
+      this.target = { kind: "session", id }
+      this.opts.storage?.set(LAST_SESSION_KEY, id)
+      await this.loadView(id)
+      this.markViewed(id)
+    } finally {
+      if (this.opening === id) this.opening = undefined
+    }
   }
 
   /**
@@ -1195,13 +1202,18 @@ export class Controller {
   setActive(active: boolean): void {
     if (this.active === active) return
     this.active = active
-    if (active) void this.loadPendingView()
+    // In a microtask: the host switches the folder and opens the clicked row in the same tick, and that row's session is
+    // the one to load. A plain switch has no `open` by then and loads the session this folder remembers.
+    if (active) void Promise.resolve().then(() => this.loadPendingView())
   }
 
   /** The transcript of the session on screen, when this folder never loaded one (it started in the background). */
   private async loadPendingView(): Promise<void> {
     const id = this.currentSessionID
     if (!id || !this.client || this.feed.loading) return
+    // A session is being opened in this folder right now: that load is the one the user asked for. Loading the
+    // remembered session first would send its requests too and throw the answer away.
+    if (this.opening) return
     if (this.feed.view.loaded && !this.feed.loadError) return
     await this.loadView(id)
   }
