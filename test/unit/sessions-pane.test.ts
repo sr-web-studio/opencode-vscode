@@ -486,8 +486,9 @@ describe("sessions pane wiring", () => {
     expect(view).toContain(`this.post({ type: "folderSessions", folders })`)
     // Only a multi-root window needs it; a single folder already arrives in the app state.
     expect(view).toMatch(/if \(list\.length <= 1\) return/)
-    // The lists come from the controllers the window already holds, never from a new server call.
-    expect(view).toMatch(/controllerAt\(folder\.directory\)\?\.snapshot\(\)/)
+    // The lists come from the light summary of the controllers the window already holds, never from a new server call.
+    expect(view).toMatch(/const controller = this\.folders\.controllerAt\(folder\.directory\)/)
+    expect(view).toMatch(/const summary = controller\?\.folderSessions\(\)/)
   })
 
   test("the host throttles the folder lists on their own timer", () => {
@@ -565,7 +566,7 @@ describe("sessions pane wiring", () => {
 
   test("the pane and the drawer show running workers with the shared label and icon", () => {
     expect(protocol).toContain("workerRunning: Record<string, number>")
-    expect(view).toContain("workerRunning: state?.workerRunning ?? {}")
+    expect(view).toContain("workerRunning: summary?.workerRunning ?? {}")
     expect(pane).toContain(`<Codicon name="organization" />`)
     expect(pane).toContain("workerLabel(row.workers)")
     expect(pane).toContain("workerLabel(project.workers)")

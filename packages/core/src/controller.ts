@@ -4,7 +4,7 @@ import { SessionFeed } from "./feed"
 import { detectFeatures, isUnsupported } from "./features"
 import { primaryAgents, type ModelSelection } from "./models"
 import { normalizePins, togglePin } from "./pins"
-import { defaultViewSettings, type Action, type AgentSummary, type AppState, type ConnectionState, type EnhanceState, type PromptRestore, type ViewSettings } from "./protocol"
+import { defaultViewSettings, type Action, type AgentSummary, type AppState, type ConnectionState, type EnhanceState, type FolderSession, type PromptRestore, type ViewSettings } from "./protocol"
 import { isRoot, upsertSession } from "./sessions"
 import { isWindowsPath, sameDirectory, withinDirectory } from "./paths"
 import { isRunning } from "./transcript/reducer"
@@ -165,7 +165,6 @@ export class Controller {
   snapshot(): AppState {
     const id = this.target.kind === "session" ? this.target.id : undefined
     const current = id ? (this.sessions.find((s) => s.id === id) ?? this.archived.find((s) => s.id === id)) : undefined
-    const waiting = new Set([...this.permissions.entries(), ...this.forms.entries()].filter(([, v]) => v.length > 0).map(([k]) => k))
     return {
       connection: this.shownConnection(),
       settings: this.settings,
@@ -178,7 +177,7 @@ export class Controller {
       showArchived: this.showArchived,
       sessionsLoaded: this.sessionsLoaded,
       running: [...this.running],
-      waiting: [...waiting],
+      waiting: this.waitingIds(),
       workerRunning: this.workerRunning(),
       view: this.feed.view,
       loadingView: this.feed.loading,
@@ -218,6 +217,33 @@ export class Controller {
 
   private pins(): string[] {
     return normalizePins(this.opts.pins?.get())
+  }
+
+  /** Sessions of this folder with a permission or a form waiting for the user. */
+  private waitingIds(): string[] {
+    const waiting = new Set([...this.permissions.entries(), ...this.forms.entries()].filter(([, v]) => v.length > 0).map(([k]) => k))
+    return [...waiting]
+  }
+
+  /**
+   * The light part of the state the sessions pane shows for this folder: its root sessions and what each one is doing.
+   * The pane needs this for every folder, so it must not build the whole snapshot (workers, features, the transcript)
+   * for a list of rows that reads only these fields.
+   */
+  folderSessions(): Pick<AppState, "running" | "waiting" | "workerRunning"> & { sessions: FolderSession[]; loaded: boolean } {
+    return { sessions: this.folderRows(), running: [...this.running], waiting: this.waitingIds(), workerRunning: this.workerRunning(), loaded: this.sessionsLoaded }
+  }
+
+  private folderRowsCache?: { sessions: SessionInfo[]; rows: FolderSession[] }
+
+  /** The pane's rows, rebuilt only when the session list really changed (the lists are replaced, never mutated). */
+  private folderRows(): FolderSession[] {
+    const cache = this.folderRowsCache
+    if (cache && cache.sessions === this.sessions) return cache.rows
+    const rows: FolderSession[] = []
+    for (const s of this.sessions) if (!s.parentID && s.time.archived === undefined) rows.push({ id: s.id, title: s.title, time: s.time, outcome: s.outcome })
+    this.folderRowsCache = { sessions: this.sessions, rows }
+    return rows
   }
 
   private childList(): ChildSession[] {

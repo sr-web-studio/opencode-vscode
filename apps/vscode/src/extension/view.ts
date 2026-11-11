@@ -11,6 +11,8 @@ export const VIEW_ID = "opencode.chat"
 
 /** Non-active folders can emit at ~33 Hz; the dropdown only needs a few updates per second. */
 const FOLDERS_THROTTLE_MS = 200
+/** The sessions pane's dots and rows do not need 5 Hz: its per-folder lists are recomputed at most twice a second. */
+const SESSIONS_THROTTLE_MS = 500
 
 /**
  * The chat panel. It follows the active workspace folder's controller and forwards state to the webview; a
@@ -154,7 +156,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     this.sessionsTimer = setTimeout(() => {
       this.sessionsTimer = undefined
       this.postFolderSessions()
-    }, FOLDERS_THROTTLE_MS)
+    }, SESSIONS_THROTTLE_MS)
   }
 
   /**
@@ -166,16 +168,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     const list = this.folders.foldersState()
     if (list.length <= 1) return
     const folders: FolderSessions[] = list.map((folder) => {
-      const state = this.folders.controllerAt(folder.directory)?.snapshot()
+      const controller = this.folders.controllerAt(folder.directory)
+      // The light summary, not the whole snapshot: this runs for every folder on every refresh.
+      const summary = controller?.folderSessions()
       return {
         directory: folder.directory,
-        sessions: (state?.sessions ?? [])
-          .filter((session) => !session.parentID && session.time.archived === undefined)
-          .map((session) => ({ id: session.id, title: session.title, time: session.time, outcome: session.outcome })),
-        running: state?.running ?? [],
-        waiting: state?.waiting ?? [],
-        workerRunning: state?.workerRunning ?? {},
-        loaded: state?.sessionsLoaded ?? false,
+        sessions: summary?.sessions ?? [],
+        running: summary?.running ?? [],
+        waiting: summary?.waiting ?? [],
+        workerRunning: summary?.workerRunning ?? {},
+        loaded: summary?.loaded ?? false,
       }
     })
     this.post({ type: "folderSessions", folders })
