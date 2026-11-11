@@ -102,6 +102,15 @@ textarea {
 }
 
 /* Markdown answers */
+.md {
+  /* An answer never widens the transcript: long words wrap, and the boxes below scroll instead. */
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+.md img {
+  max-width: 100%;
+  height: auto;
+}
 .md > :first-child {
   margin-top: 0;
 }
@@ -113,7 +122,7 @@ textarea {
 .md ol,
 .md pre,
 .md blockquote,
-.md table {
+.md .oc-table {
   margin: 0.75em 0;
 }
 .md ul,
@@ -147,6 +156,8 @@ textarea {
   background: var(--oc-code-bg);
   padding: 0.1em 0.35em;
   border-radius: 3px;
+  /* A long path or identifier breaks anywhere instead of widening the answer. */
+  overflow-wrap: anywhere;
 }
 .md pre {
   background: var(--oc-code-bg);
@@ -229,6 +240,8 @@ textarea {
 .md a {
   color: var(--oc-accent);
   text-decoration: none;
+  /* Long URLs break rather than widen the answer; only when a word alone is wider than the line. */
+  overflow-wrap: anywhere;
 }
 .md a:hover {
   text-decoration: underline;
@@ -236,6 +249,31 @@ textarea {
 .md a.oc-path code {
   color: var(--oc-accent);
 }
+/* A table wider than the answer scrolls inside this box, so the chat around it never moves sideways. */
+.md .oc-table {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  /* Thin and in the theme's border/description colours, like the other scroll boxes; VS Code's own
+     scrollbar slider variables are not available in the phone app's theme. */
+  scrollbar-width: thin;
+  scrollbar-color: var(--oc-hairline) transparent;
+}
+.md .oc-table::-webkit-scrollbar {
+  height: 8px;
+}
+.md .oc-table::-webkit-scrollbar-track {
+  background: transparent;
+}
+.md .oc-table::-webkit-scrollbar-thumb {
+  background: var(--oc-hairline);
+  border-radius: 4px;
+}
+.md .oc-table::-webkit-scrollbar-thumb:hover {
+  background: var(--oc-muted);
+}
+/* The table keeps its natural width inside the box: its columns wrap their own prose, the chat never widens. */
 .md table {
   border-collapse: collapse;
 }
@@ -243,6 +281,14 @@ textarea {
 .md td {
   border: 1px solid var(--oc-hairline);
   padding: 0.25em 0.6em;
+  /* Prose wraps at spaces and breaks a word only when that word alone is wider than the cell. Long paths,
+     URLs and identifiers in `code`/`a` break anywhere (rules above), so they cannot widen the table. */
+  overflow-wrap: break-word;
+}
+.md td {
+  /* About six characters: a short cell is never squeezed to one letter per line. Headers are sized by their
+     own words, so a column keeps its label whole. */
+  min-width: 3.5em;
 }
 .md hr {
   border: none;

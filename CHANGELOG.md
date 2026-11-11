@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.17 (preview)
+
+- **Wide tables scroll inside their own box.** A table wider than the chat no longer cuts off its last columns or makes the whole conversation scroll sideways (VS Code and the Android app).
+
 ## 0.3.16 (preview)
 
 - **Closing VS Code or a command terminal no longer asks to stop a running command.** The command keeps running on the server; Ctrl+C in the terminal still stops it after asking.

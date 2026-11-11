@@ -2,6 +2,7 @@ import DOMPurify from "dompurify"
 import { marked } from "marked"
 import { codeLanguage } from "@occ/core/code-block"
 import { looksLikePath } from "@occ/core/paths"
+import { wrapTables } from "./markdown-tables"
 
 marked.setOptions({ gfm: true, breaks: false })
 
@@ -21,8 +22,9 @@ export function renderMarkdown(text: string): string {
   const raw = marked.parse(text, { async: false }) as string
   const clean = purify.sanitize(raw, { FORBID_ATTR: ["style"], FORBID_TAGS: ["style", "form", "input", "button"] })
   const tpl = document.createElement("template")
-  tpl.innerHTML = clean
-  // Added after sanitizing on purpose: the sanitizer keeps forbidding `button`.
+  // Added after sanitizing on purpose, like the code-block wrapper below: the sanitizer keeps forbidding `button`,
+  // and a wide table must not reach the transcript's scroll width.
+  tpl.innerHTML = wrapTables(clean)
   for (const pre of Array.from(tpl.content.querySelectorAll("pre"))) {
     const code = pre.querySelector("code")
     if (!code) continue
