@@ -37,6 +37,8 @@ export type PaneFolder = {
   sessions: readonly PaneSession[]
   running: ReadonlySet<string>
   waiting: ReadonlySet<string>
+  /** Root session id → running workers (child sessions). The row's own state stays idle while they run. */
+  workers: ReadonlyMap<string, number>
   /** The session the chat shows; only meaningful for the active folder. */
   currentID?: string
   /** The controller has loaded its session list at least once. */
@@ -54,6 +56,8 @@ export type PaneRow = {
   state: ActivityState
   /** What the row's icon says; the order still uses `state`. */
   status: SessionStatus
+  /** Workers (child sessions) of this session that run now; the row says so without moving. */
+  workers: number
   /** Archived on the server: dimmed, and only listed while "Show archived" is on. */
   archived: boolean
   /** Last activity in ms since the epoch, for the shared order and the tooltip. */
@@ -72,6 +76,8 @@ export type PaneProject = {
   state: ActivityState
   /** The highest status among its sessions, for the group's icon. */
   status: SessionStatus
+  /** Running workers of all its sessions, for the group's own indicator. */
+  workers: number
   /** Sessions the user has not seen the last turn of. */
   unread: number
   /** Newest activity among the project's sessions, in ms since the epoch. */
@@ -87,7 +93,10 @@ export type PaneProject = {
 export type PaneLayout = { kind: "empty" } | { kind: "sessions"; sessions: PaneRow[] } | { kind: "projects"; projects: PaneProject[] }
 
 /** The parts of `AppState` the pane reads for the active folder. */
-export type PaneState = Pick<AppState, "folders" | "directory" | "folderName" | "projectName" | "sessions" | "archived" | "showArchived" | "running" | "waiting" | "target" | "sessionsLoaded">
+export type PaneState = Pick<
+  AppState,
+  "folders" | "directory" | "folderName" | "projectName" | "sessions" | "archived" | "showArchived" | "running" | "waiting" | "workerRunning" | "target" | "sessionsLoaded"
+>
 
 /**
  * The active folder's controller keeps the server's root list, which carries archived sessions too; the archived page
@@ -121,6 +130,7 @@ export function paneFolders(state: PaneState, folderSessions: readonly FolderSes
         sessions: activeSessions,
         running: new Set(state.running),
         waiting: new Set(state.waiting),
+        workers: new Map(Object.entries(state.workerRunning)),
         currentID,
         loaded: state.sessionsLoaded,
         includeArchived: state.showArchived,
@@ -137,6 +147,7 @@ export function paneFolders(state: PaneState, folderSessions: readonly FolderSes
         sessions: activeSessions,
         running: new Set(state.running),
         waiting: new Set(state.waiting),
+        workers: new Map(Object.entries(state.workerRunning)),
         currentID,
         loaded: state.sessionsLoaded,
         includeArchived: state.showArchived,
@@ -151,6 +162,7 @@ export function paneFolders(state: PaneState, folderSessions: readonly FolderSes
       sessions: light?.sessions ?? [],
       running: new Set(light?.running ?? []),
       waiting: new Set(light?.waiting ?? []),
+      workers: new Map(Object.entries(light?.workerRunning ?? {})),
       loaded: light?.loaded ?? false,
     }
   })
@@ -172,6 +184,7 @@ function sessionRows(folder: PaneFolder, now: number): PaneRow[] {
         title: session.title?.trim() || UNTITLED,
         state: activity.state,
         status: sessionStatus(session, sets, now),
+        workers: folder.workers.get(session.id) ?? 0,
         archived: session.time.archived !== undefined,
         updated: activity.last,
         description: relativeTime(activity.last, now),
@@ -192,6 +205,7 @@ function projectRows(folders: readonly PaneFolder[], now: number): PaneProject[]
       name: folder.projectName?.trim() || folder.name || folder.directory,
       state: activity.state,
       status: combineStatus(sessions.map((session) => session.status)),
+      workers: sessions.reduce((count, session) => count + session.workers, 0),
       unread: unreadCount(sessions.map((session) => session.status)),
       last: activity.last,
       active: folder.active,

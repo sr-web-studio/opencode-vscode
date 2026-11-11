@@ -11,13 +11,15 @@
  */
 import type { EventEnvelope, OpenCodeClient, SessionInfo } from "@occ/core/api"
 import { errorMessage } from "@occ/core/errors"
-import { applyOverviewEvent, emptyOverview, toOverviewSession, type OverviewData } from "./overview"
+import { applyOverviewEvent, emptyOverview, toOverviewSession, type OverviewChild, type OverviewData } from "./overview"
 import type { ProjectLike } from "./projects"
 
 /** UI redraws at most this often while events stream in (the same 200 ms the extension uses for background folders). */
 export const OVERVIEW_PUBLISH_MS = 200
 /** One page of root sessions; the live server had 112 roots in one page. */
 export const ROOT_PAGE = 200
+/** One page of children (workers); a running one is recent, and the drawer only counts them on the parent. */
+export const CHILD_PAGE = 200
 /** A hard cap so a server with a very long history cannot hold the drawer hostage. */
 export const ROOT_CAP = 500
 /** Pending requests are asked per folder, a few folders at a time. */
@@ -183,7 +185,12 @@ export class OverviewStore {
     const first = !this.current
     if (first) this.loading = true
     try {
-      const [projects, sessions, active] = await Promise.all([client.project.list().catch(() => [] as ProjectLike[]), this.loadRootSessions(client), client.session.active().catch(() => ({}))])
+      const [projects, sessions, active, children] = await Promise.all([
+        client.project.list().catch(() => [] as ProjectLike[]),
+        this.loadRootSessions(client),
+        client.session.active().catch(() => ({})),
+        this.loadChildren(client),
+      ])
       if (generation !== this.loadGeneration || this.client !== client) return
       const pending = await this.loadPending(client, sessions)
       if (generation !== this.loadGeneration || this.client !== client) return
@@ -192,6 +199,8 @@ export class OverviewStore {
         projects,
         // Archived sessions stay in the snapshot: the drawer's archive switch decides whether to show them.
         sessions: sessions.map(toOverviewSession),
+        // A failed children call keeps the previous list, so the indicator does not blink out on a transient error.
+        children: children ?? this.current?.children ?? [],
         running: Object.keys(active),
         permissions: pending.permissions,
         forms: pending.forms,
@@ -217,6 +226,19 @@ export class OverviewStore {
       cursor = page.cursor?.next ?? undefined
     } while (cursor && all.length < ROOT_CAP)
     return all.slice(0, ROOT_CAP)
+  }
+
+  /**
+   * Children (workers) of the root sessions. `session.list` without `parentID` answers roots and children together, so
+   * one page is enough: a running worker is recent. `undefined` on a failed call keeps the previous list.
+   */
+  private async loadChildren(client: OpenCodeClient): Promise<OverviewChild[] | undefined> {
+    try {
+      const page = await client.session.list({ limit: CHILD_PAGE })
+      return page.data.filter((session): session is SessionInfo & { parentID: string } => typeof session.parentID === "string").map((session) => ({ id: session.id, parentID: session.parentID }))
+    } catch {
+      return undefined
+    }
   }
 
   /**

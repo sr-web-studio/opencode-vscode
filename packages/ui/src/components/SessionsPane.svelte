@@ -3,6 +3,7 @@
   import type { AppState } from "@occ/core/protocol"
   import { statusLabel, unreadCount, type SessionStatus } from "@occ/core/session-status"
   import { applyPaneOrder, buildPane, filterPane, freezePane, PANE_WIDTH, paneFolders, type FrozenPane, type PaneProject, type PaneRow } from "@occ/core/sessions-pane"
+  import { workerLabel } from "@occ/core/worker-activity"
   import { useStore } from "../context"
   import { focusGuarded } from "../focus"
   import Codicon from "./Codicon.svelte"
@@ -61,7 +62,9 @@
   const canRename = $derived(app.features.rename && !app.readOnly)
 
   function rowLabel(row: PaneRow): string {
-    return [row.title, statusLabel(row.status), row.description, row.archived ? "archived" : undefined, row.current ? "current session" : undefined].filter(Boolean).join(", ")
+    return [row.title, statusLabel(row.status), workerLabel(row.workers), row.description, row.archived ? "archived" : undefined, row.current ? "current session" : undefined]
+      .filter(Boolean)
+      .join(", ")
   }
 
   function projectOpen(project: PaneProject): boolean {
@@ -83,6 +86,16 @@
 
   function newSession(): void {
     store.dispatch({ type: "newDraft", hasText: false })
+    if (overlay) onclose()
+  }
+
+  /** A project header's `+`: the host shows that folder first, so the draft lands there and not in the open folder. */
+  function newSessionIn(project: PaneProject): void {
+    if (store.bridge.newSessionIn) store.bridge.newSessionIn(project.directory)
+    else {
+      store.dispatch({ type: "switchFolder", directory: project.directory })
+      store.dispatch({ type: "newDraft", hasText: false })
+    }
     if (overlay) onclose()
   }
 
@@ -209,7 +222,6 @@
         <Codicon name="search" />
       </button>
       <button class="icon" onclick={refresh} title="Refresh sessions" aria-label="Refresh sessions"><Codicon name="refresh" /></button>
-      <button class="icon" onclick={newSession} title="New session" aria-label="New session"><Codicon name="add" /></button>
       <button class="icon" onclick={onclose} title="Close sessions" aria-label="Close sessions"><Codicon name="close" /></button>
     </div>
   </header>
@@ -225,9 +237,15 @@
     {#if shown.kind === "empty"}
       <p class="hint muted">Open a folder to see its OpenCode sessions.</p>
     {:else if shown.kind === "sessions"}
+      {#if !query.trim()}
+        <button class="newrow" onclick={newSession} title="New session" aria-label="New session">
+          <span class="state"><Codicon name="add" /></span>
+          <span class="text">New session</span>
+        </button>
+      {/if}
       {#if shown.sessions.length === 0}
         <p class="hint muted">
-          {#if query.trim()}No matching sessions{:else if anyLoading}<Codicon name="loading" spin /> Loading sessions…{:else}No sessions yet. Start one with +.{/if}
+          {#if query.trim()}No matching sessions{:else if anyLoading}<Codicon name="loading" spin /> Loading sessions…{:else}No sessions yet. Use New session above.{/if}
         </p>
       {:else}
         <div role="listbox" aria-label="Sessions">
@@ -245,21 +263,27 @@
             {#if searching}
               <div class="pname static">
                 <span class="chev"><Codicon name="chevron-down" /></span>
-                {@render statusIcon(project.status)}
+                <span class="folder"><Codicon name="folder-opened" /></span>
                 <span class="pname-text">{project.name}</span>
                 {#if project.unread > 0}<span class="badge" aria-hidden="true" title={`${project.unread} unread`}>{project.unread}</span>{/if}
+                {#if project.sessions.length > 0}<span class="count muted" title={`${project.sessions.length} sessions`}>{project.sessions.length}</span>{/if}
+                {#if project.workers > 0}<span class="workers" title={workerLabel(project.workers)} aria-hidden="true"><Codicon name="organization" /></span>{/if}
+                {#if project.sessions.length > 0}{@render statusIcon(project.status)}{/if}
               </div>
             {:else}
               <button
                 class="pname"
                 onclick={() => toggleProject(project)}
                 aria-expanded={open}
-                aria-label={`${open ? "Collapse" : "Expand"} ${project.name}, ${statusLabel(project.status)}${project.unread > 0 ? `, ${project.unread} unread` : ""}`}
+                aria-label={`${open ? "Collapse" : "Expand"} ${project.name}, ${project.sessions.length === 0 ? "no sessions" : statusLabel(project.status)}${project.workers > 0 ? `, ${workerLabel(project.workers)}` : ""}${project.unread > 0 ? `, ${project.unread} unread` : ""}`}
               >
                 <span class="chev"><Codicon name={open ? "chevron-down" : "chevron-right"} /></span>
-                {@render statusIcon(project.status)}
+                <span class="folder"><Codicon name={open ? "folder-opened" : "folder"} /></span>
                 <span class="pname-text">{project.name}</span>
                 {#if project.unread > 0}<span class="badge" aria-hidden="true" title={`${project.unread} unread`}>{project.unread}</span>{/if}
+                {#if project.sessions.length > 0}<span class="count muted" title={`${project.sessions.length} sessions`}>{project.sessions.length}</span>{/if}
+                {#if project.workers > 0}<span class="workers" title={workerLabel(project.workers)} aria-hidden="true"><Codicon name="organization" /></span>{/if}
+                {#if project.sessions.length > 0}{@render statusIcon(project.status)}{/if}
               </button>
             {/if}
             {#if store.bridge.renameProject}
@@ -267,6 +291,9 @@
                 <Codicon name="edit" />
               </button>
             {/if}
+            <button class="icon add" onclick={() => newSessionIn(project)} title="New session in {project.name}" aria-label="New session in {project.name}">
+              <Codicon name="add" />
+            </button>
           </div>
           {#if open}
             {#if project.sessions.length === 0}
@@ -322,6 +349,9 @@
       />
     {:else}
       <span class="text">{row.title}</span>
+      {#if row.workers > 0}
+        <span class="workers" title={workerLabel(row.workers)} aria-hidden="true"><Codicon name="organization" /></span>
+      {/if}
       {#if canRename}
         <button
           class="icon ren"
@@ -467,10 +497,24 @@
     background: none;
   }
   .chev,
-  .state {
+  .state,
+  .folder {
     display: inline-flex;
     flex: none;
     color: var(--oc-muted);
+  }
+  /* The project's own status stays at the end of its header, so a collapsed project still shows waiting/running. */
+  .pname .state {
+    margin-left: auto;
+  }
+  .count {
+    flex: none;
+    font-size: 0.8em;
+  }
+  .workers {
+    display: inline-flex;
+    flex: none;
+    color: var(--oc-accent);
   }
   .state.waiting {
     color: var(--oc-amber);
@@ -515,6 +559,22 @@
     padding: 0.1em 0.4em 0.1em 0.9em;
     cursor: pointer;
     border-radius: 3px;
+  }
+  /* The flat list's "New session" row: the header's `+` moved here, so one folder still starts a draft from the list. */
+  .newrow {
+    display: flex;
+    align-items: center;
+    gap: 0.45em;
+    width: 100%;
+    min-height: 28px;
+    padding: 0.1em 0.4em 0.1em 0.9em;
+    border-radius: 3px;
+    text-align: left;
+    color: var(--oc-muted);
+  }
+  .newrow:hover {
+    background: var(--oc-hover);
+    color: var(--oc-fg);
   }
   .group .row {
     padding-left: 1.5em;

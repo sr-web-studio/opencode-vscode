@@ -18,6 +18,7 @@ import { McpManager, type McpHost } from "./mcp"
 import { commandBlock, isClientCommand, isEmptySession, parseSlash } from "./slash"
 import { deriveWorkers, type ChildSession } from "./workers"
 import { addHidden, clearable, forgetSession, normalizeHidden, pruneHidden, removeHidden, type HiddenWorkers } from "./worker-hidden"
+import { runningWorkers } from "./worker-activity"
 
 export type ControllerOptions = {
   directory: string
@@ -176,6 +177,7 @@ export class Controller {
       sessionsLoaded: this.sessionsLoaded,
       running: [...this.running],
       waiting: [...waiting],
+      workerRunning: this.workerRunning(),
       view: this.feed.view,
       loadingView: this.feed.loading,
       permissions: id ? (this.permissions.get(id) ?? []) : [],
@@ -223,6 +225,18 @@ export class Controller {
 
   private workers() {
     return deriveWorkers({ view: this.feed.view, children: this.childList(), running: this.running })
+  }
+
+  /** Root session id → how many of its workers run now. The row stays where it is: its own turn is idle. */
+  private workerRunning(): Record<string, number> {
+    const children = [...this.workerChildren].map(([id, parentID]) => ({ id, parentID }))
+    return Object.fromEntries(
+      runningWorkers(
+        this.sessions.map((s) => s.id),
+        children,
+        this.running,
+      ),
+    )
   }
 
   /** "x" and "Clear done": hide finished workers of the current session. Running ones are skipped. */
@@ -362,11 +376,19 @@ export class Controller {
   private children = new Map<string, SessionInfo>()
 
   /**
+   * Children (workers) of the root sessions this window lists: child id → parent id. Kept apart from `children`, which
+   * is the open session's worker list and is cleared whenever the view changes. A project row still has to say that a
+   * worker of a session that is not open runs.
+   */
+  private workerChildren = new Map<string, string>()
+
+  /**
    * This window lists the session: a root in the project's session list, or a worker of one. Such a session belongs
    * here even when its recorded folder is spelled differently from the workspace folder.
    */
   listsSession(id: string): boolean {
     if (this.sessions.some((s) => s.id === id) || this.archived.some((s) => s.id === id)) return true
+    if (this.workerChildren.has(id)) return true
     const parent = this.children.get(id)?.parentID
     return !!parent && (this.sessions.some((s) => s.id === parent) || this.archived.some((s) => s.id === parent))
   }
@@ -542,6 +564,8 @@ export class Controller {
         } else if (s.parentID && this.listsSession(s.parentID)) {
           // A worker belongs here through its parent, wherever it runs: it can move to its own worktree.
           this.children.set(s.id, s)
+          // A project row reads this map, so a worker of a session that is not open still shows as running.
+          if (this.sessions.some((root) => root.id === s.parentID)) this.workerChildren.set(s.id, s.parentID)
         }
         break
       }
@@ -778,6 +802,11 @@ export class Controller {
         if (active[id]) this.running.add(id)
         else this.running.delete(id)
       }
+      // Workers of sessions that are not open: their row's indicator reads the same running set.
+      for (const id of this.workerChildren.keys()) {
+        if (active[id]) this.running.add(id)
+        else this.running.delete(id)
+      }
     } catch {
       // keep what events told us
     }
@@ -793,17 +822,36 @@ export class Controller {
     if (!client) return
     // By project when known (all spellings of the folder, like the OpenCode web app), filtered to this folder below.
     const scope = this.projectID ? { project: this.projectID } : { directory: this.dir }
-    const [scoped, active] = await Promise.all([client.session.list({ ...scope, parentID: null, limit: 200 }), client.session.active()])
+    const [scoped, active, all] = await Promise.all([
+      client.session.list({ ...scope, parentID: null, limit: 200 }),
+      client.session.active(),
+      // Children (workers) of any of this project's sessions. One extra list, because the server has no children-only
+      // endpoint and a running worker is always recent; without it an idle parent looks finished while its workers run.
+      client.session.list({ ...scope, limit: 200 }).catch(() => undefined),
+    ])
     let roots = scoped
+    let children = all
     // The server filters on the exact stored path. On Windows its spelling can still differ (drive letter case, an
     // older server without `location.get`), so look through the newest sessions of every folder instead.
-    if (roots.data.length === 0 && isWindowsPath(this.dir)) roots = await client.session.list({ parentID: null, limit: 200 })
+    if (roots.data.length === 0 && isWindowsPath(this.dir)) {
+      roots = await client.session.list({ parentID: null, limit: 200 })
+      children = await client.session.list({ limit: 200 }).catch(() => undefined)
+    }
     this.sessions = this.sort(roots.data.filter((s) => isRoot(s) && this.isListed(s.location.directory)))
+    // A transient error keeps the previous map rather than dropping every indicator.
+    if (children) {
+      const listed = new Set(this.sessions.map((s) => s.id))
+      const next = new Map<string, string>()
+      for (const s of children.data) if (s.parentID && listed.has(s.parentID)) next.set(s.id, s.parentID)
+      this.workerChildren = next
+    }
     const others = [...new Set(roots.data.filter((s) => !this.isListed(s.location?.directory)).map((s) => s.location?.directory))]
     this.opts.log?.(
       `Sessions: ${this.sessions.length} for this folder of ${roots.data.length} listed for ${this.projectID ? `project ${this.projectID}` : this.dir}${others.length ? `; other folders: ${others.slice(0, 5).join(", ")}` : ""}`,
     )
-    this.running = new Set(Object.keys(active).filter((id) => this.sessions.some((s) => s.id === id) || this.children.has(id) || this.running.has(id) || id === this.currentSessionID))
+    this.running = new Set(
+      Object.keys(active).filter((id) => this.sessions.some((s) => s.id === id) || this.children.has(id) || this.workerChildren.has(id) || this.running.has(id) || id === this.currentSessionID),
+    )
     this.sessionsLoaded = true
     if (this.showArchived) await this.loadArchived()
     this.emit()
@@ -900,6 +948,7 @@ export class Controller {
   private async forget(id: string): Promise<void> {
     const gone = new Set([id])
     for (const [cid, c] of this.children) if (c.parentID === id) gone.add(cid)
+    for (const [cid, parentID] of this.workerChildren) if (cid === id || parentID === id) gone.add(cid)
     this.sessions = this.sessions.filter((s) => s.id !== id)
     this.archived = this.archived.filter((s) => s.id !== id)
     for (const g of gone) {
@@ -907,6 +956,7 @@ export class Controller {
       this.permissions.delete(g)
       this.forms.delete(g)
       this.children.delete(g)
+      this.workerChildren.delete(g)
     }
     this.setHidden(forgetSession(this.hidden, id))
     if (this.opts.storage?.get(LAST_SESSION_KEY) === id) this.opts.storage.set(LAST_SESSION_KEY, undefined)

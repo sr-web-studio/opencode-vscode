@@ -164,6 +164,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
           .map((session) => ({ id: session.id, title: session.title, time: session.time, outcome: session.outcome })),
         running: state?.running ?? [],
         waiting: state?.waiting ?? [],
+        workerRunning: state?.workerRunning ?? {},
         loaded: state?.sessionsLoaded ?? false,
       }
     })
@@ -206,6 +207,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     if (m.request.type === "renameSession") {
       const controller = this.folders.controllerAt(m.request.directory) ?? this.folders.forSession(m.request.sessionID)
       await controller.dispatch({ type: "rename", id: m.request.sessionID, title: m.request.title })
+      return
+    }
+    // A project header's `+`: show that folder first, so the new draft lands there and not in the folder the chat had.
+    if (m.request.type === "newSessionIn") {
+      const controller = this.folders.controllerAt(m.request.directory)
+      if (controller) {
+        this.folders.setActive(controller.folderPath)
+        await controller.dispatch({ type: "newDraft", hasText: false })
+      }
       return
     }
     await this.host.handle(m.request, this.surfaceFor(this.folders.active))
