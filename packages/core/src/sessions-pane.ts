@@ -340,11 +340,51 @@ export function applyPaneOrder(layout: PaneLayout, frozen: FrozenPane): PaneLayo
 
 /** From this width the pane takes a column of its own; below it, it overlays the chat instead of squeezing it. */
 export const PANE_WIDE_MIN = 560
-/** The pane's column width when there is room for both. */
+/** The pane's column width when there is room for both, and the width a double-click on its handle goes back to. */
 export const PANE_WIDTH = 240
+/**
+ * The narrowest the pane may be dragged. Measured in the pane's own font: a 16-character project name stops fitting
+ * next to its chevron, folder and status icons, the unread badge and the session count below 220 px, so 224 keeps the
+ * whole header readable with a little slack. Narrower than that only the name would ellipsize.
+ */
+export const PANE_MIN = 224
+/** The widest share of the view the pane may take; the chat keeps the rest. */
+export const PANE_MAX_SHARE = 0.6
+/** The chat's own usable width: however wide the view, the pane never takes so much that the chat drops below this. */
+export const CHAT_MIN = 320
+/** One arrow-key step on the pane's handle, and the larger step while Shift is held. */
+export const PANE_STEP = 16
+export const PANE_STEP_LARGE = 64
 
 export type PaneMode = "wide" | "overlay"
 
 export function paneMode(width: number): PaneMode {
   return width >= PANE_WIDE_MIN ? "wide" : "overlay"
+}
+
+/** The widths the pane may take in a view `view` px wide. */
+export type PaneWidthRange = { min: number; max: number }
+
+/**
+ * The pane's allowed widths: at least `PANE_MIN`, at most 60% of the view and never more than the view minus the
+ * chat's minimum. The pane is only a column from `PANE_WIDE_MIN`, where both bounds fit; in a narrower view it
+ * overlays the chat and `max` falls back to `min` so a saved width still comes back usable.
+ */
+export function paneWidthRange(view: number): PaneWidthRange {
+  const usable = Number.isFinite(view) ? Math.round(view) : PANE_WIDE_MIN
+  const max = Math.max(PANE_MIN, Math.min(Math.round(usable * PANE_MAX_SHARE), usable - CHAT_MIN))
+  return { min: PANE_MIN, max }
+}
+
+/** Clamp a wanted width into the range for this view; a width saved in a wider window comes back usable here. */
+export function clampPaneWidth(width: number, view: number): number {
+  const { min, max } = paneWidthRange(view)
+  const wanted = Number.isFinite(width) ? Math.round(width) : PANE_WIDTH
+  return Math.min(max, Math.max(min, wanted))
+}
+
+/** One step from the current width: `direction` is 1 for wider (Right) and -1 for narrower (Left). */
+export function stepPaneWidth(width: number, direction: number, view: number, large = false): number {
+  const step = large ? PANE_STEP_LARGE : PANE_STEP
+  return clampPaneWidth(width + Math.sign(direction) * step, view)
 }
