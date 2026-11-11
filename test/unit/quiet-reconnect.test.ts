@@ -35,6 +35,32 @@ async function ready() {
 
 const status = (ctl: Controller) => ctl.snapshot().connection.status
 
+describe("startup sync of a multi-root window", () => {
+  const connected = { type: "server.connected", data: {} } as any
+
+  test("the folder on screen syncs at once", async () => {
+    const ctl = new Controller({ directory: "/w", folderName: "w", displayPath: "/w", syncStaggerMs: 60 })
+    ;(ctl as any).client = server()
+    ctl.setActive(true)
+    await ctl.onEvent(connected)
+    expect(ctl.snapshot().sessions.map((s) => s.id)).toEqual(["ses_a", "ses_b"])
+    ctl.detach()
+  })
+
+  test("a background folder waits its turn, and still syncs", async () => {
+    const ctl = new Controller({ directory: "/w", folderName: "w", displayPath: "/w", syncStaggerMs: 60 })
+    ;(ctl as any).client = server()
+    ctl.setActive(false)
+    const pending = ctl.onEvent(connected)
+    // Connected, but the session list is not requested yet.
+    expect(status(ctl)).toBe("connected")
+    expect(ctl.snapshot().sessions).toEqual([])
+    await pending
+    expect(ctl.snapshot().sessions.map((s) => s.id)).toEqual(["ses_a", "ses_b"])
+    ctl.detach()
+  })
+})
+
 afterEach(() => setSystemTime())
 
 describe("a quiet (resume) reconnect", () => {
@@ -103,6 +129,23 @@ describe("the terminal badge (running shells of the open session)", () => {
     expect(count(ctl)).toBe(1)
     await ctl.onEvent({ type: "shell.deleted", data: { id: "sh_1" } } as any)
     expect(count(ctl)).toBe(0)
+    ctl.detach()
+  })
+
+  test("the shell → session map answers without a request, and keeps the session after the exit", async () => {
+    const ctl = await ready()
+    const calls: string[] = []
+    ;(ctl as any).client.shell.get = async ({ id }: { id: string }) => {
+      calls.push(id)
+      return { data: { id, metadata: { sessionID: "ses_a" } } }
+    }
+    await ctl.onEvent(created)
+    expect(ctl.shellSessionOf("sh_1")).toBe("ses_a")
+    await ctl.onEvent({ type: "shell.exited", data: { id: "sh_1", status: "exited", exit: 0 } } as any)
+    expect(ctl.shellSessionOf("sh_1")).toBe("ses_a")
+    expect(calls).toEqual([])
+    await ctl.onEvent({ type: "shell.deleted", data: { id: "sh_1" } } as any)
+    expect(ctl.shellSessionOf("sh_1")).toBeUndefined()
     ctl.detach()
   })
 

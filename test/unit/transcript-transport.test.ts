@@ -211,3 +211,62 @@ describe("the retry timing", () => {
     expect(isTransportError(undefined)).toBe(false)
   })
 })
+
+describe("a click on a session of another folder", () => {
+  /** Two folders; the second lists two sessions, so the one the click opens is not the one it remembers. */
+  async function clickable() {
+    const calls: string[] = []
+    const byDirectory: Record<string, Array<{ id: string; title: string; projectID: string; time: { created: number; updated: number }; location: { directory: string } }>> = {
+      "/w/a": [session("ses_a", "/w/a")],
+      "/w/b": [session("ses_b1", "/w/b"), session("ses_b2", "/w/b")],
+    }
+    const { list } = messageListFake(history)
+    const unsupported = () => Promise.reject(new Error("404 not found"))
+    const empty = { data: [] }
+    const client: any = {
+      location: { get: unsupported },
+      session: {
+        list: async ({ directory }: { directory?: string }) => ({ data: directory ? (byDirectory[directory] ?? []) : [] }),
+        active: async () => ({}),
+        get: async ({ sessionID }: { sessionID: string }) => byDirectory["/w/b"]!.find((s) => s.id === sessionID) ?? session(sessionID, "/w/a"),
+        inbox: { list: async () => [] },
+      },
+      command: { list: async () => empty },
+      skill: { list: async () => empty },
+      mcp: { list: async () => empty },
+      permission: { request: { list: async () => empty } },
+      form: { list: async () => empty },
+      agent: { list: async () => empty },
+      model: { list: async () => empty, default: unsupported },
+      provider: { list: async () => empty },
+      config: { get: unsupported },
+      shell: { list: async () => empty },
+      message: {
+        list: async (input: { sessionID: string }) => {
+          calls.push(input.sessionID)
+          return list(input)
+        },
+      },
+      event: { subscribe: async function* () {} },
+    }
+    const folders = new FolderRegistry<Controller>({
+      make: (folder) => new Controller({ directory: folder.directory, folderName: folder.folderName, displayPath: folder.displayPath }),
+    })
+    folders.sync([entry("/w/a"), entry("/w/b")])
+    for (const controller of folders.controllers()) (controller as any).client = client
+    await Promise.all(folders.controllers().map((controller) => controller.sync()))
+    return { folders, calls }
+  }
+
+  test("loads the clicked session once, not the folder's remembered one first", async () => {
+    const { folders, calls } = await clickable()
+    expect(calls).toEqual(["ses_a"])
+    calls.length = 0
+    // What `view.ts` does for `openSessionInFolder`: switch the folder, then open the row in the same tick.
+    const controller = folders.activateForSession("ses_b2", "/w/b")
+    await controller.open("ses_b2")
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(calls).toEqual(["ses_b2"])
+    folders.dispose()
+  })
+})

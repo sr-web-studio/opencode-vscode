@@ -1,12 +1,48 @@
 <script lang="ts">
+  import { onDestroy, untrack } from "svelte"
   import { splitLine } from "@occ/core/paths"
   import { copyCodeBlock } from "../code-copy"
   import { useStore } from "../context"
+  import { renderDue, STREAM_RENDER_MS } from "../markdown-stream"
   import { renderMarkdown } from "../markdown"
 
-  let { text }: { text: string } = $props()
+  /**
+   * `streaming`: the text is still arriving. A streaming answer is re-rendered at most every `STREAM_RENDER_MS`
+   * (parsing and sanitising the whole text per delta is quadratic); the finished text is rendered at once.
+   */
+  let { text, streaming = false }: { text: string; streaming?: boolean } = $props()
   const store = useStore()
-  const html = $derived(renderMarkdown(text))
+
+  // The first text is rendered once, here; every later one goes through the effect below.
+  let html = $state(untrack(() => renderMarkdown(text)))
+  let shown = untrack(() => text)
+  let renderedAt = Date.now()
+  let timer: ReturnType<typeof setTimeout> | undefined
+
+  $effect(() => {
+    const next = text
+    const live = streaming
+    if (next === shown) return
+    if (renderDue(live, Date.now() - renderedAt)) {
+      render(next)
+      return
+    }
+    if (timer) return
+    timer = setTimeout(() => {
+      timer = undefined
+      render(text)
+    }, STREAM_RENDER_MS)
+  })
+
+  function render(value: string) {
+    html = renderMarkdown(value)
+    shown = value
+    renderedAt = Date.now()
+  }
+
+  onDestroy(() => {
+    if (timer) clearTimeout(timer)
+  })
 
   function onclick(e: MouseEvent) {
     const target = e.target as HTMLElement

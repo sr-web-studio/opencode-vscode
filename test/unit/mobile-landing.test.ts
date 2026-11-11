@@ -13,7 +13,12 @@ const groupsOf = (over: Partial<OverviewData>) => buildOverview({ ...emptyOvervi
 describe("landing after connecting", () => {
   test("the chat last used on that server wins over everything else", () => {
     const groups = groupsOf({ projects: [project("a", "/a", 1), project("b", "/b", 50)], sessions: [session("s1", "/a", 1), session("s2", "/b", 50)].map(toOverviewSession) })
-    expect(chooseLanding(groups, { directory: "/a", sessionID: "s1" })).toEqual({ kind: "chat", directory: "/a", sessionID: "s1" })
+    expect(chooseLanding(groups, { directory: "/a", sessionID: "s1" })).toEqual({ kind: "chat", directory: "/a", sessionID: "s1", title: "s1" })
+  })
+
+  test("a session without a name leaves the header to the folder, not the drawer's placeholder", () => {
+    const groups = groupsOf({ projects: [project("a", "/a", 1)], sessions: [{ ...session("s1", "/a", 1), title: "  " } as SessionInfo].map(toOverviewSession) })
+    expect(chooseLanding(groups, { directory: "/a", sessionID: "s1" })).toEqual({ kind: "chat", directory: "/a", sessionID: "s1", title: undefined })
   })
 
   test("a remembered session that no longer exists opens its folder's newest session instead", () => {

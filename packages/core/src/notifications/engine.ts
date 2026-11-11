@@ -20,7 +20,8 @@ export type EngineDeps = {
   /** Session facts needed for filtering and wording. Return undefined when the session is not known. */
   session: (sessionID: string) => SessionMeta | undefined | Promise<SessionMeta | undefined>
   /** `shell.exited` carries only the shell id. The shell's `metadata.sessionID` links it to a session. */
-  shellSession: (shellID: string) => string | undefined | Promise<string | undefined>
+  /** The session a shell belongs to. `directory` is the event's folder, when it carries one. */
+  shellSession: (shellID: string, directory?: string) => string | undefined | Promise<string | undefined>
   /**
    * The window already lists this session (it is in the project's session list, whatever the spelling of its folder).
    * Such a session belongs to this window even when its recorded folder does not match `directory` textually.
@@ -89,7 +90,8 @@ export class NotificationEngine {
         })
       }
       case "shell.exited": {
-        const sessionID = await this.deps.shellSession(d.id)
+        // The event names the folder, so the lookup only asks the server when the shell is not known yet.
+        const sessionID = await this.deps.shellSession(d.id, ev.location?.directory)
         if (!sessionID) return
         const bad = typeof d.exit === "number" && d.exit !== 0
         return this.consider(ev, sessionID, "shell", { body: `Background shell ${bad ? `exited with code ${d.exit}` : "finished"}`, failed: bad })

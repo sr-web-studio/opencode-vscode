@@ -1,4 +1,5 @@
 import type { Action, AppState, FolderSessions, ToWebview } from "@occ/core/protocol"
+import { applyStatePatch, type StatePatch } from "@occ/core/state-post"
 import type { HostBridge } from "./bridge"
 
 /** Reactive view of the host's state plus a typed `dispatch`. One per webview. */
@@ -16,6 +17,7 @@ export class Store {
   constructor(readonly bridge: HostBridge) {
     this.off = bridge.onMessage((m: ToWebview) => {
       if (m.type === "state") this.state = m.state
+      else if (m.type === "statePatch") this.applyPatch(m.patch)
       else if (m.type === "folders") {
         // A folder the view is not showing changed: only the dropdown's dots need the update, not the active state.
         if (this.state) this.state = { ...this.state, folders: m.folders }
@@ -27,8 +29,24 @@ export class Store {
     this.dispatch({ type: "ready" })
   }
 
-  /** Dictated text for the prompt box. Returns the unsubscribe function. */
-  onDictation(handler: (m: Extract<ToWebview, { type: "dictation" }>) => void): () => void {
+  /**
+   * Only the changed parts of the state arrived. A patch that does not fit the state the view holds (a message lost
+   * while the webview was busy) asks for a full state instead of showing something quietly wrong.
+   */
+  private applyPatch(patch: StatePatch): void {
+    if (!this.state) {
+      this.dispatch({ type: "ready" })
+      return
+    }
+    try {
+      this.state = applyStatePatch(this.state, patch)
+    } catch {
+      this.state = undefined
+      this.dispatch({ type: "ready" })
+    }
+  }
+
+  /** Dictated text for the prompt box. Returns the unsubscribe function. */ onDictation(handler: (m: Extract<ToWebview, { type: "dictation" }>) => void): () => void {
     this.dictationHandlers.add(handler)
     return () => this.dictationHandlers.delete(handler)
   }

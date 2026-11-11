@@ -11,6 +11,7 @@
   import { currentPrompt, promptLabel, promptPosition, type PromptPosition } from "@occ/core/sticky"
   import { startsDay } from "@occ/core/turn-time"
   import { useStore } from "../context"
+  import { turnToolIds } from "../transcript-index"
   import SentFiles from "./SentFiles.svelte"
   import Codicon from "./Codicon.svelte"
   import PermissionPrompt from "./PermissionPrompt.svelte"
@@ -28,7 +29,7 @@
   const turns = $derived(visibleTurns(app.view))
   const hidden = $derived(hiddenTurnCount(app.view))
   const byTool = $derived(new Map(app.permissions.flatMap((p) => (p.source?.id ? [[p.source.id, p] as const] : []))))
-  const toolIDs = $derived(new Set(app.view.turns.flatMap((t) => t.steps.flatMap((s) => s.items.flatMap((i) => (i.kind === "tool" ? [i.id] : []))))))
+  const toolIDs = $derived(new Set(app.view.turns.flatMap(turnToolIds)))
   // Requests that do not map to a visible tool line still need an answer.
   const orphans = $derived<PermissionRequest[]>(app.permissions.filter((p) => !p.source?.id || !toolIDs.has(p.source.id)))
   const busy = $derived(isRunning(app.view))

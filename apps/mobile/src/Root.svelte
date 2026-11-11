@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte"
+  import Codicon from "@occ/ui/components/Codicon.svelte"
   import Drawer from "./components/Drawer.svelte"
   import Overlays from "./components/Overlays.svelte"
   import { model } from "./model.svelte"
@@ -19,7 +20,8 @@
 </script>
 
 {#if !model.ready}
-  <div class="screen"><div class="center muted">Loading…</div></div>
+  <!-- A launch link or the last server is being opened: nothing of the saved-server list shows before the chat. -->
+  <div class="screen"><div class="body"><div class="center muted"><Codicon name="loading" spin /> Opening…</div></div></div>
 {:else}
   <!-- Every screen of the stack stays mounted: the one below keeps its scroll position and its unsent text. -->
   {#each model.stack as entry, i (entry.key)}
@@ -28,7 +30,7 @@
       {#if s.kind === "servers"}<ServersScreen />
       {:else if s.kind === "server-form"}<ServerFormScreen key={entry.key} profileID={s.profileID} />
       {:else if s.kind === "home"}<HomeScreen />
-      {:else if s.kind === "chat"}<ChatScreen screenKey={entry.key} directory={s.directory} sessionID={s.sessionID} draft={s.draft} />
+      {:else if s.kind === "chat"}<ChatScreen screenKey={entry.key} directory={s.directory} sessionID={s.sessionID} draft={s.draft} title={s.title} />
       {:else if s.kind === "file"}<FileScreen directory={s.directory} path={s.path} line={s.line} />
       {:else if s.kind === "diff"}<DiffScreen file={s.file} patches={s.patches} />
       {:else if s.kind === "changes"}<ChangesScreen directory={s.directory} title={s.title} files={s.files} />

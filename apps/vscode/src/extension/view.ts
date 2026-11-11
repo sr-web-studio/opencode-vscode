@@ -2,6 +2,7 @@ import * as vscode from "vscode"
 import type { Controller } from "@occ/core/controller"
 import type { FolderRegistry } from "@occ/core/folders"
 import type { AppState, FolderSessions, ToHost, ToWebview, WebviewMetrics } from "@occ/core/protocol"
+import { diffState } from "@occ/core/state-post"
 import type { HostActions, Surface } from "./host"
 import type { MinWidth } from "./min-width"
 import { webviewHtml } from "./html"
@@ -10,6 +11,8 @@ export const VIEW_ID = "opencode.chat"
 
 /** Non-active folders can emit at ~33 Hz; the dropdown only needs a few updates per second. */
 const FOLDERS_THROTTLE_MS = 200
+/** The sessions pane's dots and rows do not need 5 Hz: its per-folder lists are recomputed at most twice a second. */
+const SESSIONS_THROTTLE_MS = 500
 
 /**
  * The chat panel. It follows the active workspace folder's controller and forwards state to the webview; a
@@ -23,6 +26,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   private foldersTimer?: ReturnType<typeof setTimeout>
   /** The sessions pane's per-folder list is throttled on its own, so a busy folder cannot flood the webview. */
   private sessionsTimer?: ReturnType<typeof setTimeout>
+  /** The last state posted to the webview, so the next one can be a patch instead of the whole thing. */
+  private lastState?: AppState
   private readonly subs: vscode.Disposable[] = []
   private readonly offActive: () => void
   private readonly offChange: () => void
@@ -89,12 +94,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
 
   private bind(): void {
     this.unsubscribe?.()
+    // Another folder's state is not a continuation of the one on screen: the first post after a switch is a full one.
+    this.lastState = undefined
     this.unsubscribe = this.folders.active.subscribe((state) => {
       this.postState(state)
       this.scheduleFolderSessions()
     })
     this.watchOthers()
-    this.postFolderSessions()
+    // The pane's per-folder lists are not part of the click: the transcript request goes first, the pane fills after.
+    this.scheduleFolderSessions()
     this.syncVisible()
   }
 
@@ -104,6 +112,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
    */
   private syncVisible(): void {
     const active = this.folders.active
+    // A hidden view keeps no live DOM: the next state it gets must be a full one.
+    if (!this.visible) this.lastState = undefined
     for (const controller of this.folders.controllers()) controller.setVisible(controller === active && this.visible)
   }
 
@@ -132,6 +142,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
 
   /** A light folder-list update: no controller snapshots, throttled so a busy background folder cannot flood the view. */
   private postFolders(): void {
+    if (!this.visible) return
     if (this.foldersTimer) return
     this.foldersTimer = setTimeout(() => {
       this.foldersTimer = undefined
@@ -145,7 +156,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     this.sessionsTimer = setTimeout(() => {
       this.sessionsTimer = undefined
       this.postFolderSessions()
-    }, FOLDERS_THROTTLE_MS)
+    }, SESSIONS_THROTTLE_MS)
   }
 
   /**
@@ -153,29 +164,52 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
    * light message so the main state stays small; the controllers already hold the lists, so this never asks the server.
    */
   private postFolderSessions(): void {
+    if (!this.visible) return
     const list = this.folders.foldersState()
     if (list.length <= 1) return
     const folders: FolderSessions[] = list.map((folder) => {
-      const state = this.folders.controllerAt(folder.directory)?.snapshot()
+      const controller = this.folders.controllerAt(folder.directory)
+      // The light summary, not the whole snapshot: this runs for every folder on every refresh.
+      const summary = controller?.folderSessions()
       return {
         directory: folder.directory,
-        sessions: (state?.sessions ?? [])
-          .filter((session) => !session.parentID && session.time.archived === undefined)
-          .map((session) => ({ id: session.id, title: session.title, time: session.time, outcome: session.outcome })),
-        running: state?.running ?? [],
-        waiting: state?.waiting ?? [],
-        loaded: state?.sessionsLoaded ?? false,
+        sessions: summary?.sessions ?? [],
+        running: summary?.running ?? [],
+        waiting: summary?.waiting ?? [],
+        workerRunning: summary?.workerRunning ?? {},
+        loaded: summary?.loaded ?? false,
       }
     })
     this.post({ type: "folderSessions", folders })
   }
 
-  /** The folder list is a property of the window, so it is added here to whichever controller's state is posted. */
+  /**
+   * The folder list is a property of the window, so it is added here to whichever controller's state is posted.
+   * Only what changed since the last post is sent: a streaming delta is a few kilobytes, not the whole state.
+   */
   private postState(state: AppState = this.folders.active.snapshot()): void {
+    // A hidden view has no live DOM, so a post would only queue up work for nothing. Coming back resends everything.
+    if (!this.visible) {
+      this.lastState = undefined
+      return
+    }
+    const decorated = this.decorate(state)
+    const prev = this.lastState
+    this.lastState = decorated
+    if (!prev) {
+      this.post({ type: "state", state: decorated })
+      return
+    }
+    const patch = diffState(prev, decorated)
+    if (patch) this.post({ type: "statePatch", patch })
+  }
+
+  /** Add the window-level parts of the state (the folder list and the active folder's project name). */
+  private decorate(state: AppState): AppState {
     const list = this.folders.foldersState()
     const projectName = this.folders.projectName(this.folders.active.folderPath)
     const decorated: AppState = list.length > 1 ? { ...state, folders: list } : state
-    this.post({ type: "state", state: projectName ? { ...decorated, projectName } : decorated })
+    return projectName ? { ...decorated, projectName } : decorated
   }
 
   private async onMessage(m: ToHost | WebviewMetrics): Promise<void> {
@@ -186,7 +220,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     if (m.type === "action") {
       // The registry owns the folder switch; a Controller knows nothing about the window's other folders.
       if (m.action.type === "switchFolder") this.folders.setActive(m.action.directory)
-      else await this.folders.active.dispatch(m.action)
+      else {
+        // `ready`: the webview has no state (a fresh or reloaded view) or lost track of it, so the next post is full.
+        if (m.action.type === "ready") this.lastState = undefined
+        await this.folders.active.dispatch(m.action)
+      }
       return
     }
     // The sessions pane's refresh: re-post what the controllers already hold, never a server call.
@@ -206,6 +244,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     if (m.request.type === "renameSession") {
       const controller = this.folders.controllerAt(m.request.directory) ?? this.folders.forSession(m.request.sessionID)
       await controller.dispatch({ type: "rename", id: m.request.sessionID, title: m.request.title })
+      return
+    }
+    // A project header's `+`: show that folder first, so the new draft lands there and not in the folder the chat had.
+    if (m.request.type === "newSessionIn") {
+      const controller = this.folders.controllerAt(m.request.directory)
+      if (controller) {
+        this.folders.setActive(controller.folderPath)
+        await controller.dispatch({ type: "newDraft", hasText: false })
+      }
       return
     }
     await this.host.handle(m.request, this.surfaceFor(this.folders.active))

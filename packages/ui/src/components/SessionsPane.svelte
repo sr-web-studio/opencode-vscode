@@ -2,7 +2,8 @@
   import { tick, untrack } from "svelte"
   import type { AppState } from "@occ/core/protocol"
   import { statusLabel, unreadCount, type SessionStatus } from "@occ/core/session-status"
-  import { applyPaneOrder, buildPane, filterPane, freezePane, PANE_WIDTH, paneFolders, type FrozenPane, type PaneProject, type PaneRow } from "@occ/core/sessions-pane"
+  import { applyPaneOrder, filterPane, freezePane, PANE_WIDTH, PaneMemo, type FrozenPane, type PaneProject, type PaneRow } from "@occ/core/sessions-pane"
+  import { workerLabel } from "@occ/core/worker-activity"
   import { useStore } from "../context"
   import { focusGuarded } from "../focus"
   import Codicon from "./Codicon.svelte"
@@ -35,9 +36,12 @@
     return () => clearInterval(timer)
   })
 
-  const layout = $derived(buildPane(paneFolders(app, store.folderSessions), now))
+  const memo = new PaneMemo()
+  // One build per real change of the rows: a transcript delta leaves every input the pane reads untouched.
+  const built = $derived(memo.build(app, store.folderSessions, now))
+  const layout = $derived(built.layout)
   /** Every folder has its list: before that, the order would be a guess from empty groups. */
-  const loadedAll = $derived(paneFolders(app, store.folderSessions).every((folder) => folder.loaded))
+  const loadedAll = $derived(built.folders.every((folder) => folder.loaded))
   /**
    * The shared order places the rows when the pane opens (and when the search changes); while it stays open the frozen
    * ids keep every row where it was, so a live event never moves a row under the pointer. The next open sorts again.
@@ -61,7 +65,9 @@
   const canRename = $derived(app.features.rename && !app.readOnly)
 
   function rowLabel(row: PaneRow): string {
-    return [row.title, statusLabel(row.status), row.description, row.archived ? "archived" : undefined, row.current ? "current session" : undefined].filter(Boolean).join(", ")
+    return [row.title, statusLabel(row.status), workerLabel(row.workers), row.description, row.archived ? "archived" : undefined, row.current ? "current session" : undefined]
+      .filter(Boolean)
+      .join(", ")
   }
 
   function projectOpen(project: PaneProject): boolean {
@@ -83,6 +89,16 @@
 
   function newSession(): void {
     store.dispatch({ type: "newDraft", hasText: false })
+    if (overlay) onclose()
+  }
+
+  /** A project header's `+`: the host shows that folder first, so the draft lands there and not in the open folder. */
+  function newSessionIn(project: PaneProject): void {
+    if (store.bridge.newSessionIn) store.bridge.newSessionIn(project.directory)
+    else {
+      store.dispatch({ type: "switchFolder", directory: project.directory })
+      store.dispatch({ type: "newDraft", hasText: false })
+    }
     if (overlay) onclose()
   }
 
@@ -209,7 +225,6 @@
         <Codicon name="search" />
       </button>
       <button class="icon" onclick={refresh} title="Refresh sessions" aria-label="Refresh sessions"><Codicon name="refresh" /></button>
-      <button class="icon" onclick={newSession} title="New session" aria-label="New session"><Codicon name="add" /></button>
       <button class="icon" onclick={onclose} title="Close sessions" aria-label="Close sessions"><Codicon name="close" /></button>
     </div>
   </header>
@@ -225,9 +240,15 @@
     {#if shown.kind === "empty"}
       <p class="hint muted">Open a folder to see its OpenCode sessions.</p>
     {:else if shown.kind === "sessions"}
+      {#if !query.trim()}
+        <button class="newrow" onclick={newSession} title="New session" aria-label="New session">
+          <span class="state"><Codicon name="add" /></span>
+          <span class="text">New session</span>
+        </button>
+      {/if}
       {#if shown.sessions.length === 0}
         <p class="hint muted">
-          {#if query.trim()}No matching sessions{:else if anyLoading}<Codicon name="loading" spin /> Loading sessions…{:else}No sessions yet. Start one with +.{/if}
+          {#if query.trim()}No matching sessions{:else if anyLoading}<Codicon name="loading" spin /> Loading sessions…{:else}No sessions yet. Use New session above.{/if}
         </p>
       {:else}
         <div role="listbox" aria-label="Sessions">
@@ -245,7 +266,9 @@
             {#if searching}
               <div class="pname static">
                 <span class="chev"><Codicon name="chevron-down" /></span>
-                {@render statusIcon(project.status)}
+                <span class="folder"><Codicon name="folder-opened" /></span>
+                {#if project.sessions.length > 0 && !(project.status === "running" && project.workers > 0)}{@render statusIcon(project.status)}{/if}
+                {#if project.workers > 0}<span class="workers" title={workerLabel(project.workers)} aria-hidden="true"><Codicon name="organization" /></span>{/if}
                 <span class="pname-text">{project.name}</span>
                 {#if project.unread > 0}<span class="badge" aria-hidden="true" title={`${project.unread} unread`}>{project.unread}</span>{/if}
               </div>
@@ -254,19 +277,28 @@
                 class="pname"
                 onclick={() => toggleProject(project)}
                 aria-expanded={open}
-                aria-label={`${open ? "Collapse" : "Expand"} ${project.name}, ${statusLabel(project.status)}${project.unread > 0 ? `, ${project.unread} unread` : ""}`}
+                title={`${project.name}${project.sessions.length > 0 ? `, ${project.sessions.length} sessions` : ""}`}
+                aria-label={`${open ? "Collapse" : "Expand"} ${project.name}, ${project.sessions.length === 0 ? "no sessions" : statusLabel(project.status)}${project.workers > 0 ? `, ${workerLabel(project.workers)}` : ""}${project.sessions.length > 0 ? `, ${project.sessions.length} sessions` : ""}${project.unread > 0 ? `, ${project.unread} unread` : ""}`}
               >
                 <span class="chev"><Codicon name={open ? "chevron-down" : "chevron-right"} /></span>
-                {@render statusIcon(project.status)}
+                <span class="folder"><Codicon name={open ? "folder-opened" : "folder"} /></span>
+                {#if project.sessions.length > 0 && !(project.status === "running" && project.workers > 0)}{@render statusIcon(project.status)}{/if}
+                {#if project.workers > 0}<span class="workers" title={workerLabel(project.workers)} aria-hidden="true"><Codicon name="organization" /></span>{/if}
                 <span class="pname-text">{project.name}</span>
                 {#if project.unread > 0}<span class="badge" aria-hidden="true" title={`${project.unread} unread`}>{project.unread}</span>{/if}
+                {#if !open && project.sessions.length > 0}<span class="count muted" title={`${project.sessions.length} sessions`}>{project.sessions.length}</span>{/if}
               </button>
             {/if}
-            {#if store.bridge.renameProject}
-              <button class="icon pencil" onclick={() => store.bridge.renameProject?.(project.directory)} title="Rename project" aria-label="Rename {project.name}">
-                <Codicon name="edit" />
+            <div class="pactions">
+              {#if store.bridge.renameProject}
+                <button class="icon pencil" onclick={() => store.bridge.renameProject?.(project.directory)} title="Rename project" aria-label="Rename {project.name}">
+                  <Codicon name="edit" />
+                </button>
+              {/if}
+              <button class="icon add" onclick={() => newSessionIn(project)} title="New session in {project.name}" aria-label="New session in {project.name}">
+                <Codicon name="add" />
               </button>
-            {/if}
+            </div>
           </div>
           {#if open}
             {#if project.sessions.length === 0}
@@ -322,6 +354,9 @@
       />
     {:else}
       <span class="text">{row.title}</span>
+      {#if row.workers > 0}
+        <span class="workers" title={workerLabel(row.workers)} aria-hidden="true"><Codicon name="organization" /></span>
+      {/if}
       {#if canRename}
         <button
           class="icon ren"
@@ -453,7 +488,7 @@
     min-width: 0;
     display: flex;
     align-items: center;
-    gap: 0.35em;
+    gap: 0.3em;
     padding: 0.3em 0.3em 0.3em 0.55em;
     text-align: left;
     font-weight: 600;
@@ -467,10 +502,21 @@
     background: none;
   }
   .chev,
-  .state {
+  .state,
+  .folder {
     display: inline-flex;
     flex: none;
     color: var(--oc-muted);
+  }
+  /* The project's status sits next to its folder, so a collapsed project still shows waiting/running. */
+  .count {
+    flex: none;
+    font-size: 0.8em;
+  }
+  .workers {
+    display: inline-flex;
+    flex: none;
+    color: var(--oc-accent);
   }
   .state.waiting {
     color: var(--oc-amber);
@@ -500,12 +546,28 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .pencil {
+  /* Project actions take their room from the name only while the header is hovered or focused: at rest the name gets
+     the full width, and while they show the name shrinks with an ellipsis so the status, worker icon, badge and count
+     stay visible. The buttons stay tabbable, so focus reveals them. */
+  .pactions {
+    display: flex;
+    align-items: center;
+    gap: 0.1em;
+    flex: none;
+    max-width: 0;
+    padding-left: 0.4em;
+    overflow: hidden;
     opacity: 0;
+    pointer-events: none;
+    transition:
+      max-width 120ms ease,
+      opacity 120ms ease;
   }
-  .phead:hover .pencil,
-  .pencil:focus-visible {
+  .phead:hover .pactions,
+  .phead:focus-within .pactions {
+    max-width: 4.5em;
     opacity: 1;
+    pointer-events: auto;
   }
   .row {
     display: flex;
@@ -515,6 +577,22 @@
     padding: 0.1em 0.4em 0.1em 0.9em;
     cursor: pointer;
     border-radius: 3px;
+  }
+  /* The flat list's "New session" row: the header's `+` moved here, so one folder still starts a draft from the list. */
+  .newrow {
+    display: flex;
+    align-items: center;
+    gap: 0.45em;
+    width: 100%;
+    min-height: 28px;
+    padding: 0.1em 0.4em 0.1em 0.9em;
+    border-radius: 3px;
+    text-align: left;
+    color: var(--oc-muted);
+  }
+  .newrow:hover {
+    background: var(--oc-hover);
+    color: var(--oc-fg);
   }
   .group .row {
     padding-left: 1.5em;

@@ -67,6 +67,11 @@ export interface HostBridge {
    */
   openSessionInFolder?(sessionID: string, directory?: string): void
   /**
+   * Start a new draft session in a project folder: the host switches the chat there first. The sessions pane's project
+   * header uses this; hosts without the pane leave it out.
+   */
+  newSessionIn?(directory: string): void
+  /**
    * Rename a session of any folder where it lives, without switching the chat there. The sessions pane uses this;
    * hosts without the pane leave it out.
    */

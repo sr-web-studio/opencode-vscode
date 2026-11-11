@@ -5,6 +5,7 @@
   import { relativeTime } from "@occ/core/format"
   import type { ActivityState } from "@occ/core/activity-order"
   import { statusLabel, type SessionStatus } from "@occ/core/session-status"
+  import { workerLabel } from "@occ/core/worker-activity"
   import { applyFrozenOrder, buildOverview, filterOverview, freezeOrder, splitEmptyProjects, type FrozenOrder, type OverviewGroup } from "../lib/overview"
   import { expandedKey, isExpanded, parseExpanded, parseShowEmpty, serializeShowEmpty, setExpanded, showEmptyKey } from "../lib/drawer-prefs"
   import { model } from "../model.svelte"
@@ -150,14 +151,12 @@
         class="pname"
         onclick={() => toggle(group.directory, open)}
         aria-expanded={open}
-        aria-label={`${open ? "Collapse" : "Expand"} ${group.title}, ${group.sessions.length === 0 ? "no sessions" : statusLabel(group.status)}${group.unread > 0 ? `, ${group.unread} unread` : ""}`}
+        aria-label={`${open ? "Collapse" : "Expand"} ${group.title}, ${group.sessions.length === 0 ? "no sessions" : statusLabel(group.status)}${group.workers > 0 ? `, ${workerLabel(group.workers)}` : ""}${group.sessions.length > 0 ? `, ${group.sessions.length} sessions` : ""}${group.unread > 0 ? `, ${group.unread} unread` : ""}`}
       >
-        {#if group.sessions.length === 0}
-          <!-- A check means "read", which says nothing about a project with no sessions: the folder is what it is. -->
-          <span class="state folder"><Codicon name="folder" /></span>
-        {:else}
-          {@render stateIcon(group.status)}
-        {/if}
+        <!-- The folder says what the row is; its status and workers sit beside it, leaving the name the rest. -->
+        <span class="state folder"><Codicon name={open ? "folder-opened" : "folder"} /></span>
+        {#if group.sessions.length > 0 && !(group.status === "running" && group.workers > 0)}{@render stateIcon(group.status)}{/if}
+        {#if group.workers > 0}<span class="workers" title={workerLabel(group.workers)} aria-hidden="true"><Codicon name="organization" /></span>{/if}
         <span class="main">
           <span class="t"
             >{group.title}{#if group.unread > 0}<span class="badge" aria-hidden="true" title={`${group.unread} unread`}>{group.unread}</span>{/if}</span
@@ -175,11 +174,23 @@
       {:else}
         {#each group.sessions as session (session.id)}
           <div class="srow-wrap" class:archived={session.archived}>
-            <button class="srow" onclick={() => model.openSession(group.directory, session.id)} aria-label={`${session.title}, ${statusLabel(session.status)}${session.archived ? ", archived" : ""}`}>
+            <button
+              class="srow"
+              onclick={() => model.openSession(group.directory, session.id)}
+              aria-label={`${session.title}, ${statusLabel(session.status)}${session.workers > 0 ? `, ${workerLabel(session.workers)}` : ""}${session.archived ? ", archived" : ""}`}
+            >
               {@render stateIcon(session.status)}
               <span class="main">
                 <span class="t" class:unread={session.status === "unread"}>{session.title}</span>
-                {#if statusText(session.status)}<span class="s">{statusText(session.status)}</span>{/if}
+                {#if session.workers > 0 || statusText(session.status)}
+                  <span class="s">
+                    {#if session.workers > 0}<span class="workers"><Codicon name="organization" /> {workerLabel(session.workers)}</span>{/if}
+                    {#if session.workers > 0 && statusText(session.status)}
+                      ·
+                    {/if}
+                    {statusText(session.status) ?? ""}
+                  </span>
+                {/if}
               </span>
               <span class="end">{relativeTime(session.last, now)}</span>
             </button>
@@ -407,6 +418,8 @@
   .prow {
     display: flex;
     align-items: center;
+    gap: 6px;
+    padding-right: 4px;
     background: var(--vscode-editor-background);
   }
   .pname {
@@ -414,10 +427,15 @@
     min-width: 0;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 6px;
     min-height: 52px;
-    padding: 8px 0 8px 16px;
+    padding: 8px 0 8px 12px;
     text-align: left;
+  }
+  /* The two project actions keep a 40 px touch target without crowding the name. */
+  .prow .iconbtn {
+    min-width: 40px;
+    min-height: 40px;
   }
   .pname:active {
     background: var(--oc-hover);
@@ -438,7 +456,7 @@
   }
   .badge {
     display: inline-block;
-    margin-left: 6px;
+    margin-left: 4px;
     min-width: 1.4em;
     padding: 0 0.35em;
     border-radius: 999px;
@@ -457,6 +475,12 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  .workers {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--oc-accent);
   }
   .srow-wrap {
     display: flex;

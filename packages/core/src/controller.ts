@@ -4,7 +4,7 @@ import { SessionFeed } from "./feed"
 import { detectFeatures, isUnsupported } from "./features"
 import { primaryAgents, type ModelSelection } from "./models"
 import { normalizePins, togglePin } from "./pins"
-import { defaultViewSettings, type Action, type AgentSummary, type AppState, type ConnectionState, type EnhanceState, type PromptRestore, type ViewSettings } from "./protocol"
+import { defaultViewSettings, type Action, type AgentSummary, type AppState, type ConnectionState, type EnhanceState, type FolderSession, type PromptRestore, type ViewSettings } from "./protocol"
 import { isRoot, upsertSession } from "./sessions"
 import { isWindowsPath, sameDirectory, withinDirectory } from "./paths"
 import { isRunning } from "./transcript/reducer"
@@ -16,8 +16,9 @@ import { NOT_DELETABLE, STOP_FIRST, WAITING_FOR_USER, WORKER_RUNNING } from "./d
 import { CommandCatalog } from "./commands"
 import { McpManager, type McpHost } from "./mcp"
 import { commandBlock, isClientCommand, isEmptySession, parseSlash } from "./slash"
-import { deriveWorkers, type ChildSession } from "./workers"
+import { deriveWorkers, type ChildSession, type Worker } from "./workers"
 import { addHidden, clearable, forgetSession, normalizeHidden, pruneHidden, removeHidden, type HiddenWorkers } from "./worker-hidden"
+import { runningWorkers } from "./worker-activity"
 
 export type ControllerOptions = {
   directory: string
@@ -34,6 +35,11 @@ export type ControllerOptions = {
    * written to OpenCode config. `undefined` means the server's default model.
    */
   enhanceModel?: { get(): ModelSelection | undefined; set(model: ModelSelection | undefined): void }
+  /**
+   * Wait this long after `server.connected` before `sync()`, while this folder is not the one on screen. A multi-root
+   * window otherwise sends every folder's session list, catalog and shell list in one burst on every reconnect.
+   */
+  syncStaggerMs?: number
   /** Diagnostics for the output channel. Never given secrets or message text. */
   log?: (line: string) => void
   /** What `/mcps` needs from the machine we run on: open a browser, forward a port, ask for a code, confirm. */
@@ -81,6 +87,8 @@ export class Controller {
    * then, the others when they come on screen.
    */
   private active = true
+  /** A session the host is opening right now, so `setActive`'s own load does not race it with the remembered one. */
+  private opening?: string
   private permissions = new Map<string, PermissionRequest[]>()
   private forms = new Map<string, FormInfo[]>()
   private readonly feed = new SessionFeed(
@@ -162,7 +170,6 @@ export class Controller {
   snapshot(): AppState {
     const id = this.target.kind === "session" ? this.target.id : undefined
     const current = id ? (this.sessions.find((s) => s.id === id) ?? this.archived.find((s) => s.id === id)) : undefined
-    const waiting = new Set([...this.permissions.entries(), ...this.forms.entries()].filter(([, v]) => v.length > 0).map(([k]) => k))
     return {
       connection: this.shownConnection(),
       settings: this.settings,
@@ -175,7 +182,8 @@ export class Controller {
       showArchived: this.showArchived,
       sessionsLoaded: this.sessionsLoaded,
       running: [...this.running],
-      waiting: [...waiting],
+      waiting: this.waitingIds(),
+      workerRunning: this.workerRunning(),
       view: this.feed.view,
       loadingView: this.feed.loading,
       permissions: id ? (this.permissions.get(id) ?? []) : [],
@@ -216,13 +224,83 @@ export class Controller {
     return normalizePins(this.opts.pins?.get())
   }
 
+  /** Sessions of this folder with a permission or a form waiting for the user. */
+  private waitingIds(): string[] {
+    const waiting = new Set([...this.permissions.entries(), ...this.forms.entries()].filter(([, v]) => v.length > 0).map(([k]) => k))
+    return [...waiting]
+  }
+
+  /**
+   * The light part of the state the sessions pane shows for this folder: its root sessions and what each one is doing.
+   * The pane needs this for every folder, so it must not build the whole snapshot (workers, features, the transcript)
+   * for a list of rows that reads only these fields.
+   */
+  folderSessions(): Pick<AppState, "running" | "waiting" | "workerRunning"> & { sessions: FolderSession[]; loaded: boolean } {
+    return { sessions: this.folderRows(), running: [...this.running], waiting: this.waitingIds(), workerRunning: this.workerRunning(), loaded: this.sessionsLoaded }
+  }
+
+  private folderRowsCache?: { sessions: SessionInfo[]; rows: FolderSession[] }
+
+  /** The pane's rows, rebuilt only when the session list really changed (the lists are replaced, never mutated). */
+  private folderRows(): FolderSession[] {
+    const cache = this.folderRowsCache
+    if (cache && cache.sessions === this.sessions) return cache.rows
+    const rows: FolderSession[] = []
+    for (const s of this.sessions) if (!s.parentID && s.time.archived === undefined) rows.push({ id: s.id, title: s.title, time: s.time, outcome: s.outcome })
+    this.folderRowsCache = { sessions: this.sessions, rows }
+    return rows
+  }
+
   private childList(): ChildSession[] {
     const id = this.currentSessionID
     return id ? [...this.children.values()].filter((c) => c.parentID === id) : []
   }
 
-  private workers() {
-    return deriveWorkers({ view: this.feed.view, children: this.childList(), running: this.running })
+  /** Bumped whenever a session starts or stops executing, so cached snapshots know the running set changed. */
+  private runningTick = 0
+
+  private setRunning(id: string, on: boolean): void {
+    if (on === this.running.has(id)) return
+    if (on) this.running.add(id)
+    else this.running.delete(id)
+    this.runningTick++
+  }
+
+  private workersCache?: { view: object; children: string; runningTick: number; list: Worker[] }
+
+  /**
+   * Workers of the session on screen. Walking the whole transcript per snapshot is what made a streaming session
+   * expensive, so the result is kept until the transcript, a child or the running set changes.
+   */
+  private workers(): Worker[] {
+    const children = this.childList()
+    const signature = children.map((c) => `${c.id}:${c.outcome ?? ""}:${c.time.updated}:${c.model?.id ?? ""}`).join("|")
+    const cache = this.workersCache
+    if (cache && cache.view === this.feed.view && cache.children === signature && cache.runningTick === this.runningTick) return cache.list
+    const list = deriveWorkers({ view: this.feed.view, children, running: this.running })
+    this.workersCache = { view: this.feed.view, children: signature, runningTick: this.runningTick, list }
+    return list
+  }
+
+  /** Bumped when the map of workers of sessions that are not open changes (a `session.created` or a list reload). */
+  private workerChildrenTick = 0
+
+  private workerRunningCache?: { sessions: SessionInfo[]; tick: number; runningTick: number; value: Record<string, number> }
+
+  /** Root session id → how many of its workers run now. The row stays where it is: its own turn is idle. */
+  private workerRunning(): Record<string, number> {
+    const cache = this.workerRunningCache
+    if (cache && cache.sessions === this.sessions && cache.tick === this.workerChildrenTick && cache.runningTick === this.runningTick) return cache.value
+    const children = [...this.workerChildren].map(([id, parentID]) => ({ id, parentID }))
+    const value = Object.fromEntries(
+      runningWorkers(
+        this.sessions.map((s) => s.id),
+        children,
+        this.running,
+      ),
+    )
+    this.workerRunningCache = { sessions: this.sessions, tick: this.workerChildrenTick, runningTick: this.runningTick, value }
+    return value
   }
 
   /** "x" and "Clear done": hide finished workers of the current session. Running ones are skipped. */
@@ -355,20 +433,50 @@ export class Controller {
 
   /** Known facts about a session (for notifications). */
   sessionMeta(id: string): { title?: string; parentID?: string; directory?: string } | undefined {
-    const s = this.sessions.find((x) => x.id === id) ?? this.archived.find((x) => x.id === id) ?? this.children.get(id)
+    const s = this.listedIndex().byID.get(id) ?? this.children.get(id)
     return s ? { title: s.title, parentID: s.parentID, directory: s.location?.directory } : undefined
   }
 
   private children = new Map<string, SessionInfo>()
 
   /**
+   * Children (workers) of the root sessions this window lists: child id → parent id. Kept apart from `children`, which
+   * is the open session's worker list and is cleared whenever the view changes. A project row still has to say that a
+   * worker of a session that is not open runs.
+   */
+  private workerChildren = new Map<string, string>()
+
+  /**
    * This window lists the session: a root in the project's session list, or a worker of one. Such a session belongs
    * here even when its recorded folder is spelled differently from the workspace folder.
+   *
+   * The lists are replaced wholesale on every change, so an index built from their references is rebuilt only when
+   * one of them really changed. Every event of the stream asks this question for every folder, so it has to be cheap.
    */
   listsSession(id: string): boolean {
-    if (this.sessions.some((s) => s.id === id) || this.archived.some((s) => s.id === id)) return true
+    if (this.listedIndex().ids.has(id)) return true
+    if (this.workerChildren.has(id)) return true
     const parent = this.children.get(id)?.parentID
-    return !!parent && (this.sessions.some((s) => s.id === parent) || this.archived.some((s) => s.id === parent))
+    return !!parent && this.listedIndex().ids.has(parent)
+  }
+
+  private listed?: { sessions: SessionInfo[]; archived: SessionInfo[]; ids: Set<string>; byID: Map<string, SessionInfo> }
+
+  private listedIndex(): { ids: Set<string>; byID: Map<string, SessionInfo> } {
+    const cache = this.listed
+    if (cache && cache.sessions === this.sessions && cache.archived === this.archived) return cache
+    const ids = new Set<string>()
+    const byID = new Map<string, SessionInfo>()
+    for (const s of this.sessions) {
+      ids.add(s.id)
+      byID.set(s.id, s)
+    }
+    for (const s of this.archived) {
+      ids.add(s.id)
+      if (!byID.has(s.id)) byID.set(s.id, s)
+    }
+    this.listed = { sessions: this.sessions, archived: this.archived, ids, byID }
+    return this.listed
   }
 
   /** Fetch a session we do not list (child sessions) so notifications know their parent. */
@@ -384,7 +492,15 @@ export class Controller {
     }
   }
 
-  /** The session a background shell belongs to (`metadata.sessionID` on the shell). */
+  /**
+   * The session a background shell belongs to, when its `shell.created` event or its `shell.list` row has arrived.
+   * Synchronous, so a notification never walks the folders with one `shell.get` each.
+   */
+  shellSessionOf(shellID: string): string | undefined {
+    return this.shells.get(shellID)?.sessionID
+  }
+
+  /** The session a background shell belongs to (`metadata.sessionID` on the shell), asking the server. */
   async shellSessionID(shellID: string): Promise<string | undefined> {
     if (!this.client) return undefined
     try {
@@ -498,12 +614,19 @@ export class Controller {
   async onEvent(ev: EventEnvelope): Promise<void> {
     if (ev.type === "server.connected") {
       this.setConnection({ ...this.connection, status: "connected", message: undefined })
+      // The folder on screen loads first; the others wait their turn, so a reconnect does not open a dozen requests
+      // per folder at the same instant. The connection shows as connected meanwhile.
+      const stagger = this.active ? 0 : (this.opts.syncStaggerMs ?? 0)
+      if (stagger > 0) await new Promise((r) => setTimeout(r, stagger))
       await this.sync()
       return
     }
     if (!this.belongs(ev)) return
     try {
-      await this.apply(ev)
+      // Most frames of a busy stream (deltas of a session another folder shows) change nothing here: a snapshot and a
+      // webview post for them is what made a multi-root window expensive.
+      const changed = await this.apply(ev)
+      if (changed) this.emit()
     } finally {
       // A failure while updating the view must not swallow the notification for this event (a turn end that never
       // reaches the notifier). The error still reaches the stream loop.
@@ -527,62 +650,88 @@ export class Controller {
     return !dir || this.isListed(dir)
   }
 
-  private async apply(ev: EventEnvelope): Promise<void> {
+  /** Apply one event. Returns true when something the view shows changed, so an irrelevant frame costs no snapshot. */
+  private async apply(ev: EventEnvelope): Promise<boolean> {
     const d = ev.data ?? {}
     const sessionID: string | undefined = d.sessionID ?? d.form?.sessionID
-    if (sessionID && ev.type.startsWith("session.")) this.touchChild(sessionID, ev.created)
+    let changed = sessionID && ev.type.startsWith("session.") ? this.touchChild(sessionID, ev.created) : false
     switch (ev.type) {
       case "session.created":
       case "session.forked": {
-        if (!this.client) return
+        if (!this.client) return changed
         const s = await this.client.session.get({ sessionID: d.sessionID }).catch(() => undefined)
-        if (!s) return
+        if (!s) return changed
         if (isRoot(s)) {
-          if (this.isListed(s.location?.directory)) this.sessions = this.sort(upsertSession(this.sessions, s))
+          if (this.isListed(s.location?.directory)) {
+            this.sessions = this.sort(upsertSession(this.sessions, s))
+            changed = true
+          }
         } else if (s.parentID && this.listsSession(s.parentID)) {
           // A worker belongs here through its parent, wherever it runs: it can move to its own worktree.
           this.children.set(s.id, s)
+          // A project row reads this map, so a worker of a session that is not open still shows as running.
+          if (this.sessions.some((root) => root.id === s.parentID)) {
+            this.workerChildren.set(s.id, s.parentID)
+            this.workerChildrenTick++
+          }
+          changed = true
         }
         break
       }
       case "session.renamed":
         this.sessions = this.sessions.map((s) => (s.id === d.sessionID ? { ...s, title: d.title } : s))
         if (this.children.has(d.sessionID)) this.children.set(d.sessionID, { ...this.children.get(d.sessionID)!, title: d.title })
+        changed = true
         break
       case "mcp.status.changed":
         this.mcp.statusChanged()
+        changed = true
         break
       case "command.updated":
         this.catalog.invalidateCommands()
         void this.loadCommands()
+        changed = true
         break
       case "skill.updated":
         this.catalog.invalidateSkills()
+        changed = true
         break
       case "shell.created": {
         const info = d.info
-        if (info?.id) this.shells.set(info.id, { sessionID: typeof info.metadata?.sessionID === "string" ? info.metadata.sessionID : undefined, running: info.status === "running" })
+        if (info?.id) {
+          this.shells.set(info.id, { sessionID: typeof info.metadata?.sessionID === "string" ? info.metadata.sessionID : undefined, running: info.status === "running" })
+          changed = true
+        }
         break
       }
       case "shell.exited": {
         const sh = this.shells.get(d.id)
-        if (sh) this.shells.set(d.id, { ...sh, running: false })
+        if (sh) {
+          this.shells.set(d.id, { ...sh, running: false })
+          changed = true
+        }
         break
       }
       case "shell.deleted":
         this.shells.delete(d.id)
+        changed = true
         break
       case "session.deleted":
         await this.forget(d.sessionID)
+        changed = true
         break
       case "session.archived":
       case "session.unarchived":
         await this.loadSessions()
+        changed = true
         break
       case "session.viewed": {
         // Any client opened the session: its last turn is seen everywhere. `updated` does not move.
         const idle = typeof d.idle === "number" ? d.idle : undefined
-        if (idle) this.applyViewed(d.sessionID, idle)
+        if (idle) {
+          this.applyViewed(d.sessionID, idle)
+          changed = true
+        }
         break
       }
       case "session.idle": {
@@ -591,26 +740,30 @@ export class Controller {
         const at = ev.created
         if (!at) break
         this.sessions = this.sessions.map((s) => (s.id === d.sessionID && (s.time.idle ?? 0) < at ? { ...s, time: { ...s.time, idle: at } } : s))
+        changed = true
         if (d.sessionID === this.currentSessionID && this.visible) this.markViewed(d.sessionID, at)
         break
       }
       case "session.agent.selected":
         this.sessions = this.sessions.map((s) => (s.id === d.sessionID ? { ...s, agent: d.agent } : s))
+        changed = true
         break
       case "session.model.selected":
         this.sessions = this.sessions.map((s) => (s.id === d.sessionID ? { ...s, model: d.model } : s))
         // A worker's own model change shows in the panel too.
         if (this.children.has(d.sessionID)) this.children.set(d.sessionID, { ...this.children.get(d.sessionID)!, model: d.model })
+        changed = true
         break
       case "session.execution.started":
-        this.running.add(d.sessionID)
+        this.setRunning(d.sessionID, true)
         this.touch(d.sessionID, ev.created)
         if (this.children.has(d.sessionID)) this.unhideRunning()
+        changed = true
         break
       case "session.execution.succeeded":
       case "session.execution.failed":
       case "session.execution.interrupted": {
-        this.running.delete(d.sessionID)
+        this.setRunning(d.sessionID, false)
         this.touch(d.sessionID, ev.created)
         const outcome = ev.type === "session.execution.succeeded" ? "succeeded" : ev.type === "session.execution.failed" ? "failed" : "interrupted"
         // The root record keeps the turn's result and end stamp, so the pane can say "New reply" or "Failed" without
@@ -620,6 +773,7 @@ export class Controller {
         this.archived = this.archived.map(ended)
         const child = this.children.get(d.sessionID)
         if (child) this.children.set(child.id, { ...child, outcome })
+        changed = true
         // A turn ended: the server's shell list is the truth. A lost `shell.exited`/`shell.deleted` (a stalled stream)
         // must not leave the terminal badge counting a command that is gone.
         if (d.sessionID === this.currentSessionID) {
@@ -632,15 +786,20 @@ export class Controller {
       }
       case "permission.asked":
         this.permissions.set(d.sessionID, [...(this.permissions.get(d.sessionID) ?? []).filter((p) => p.id !== d.id), d as PermissionRequest])
+        changed = true
         break
       case "permission.replied":
         this.permissions.set(
           d.sessionID,
           (this.permissions.get(d.sessionID) ?? []).filter((p) => p.id !== d.requestID),
         )
+        changed = true
         break
       case "form.created":
-        if (d.form) this.forms.set(d.form.sessionID, [...(this.forms.get(d.form.sessionID) ?? []).filter((f) => f.id !== d.form.id), d.form as FormInfo])
+        if (d.form) {
+          this.forms.set(d.form.sessionID, [...(this.forms.get(d.form.sessionID) ?? []).filter((f) => f.id !== d.form.id), d.form as FormInfo])
+          changed = true
+        }
         break
       case "form.replied":
       case "form.cancelled":
@@ -648,17 +807,22 @@ export class Controller {
           d.sessionID,
           (this.forms.get(d.sessionID) ?? []).filter((f) => f.id !== d.id),
         )
+        changed = true
         break
     }
-    if (sessionID && sessionID === this.currentSessionID && ev.type.startsWith("session.")) this.feed.apply(ev)
-    this.emit()
+    if (sessionID && sessionID === this.currentSessionID && ev.type.startsWith("session.")) changed = this.feed.apply(ev) || changed
+    return changed
   }
 
   /** Any event of a worker is a sign of life: the Background row's "quiet for …" counts from the last one. */
-  private touchChild(id: string, at: number | undefined) {
+  private touchChild(id: string, at: number | undefined): boolean {
     const child = this.children.get(id)
     const when = at || Date.now()
-    if (child && when > child.time.updated) this.children.set(id, { ...child, time: { ...child.time, updated: when } })
+    if (child && when > child.time.updated) {
+      this.children.set(id, { ...child, time: { ...child.time, updated: when } })
+      return true
+    }
+    return false
   }
 
   private touch(id: string, at: number | undefined) {
@@ -774,10 +938,9 @@ export class Controller {
   private async refreshChildRunning(client: OpenCodeClient): Promise<void> {
     try {
       const active = await client.session.active()
-      for (const id of this.children.keys()) {
-        if (active[id]) this.running.add(id)
-        else this.running.delete(id)
-      }
+      for (const id of this.children.keys()) this.setRunning(id, !!active[id])
+      // Workers of sessions that are not open: their row's indicator reads the same running set.
+      for (const id of this.workerChildren.keys()) this.setRunning(id, !!active[id])
     } catch {
       // keep what events told us
     }
@@ -793,17 +956,37 @@ export class Controller {
     if (!client) return
     // By project when known (all spellings of the folder, like the OpenCode web app), filtered to this folder below.
     const scope = this.projectID ? { project: this.projectID } : { directory: this.dir }
-    const [scoped, active] = await Promise.all([client.session.list({ ...scope, parentID: null, limit: 200 }), client.session.active()])
+    const [scoped, active, all] = await Promise.all([
+      client.session.list({ ...scope, parentID: null, limit: 200 }),
+      client.session.active(),
+      // Children (workers) of any of this project's sessions. One extra list, because the server has no children-only
+      // endpoint and a running worker is always recent; without it an idle parent looks finished while its workers run.
+      client.session.list({ ...scope, limit: 200 }).catch(() => undefined),
+    ])
     let roots = scoped
+    let children = all
     // The server filters on the exact stored path. On Windows its spelling can still differ (drive letter case, an
     // older server without `location.get`), so look through the newest sessions of every folder instead.
-    if (roots.data.length === 0 && isWindowsPath(this.dir)) roots = await client.session.list({ parentID: null, limit: 200 })
+    if (roots.data.length === 0 && isWindowsPath(this.dir)) {
+      roots = await client.session.list({ parentID: null, limit: 200 })
+      children = await client.session.list({ limit: 200 }).catch(() => undefined)
+    }
     this.sessions = this.sort(roots.data.filter((s) => isRoot(s) && this.isListed(s.location.directory)))
+    // A transient error keeps the previous map rather than dropping every indicator.
+    if (children) {
+      const listed = new Set(this.sessions.map((s) => s.id))
+      const next = new Map<string, string>()
+      for (const s of children.data) if (s.parentID && listed.has(s.parentID)) next.set(s.id, s.parentID)
+      this.workerChildren = next
+    }
     const others = [...new Set(roots.data.filter((s) => !this.isListed(s.location?.directory)).map((s) => s.location?.directory))]
     this.opts.log?.(
       `Sessions: ${this.sessions.length} for this folder of ${roots.data.length} listed for ${this.projectID ? `project ${this.projectID}` : this.dir}${others.length ? `; other folders: ${others.slice(0, 5).join(", ")}` : ""}`,
     )
-    this.running = new Set(Object.keys(active).filter((id) => this.sessions.some((s) => s.id === id) || this.children.has(id) || this.running.has(id) || id === this.currentSessionID))
+    this.running = new Set(
+      Object.keys(active).filter((id) => this.sessions.some((s) => s.id === id) || this.children.has(id) || this.workerChildren.has(id) || this.running.has(id) || id === this.currentSessionID),
+    )
+    this.runningTick++
     this.sessionsLoaded = true
     if (this.showArchived) await this.loadArchived()
     this.emit()
@@ -900,13 +1083,15 @@ export class Controller {
   private async forget(id: string): Promise<void> {
     const gone = new Set([id])
     for (const [cid, c] of this.children) if (c.parentID === id) gone.add(cid)
+    for (const [cid, parentID] of this.workerChildren) if (cid === id || parentID === id) gone.add(cid)
     this.sessions = this.sessions.filter((s) => s.id !== id)
     this.archived = this.archived.filter((s) => s.id !== id)
     for (const g of gone) {
-      this.running.delete(g)
+      this.setRunning(g, false)
       this.permissions.delete(g)
       this.forms.delete(g)
       this.children.delete(g)
+      this.workerChildren.delete(g)
     }
     this.setHidden(forgetSession(this.hidden, id))
     if (this.opts.storage?.get(LAST_SESSION_KEY) === id) this.opts.storage.set(LAST_SESSION_KEY, undefined)
@@ -1029,10 +1214,15 @@ export class Controller {
       this.markViewed(id)
       return
     }
-    this.target = { kind: "session", id }
-    this.opts.storage?.set(LAST_SESSION_KEY, id)
-    await this.loadView(id)
-    this.markViewed(id)
+    this.opening = id
+    try {
+      this.target = { kind: "session", id }
+      this.opts.storage?.set(LAST_SESSION_KEY, id)
+      await this.loadView(id)
+      this.markViewed(id)
+    } finally {
+      if (this.opening === id) this.opening = undefined
+    }
   }
 
   /**
@@ -1055,13 +1245,18 @@ export class Controller {
   setActive(active: boolean): void {
     if (this.active === active) return
     this.active = active
-    if (active) void this.loadPendingView()
+    // In a microtask: the host switches the folder and opens the clicked row in the same tick, and that row's session is
+    // the one to load. A plain switch has no `open` by then and loads the session this folder remembers.
+    if (active) void Promise.resolve().then(() => this.loadPendingView())
   }
 
   /** The transcript of the session on screen, when this folder never loaded one (it started in the background). */
   private async loadPendingView(): Promise<void> {
     const id = this.currentSessionID
     if (!id || !this.client || this.feed.loading) return
+    // A session is being opened in this folder right now: that load is the one the user asked for. Loading the
+    // remembered session first would send its requests too and throw the answer away.
+    if (this.opening) return
     if (this.feed.view.loaded && !this.feed.loadError) return
     await this.loadView(id)
   }

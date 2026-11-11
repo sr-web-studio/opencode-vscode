@@ -19,6 +19,8 @@ type Run = {
   stopping: boolean
   started: number
   completed?: number
+  /** The `shell.exited` event already said how it ended: the pager then needs no `shell.get` to learn it. */
+  exit?: ShellState
   /** Removes the shell on the server (Ctrl+C after the user agreed). */
   remove: () => Promise<void>
 }
@@ -93,6 +95,16 @@ export class ShellTerminals implements vscode.Disposable {
 
   /** A `shell` tool reported its shell id: start mirroring it. */
   private onEvent(ev: EventEnvelope): void {
+    if (ev.type === "shell.exited") {
+      // The event already carries the end of the command: the pager can report it without asking the server again.
+      for (const term of this.terms) {
+        const run = term.current
+        if (!run || run.shellID !== ev.data.id) continue
+        run.completed = ev.created
+        if (ev.data.status !== "running") run.exit = { status: ev.data.status, exit: ev.data.exit }
+      }
+      return
+    }
     if (ev.type !== "session.tool.progress") return
     const shellID = ev.data?.metadata?.shellID
     const sessionID = ev.data?.sessionID
@@ -178,6 +190,8 @@ export class ShellTerminals implements vscode.Disposable {
         return { output: r.output, cursor: r.cursor, size: r.size, truncated: r.truncated }
       },
       state: async (): Promise<ShellState> => {
+        // The `shell.exited` event already told us: never ask the server for a command that has ended.
+        if (run.exit) return run.exit
         const r = (await client.shell.get({ id: shellID, location })).data
         run.completed = r.time.completed
         return { status: r.status, exit: r.exit }

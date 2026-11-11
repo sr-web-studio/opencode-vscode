@@ -8,6 +8,7 @@ import type { ImageRef } from "./images"
 import type { McpState } from "./mcp"
 import type { VoiceEngine } from "./dictation"
 import type { SessionView } from "./transcript/types"
+import type { StatePatch } from "./state-post"
 import type { Worker } from "./workers"
 
 export type ConnectionState = {
@@ -95,6 +96,8 @@ export type FolderSessions = {
   sessions: FolderSession[]
   running: string[]
   waiting: string[]
+  /** Root session id → how many of its workers (child sessions) are running now. */
+  workerRunning: Record<string, number>
   /** The folder's controller loaded its session list at least once. */
   loaded: boolean
 }
@@ -119,6 +122,11 @@ export type AppState = {
   sessionsLoaded: boolean
   running: string[]
   waiting: string[]
+  /**
+   * Root session id → how many of its workers (child sessions) are running now. A parent whose own turn is idle but
+   * whose workers still run looks finished otherwise; the sessions pane and the drawer show it separately.
+   */
+  workerRunning: Record<string, number>
   /** Current session's transcript (empty for a draft). */
   view: SessionView
   loadingView: boolean
@@ -238,6 +246,11 @@ export type Action =
 /** Messages from the extension host to the webview. */
 export type ToWebview =
   | { type: "state"; state: AppState }
+  /**
+   * What changed since the last state post (see `state-post.ts`). A host that has no full state yet, or that cannot
+   * apply a patch, gets a `state` message instead.
+   */
+  | { type: "statePatch"; patch: StatePatch }
   /** A light refresh of the folder dropdown (busy/attention dots) when a folder the view is not showing changes. */
   | { type: "folders"; folders: FolderInfo[] }
   /** The root sessions of every folder, for the in-chat sessions pane (multi-root windows). */
@@ -271,6 +284,11 @@ export type HostRequest =
   | { type: "confirmDeleteSession"; sessionID: string; title?: string; directory?: string }
   /** The sessions pane picked a session of any folder: the host switches folders first, then opens it there. */
   | { type: "openSessionInFolder"; sessionID: string; directory?: string }
+  /**
+   * A project header's `+`: start a new draft session in that folder. The host switches the chat to the folder first,
+   * so the draft lands there and not in whichever folder happened to be active.
+   */
+  | { type: "newSessionIn"; directory: string }
   /**
    * A session row's pencil: rename it in the folder that owns it, without switching the chat there. The directory
    * comes from the row, so a row that moved folders in the meantime cannot rename the wrong session.

@@ -26,6 +26,11 @@ export type PagerOptions = {
   intervalMs?: number
   /** Bytes per request. Large pages keep multi-byte characters from being cut. */
   pageBytes?: number
+  /**
+   * Check the shell's state every N polls instead of every one. Draining output already returns promptly, and the
+   * end of a mirrored command may lag by a poll or two; the state call is the one that costs a request each time.
+   */
+  stateEvery?: number
   sleep?: (ms: number) => Promise<void>
 }
 
@@ -56,14 +61,16 @@ export class ShellPager {
   /** Run until the shell has exited (all output delivered), `stop()` is called, or the shell disappears. */
   async run(): Promise<void> {
     const interval = this.options.intervalMs ?? 300
+    const stateEvery = Math.max(1, this.options.stateEvery ?? 4)
     const sleep = this.options.sleep ?? defaultSleep
     try {
-      while (!this.stopped) {
-        // Ask for the state first, then drain: output written between the two calls is still read.
-        const state = await this.source.state()
+      for (let round = 0; !this.stopped; round++) {
+        // Ask for the state first, then drain: output written between the two calls is still read. The state costs a
+        // request, so it is checked every few polls; the output drain still runs every poll.
+        const state = round % stateEvery === 0 ? await this.source.state() : undefined
         await this.drain()
         if (this.stopped) return
-        if (state.status !== "running") {
+        if (state && state.status !== "running") {
           this.sink.exit(state)
           return
         }

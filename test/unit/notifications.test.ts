@@ -22,6 +22,7 @@ let ui: UiState
 let clock: number
 let sessions: Record<string, SessionMeta>
 let shells: Record<string, string>
+let shellLookups: Array<{ id: string; directory?: string }>
 let engine: NotificationEngine
 
 beforeEach(() => {
@@ -31,7 +32,19 @@ beforeEach(() => {
   clock = 1_000_000
   sessions = { root: { title: "Fix login", directory: DIR }, child: { title: "Worker", parentID: "root", directory: DIR }, other: { title: "Elsewhere", directory: "/other" } }
   shells = { sh1: "root", sh2: "other" }
-  engine = new NotificationEngine({ directory: DIR, settings: () => settings, ui: () => ui, notifier: rec, now: () => clock, session: (id) => sessions[id], shellSession: (id) => shells[id] })
+  shellLookups = []
+  engine = new NotificationEngine({
+    directory: DIR,
+    settings: () => settings,
+    ui: () => ui,
+    notifier: rec,
+    now: () => clock,
+    session: (id) => sessions[id],
+    shellSession: (id, directory) => {
+      shellLookups.push({ id, directory })
+      return shells[id]
+    },
+  })
 })
 
 const permission = (id = "per_1", sessionID = "root", location: any = loc) => ({ type: "permission.asked", location, data: { id, sessionID, action: "shell", resources: ["rm -rf dist"] } })
@@ -83,6 +96,12 @@ describe("triggers and defaults", () => {
     await engine.handle({ type: "shell.exited", location: loc, data: { id: "unknown", exit: 0 } })
     await engine.handle({ type: "shell.exited", location: { directory: "/other" }, data: { id: "sh2", exit: 0 } })
     expect(rec.shown).toHaveLength(1)
+    // The event's folder goes with the lookup, so the host asks the server only in the folder that owns the shell.
+    expect(shellLookups).toEqual([
+      { id: "sh1", directory: DIR },
+      { id: "unknown", directory: DIR },
+      { id: "sh2", directory: "/other" },
+    ])
   })
   test("settings gate each kind", async () => {
     settings.attention = false
