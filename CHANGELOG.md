@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.17 (preview)
 
 - **Wide tables scroll inside their own box.** A table wider than the chat no longer cuts off its last columns or makes the whole conversation scroll sideways (VS Code and the Android app).
 
