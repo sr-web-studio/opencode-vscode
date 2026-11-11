@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **`/export` saves the current session as Markdown or JSON.** Type `/export` in the prompt box, choose a format, and the file is saved where you want it: VS Code asks where to save it in the session's folder and offers to open it, and the Android app opens the share sheet (or saves to Documents when no share target is available). The Markdown follows OpenCode's own transcript layout — title, session id and times, `## User` and `## Assistant (agent · model · duration)` turns, reasoning as `_Thinking:_`, and tool calls with their input, output or error. The JSON is the same `{ info, messages }` shape as `opencode export`. A running session exports what has been written so far, and the notice says so.
+
 ## 0.3.18 (preview)
 
 - **A window with many folders is much lighter while a session streams.** The chat sends only the part of the state that changed instead of the whole state on every update, the sessions list keeps its rows when only the transcript moved, a long answer is re-rendered at most four times a second instead of on every delta, and clicking a session in another folder loads its transcript once. A reconnect now spreads the folders' startup requests instead of sending them all together, and a running command's mirror asks the server for its state less often. The Android app shares the lighter state handling.
