@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.18 (preview)
 
 - **A window with many folders is much lighter while a session streams.** The chat sends only the part of the state that changed instead of the whole state on every update, the sessions list keeps its rows when only the transcript moved, a long answer is re-rendered at most four times a second instead of on every delta, and clicking a session in another folder loads its transcript once. A reconnect now spreads the folders' startup requests instead of sending them all together, and a running command's mirror asks the server for its state less often. The Android app shares the lighter state handling.
 - **The sessions list shows projects as folders, with their sessions under them.** In a window with several folders, each project header now carries a folder icon (open while its group is open) and its session count, and the sessions are indented under it. A project's aggregated status stays at the end of its header, so a collapsed project still shows that it needs you, is running or failed. The Android drawer uses the same folder icon and shows each project's status at the end of its header too.
