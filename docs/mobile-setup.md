@@ -113,11 +113,26 @@ Write the address down as `http://<address>:4096`, for example `http://192.168.1
 
 ## 3. Install the app
 
+The app is a beta. Android 7.0 or newer is required. Install it one of two ways:
+
+**From Google Play (beta testing)**
+
+1. Join the [testers group](https://groups.google.com/g/opencode-unofficial-testers) with the Google account you use on
+   the phone.
+2. Open the [testing page](https://play.google.com/apps/testing/dev.srwebstudio.opencode) and choose **Become a tester**.
+3. Install the app from [Google Play](https://play.google.com/store/apps/details?id=dev.srwebstudio.opencode). Updates
+   arrive through the Play Store.
+
+**From GitHub**
+
 1. On the phone, open the [latest release](https://github.com/sr-web-studio/opencode-vscode/releases) and download the
-   `opencode-mobile-…-beta.apk` file from the newest `mobile-v…-beta` pre-release. Android 7.0 or newer is required.
+   `opencode-mobile-…-beta.apk` file from the newest `mobile-v…-beta` pre-release.
 2. Open the downloaded file. Android asks whether the browser or file manager may install apps; allow it for this
    install.
-3. The app is a beta and is not in the Play Store. Updates are installed the same way, from a newer APK.
+3. Updates are installed the same way, from a newer APK.
+
+The two are signed differently, so one cannot update the other: uninstall the app before switching between Google
+Play and the GitHub APK.
 
 ## 4. Pair
 
