@@ -25,7 +25,6 @@ export function renderMarkdown(text: string): string {
   // Added after sanitizing on purpose, like the code-block wrapper below: the sanitizer keeps forbidding `button`,
   // and a wide table must not reach the transcript's scroll width.
   tpl.innerHTML = wrapTables(clean)
-  // Added after sanitizing on purpose: the sanitizer keeps forbidding `button`.
   for (const pre of Array.from(tpl.content.querySelectorAll("pre"))) {
     const code = pre.querySelector("code")
     if (!code) continue
