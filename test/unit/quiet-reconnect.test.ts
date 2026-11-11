@@ -106,6 +106,23 @@ describe("the terminal badge (running shells of the open session)", () => {
     ctl.detach()
   })
 
+  test("the shell → session map answers without a request, and keeps the session after the exit", async () => {
+    const ctl = await ready()
+    const calls: string[] = []
+    ;(ctl as any).client.shell.get = async ({ id }: { id: string }) => {
+      calls.push(id)
+      return { data: { id, metadata: { sessionID: "ses_a" } } }
+    }
+    await ctl.onEvent(created)
+    expect(ctl.shellSessionOf("sh_1")).toBe("ses_a")
+    await ctl.onEvent({ type: "shell.exited", data: { id: "sh_1", status: "exited", exit: 0 } } as any)
+    expect(ctl.shellSessionOf("sh_1")).toBe("ses_a")
+    expect(calls).toEqual([])
+    await ctl.onEvent({ type: "shell.deleted", data: { id: "sh_1" } } as any)
+    expect(ctl.shellSessionOf("sh_1")).toBeUndefined()
+    ctl.detach()
+  })
+
   test("a turn that ends with the shell events lost no longer leaves the badge at 1 (the server list is the truth)", async () => {
     const ctl = await ready()
     await ctl.open("ses_a")

@@ -487,7 +487,15 @@ export class Controller {
     }
   }
 
-  /** The session a background shell belongs to (`metadata.sessionID` on the shell). */
+  /**
+   * The session a background shell belongs to, when its `shell.created` event or its `shell.list` row has arrived.
+   * Synchronous, so a notification never walks the folders with one `shell.get` each.
+   */
+  shellSessionOf(shellID: string): string | undefined {
+    return this.shells.get(shellID)?.sessionID
+  }
+
+  /** The session a background shell belongs to (`metadata.sessionID` on the shell), asking the server. */
   async shellSessionID(shellID: string): Promise<string | undefined> {
     if (!this.client) return undefined
     try {

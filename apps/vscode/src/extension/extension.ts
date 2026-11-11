@@ -144,13 +144,15 @@ export function activate(context: vscode.ExtensionContext): void {
     // A child session this window has not fetched yet: any controller can ask the shared client.
     return folders.active.lookupSession(id)
   }
-  const lookupShellSession = async (id: string) => {
+  const lookupShellSession = async (id: string, directory?: string) => {
+    // The shell → session map the controllers already keep: no request, and no walk of the folders.
     for (const controller of folders.controllers()) {
-      if (!controller.directory) continue
-      const sessionID = await controller.shellSessionID(id)
-      if (sessionID) return sessionID
+      const known = controller.shellSessionOf(id)
+      if (known) return known
     }
-    return undefined
+    // A shell this window has not listed yet: one request, in the folder the event names (or the one on screen).
+    const owner = (directory && folders.controllerAt(directory)) || folders.active
+    return owner.shellSessionID(id)
   }
   const runNotice = async (cmd: NoticeCommand) => {
     if (cmd.type === "open") {
