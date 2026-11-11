@@ -11,6 +11,7 @@ import {
   freezePane,
   paneFolders,
   paneMode,
+  PaneMemo,
   type PaneFolder,
   type PaneLayout,
   type PaneProject,
@@ -345,6 +346,57 @@ describe("pane folder inputs", () => {
     const [project] = projects(buildPane(folders, now))
     expect(project).toMatchObject({ directory: "/q", workers: 1 })
     expect(project?.sessions[0]).toMatchObject({ id: "q1", workers: 1 })
+  })
+})
+
+describe("pane memo", () => {
+  /** A single-folder window posts no light list; keep one empty array so its reference is stable like a message's. */
+  const none: FolderSessions[] = []
+
+  test("the same inputs return the very same rows and layout", () => {
+    const memo = new PaneMemo()
+    const current = state({ sessions: [fullSession("a", now, "A")], target: { kind: "session", id: "a" } })
+    const first = memo.build(current, none, now)
+    const second = memo.build(current, none, now)
+    expect(second.layout).toBe(first.layout)
+    expect(second.folders).toBe(first.folders)
+    expect(rows(second.layout).map((row) => row.id)).toEqual(["a"])
+  })
+
+  test("a transcript delta replaces the state but no pane input, so the rows are not rebuilt", () => {
+    const memo = new PaneMemo()
+    const current = state({ sessions: [fullSession("a", now, "A")] })
+    const first = memo.build(current, none, now)
+    // The reducer hands out a new state object and keeps every field the pane reads by reference.
+    const next: PaneState = { ...current }
+    expect(memo.build(next, none, now).layout).toBe(first.layout)
+  })
+
+  test("a live change rebuilds the rows", () => {
+    const memo = new PaneMemo()
+    const first = memo.build(state({ sessions: [fullSession("a", now, "A")] }), none, now)
+    const next = memo.build(state({ sessions: [fullSession("a", now, "A")], running: ["a"] }), none, now)
+    expect(next.layout).not.toBe(first.layout)
+    expect(rows(next.layout)[0]!.state).toBe("running")
+  })
+
+  test("a new light folder list rebuilds the rows", () => {
+    const memo = new PaneMemo()
+    const folders = [folderInfo("/p", "p", { active: true }), folderInfo("/q", "q")]
+    const first = memo.build(state({ folders }), none, now)
+    const light: FolderSessions = { directory: "/q", sessions: [session("q1", now)], running: [], waiting: [], workerRunning: {}, loaded: true }
+    const next = memo.build(state({ folders }), [light], now)
+    expect(next.layout).not.toBe(first.layout)
+    expect(rows(next.layout).map((row) => row.id)).toContain("q1")
+  })
+
+  test("the relative-time tick rebuilds the rows", () => {
+    const memo = new PaneMemo()
+    const current = state({ sessions: [fullSession("a", now - 5 * m, "A")] })
+    const first = memo.build(current, none, now)
+    const later = memo.build(current, none, now + m)
+    expect(later.layout).not.toBe(first.layout)
+    expect(rows(later.layout)[0]!.description).toBe("6m")
   })
 })
 

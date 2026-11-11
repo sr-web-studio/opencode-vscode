@@ -2,7 +2,7 @@
   import { tick, untrack } from "svelte"
   import type { AppState } from "@occ/core/protocol"
   import { statusLabel, unreadCount, type SessionStatus } from "@occ/core/session-status"
-  import { applyPaneOrder, buildPane, filterPane, freezePane, PANE_WIDTH, paneFolders, type FrozenPane, type PaneProject, type PaneRow } from "@occ/core/sessions-pane"
+  import { applyPaneOrder, filterPane, freezePane, PANE_WIDTH, PaneMemo, type FrozenPane, type PaneProject, type PaneRow } from "@occ/core/sessions-pane"
   import { workerLabel } from "@occ/core/worker-activity"
   import { useStore } from "../context"
   import { focusGuarded } from "../focus"
@@ -36,9 +36,12 @@
     return () => clearInterval(timer)
   })
 
-  const layout = $derived(buildPane(paneFolders(app, store.folderSessions), now))
+  const memo = new PaneMemo()
+  // One build per real change of the rows: a transcript delta leaves every input the pane reads untouched.
+  const built = $derived(memo.build(app, store.folderSessions, now))
+  const layout = $derived(built.layout)
   /** Every folder has its list: before that, the order would be a guess from empty groups. */
-  const loadedAll = $derived(paneFolders(app, store.folderSessions).every((folder) => folder.loaded))
+  const loadedAll = $derived(built.folders.every((folder) => folder.loaded))
   /**
    * The shared order places the rows when the pane opens (and when the search changes); while it stays open the frozen
    * ids keep every row where it was, so a live event never moves a row under the pointer. The next open sorts again.
