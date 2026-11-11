@@ -264,36 +264,38 @@
               <div class="pname static">
                 <span class="chev"><Codicon name="chevron-down" /></span>
                 <span class="folder"><Codicon name="folder-opened" /></span>
+                {#if project.sessions.length > 0 && !(project.status === "running" && project.workers > 0)}{@render statusIcon(project.status)}{/if}
+                {#if project.workers > 0}<span class="workers" title={workerLabel(project.workers)} aria-hidden="true"><Codicon name="organization" /></span>{/if}
                 <span class="pname-text">{project.name}</span>
                 {#if project.unread > 0}<span class="badge" aria-hidden="true" title={`${project.unread} unread`}>{project.unread}</span>{/if}
-                {#if project.sessions.length > 0}<span class="count muted" title={`${project.sessions.length} sessions`}>{project.sessions.length}</span>{/if}
-                {#if project.workers > 0}<span class="workers" title={workerLabel(project.workers)} aria-hidden="true"><Codicon name="organization" /></span>{/if}
-                {#if project.sessions.length > 0}{@render statusIcon(project.status)}{/if}
               </div>
             {:else}
               <button
                 class="pname"
                 onclick={() => toggleProject(project)}
                 aria-expanded={open}
-                aria-label={`${open ? "Collapse" : "Expand"} ${project.name}, ${project.sessions.length === 0 ? "no sessions" : statusLabel(project.status)}${project.workers > 0 ? `, ${workerLabel(project.workers)}` : ""}${project.unread > 0 ? `, ${project.unread} unread` : ""}`}
+                title={`${project.name}${project.sessions.length > 0 ? `, ${project.sessions.length} sessions` : ""}`}
+                aria-label={`${open ? "Collapse" : "Expand"} ${project.name}, ${project.sessions.length === 0 ? "no sessions" : statusLabel(project.status)}${project.workers > 0 ? `, ${workerLabel(project.workers)}` : ""}${project.sessions.length > 0 ? `, ${project.sessions.length} sessions` : ""}${project.unread > 0 ? `, ${project.unread} unread` : ""}`}
               >
                 <span class="chev"><Codicon name={open ? "chevron-down" : "chevron-right"} /></span>
                 <span class="folder"><Codicon name={open ? "folder-opened" : "folder"} /></span>
+                {#if project.sessions.length > 0 && !(project.status === "running" && project.workers > 0)}{@render statusIcon(project.status)}{/if}
+                {#if project.workers > 0}<span class="workers" title={workerLabel(project.workers)} aria-hidden="true"><Codicon name="organization" /></span>{/if}
                 <span class="pname-text">{project.name}</span>
                 {#if project.unread > 0}<span class="badge" aria-hidden="true" title={`${project.unread} unread`}>{project.unread}</span>{/if}
-                {#if project.sessions.length > 0}<span class="count muted" title={`${project.sessions.length} sessions`}>{project.sessions.length}</span>{/if}
-                {#if project.workers > 0}<span class="workers" title={workerLabel(project.workers)} aria-hidden="true"><Codicon name="organization" /></span>{/if}
-                {#if project.sessions.length > 0}{@render statusIcon(project.status)}{/if}
+                {#if !open && project.sessions.length > 0}<span class="count muted" title={`${project.sessions.length} sessions`}>{project.sessions.length}</span>{/if}
               </button>
             {/if}
-            {#if store.bridge.renameProject}
-              <button class="icon pencil" onclick={() => store.bridge.renameProject?.(project.directory)} title="Rename project" aria-label="Rename {project.name}">
-                <Codicon name="edit" />
+            <div class="pactions">
+              {#if store.bridge.renameProject}
+                <button class="icon pencil" onclick={() => store.bridge.renameProject?.(project.directory)} title="Rename project" aria-label="Rename {project.name}">
+                  <Codicon name="edit" />
+                </button>
+              {/if}
+              <button class="icon add" onclick={() => newSessionIn(project)} title="New session in {project.name}" aria-label="New session in {project.name}">
+                <Codicon name="add" />
               </button>
-            {/if}
-            <button class="icon add" onclick={() => newSessionIn(project)} title="New session in {project.name}" aria-label="New session in {project.name}">
-              <Codicon name="add" />
-            </button>
+            </div>
           </div>
           {#if open}
             {#if project.sessions.length === 0}
@@ -473,6 +475,7 @@
     margin-bottom: 0.15em;
   }
   .phead {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 0.1em;
@@ -483,7 +486,7 @@
     min-width: 0;
     display: flex;
     align-items: center;
-    gap: 0.35em;
+    gap: 0.3em;
     padding: 0.3em 0.3em 0.3em 0.55em;
     text-align: left;
     font-weight: 600;
@@ -503,10 +506,7 @@
     flex: none;
     color: var(--oc-muted);
   }
-  /* The project's own status stays at the end of its header, so a collapsed project still shows waiting/running. */
-  .pname .state {
-    margin-left: auto;
-  }
+  /* The project's status sits next to its folder, so a collapsed project still shows waiting/running. */
   .count {
     flex: none;
     font-size: 0.8em;
@@ -544,12 +544,27 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .pencil {
+  /* Project actions overlay the header's trailing edge only while it is hovered or focused: at 240 px the name needs
+     the room, and VS Code tree rows reveal their toolbar the same way. The buttons stay tabbable, so focus reveals them. */
+  .pactions {
+    position: absolute;
+    right: 0.25em;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    gap: 0.1em;
+    padding-left: 0.5em;
+    border-radius: 4px;
+    background: var(--vscode-sideBar-background, var(--vscode-editor-background));
     opacity: 0;
+    pointer-events: none;
   }
-  .phead:hover .pencil,
-  .pencil:focus-visible {
+  .phead:hover .pactions,
+  .phead:focus-within .pactions {
     opacity: 1;
+    pointer-events: auto;
+    background: var(--oc-hover);
   }
   .row {
     display: flex;

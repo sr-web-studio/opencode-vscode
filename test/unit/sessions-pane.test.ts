@@ -574,10 +574,17 @@ describe("sessions pane wiring", () => {
     expect(drawer).toContain("workerLabel(session.workers)")
   })
 
-  test("a project shows its folder and keeps its status at the end of the header", () => {
+  test("a project shows its folder, its status beside it, and its count only while collapsed", () => {
     expect(pane).toContain(`<Codicon name={open ? "folder-opened" : "folder"} />`)
     expect(pane).toContain(`<span class="folder"><Codicon name="folder-opened" /></span>`)
-    expect(pane).toContain("margin-left: auto")
+    expect(pane).toContain(`{#if !open && project.sessions.length > 0}<span class="count muted"`)
+    // A running project that also has running workers shows the worker icon, not both spinners.
+    expect(pane).toContain(`{#if project.sessions.length > 0 && !(project.status === "running" && project.workers > 0)}{@render statusIcon(project.status)}{/if}`)
+    // The header actions overlay the trailing edge and appear on hover or keyboard focus, so the name keeps the room.
+    expect(pane).toContain(`<div class="pactions">`)
+    expect(pane).toContain(`.phead:hover .pactions,`)
+    expect(pane).toContain(`.phead:focus-within .pactions {`)
+    expect(pane).not.toContain("margin-left: auto")
   })
 
   test("the order freezes only once every folder has its list", () => {
