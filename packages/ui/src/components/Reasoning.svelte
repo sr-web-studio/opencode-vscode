@@ -30,6 +30,8 @@
   }
   .body {
     white-space: pre-wrap;
+    /* Thinking text is plain text: an unbroken identifier must not widen the transcript. */
+    overflow-wrap: anywhere;
     margin: 0.2em 0 0.4em 1.2em;
     font-style: italic;
   }

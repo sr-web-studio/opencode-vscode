@@ -273,6 +273,10 @@
   .transcript {
     flex: 1;
     min-height: 0;
+    /* Vertical only: `overflow-y: auto` alone would make the other axis scrollable too, so one wide table
+       used to scroll the whole conversation sideways. Content that can be wide (tables, code, diffs) scrolls
+       inside its own box instead. */
+    overflow-x: hidden;
     overflow-y: auto;
     padding: 0.8em var(--oc-side) 0.6em;
     overflow-anchor: none;
