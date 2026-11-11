@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.16 (preview)
+
+- **Closing VS Code or a command terminal no longer asks to stop a running command.** The command keeps running on the server; Ctrl+C in the terminal still stops it after asking.
+
 ## 0.3.15 (preview)
 
 - **A window with several folders opens its chat without a transcript error.** At startup only the folder on screen loads its transcript; the other folders load theirs when you switch to them. A request the server closed without an answer is retried after a short pause (twice, with a longer pause before the last try).

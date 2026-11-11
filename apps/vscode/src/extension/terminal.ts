@@ -5,6 +5,7 @@ import type { FolderRegistry } from "@occ/core/folders"
 import type { EventEnvelope } from "@occ/core/api"
 import { ShellPager, type ShellPage, type ShellState } from "@occ/core/shell-pager"
 import { planTerminal, shouldReveal, terminalsToClose, type Slot } from "@occ/core/terminal-slots"
+import { TERMINAL_CLOSE_NOTICE, terminalCloseAction, type TerminalCloseCause } from "@occ/core/terminal-close"
 import { DEFAULT_COLUMNS, commandBlockText, endText, noticeText, sessionTerminalName, terminalName, toCrlf } from "@occ/core/terminal-text"
 import { homedir } from "node:os"
 import type { TerminalSettings } from "./settings"
@@ -36,6 +37,10 @@ type Term = Slot & {
   afterCR: boolean
   atLineStart: boolean
   shells: Set<string>
+  /** VS Code called `close`: the pager stopped and the emitters are disposed. Nothing may write any more. */
+  detached: boolean
+  /** We are disposing it ourselves (`dispose` or `trim`), so its close is not a user action. */
+  closing: boolean
 }
 
 /**
@@ -43,7 +48,8 @@ type Term = Slot & {
  *
  * `session` mode (default): one terminal per session, every command appended as a block. A command that starts while
  * the session's terminal is still running another one gets an extra terminal (`#2`), which later commands reuse.
- * `perCommand`: a terminal per command. Ctrl+C stops only the running command, after asking.
+ * `perCommand`: a terminal per command. Ctrl+C stops only the running command, after asking. Closing a terminal never
+ * asks and never stops the command: the mirror detaches, and "Show terminal" attaches again.
  */
 export class ShellTerminals implements vscode.Disposable {
   private readonly terms: Term[] = []
@@ -222,7 +228,7 @@ export class ShellTerminals implements vscode.Disposable {
 
   /** Write to the terminal, or hold the text until VS Code has opened it. */
   private emit(term: Term, text: string): void {
-    if (!text) return
+    if (!text || term.detached) return
     if (term.opened) term.write.fire(text)
     else term.pending.push(text)
   }
@@ -246,6 +252,8 @@ export class ShellTerminals implements vscode.Disposable {
       afterCR: false,
       atLineStart: true,
       shells: new Set(),
+      detached: false,
+      closing: false,
     }
 
     const pty: vscode.Pseudoterminal = {
@@ -264,11 +272,10 @@ export class ShellTerminals implements vscode.Disposable {
         if (data === "\x03") void this.confirmStop(term)
       },
       close: () => {
-        // The tab was closed. A running command is only stopped when the user says so; otherwise it keeps running
-        // on the server and "Show terminal" can attach again.
-        const run = term.current
-        run?.pager?.stop()
-        if (run && !run.finished) void this.confirmStop(term, run)
+        // Closing the mirror only detaches it: the command keeps running on the server and "Show terminal" attaches
+        // again. Whether to tell the user is decided in `forget`, where VS Code reports the exit reason.
+        term.detached = true
+        term.current?.pager?.stop()
         write.dispose()
         closed.dispose()
       },
@@ -281,6 +288,7 @@ export class ShellTerminals implements vscode.Disposable {
   }
 
   private async confirmStop(term: Term, given?: Run): Promise<boolean> {
+    // Only Ctrl+C in the terminal calls this. Closing the terminal never asks: see `close` and `forget`.
     const run = given ?? term.current
     if (!run || run.finished) return false
     const stop = "Stop"
@@ -298,15 +306,21 @@ export class ShellTerminals implements vscode.Disposable {
   private forget(terminal: vscode.Terminal): void {
     const i = this.terms.findIndex((t) => t.terminal === terminal)
     if (i === -1) return
-    this.terms[i]!.current?.pager?.stop()
+    const term = this.terms[i]!
+    term.current?.pager?.stop()
     this.terms.splice(i, 1)
+    const running = term.current !== undefined && !term.current.finished
+    const cause = term.closing ? "extension" : closeCause(terminal.exitStatus?.reason)
+    if (terminalCloseAction({ running, cause }) === "notify") void vscode.window.showInformationMessage(TERMINAL_CLOSE_NOTICE)
   }
 
   /** Keep at most `maxOpen` terminals: the least recently used idle ones go first, running ones stay. */
   private trim(): void {
     for (const id of terminalsToClose(this.terms, this.settings().maxOpen)) {
       const term = this.terms.find((t) => t.id === id)
-      term?.terminal.dispose()
+      if (!term) continue
+      term.closing = true
+      term.terminal.dispose()
     }
   }
 
@@ -316,8 +330,23 @@ export class ShellTerminals implements vscode.Disposable {
     this.stops.clear()
     for (const s of this.subs) s.dispose()
     for (const t of this.terms.splice(0)) {
+      t.closing = true
       t.current?.pager?.stop()
       t.terminal.dispose()
     }
+  }
+}
+
+/** VS Code's exit reason as the pure helper names it. Anything unknown is treated as silent. */
+function closeCause(reason: vscode.TerminalExitReason | undefined): TerminalCloseCause {
+  switch (reason) {
+    case vscode.TerminalExitReason.User:
+      return "user"
+    case vscode.TerminalExitReason.Shutdown:
+      return "shutdown"
+    case vscode.TerminalExitReason.Extension:
+      return "extension"
+    default:
+      return "unknown"
   }
 }
