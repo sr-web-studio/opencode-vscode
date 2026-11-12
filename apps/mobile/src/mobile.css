@@ -8,12 +8,21 @@
  * the app's own chrome starts with `.screen > ` (the header, the body) or `.screen > :not(.chat) ` (anything inside
  * them): the shared chat view is always inside `.screen > .chat` and never matches.
  */
-:root {
+html:root {
   --sat: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
   --sar: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
   --sab: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
   --sal: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
-  --touch: 44px;
+  --touch: 48px;
+  /* The shared UI's desktop sizes are defaults in packages/ui/src/app.css; a finger needs more room than a mouse.
+     `html:root` wins over the shared `:root` whatever order the two stylesheets load in. */
+  --oc-font-size: 15px;
+  --oc-popup-row: 48px;
+  --oc-menu-row: 48px;
+  --oc-choice-row: 48px;
+  --oc-hit: 44px;
+  --oc-hit-md: 44px;
+  --oc-jump: 48px;
 }
 
 html,
@@ -71,7 +80,7 @@ body {
 }
 .screen > .bar .sub {
   display: block;
-  font-size: 0.78em;
+  font-size: 0.88em;
   font-weight: 400;
   color: var(--oc-muted);
   overflow: hidden;
@@ -87,7 +96,7 @@ body {
   min-width: var(--touch);
   min-height: var(--touch);
   border-radius: 8px;
-  font-size: 18px;
+  font-size: 20px;
 }
 .screen > :not(.chat) .iconbtn:active,
 .screen > :not(.chat) .row:active {
@@ -171,7 +180,7 @@ body {
 }
 .screen > :not(.chat) .row .s {
   display: block;
-  font-size: 0.85em;
+  font-size: 0.88em;
   color: var(--oc-muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -179,7 +188,7 @@ body {
 }
 .screen > :not(.chat) .row .end {
   flex: none;
-  font-size: 0.8em;
+  font-size: 0.88em;
   color: var(--oc-muted);
 }
 
@@ -190,7 +199,7 @@ body {
 .screen > :not(.chat) .field > span {
   display: block;
   margin-bottom: 4px;
-  font-size: 0.85em;
+  font-size: 0.87em;
   color: var(--oc-muted);
 }
 .screen > :not(.chat) .field input,
@@ -211,7 +220,7 @@ body {
   display: block;
   margin-top: 4px;
   color: var(--oc-muted);
-  font-size: 0.8em;
+  font-size: 0.87em;
 }
 
 .screen > .search {
@@ -273,7 +282,7 @@ body {
   gap: 6px;
   padding: 2px 10px;
   border-radius: 999px;
-  font-size: 0.78em;
+  font-size: 0.88em;
   background: var(--oc-bubble);
   color: var(--oc-muted);
 }
@@ -290,20 +299,36 @@ body {
   background: var(--oc-amber);
 }
 
-/* The shared UI (packages/ui) was made for a mouse: on a touch screen its buttons get a finger-sized hit area. Inline links inside prose stay inline. */
+/* The shared UI (packages/ui) was made for a mouse: on a touch screen every control gets a finger-sized hit area.
+   Primary actions (send, stop, attach, enhance) get the full 48px; dense secondary controls keep 44px, which the
+   popups and rows already space apart. Inline links inside prose stay inline. */
 @media (pointer: coarse) {
-  .chat button:not(.md button):not(.link),
+  .chat button,
   .chat summary,
   .chat select,
   .chat [role="button"],
   .chat [role="switch"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  /* The copy button of a code block sits in a strip beside the language label: it grows, but not to a full row. */
+  .chat .md button {
     min-height: 40px;
     min-width: 40px;
   }
+  /* Primary actions in the composer. */
+  .chat button.send,
+  .chat button.stop,
+  .chat button.clip,
+  .chat button.spark,
+  .chat button.mic {
+    min-height: 48px;
+    min-width: 48px;
+  }
   .chat .link {
     display: inline-block;
-    min-height: 40px;
-    line-height: 40px;
+    min-height: 44px;
+    line-height: 44px;
   }
   .chat .md .link,
   .chat .md a {
@@ -312,7 +337,7 @@ body {
     display: inline;
   }
   /* The round "revert" button sits on the corner of the prompt: keep it small to the eye, and give it a 40px hit area that reaches outside. */
-  /* Doubled class: the general 40px rule above has a :not() chain and would win otherwise. */
+  /* Doubled class: the general rule above would win otherwise. */
   .chat .user button.revert.revert {
     min-width: 0;
     min-height: 0;
@@ -330,12 +355,121 @@ body {
   }
 }
 
+/* Text the shared chat sizes for a desktop. On a phone the answer text follows the "Transcript text size" setting
+   (two pixels above the stored number, so the default answer is 16px) and the dense popups get full rows. */
+.screen > .chat .transcript,
+.screen > .chat .box textarea {
+  font-size: calc(var(--oc-font-size, 14px) + 2px);
+}
+/* The placeholder is a hint, not answer text: at answer size it wraps and the empty composer grows to three rows. */
+.screen > .chat .box textarea::placeholder {
+  font-size: 0.87em;
+}
+/* Every option row in a popup is a full row under a finger. */
+.screen > .chat .pop [role="option"] {
+  min-height: 48px;
+  align-items: center;
+}
+/* A question's options and its answer buttons. */
+.screen > .chat .q .row {
+  align-items: center;
+}
+/* The option numbers are keyboard shortcuts (1–9): a phone has no number row. */
+.screen > .chat .q .num {
+  display: none;
+}
+.screen > .chat .q .actions {
+  align-items: center;
+}
+.screen > .chat .q .btns {
+  flex: 1;
+  gap: 0.5em;
+  justify-content: flex-end;
+}
+.screen > .chat .q .btns button {
+  min-height: 48px;
+  padding: 0 0.9em;
+  border: 1px solid var(--oc-hairline);
+  border-radius: 999px;
+}
+.screen > .chat .q .btns button.primary,
+.screen > .chat .q .btns button.accent {
+  border-color: var(--vscode-button-background);
+}
+/* Keyboard hints ("Enter", "1/2") mean nothing on a touch screen. */
+.screen > .chat .q .keys {
+  display: none;
+}
+/* Permission: three pill buttons instead of prose links, so each answer is a full target. */
+.screen > .chat .perm {
+  align-items: center;
+  gap: 0.45em;
+}
+.screen > .chat .perm > span.muted {
+  display: none;
+}
+.screen > .chat .perm button {
+  min-height: 48px;
+  padding: 0 0.9em;
+  border: 1px solid var(--oc-hairline);
+  border-radius: 999px;
+}
+.screen > .chat .perm button.allow {
+  border-color: var(--vscode-button-background);
+}
+/* Code is read character by character: 14px monospace, and the block still scrolls sideways instead of wrapping. */
+.screen > .chat .md code {
+  font-size: 14px;
+}
+/* The language chip above the prompt box is read at a glance: keep it at secondary-text size. */
+.screen > .chat .box .lang {
+  font-size: 0.87em;
+}
+/* Composer icons are tapped, not read: 20px is the smallest that still looks like a button. */
+.screen > .chat .box .clip,
+.screen > .chat .box .spark,
+.screen > .chat .box .mic {
+  font-size: 20px;
+}
+/* The model picker is a panel, not a one-line menu: a name and its three variant buttons do not share one phone-width
+   line, so the name takes the first line (with its pin) and the variants the second, aligned under the name. */
+.screen > .chat .picker .pop {
+  min-width: min(24em, calc(100vw - 2em));
+}
+.screen > .chat .picker .row {
+  flex-wrap: wrap;
+  align-items: center;
+  row-gap: 0;
+  padding-top: 0.35em;
+  padding-bottom: 0.35em;
+}
+.screen > .chat .picker .row .n {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.screen > .chat .picker .row .vars {
+  flex: 1 1 100%;
+  margin-left: 0;
+  padding-left: 1.4em;
+  justify-content: flex-start;
+}
+/* A tool line's row and the picker's search box are tappable too. Component rules win over `.chat button`, so these
+   carry one class more. */
+.screen > .chat button.main {
+  min-height: 44px;
+}
+.screen > .chat .picker .pop input {
+  min-height: 44px;
+}
+
 /* The file viewer. `.source` is used by no component of packages/ui, so DiffView's own `.code` is not touched. */
 .screen > .body .source {
   margin: 0;
   padding: 8px 0;
   font-family: var(--vscode-editor-font-family);
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.5;
   overflow-x: hidden;
   overflow-y: auto;

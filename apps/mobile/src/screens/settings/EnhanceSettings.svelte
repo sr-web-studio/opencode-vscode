@@ -73,7 +73,7 @@
     display: block;
     margin-top: 2px;
     color: var(--oc-muted);
-    font-size: 0.82em;
+    font-size: 0.87em;
     overflow-wrap: anywhere;
   }
   .servers small.default {
@@ -86,7 +86,7 @@
   .hint {
     margin: 8px 0 0;
     color: var(--oc-muted);
-    font-size: 0.85em;
+    font-size: 0.87em;
     line-height: 1.45;
   }
 </style>

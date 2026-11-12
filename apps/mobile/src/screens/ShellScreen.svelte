@@ -171,19 +171,19 @@
 
 <style>
   .stopbtn {
-    min-height: 40px;
+    min-height: var(--touch);
     padding: 0 12px;
   }
   .status {
     flex: none;
     padding: 6px 16px;
-    font-size: 0.85em;
+    font-size: 0.87em;
     border-bottom: 1px solid var(--oc-hairline);
   }
   .hint {
     flex: none;
     padding: 6px 16px;
-    font-size: 0.85em;
+    font-size: 0.87em;
     border-bottom: 1px solid var(--oc-hairline);
     background: var(--oc-bubble);
   }
@@ -195,7 +195,7 @@
   pre {
     margin: 0;
     font-family: var(--vscode-editor-font-family);
-    font-size: 12.5px;
+    font-size: 14px;
     line-height: 1.45;
     white-space: pre-wrap;
     word-break: break-all;

@@ -33,7 +33,7 @@
   .field > span {
     display: block;
     margin-bottom: 4px;
-    font-size: 0.85em;
+    font-size: 0.87em;
     color: var(--oc-muted);
   }
   .field select {
@@ -50,6 +50,6 @@
     display: block;
     margin-top: 4px;
     color: var(--oc-muted);
-    font-size: 0.8em;
+    font-size: 0.87em;
   }
 </style>
