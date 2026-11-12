@@ -1022,6 +1022,8 @@ class AppModel {
     try {
       const file = await controller.exportSession(format)
       const saved = await saveExport(file.filename, file.content, format === "json" ? "application/json" : "text/markdown")
+      // Closing the share sheet is the user's choice: no notice, and the cached copy is harmless.
+      if (saved.how === "canceled") return
       const note = saved.how === "share" ? `Exported ${file.filename}.` : saved.how === "documents" ? `Saved ${file.filename} to Documents.` : `Downloaded ${file.filename}.`
       this.notify("info", file.running ? `${note} The session is still running, so the file holds what was written so far.` : note)
     } catch (e) {

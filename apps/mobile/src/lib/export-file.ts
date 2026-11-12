@@ -7,9 +7,10 @@
 import { Capacitor } from "@capacitor/core"
 import { Directory, Encoding, Filesystem } from "@capacitor/filesystem"
 import { Share } from "@capacitor/share"
+import { isShareCancel } from "./share-cancel"
 
 export type ExportSave = {
-  how: "share" | "documents" | "download"
+  how: "share" | "documents" | "download" | "canceled"
   name: string
 }
 
@@ -29,7 +30,14 @@ export async function saveExport(name: string, content: string, mime: string): P
   const canShare = await Share.canShare().catch(() => ({ value: false }))
   if (canShare.value) {
     const written = await Filesystem.writeFile({ path: name, data: content, directory: Directory.Cache, encoding: Encoding.UTF8 })
-    await Share.share({ title: name, files: [written.uri], dialogTitle: "Export session" })
+    try {
+      // Resolves only after the user picks a target; a dismissed chooser rejects with "Share canceled".
+      await Share.share({ title: name, files: [written.uri], dialogTitle: "Export session" })
+    } catch (e) {
+      // The cached copy stays: the app's cache is private and the system clears it, and the next export overwrites it.
+      if (isShareCancel(e)) return { how: "canceled", name }
+      throw e
+    }
     return { how: "share", name }
   }
 
