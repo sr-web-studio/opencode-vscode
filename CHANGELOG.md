@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Android app: starting a new session from a project's `+` in the drawer, from the chat's own `+` or with `/fork` no longer leaves the chat on "Loading…": the chat follows the session it moved to, and a session that never opens ends the wait after 8 seconds instead of waiting forever.
+
 ## 0.3.18 (preview)
 
 - **A window with many folders is much lighter while a session streams.** The chat sends only the part of the state that changed instead of the whole state on every update, the sessions list keeps its rows when only the transcript moved, a long answer is re-rendered at most four times a second instead of on every delta, and clicking a session in another folder loads its transcript once. A reconnect now spreads the folders' startup requests instead of sending them all together, and a running command's mirror asks the server for its state less often. The Android app shares the lighter state handling.
