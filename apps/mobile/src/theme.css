@@ -20,6 +20,7 @@
   --vscode-charts-green: #89d185;
   --vscode-textLink-foreground: #4daafc;
   --vscode-focusBorder: #0078d4;
+  --vscode-sash-hoverBorder: #0078d4;
   --vscode-badge-foreground: #ffffff;
   --vscode-contrastBorder: transparent;
 
@@ -92,6 +93,7 @@
     --vscode-charts-green: #388a34;
     --vscode-textLink-foreground: #005fb8;
     --vscode-focusBorder: #005fb8;
+    --vscode-sash-hoverBorder: #005fb8;
 
     --vscode-editor-background: #ffffff;
     --vscode-sideBar-background: #f8f8f8;
