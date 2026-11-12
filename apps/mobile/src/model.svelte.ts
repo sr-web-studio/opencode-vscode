@@ -15,7 +15,7 @@ import { deleteQuestion, DELETE_BUTTON, DELETE_DETAIL } from "@occ/core/delete-s
 import { errorMessage } from "@occ/core/errors"
 import { checkProjectName, MAX_PROJECT_NAME, normalizeProjectName } from "@occ/core/project-names"
 import { normalizeServerUrl } from "@occ/core/server-url"
-import type { ExportFormat } from "@occ/core/session-export"
+import { EXPORT_FORMATS, type ExportFormat } from "@occ/core/session-export"
 import { enhanceModelKey, parseEnhanceModel, parseViewSettings, patchViewSettings, resetSettingKeys, VIEW_KEY } from "./lib/app-settings"
 import { makeClient, redeemPairing, testConnection } from "./lib/client"
 import { parseDeepLink, routeDeepLink } from "./lib/deep-link"
@@ -36,6 +36,7 @@ import {
   serviceStatus,
   setVisibleSession,
 } from "./lib/notify-native"
+import { choiceAnswer, type ModalOption } from "./lib/modal-choice"
 import { parsePairingLink } from "./lib/pairing-link"
 import { pickFiles } from "./lib/picker"
 import { ProjectNames } from "./lib/project-names"
@@ -60,7 +61,7 @@ export type ModalInput = {
   /** A friendly message under the field; the confirm button stays disabled while it is set. */
   validate?: (value: string) => string | undefined
 }
-export type ModalSpec = { title: string; detail?: string; confirm: string; danger?: boolean; input?: ModalInput }
+export type ModalSpec = { title: string; detail?: string; confirm?: string; danger?: boolean; input?: ModalInput; options?: ReadonlyArray<ModalOption> }
 type Modal = ModalSpec & { id: number; resolve: (result: boolean | string | undefined) => void }
 export type Problem = { profileID: string; kind: string; message: string }
 
@@ -964,7 +965,7 @@ class AppModel {
     this.toast = undefined
   }
 
-  confirm(spec: ModalSpec): Promise<boolean> {
+  confirm(spec: ModalSpec & { confirm: string }): Promise<boolean> {
     this.modal?.resolve(false)
     return new Promise((resolve) => {
       this.modal = { ...spec, id: nextKey(), resolve: (result) => resolve(result === true) }
@@ -979,10 +980,25 @@ class AppModel {
     })
   }
 
+  /** A dialog with one button per option. Resolves with the chosen id, or undefined on Cancel, the scrim or back. */
+  choose<T extends string>(spec: ModalSpec & { options: ReadonlyArray<ModalOption<T>> }): Promise<T | undefined> {
+    this.modal?.resolve(false)
+    return new Promise((resolve) => {
+      this.modal = { ...spec, id: nextKey(), resolve: (result) => resolve(choiceAnswer(spec.options, result)) }
+    })
+  }
+
   answer(ok: boolean) {
     const m = this.modal
     this.modal = undefined
     m?.resolve(ok)
+  }
+
+  /** A choice dialog's button. */
+  answerChoice(id: string) {
+    const m = this.modal
+    this.modal = undefined
+    m?.resolve(id)
   }
 
   /** Save the text of an input dialog (the field's Enter key and the confirm button). */
@@ -1013,19 +1029,13 @@ class AppModel {
     }
   }
 
-  /**
-   * The phone's modal has one confirm button, so the two formats are two questions. The first says how to reach JSON;
-   * cancelling both leaves nothing exported.
-   */
-  private async chooseExportFormat(): Promise<ExportFormat | undefined> {
-    const markdown = await this.confirm({
+  /** `/export`'s one dialog: a button per format, and Cancel. The labels are the same as VS Code's quick pick. */
+  private chooseExportFormat(): Promise<ExportFormat | undefined> {
+    return this.choose<ExportFormat>({
       title: "Export session",
-      detail: "Markdown is a readable transcript. Choose Cancel to export as JSON instead.",
-      confirm: "Markdown",
+      detail: "Markdown is a readable transcript; JSON is the full session data.",
+      options: EXPORT_FORMATS.map((format) => ({ id: format.format, label: format.label })),
     })
-    if (markdown) return "markdown"
-    const json = await this.confirm({ title: "Export session", detail: "Export the full session data as JSON?", confirm: "JSON" })
-    return json ? "json" : undefined
   }
 
   /** What the editor did for the VS Code UI, as this app's screens. */
