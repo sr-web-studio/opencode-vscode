@@ -219,7 +219,7 @@
     display: flex;
     align-items: baseline;
     gap: 0.5em;
-    min-height: 26px;
+    min-height: var(--oc-menu-row, 26px);
     padding: 0.1em 0.8em;
     cursor: pointer;
   }
@@ -279,7 +279,7 @@
     display: flex;
     align-items: center;
     gap: 0.35em;
-    min-height: 26px;
+    min-height: var(--oc-menu-row, 26px);
     padding: 0.15em 0.8em;
     border-top: 1px solid var(--oc-hairline);
     font-size: 0.9em;
@@ -297,10 +297,10 @@
   @media (hover: none) {
     .row {
       align-items: center;
-      min-height: 44px;
+      min-height: max(44px, var(--oc-menu-row, 26px));
     }
     .back {
-      min-height: 44px;
+      min-height: max(44px, var(--oc-menu-row, 26px));
     }
   }
 </style>

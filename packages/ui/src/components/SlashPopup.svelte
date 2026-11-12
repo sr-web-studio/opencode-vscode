@@ -78,7 +78,7 @@
     display: flex;
     align-items: baseline;
     gap: 0.7em;
-    min-height: 24px;
+    min-height: var(--oc-popup-row, 24px);
     padding: 1px 10px;
     cursor: pointer;
   }

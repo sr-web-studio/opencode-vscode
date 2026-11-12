@@ -49,8 +49,8 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 24px;
-    min-height: 24px;
+    width: var(--oc-hit, 24px);
+    min-height: var(--oc-hit, 24px);
     border-radius: 4px;
   }
   .ico.reveal {

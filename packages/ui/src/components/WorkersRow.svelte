@@ -225,7 +225,7 @@
     gap: 0.5em;
     flex: 1 1 0;
     min-width: 0;
-    min-height: 28px;
+    min-height: var(--oc-hit-md, 28px);
     padding: 0 0.4em;
     border-radius: 4px;
     text-align: left;
@@ -268,8 +268,8 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 24px;
-    min-height: 24px;
+    width: var(--oc-hit, 24px);
+    min-height: var(--oc-hit, 24px);
     border-radius: 4px;
     opacity: 0;
   }
