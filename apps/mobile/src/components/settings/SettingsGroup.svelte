@@ -11,7 +11,7 @@
 <style>
   h2.group {
     margin: 20px 16px 0;
-    font-size: 0.8em;
+    font-size: 0.87em;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.04em;

@@ -29,6 +29,8 @@ export interface MobileHost {
   /** A worker (child session) as a pushed, read-only screen. */
   openWorker(sessionID: string): void
   pickFiles(): Promise<PickedFile[]>
+  /** `/export`: ask for Markdown or JSON, then share the session file. The app shows its own notice. */
+  exportSession(): void
   /** The in-app modal; true when the user confirmed. */
   confirmRevert(): Promise<boolean>
   confirmDeleteSession(title: string): Promise<boolean>
@@ -89,6 +91,8 @@ export function createBridge(
         return void (req.readOnly || surface.isWorker?.(req.id) ? host.openWorker(req.id) : surface.dispatch({ type: "openSession", id: req.id }))
       case "openExternal":
         return host.openExternal(req.url)
+      case "exportSession":
+        return host.exportSession()
       case "notify":
         return host.notify(req.level, req.message)
       case "reconnect":
@@ -135,6 +139,7 @@ export function createBridge(
       else void surface.dispatch({ type: "openSession", id })
     },
     pickFiles: () => host.pickFiles().catch(() => []),
+    exportSession: () => host.exportSession(),
     confirmRevert: (messageID) => {
       void host.confirmRevert().then((ok) => (ok ? surface.dispatch({ type: "revert", messageID }) : undefined))
     },

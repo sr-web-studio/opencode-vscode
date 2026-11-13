@@ -390,8 +390,8 @@
     z-index: 5;
     right: calc(var(--oc-side) + 4px);
     bottom: 12px;
-    width: 32px;
-    height: 32px;
+    width: var(--oc-jump, 32px);
+    height: var(--oc-jump, 32px);
     border-radius: 50%;
     display: inline-flex;
     align-items: center;

@@ -113,7 +113,7 @@
   .hint {
     margin: 10px 0 0;
     color: var(--oc-muted);
-    font-size: 0.85em;
+    font-size: 0.87em;
     line-height: 1.45;
   }
 </style>

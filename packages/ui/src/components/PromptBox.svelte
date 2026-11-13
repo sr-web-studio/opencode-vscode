@@ -278,6 +278,9 @@
       case "fork":
         store.dispatch({ type: "fork" })
         break
+      case "export":
+        store.bridge.exportSession()
+        break
       case "redo":
         store.dispatch({ type: "redo" })
         break

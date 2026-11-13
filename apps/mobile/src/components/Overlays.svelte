@@ -65,10 +65,19 @@
           <p class="muted help" id="dlg-help">{m.input.help}</p>
         {/if}
       {/if}
-      <div class="actions">
-        <button class="btn quiet" onclick={() => model.answer(false)}>Cancel</button>
-        <button class="btn" class:danger={m.danger} disabled={!!inputError} onclick={() => (m.input ? model.answerInput(text) : model.answer(true))}>{m.confirm}</button>
-      </div>
+      {#if m.options}
+        <div class="actions choices">
+          {#each m.options as option (option.id)}
+            <button class="btn" onclick={() => model.answerChoice(option.id)}>{option.label}</button>
+          {/each}
+          <button class="btn quiet" onclick={() => model.answer(false)}>Cancel</button>
+        </div>
+      {:else}
+        <div class="actions">
+          <button class="btn quiet" onclick={() => model.answer(false)}>Cancel</button>
+          <button class="btn" class:danger={m.danger} disabled={!!inputError} onclick={() => (m.input ? model.answerInput(text) : model.answer(true))}>{m.confirm}</button>
+        </div>
+      {/if}
     </div>
   </div>
 {/if}
@@ -137,7 +146,7 @@
   .field > span {
     display: block;
     margin-bottom: 4px;
-    font-size: 0.85em;
+    font-size: 0.87em;
     color: var(--oc-muted);
   }
   .field input {
@@ -155,12 +164,12 @@
   }
   .err {
     margin: 0 0 12px;
-    font-size: 0.85em;
+    font-size: 0.87em;
     color: var(--oc-error);
   }
   .help {
     margin: 0 0 12px;
-    font-size: 0.85em;
+    font-size: 0.87em;
   }
   .actions button:disabled {
     opacity: 0.5;
@@ -169,5 +178,23 @@
     display: flex;
     justify-content: flex-end;
     gap: 8px;
+  }
+  /* A choice dialog stacks its buttons, each a full touch target: 48dp, with --touch (44px today) as the floor.
+     The dialog is outside `.screen`, so mobile.css's `.btn` rule does not reach it: give these a visible surface. */
+  .actions.choices {
+    flex-direction: column;
+  }
+  .choices .btn {
+    min-height: max(var(--touch, 48px), 48px);
+    padding: 0 16px;
+    border: 1px solid var(--oc-hairline);
+    border-radius: 8px;
+    background: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    font-weight: 500;
+  }
+  .choices .btn.quiet {
+    background: transparent;
+    color: var(--oc-accent);
   }
 </style>

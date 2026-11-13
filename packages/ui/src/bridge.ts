@@ -54,6 +54,8 @@ export interface HostBridge {
   openSession(id: string, options: { readOnly: boolean }): void
   /** The host's own file dialog (the paperclip). Resolves with nothing when the user cancels. */
   pickFiles(): Promise<PickedFile[]>
+  /** `/export`: ask for Markdown or JSON, then save the session on screen. The host shows its own notice. */
+  exportSession(): void
   /** Ask for confirmation in the host's own UI (a VS Code modal), then revert. */
   confirmRevert(messageID: string): void
   /**

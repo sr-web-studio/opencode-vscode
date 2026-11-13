@@ -63,7 +63,7 @@ describe("suggestCommands", () => {
   const server = [{ name: "init", description: "guided AGENTS.md setup" }, { name: "compact", description: "server's own" }, { name: "skills", description: "server's own" }, { name: "review" }]
   test("client commands come first and win over a server command of the same name", () => {
     const all = suggestCommands("", server)
-    expect(all.map((s) => s.name)).toEqual(["mcps", "compact", "undo", "redo", "fork", "skills", "init", "review"])
+    expect(all.map((s) => s.name)).toEqual(["mcps", "compact", "undo", "redo", "fork", "export", "skills", "init", "review"])
     expect(all.find((s) => s.name === "compact")).toMatchObject({ source: "client" })
     expect(all.filter((s) => s.name === "compact")).toHaveLength(1)
   })

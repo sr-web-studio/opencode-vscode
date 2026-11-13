@@ -1,6 +1,6 @@
 {
   "name": "@occ/mobile",
-  "version": "0.2.9-beta",
+  "version": "0.2.10-beta",
   "private": true,
   "type": "module",
   "description": "OpenCode (unofficial) for Android: a Capacitor shell around @occ/ui. The controller runs inside the app and talks to the OpenCode server over HTTP.",
@@ -19,7 +19,9 @@
     "@capacitor/app": "8.1.2",
     "@capacitor/browser": "8.0.5",
     "@capacitor/core": "8.6.0",
+    "@capacitor/filesystem": "8.1.5",
     "@capacitor/keyboard": "8.0.6",
+    "@capacitor/share": "8.0.3",
     "@capacitor/status-bar": "8.0.4",
     "@occ/core": "workspace:*",
     "@occ/ui": "workspace:*",

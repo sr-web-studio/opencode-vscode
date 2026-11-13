@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { tick, untrack } from "svelte"
+  import { onDestroy, tick, untrack } from "svelte"
   import type { AppState } from "@occ/core/protocol"
   import { statusLabel, unreadCount, type SessionStatus } from "@occ/core/session-status"
-  import { applyPaneOrder, filterPane, freezePane, PANE_WIDTH, PaneMemo, type FrozenPane, type PaneProject, type PaneRow } from "@occ/core/sessions-pane"
+  import { applyPaneOrder, clampPaneWidth, filterPane, freezePane, PANE_WIDTH, PaneMemo, paneWidthRange, stepPaneWidth, type FrozenPane, type PaneProject, type PaneRow } from "@occ/core/sessions-pane"
   import { workerLabel } from "@occ/core/worker-activity"
   import { useStore } from "../context"
   import { focusGuarded } from "../focus"
@@ -13,10 +13,14 @@
    * overlay over the chat when it is not. It is now the only session list in the editor: the old folder and session
    * dropdowns are gone, so everything they did (switch, new, delete, rename, archived) lives here.
    *
+   * In a column its right edge is a sash: drag it, double-click it, or focus it and use the arrows to set the width
+   * within a minimum that keeps the rows readable and a maximum that keeps the chat usable. The overlay has no sash:
+   * it covers the chat, so a width there would only change how much it hides.
+   *
    * The phone never renders it (`capabilities.sessionsPane` is false there; its own drawer already lists every project
    * and session).
    */
-  let { app, overlay, onclose }: { app: AppState; overlay: boolean; onclose: () => void } = $props()
+  let { app, overlay, viewWidth, onclose }: { app: AppState; overlay: boolean; viewWidth: number; onclose: () => void } = $props()
   const store = useStore()
 
   let query = $state("")
@@ -30,6 +34,80 @@
   /** The row whose title is being edited (pencil, F2). */
   let editing = $state<{ id: string; value: string } | undefined>()
   let editInput: HTMLInputElement | undefined = $state()
+
+  /* ------------------------------------------------------------ pane width */
+
+  /** Remembered next to the open/closed answer, in the webview's own state, so it survives a reload and a re-created view. */
+  const WIDTH_KEY = "sessionsPaneWidth"
+  const storedWidth = store.bridge.storage.get<number>(WIDTH_KEY)
+  /** The width the user chose. The view only clamps it, so a narrow window does not throw the choice away. */
+  let wanted = $state(typeof storedWidth === "number" && Number.isFinite(storedWidth) ? storedWidth : PANE_WIDTH)
+  const widthRange = $derived(paneWidthRange(viewWidth))
+  const width = $derived(overlay ? PANE_WIDTH : clampPaneWidth(wanted, viewWidth))
+
+  function setWidth(next: number): void {
+    wanted = clampPaneWidth(next, viewWidth)
+    store.bridge.storage.set(WIDTH_KEY, wanted)
+  }
+
+  let sash: HTMLDivElement | undefined = $state()
+  let drag: { pointer: number; startX: number; startWidth: number } | undefined
+  let dragging = $state(false)
+  /** The drag's latest width, applied once per animation frame so a fast pointer never relayouts twice in a frame. */
+  let pending = 0
+  let frame = 0
+
+  function startDrag(e: PointerEvent): void {
+    if (overlay || e.button !== 0) return
+    // No text selection and no focus change: the pointer capture below keeps the drag on the handle.
+    e.preventDefault()
+    drag = { pointer: e.pointerId, startX: e.clientX, startWidth: width }
+    pending = width
+    dragging = true
+    sash?.setPointerCapture(e.pointerId)
+    document.body.style.userSelect = "none"
+    document.body.style.cursor = "col-resize"
+  }
+
+  function moveDrag(e: PointerEvent): void {
+    if (!drag || e.pointerId !== drag.pointer) return
+    // The pane sits left of the chat, so dragging towards the chat widens it.
+    pending = clampPaneWidth(drag.startWidth + e.clientX - drag.startX, viewWidth)
+    if (frame) return
+    frame = requestAnimationFrame(() => {
+      frame = 0
+      wanted = pending
+    })
+  }
+
+  function endDrag(): void {
+    if (!drag) return
+    drag = undefined
+    dragging = false
+    if (frame) cancelAnimationFrame(frame)
+    frame = 0
+    wanted = pending
+    document.body.style.userSelect = ""
+    document.body.style.cursor = ""
+    // Persist once, on release: the frames in between only move the CSS variable.
+    store.bridge.storage.set(WIDTH_KEY, wanted)
+  }
+
+  function sashKey(e: KeyboardEvent): void {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return
+    e.preventDefault()
+    // Arrows on the handle resize the pane; they must not also walk the list behind it.
+    e.stopPropagation()
+    setWidth(stepPaneWidth(width, e.key === "ArrowRight" ? 1 : -1, viewWidth, e.shiftKey))
+  }
+
+  onDestroy(() => {
+    if (frame) cancelAnimationFrame(frame)
+    if (!drag) return
+    drag = undefined
+    document.body.style.userSelect = ""
+    document.body.style.cursor = ""
+  })
 
   $effect(() => {
     const timer = setInterval(() => (now = Date.now()), 30_000)
@@ -207,7 +285,7 @@
   }
 </script>
 
-<div class="pane" class:overlay style:width={overlay ? undefined : `${PANE_WIDTH}px`} bind:this={pane} aria-label="Sessions">
+<div class="pane" class:overlay style:--oc-pane-width={overlay ? undefined : `${width}px`} bind:this={pane} aria-label="Sessions">
   <header class="head">
     <span class="title"
       >Sessions{#if totalUnread > 0}<span class="badge" role="img" aria-label={`${totalUnread} unread`} title={`${totalUnread} unread`}>{totalUnread}</span>{/if}</span
@@ -315,6 +393,31 @@
       {/each}
     {/if}
   </div>
+  {#if !overlay}
+    <!-- A resize sash is a real ARIA separator widget: focusable, with a value, and resized by the arrow keys. -->
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
+    <div
+      class="sash"
+      class:dragging
+      role="separator"
+      tabindex="0"
+      aria-orientation="vertical"
+      aria-label="Resize sessions list"
+      aria-valuenow={width}
+      aria-valuemin={widthRange.min}
+      aria-valuemax={widthRange.max}
+      aria-valuetext={`${width} pixels`}
+      title="Drag to resize, double-click to reset"
+      bind:this={sash}
+      onpointerdown={startDrag}
+      onpointermove={moveDrag}
+      onpointerup={endDrag}
+      onpointercancel={endDrag}
+      onlostpointercapture={endDrag}
+      onkeydown={sashKey}
+      ondblclick={() => setWidth(PANE_WIDTH)}
+    ></div>
+  {/if}
 </div>
 
 {#snippet statusIcon(status: SessionStatus)}
@@ -389,12 +492,50 @@
 <style>
   .pane {
     flex: none;
+    position: relative;
+    width: var(--oc-pane-width, auto);
     display: flex;
     flex-direction: column;
     min-height: 0;
     background: var(--vscode-sideBar-background, var(--vscode-editor-background));
     border-right: 1px solid var(--oc-hairline);
     color: var(--oc-fg);
+  }
+  /* The resize sash straddles the right border: 6 px of hit area, 3 px on each side, like a VS Code sash. */
+  .sash {
+    position: absolute;
+    z-index: 5;
+    top: 0;
+    bottom: 0;
+    right: -3px;
+    width: 6px;
+    cursor: col-resize;
+    touch-action: none;
+    background: transparent;
+  }
+  /* Only the 1 px line shows, as VS Code's sashes do; the 6 px around it stay an invisible grab area. */
+  .sash::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 1px;
+    transform: translateX(-50%);
+    background: transparent;
+  }
+  .sash:hover::after,
+  .sash.dragging::after,
+  .sash:focus-visible::after {
+    background: var(--vscode-sash-hoverBorder, var(--vscode-focusBorder));
+  }
+  /* A keyboard focus makes the line twice as wide, so it is as easy to find as a mouse hover. The browser's own
+     focus ring would draw a box around the invisible 6 px strip; the line is this handle's focus indicator. */
+  .sash:focus-visible {
+    outline: none;
+  }
+  .sash:focus-visible::after {
+    width: 2px;
   }
   .pane.overlay {
     position: absolute;

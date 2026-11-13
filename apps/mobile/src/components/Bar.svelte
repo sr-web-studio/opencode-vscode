@@ -27,7 +27,7 @@
     padding: 1px 7px;
     border: 1px solid var(--oc-hairline);
     border-radius: 999px;
-    font-size: 0.62em;
+    font-size: 0.75em;
     font-weight: 500;
     letter-spacing: 0.04em;
     text-transform: uppercase;

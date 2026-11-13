@@ -30,6 +30,9 @@ export function startIntent(launch: string | undefined, profiles: ReadonlyArray<
 /** The neutral start screen never stays longer than this: a connection that hangs must still end on the server list. */
 export const START_TIMEOUT_MS = 8000
 
+/** A chat screen waits at most this long for the session it was opened with; see `chatVisible`. */
+export const CHAT_OPEN_TIMEOUT_MS = 8000
+
 /**
  * Resolve when the start work is done, or after `ms` when it hangs. The work itself keeps running: when it finishes it
  * still puts its chat on the stack, so the server list shown at the timeout is only the fallback.
@@ -43,4 +46,24 @@ export function settleWithin(work: Promise<unknown>, ms = START_TIMEOUT_MS): Pro
     }
     work.then(done, done)
   })
+}
+
+/**
+ * Whether a chat screen shows the shared chat or its own short "Loading…".
+ *
+ * A screen opened with a `sessionID` (a drawer row, a notification, the remembered chat of a cold start) withholds the
+ * shared view until the controller's target is that session, so the draft ("New session", the empty state) never
+ * flashes first. That wait must end, in two ways:
+ *
+ * 1. The controller got there: `arrived`. From then on the screen follows the controller, because the owner can move
+ *    the same chat somewhere else at any moment — the chat's own `+` (`newDraft`), `/fork`, the first prompt of a
+ *    draft, a session deleted elsewhere (the controller falls back to a draft). A gate that kept demanding the id it
+ *    was opened with would pin the screen on "Loading…" for good.
+ * 2. The wait ran out: `expired` (`CHAT_OPEN_TIMEOUT_MS`). A session deleted between the tap and the sync, or a server
+ *    that never answers, must still show the chat (with its own connection and error states) rather than a spinner.
+ *
+ * A screen without a `sessionID` (a draft, or "the newest session") never waits at all.
+ */
+export function chatVisible(gate: { sessionID?: string; arrived: boolean; expired: boolean }): boolean {
+  return !gate.sessionID || gate.arrived || gate.expired
 }

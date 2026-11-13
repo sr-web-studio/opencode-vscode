@@ -1,11 +1,13 @@
 <script lang="ts">
   import App from "@occ/ui/App.svelte"
   import Codicon from "@occ/ui/components/Codicon.svelte"
+  import type { AppState } from "@occ/core/protocol"
   import Bar from "../components/Bar.svelte"
   import ConnectionPill from "../components/ConnectionPill.svelte"
   import { createBridge } from "../lib/bridge"
   import { onPause } from "../lib/platform"
   import { liveState } from "../lib/live.svelte"
+  import { chatVisible, CHAT_OPEN_TIMEOUT_MS } from "../lib/start"
   import { model } from "../model.svelte"
 
   /**
@@ -43,28 +45,41 @@
     else if (draft) void ctl.dispatch({ type: "newDraft", hasText: false })
   })
 
+  /** The controller is showing the session this screen was opened with. */
+  const onSession = (s: AppState | undefined): boolean => !!sessionID && s?.target.kind === "session" && s.target.id === sessionID
+
   /**
    * The shared chat renders only once the controller is on the session this screen asked for. Before that its target is
    * the remembered or newest session, or a draft, and a draft would flash "New session" and the empty state first.
+   *
+   * That is a wait before the first arrival, not a permanent rule: `arrived` remembers that the controller got here, so
+   * everything the owner does afterwards (the chat's own `+`, `/fork`, a session deleted elsewhere) moves the same chat
+   * and stays visible. `expired` ends the wait when the session never arrives at all, so the screen cannot spin forever.
    */
-  const onTarget = $derived.by(() => {
-    if (!sessionID) return true
-    const st = live.state
-    return st?.target.kind === "session" && st.target.id === sessionID
+  // svelte-ignore state_referenced_locally
+  let arrived = $state(onSession(live.state))
+  let expired = $state(false)
+  $effect(() => {
+    if (arrived || onSession(live.state)) arrived = true
   })
+  $effect(() => {
+    if (!sessionID || arrived || expired) return
+    const timer = setTimeout(() => (expired = true), CHAT_OPEN_TIMEOUT_MS)
+    return () => clearTimeout(timer)
+  })
+  const onTarget = $derived(chatVisible({ sessionID, arrived, expired }))
 
   const title = $derived.by(() => {
     const st = live.state
-    const shown = st?.target.kind === "session" ? st.target.id : undefined
-    if (sessionID) {
-      // Until the controller is on the session, the name the caller knew (a link, the drawer, the last start) is right.
-      if (shown !== sessionID) return titleHint ?? "Chat"
-      return st?.sessions.find((s) => s.id === sessionID)?.title?.trim() || titleHint || st?.folderName || "Chat"
-    }
-    if (!st) return "Chat"
+    // Until the controller is on the session, the name the caller knew (a link, the drawer, the last start) is right.
+    if (!onTarget) return titleHint ?? "Chat"
+    if (!st) return titleHint ?? "Chat"
     if (st.target.kind === "draft") return "New session"
     const id = st.target.id
-    return st.sessions.find((s) => s.id === id)?.title?.trim() || st.folderName || "Chat"
+    const name = st.sessions.find((s) => s.id === id)?.title?.trim()
+    // The session this screen was opened with keeps the name the caller knew until its own title arrives.
+    if (id === sessionID) return name || titleHint || st.folderName || "Chat"
+    return name || st.folderName || "Chat"
   })
   // The project's OpenCode name and the folder: the header says which project this conversation belongs to.
   const sub = $derived([model.projectTitle(directory), live.state?.displayPath].filter((s): s is string => !!s).join(" · "))

@@ -65,7 +65,7 @@
   .bad {
     display: block;
     margin-top: 2px;
-    font-size: 0.85em;
+    font-size: 0.87em;
     color: var(--oc-error);
     white-space: normal;
   }

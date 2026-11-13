@@ -153,11 +153,11 @@
 
 <style>
   .small {
-    font-size: 0.85em;
+    font-size: 0.87em;
     margin: 8px 0 14px;
   }
   .help {
-    font-size: 0.85em;
+    font-size: 0.87em;
     color: var(--oc-muted);
     margin: -8px 0 14px;
   }

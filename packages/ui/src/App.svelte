@@ -184,7 +184,7 @@
   {:else}
     <div class="shell" bind:clientWidth={shellWidth}>
       {#if paneVisible}
-        <SessionsPane {app} {overlay} onclose={() => setPane(false)} />
+        <SessionsPane {app} {overlay} viewWidth={shellWidth} onclose={() => setPane(false)} />
       {/if}
       <div class="chat">
         {#if app.readOnly}

@@ -32,13 +32,13 @@
     display: block;
     margin-top: 2px;
     color: var(--oc-muted);
-    font-size: 0.82em;
+    font-size: 0.87em;
     line-height: 1.35;
   }
   .switch input {
     flex: none;
-    width: 44px;
-    height: 26px;
+    width: 48px;
+    height: 28px;
     accent-color: var(--vscode-button-background);
   }
 </style>

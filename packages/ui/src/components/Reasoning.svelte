@@ -23,7 +23,7 @@
     display: inline-flex;
     align-items: center;
     gap: 0.35em;
-    min-height: 28px;
+    min-height: var(--oc-hit-md, 28px);
   }
   .reasoning button:hover {
     color: var(--oc-fg);
