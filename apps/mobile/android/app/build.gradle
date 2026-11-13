@@ -5,7 +5,7 @@ apply plugin: 'com.android.application'
 // gives the id dev.srwebstudio.opencode.test, the name "OpenCode TEST 19" and the version 0.2.2-beta-test.19, signed with
 // the release key like the normal build. The number is the build counter, as in the VS Code test builds
 // (`bun run package -- --test 11`). Without the property the build keeps its released identity.
-def versionNameBase = "0.2.9-beta"
+def versionNameBase = "0.2.10-beta"
 def testNumber = project.findProperty("testBuild")?.toString()?.trim()
 if (testNumber != null && testNumber.isEmpty()) {
     testNumber = null
@@ -24,7 +24,7 @@ android {
         applicationId "dev.srwebstudio.opencode"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 10
+        versionCode 11
         versionName versionNameBase
         // The launcher label and the activity title live here, not in res/values/strings.xml, so a test build can say
         // which one it is. `cap sync` leaves strings.xml alone, so nothing writes them back.

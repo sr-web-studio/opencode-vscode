@@ -1,10 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.3.19 (preview)
 
 - **The sessions list beside the chat can be resized.** Drag the handle on its right edge, double-click it to go back to the default width, or focus it and use Left/Right (Shift for larger steps). It never gets narrower than a project header needs to show its folder, status, badge and name, and never wider than 60% of the view or the point where the chat would drop below its own usable width. The width is remembered per window, and a narrower window clamps it without losing the choice; on a narrow view the list still overlays the chat, with no handle.
 - Android app: starting a new session from a project's `+` in the drawer, from the chat's own `+` or with `/fork` no longer leaves the chat on "Loading…": the chat follows the session it moved to, and a session that never opens ends the wait after 8 seconds instead of waiting forever.
 - **`/export` saves the current session as Markdown or JSON.** Type `/export` in the prompt box, choose a format, and the file is saved where you want it: VS Code asks where to save it in the session's folder and offers to open it, and the Android app opens the share sheet (or saves to Documents when no share target is available). The Markdown follows OpenCode's own transcript layout — title, session id and times, `## User` and `## Assistant (agent · model · duration)` turns, reasoning as `_Thinking:_`, and tool calls with their input, output or error. The JSON is the same `{ info, messages }` shape as `opencode export`. A running session exports what has been written so far, and the notice says so.
+- **Android app: larger text and finger-sized controls.** The answer text is 16 px by default and follows the **Transcript text size** setting, which now actually applies (it previously had no effect), and code is 14 px and still scrolls sideways instead of wrapping. Every button, row and popup is at least a 44 dp target, and send, stop, attach and the other primary actions are 48 dp. The permission and question prompts answer with full pill buttons, the model picker puts its variants on a second line instead of squeezing them, and the option numbers and keyboard hints that mean nothing on a phone are gone. The VS Code extension looks exactly as before.
 
 ## 0.3.18 (preview)
 
@@ -13,7 +14,6 @@
 - **A session whose workers are still running says so.** When a session's own turn has finished but a worker it started is still working, the row shows a worker icon and "Worker running" (or "N workers running") instead of looking finished; its project header shows the same icon. The row keeps its place in the list, because the session itself is idle. This works in the VS Code sessions pane and in the Android drawer.
 - **Start a new session in any project from the list.** Each project header has its own `+` (VS Code sessions pane and Android drawer), which opens a new draft in that folder. In VS Code a single-folder window gets a **New session** row at the top of the list, and the pane header's own `+` is gone.
 - **Android app: a notification opens its session straight away.** Opening the app from a notification goes straight to the session without showing the server list first, and the chat carries that session's name from its first frame with a short "Loading…" until its messages arrive, so no empty "New session" screen appears on the way.
-- **Android app: larger text and finger-sized controls.** The answer text is 16 px by default and follows the **Transcript text size** setting, which now actually applies (it previously had no effect), and code is 14 px and still scrolls sideways instead of wrapping. Every button, row and popup is at least a 44 dp target, and send, stop, attach and the other primary actions are 48 dp. The permission and question prompts answer with full pill buttons, the model picker puts its variants on a second line instead of squeezing them, and the option numbers and keyboard hints that mean nothing on a phone are gone. The VS Code extension looks exactly as before.
 
 ## 0.3.17 (preview)
 
