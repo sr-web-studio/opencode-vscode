@@ -358,7 +358,7 @@
   }
   .cap {
     display: block;
-    font-size: 0.78em;
+    font-size: 0.88em;
     color: var(--oc-muted);
   }
   .iconbtn {
@@ -366,10 +366,10 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 44px;
-    min-height: 44px;
+    min-width: var(--touch);
+    min-height: var(--touch);
     border-radius: 8px;
-    font-size: 18px;
+    font-size: 20px;
   }
   .iconbtn:active {
     background: var(--oc-hover);
@@ -432,10 +432,10 @@
     padding: 8px 0 8px 12px;
     text-align: left;
   }
-  /* The two project actions keep a 40 px touch target without crowding the name. */
+  /* The two project actions keep a comfortable touch target without crowding the name. */
   .prow .iconbtn {
-    min-width: 40px;
-    min-height: 40px;
+    min-width: var(--touch);
+    min-height: var(--touch);
   }
   .pname:active {
     background: var(--oc-hover);
@@ -470,7 +470,7 @@
   }
   .s {
     display: block;
-    font-size: 0.82em;
+    font-size: 0.88em;
     color: var(--oc-muted);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -551,7 +551,7 @@
   }
   .end {
     flex: none;
-    font-size: 0.8em;
+    font-size: 0.88em;
     color: var(--oc-muted);
   }
   .empty {
@@ -601,7 +601,7 @@
     align-items: center;
     gap: 6px;
     margin: 0 4px 6px;
-    font-size: 0.82em;
+    font-size: 0.88em;
     color: var(--oc-muted);
     overflow: hidden;
     text-overflow: ellipsis;

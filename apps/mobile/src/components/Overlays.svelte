@@ -146,7 +146,7 @@
   .field > span {
     display: block;
     margin-bottom: 4px;
-    font-size: 0.85em;
+    font-size: 0.87em;
     color: var(--oc-muted);
   }
   .field input {
@@ -164,12 +164,12 @@
   }
   .err {
     margin: 0 0 12px;
-    font-size: 0.85em;
+    font-size: 0.87em;
     color: var(--oc-error);
   }
   .help {
     margin: 0 0 12px;
-    font-size: 0.85em;
+    font-size: 0.87em;
   }
   .actions button:disabled {
     opacity: 0.5;

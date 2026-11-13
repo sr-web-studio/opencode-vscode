@@ -8,7 +8,11 @@
 
   /** How the transcript looks, saved for this phone and applied to every open chat immediately. */
   const s = $derived(model.viewSettings)
-  const fontOptions = FONT_SIZES.map((n) => ({ value: String(n), label: n === 14 ? `${n} px (default)` : `${n} px` }))
+  /**
+   * The stored number is the base size; the transcript renders two pixels larger (see mobile.css), so the list shows
+   * the size the reader actually gets.
+   */
+  const fontOptions = FONT_SIZES.map((n) => ({ value: String(n), label: n === 14 ? `${n + 2} px (default)` : `${n + 2} px` }))
   const reasoningOptions: ReadonlyArray<{ value: ViewSettings["showReasoning"]; label: string }> = [
     { value: "collapsed", label: "Collapsed (tap to open)" },
     { value: "expanded", label: "Expanded" },
@@ -24,7 +28,7 @@
 <SettingsGroup title="Chat display">
   <section class="pad">
     <SettingsSelect label="Transcript text size" value={String(s.fontSize)} options={fontOptions} onchange={setFontSize} />
-    <p class="preview" style:font-size="{s.fontSize}px">The transcript text looks like this.</p>
+    <p class="preview" style:font-size="{s.fontSize + 2}px">The transcript text looks like this.</p>
     <SwitchRow
       title="Collapse completed steps"
       detail="Keep finished tool steps folded to one line."

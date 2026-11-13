@@ -303,8 +303,8 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 28px;
-    min-height: 28px;
+    min-width: var(--oc-hit-md, 28px);
+    min-height: var(--oc-hit-md, 28px);
     border-radius: 4px;
   }
   .chev:hover {

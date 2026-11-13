@@ -27,6 +27,14 @@
   --oc-turn-gap: 40px;
   --oc-popover: var(--vscode-editorWidget-background);
   --oc-code-bg: var(--vscode-textCodeBlock-background);
+  /* Row and hit-area heights of the dense popups and rows. The defaults are the desktop sizes; the Android app raises
+     them in its own stylesheet, where a finger replaces the mouse. */
+  --oc-popup-row: 24px;
+  --oc-menu-row: 26px;
+  --oc-choice-row: 0px;
+  --oc-hit: 24px;
+  --oc-hit-md: 28px;
+  --oc-jump: 32px;
 }
 
 html,

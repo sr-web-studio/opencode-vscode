@@ -10,7 +10,7 @@
 
   --vscode-font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Noto Sans Bengali", sans-serif;
   --vscode-editor-font-family: ui-monospace, "Roboto Mono", "DejaVu Sans Mono", Menlo, Consolas, monospace;
-  --vscode-editor-font-size: 13px;
+  --vscode-editor-font-size: 14px;
 
   --vscode-foreground: #cccccc;
   --vscode-descriptionForeground: #9d9d9d;
@@ -20,6 +20,7 @@
   --vscode-charts-green: #89d185;
   --vscode-textLink-foreground: #4daafc;
   --vscode-focusBorder: #0078d4;
+  --vscode-sash-hoverBorder: #0078d4;
   --vscode-badge-foreground: #ffffff;
   --vscode-contrastBorder: transparent;
 
@@ -92,6 +93,7 @@
     --vscode-charts-green: #388a34;
     --vscode-textLink-foreground: #005fb8;
     --vscode-focusBorder: #005fb8;
+    --vscode-sash-hoverBorder: #005fb8;
 
     --vscode-editor-background: #ffffff;
     --vscode-sideBar-background: #f8f8f8;

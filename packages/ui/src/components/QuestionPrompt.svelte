@@ -419,6 +419,7 @@
     display: flex;
     align-items: baseline;
     gap: 0.6em;
+    min-height: var(--oc-choice-row, 0px);
     padding: 0.25em 0.4em;
     border-radius: 3px;
     cursor: pointer;
