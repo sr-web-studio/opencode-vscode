@@ -3,15 +3,23 @@ import { readFileSync } from "node:fs"
 import type { SessionInfo } from "@occ/core/api"
 import type { FolderInfo, FolderSessions } from "@occ/core/protocol"
 import {
+  CHAT_MIN,
+  PANE_MAX_SHARE,
+  PANE_MIN,
+  PANE_STEP,
+  PANE_STEP_LARGE,
   PANE_WIDTH,
   PANE_WIDE_MIN,
   applyPaneOrder,
   buildPane,
+  clampPaneWidth,
   filterPane,
   freezePane,
   paneFolders,
   paneMode,
   PaneMemo,
+  paneWidthRange,
+  stepPaneWidth,
   type PaneFolder,
   type PaneLayout,
   type PaneProject,
@@ -663,5 +671,103 @@ describe("sessions pane wiring", () => {
     expect(extension).not.toContain("SessionsTreeProvider")
     expect(extension).not.toContain("createTreeView")
     expect(extension).not.toContain("opencode.sessions.")
+  })
+})
+
+describe("pane width", () => {
+  test("the minimum keeps a project header readable and is below the default", () => {
+    expect(PANE_MIN).toBe(224)
+    expect(PANE_MIN).toBeLessThan(PANE_WIDTH)
+    expect(PANE_STEP).toBe(16)
+    expect(PANE_STEP_LARGE).toBe(64)
+  })
+
+  test("the range leaves the chat its own minimum at every wide view", () => {
+    for (const view of [PANE_WIDE_MIN, 600, 900, 1200, 2000, 3840]) {
+      const { min, max } = paneWidthRange(view)
+      expect(min).toBe(PANE_MIN)
+      expect(max).toBeGreaterThanOrEqual(min)
+      expect(view - max).toBeGreaterThanOrEqual(CHAT_MIN)
+      expect(max).toBeLessThanOrEqual(Math.round(view * PANE_MAX_SHARE))
+    }
+    // A column from 560: the chat's minimum caps it there, 60% takes over in a wider view.
+    expect(paneWidthRange(560)).toEqual({ min: 224, max: 240 })
+    expect(paneWidthRange(600)).toEqual({ min: 224, max: 280 })
+    expect(paneWidthRange(900)).toEqual({ min: 224, max: 540 })
+    expect(paneWidthRange(2000)).toEqual({ min: 224, max: 1200 })
+  })
+
+  test("the default width fits every wide view, so double-click always lands in range", () => {
+    for (const view of [PANE_WIDE_MIN, 600, 900, 2000]) expect(clampPaneWidth(PANE_WIDTH, view)).toBe(PANE_WIDTH)
+  })
+
+  test("a width is clamped both ways, and a saved one comes back usable in a narrow view", () => {
+    expect(clampPaneWidth(120, 900)).toBe(PANE_MIN)
+    expect(clampPaneWidth(800, 900)).toBe(540)
+    expect(clampPaneWidth(300, 900)).toBe(300)
+    expect(clampPaneWidth(500, 600)).toBe(280)
+    expect(clampPaneWidth(Number.NaN, 900)).toBe(PANE_WIDTH)
+    // A view too narrow for a column still answers with the minimum, never with a negative width.
+    expect(paneWidthRange(300)).toEqual({ min: PANE_MIN, max: PANE_MIN })
+    expect(clampPaneWidth(240, 300)).toBe(PANE_MIN)
+  })
+
+  test("the arrows step by 16 px, Shift by 64, and stop at the bounds", () => {
+    expect(stepPaneWidth(300, 1, 900)).toBe(316)
+    expect(stepPaneWidth(300, -1, 900)).toBe(284)
+    expect(stepPaneWidth(300, 1, 900, true)).toBe(364)
+    expect(stepPaneWidth(PANE_MIN, -1, 900)).toBe(PANE_MIN)
+    expect(stepPaneWidth(530, 1, 900)).toBe(540)
+    expect(stepPaneWidth(240, -1, 560)).toBe(PANE_MIN)
+  })
+})
+
+describe("sessions pane resize wiring", () => {
+  const app = readFileSync("packages/ui/src/App.svelte", "utf8")
+  const pane = readFileSync("packages/ui/src/components/SessionsPane.svelte", "utf8")
+
+  test("the pane's edge is a focusable separator with a value", () => {
+    expect(pane).toContain(`role="separator"`)
+    expect(pane).toContain(`aria-orientation="vertical"`)
+    expect(pane).toContain(`aria-label="Resize sessions list"`)
+    expect(pane).toContain("aria-valuenow={width}")
+    expect(pane).toContain("aria-valuemin={widthRange.min}")
+    expect(pane).toContain("aria-valuemax={widthRange.max}")
+    expect(pane).toContain(`tabindex="0"`)
+  })
+
+  test("pointer capture keeps the drag, and each frame moves a CSS variable", () => {
+    expect(pane).toContain("sash?.setPointerCapture(e.pointerId)")
+    expect(pane).toContain("onpointerdown={startDrag}")
+    expect(pane).toContain("onpointermove={moveDrag}")
+    expect(pane).toContain("onpointerup={endDrag}")
+    expect(pane).toContain("onlostpointercapture={endDrag}")
+    expect(pane).toContain("requestAnimationFrame")
+    expect(pane).toContain("--oc-pane-width")
+    expect(pane).toContain("width: var(--oc-pane-width, auto)")
+    // No text selection while dragging.
+    expect(pane).toContain(`document.body.style.userSelect = "none"`)
+    // VS Code's sash colours, and the resize cursor.
+    expect(pane).toContain("cursor: col-resize")
+    expect(pane).toContain("--vscode-sash-hoverBorder")
+  })
+
+  test("the arrows resize, and a double-click goes back to the default", () => {
+    expect(pane).toContain(`e.key !== "ArrowLeft" && e.key !== "ArrowRight"`)
+    expect(pane).toContain('stepPaneWidth(width, e.key === "ArrowRight" ? 1 : -1, viewWidth, e.shiftKey)')
+    expect(pane).toContain("ondblclick={() => setWidth(PANE_WIDTH)}")
+  })
+
+  test("the width lives in the webview state, next to the open/closed answer", () => {
+    expect(pane).toContain(`const WIDTH_KEY = "sessionsPaneWidth"`)
+    expect(pane).toContain("store.bridge.storage.get<number>(WIDTH_KEY)")
+    expect(pane).toContain("store.bridge.storage.set(WIDTH_KEY, wanted)")
+    // The host measures the view; the pane clamps its own width against it.
+    expect(app).toContain("viewWidth={shellWidth}")
+    expect(pane).toContain("clampPaneWidth(wanted, viewWidth)")
+  })
+
+  test("the overlay covers the chat, so it has no sash", () => {
+    expect(pane).toContain("{#if !overlay}")
   })
 })

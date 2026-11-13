@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **The sessions list beside the chat can be resized.** Drag the handle on its right edge, double-click it to go back to the default width, or focus it and use Left/Right (Shift for larger steps). It never gets narrower than a project header needs to show its folder, status, badge and name, and never wider than 60% of the view or the point where the chat would drop below its own usable width. The width is remembered per window, and a narrower window clamps it without losing the choice; on a narrow view the list still overlays the chat, with no handle.
+
 ## 0.3.18 (preview)
 
 - **A window with many folders is much lighter while a session streams.** The chat sends only the part of the state that changed instead of the whole state on every update, the sessions list keeps its rows when only the transcript moved, a long answer is re-rendered at most four times a second instead of on every delta, and clicking a session in another folder loads its transcript once. A reconnect now spreads the folders' startup requests instead of sending them all together, and a running command's mirror asks the server for its state less often. The Android app shares the lighter state handling.
