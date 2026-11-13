@@ -3,6 +3,7 @@
 ## Unreleased
 
 - **The sessions list beside the chat can be resized.** Drag the handle on its right edge, double-click it to go back to the default width, or focus it and use Left/Right (Shift for larger steps). It never gets narrower than a project header needs to show its folder, status, badge and name, and never wider than 60% of the view or the point where the chat would drop below its own usable width. The width is remembered per window, and a narrower window clamps it without losing the choice; on a narrow view the list still overlays the chat, with no handle.
+- Android app: starting a new session from a project's `+` in the drawer, from the chat's own `+` or with `/fork` no longer leaves the chat on "Loading…": the chat follows the session it moved to, and a session that never opens ends the wait after 8 seconds instead of waiting forever.
 
 ## 0.3.18 (preview)
 
