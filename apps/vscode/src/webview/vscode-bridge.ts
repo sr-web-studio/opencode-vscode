@@ -68,6 +68,7 @@ export function createVsCodeBridge(): HostBridge {
         window.addEventListener("message", listener)
         host({ type: "pickFiles", requestID })
       }),
+    exportSession: () => host({ type: "exportSession" }),
     openExternal: (url) => host({ type: "openExternal", url }),
     notify: (level, message) => host({ type: "notify", level, message }),
     voice: () => host({ type: "voice" }),

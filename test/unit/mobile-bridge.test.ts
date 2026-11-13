@@ -63,6 +63,7 @@ function recordingHost(answers: { revert?: boolean; del?: boolean } = {}) {
     showTerminal: rec("showTerminal") as any,
     openWorker: rec("openWorker") as any,
     pickFiles: (async () => [{ uri: "data:text/plain;base64,aGk=", name: "a.txt", mime: "text/plain" }]) as any,
+    exportSession: rec("exportSession") as any,
     confirmRevert: (async () => (log.push(["confirmRevert"]), answers.revert ?? false)) as any,
     confirmDeleteSession: (async (t: string) => (log.push(["confirmDeleteSession", t]), answers.del ?? false)) as any,
     openExternal: rec("openExternal") as any,
@@ -207,11 +208,12 @@ describe("in-process bridge", () => {
     b.postToHost({ type: "host", request: { type: "reconnect" } })
     b.postToHost({ type: "host", request: { type: "confirmRevert", messageID: "m" } })
     b.postToHost({ type: "host", request: { type: "confirmDeleteSession", sessionID: "ses_b", title: "T" } })
+    b.postToHost({ type: "host", request: { type: "exportSession" } })
     // The VS Code only ones are ignored without a crash.
     b.postToHost({ type: "host", request: { type: "openGlobalConfig" } })
     b.postToHost({ type: "host", request: { type: "setCliPath" } })
     await settle()
-    expect(log.map((l) => l[0])).toEqual(["openFile", "openWorker", "showTerminal", "reconnect", "confirmRevert", "confirmDeleteSession"])
+    expect(log.map((l) => l[0])).toEqual(["openFile", "openWorker", "showTerminal", "reconnect", "confirmRevert", "confirmDeleteSession", "exportSession"])
     expect(log[2]).toEqual(["showTerminal", "s1", undefined, "ses_a"])
     expect(dispatched).toEqual([
       { type: "revert", messageID: "m" },

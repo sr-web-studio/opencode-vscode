@@ -1,6 +1,8 @@
 import * as vscode from "vscode"
+import type { Controller } from "@occ/core/controller"
 import { mimeFromName } from "@occ/core/attachments"
 import { isAbsolutePath } from "@occ/core/paths"
+import { EXPORT_FORMATS } from "@occ/core/session-export"
 import type { HostRequest, PickedFile, ToWebview } from "@occ/core/protocol"
 import type { WorkerPanels } from "./workers"
 import type { ShellTerminals } from "./terminal"
@@ -30,6 +32,8 @@ export class HostActions {
     private readonly images: () => ImagePreviews,
     private readonly diffs: () => DiffViews,
     private readonly renameProject: (directory: string) => void,
+    /** The controller of a folder, for `/export` (it reads the session; the host only saves the file). */
+    private readonly controllerAt: (directory: string) => Controller | undefined,
   ) {}
 
   /** Used by the diff views to find a file of the project. */
@@ -56,7 +60,9 @@ export class HostActions {
                 ? "Could not open the diff"
                 : req.type === "renameProject"
                   ? "Could not rename the project"
-                  : "OpenCode could not do that"
+                  : req.type === "exportSession"
+                    ? "Could not export the session"
+                    : "OpenCode could not do that"
       void vscode.window.showErrorMessage(`${what}: ${e instanceof Error ? e.message : "unknown error"}`)
     }
   }
@@ -84,6 +90,8 @@ export class HostActions {
         return this.workers().open(req.id, req.readOnly)
       case "pickFiles":
         return this.pickFiles(req.requestID, surface)
+      case "exportSession":
+        return this.exportSession(surface)
       case "confirmRevert":
         return this.confirmRevert(req.messageID, surface)
       case "confirmDeleteSession":
@@ -154,6 +162,40 @@ export class HostActions {
       return { uri: uri.toString(), name, mime: mimeFromName(name) }
     })
     surface.post({ type: "picked", requestID, files })
+  }
+
+  /**
+   * `/export`: a quick pick for the format, then VS Code's save dialog in the session's folder. A running session is
+   * exported as it stands, and the notice says so. The file is the session's own content: no server setting, token or
+   * path outside the transcript is written.
+   */
+  private async exportSession(surface: Surface): Promise<void> {
+    const directory = this.folder(surface)
+    const controller = this.controllerAt(directory)
+    if (!controller?.currentSessionID) {
+      void vscode.window.showInformationMessage("Nothing to export yet.")
+      return
+    }
+    const picked = await vscode.window.showQuickPick(
+      EXPORT_FORMATS.map((f) => ({ label: f.label, description: f.description, format: f.format, extension: f.extension })),
+      { title: "Export session", placeHolder: "Choose a format" },
+    )
+    if (!picked) return
+    const file = await controller.exportSession(picked.format)
+    const target = await vscode.window.showSaveDialog({
+      defaultUri: vscode.Uri.joinPath(vscode.Uri.file(directory), file.filename),
+      filters: { [picked.label]: [picked.extension] },
+      saveLabel: "Export",
+      title: "Export session",
+    })
+    if (!target) return
+    await vscode.workspace.fs.writeFile(target, new TextEncoder().encode(file.content))
+    const name = target.path.split("/").pop() || file.filename
+    const note = file.running ? `Session exported to ${name}. It is still running, so the file holds what was written so far.` : `Session exported to ${name}.`
+    const open = "Open"
+    void vscode.window.showInformationMessage(note, open).then((choice) => {
+      if (choice === open) void vscode.commands.executeCommand("vscode.open", target)
+    })
   }
 
   private async confirmRevert(messageID: string, surface: Surface): Promise<void> {
