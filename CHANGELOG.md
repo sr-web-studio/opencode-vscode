@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **The Active section can be made taller.** Dragging the bar above it upwards did nothing while its rows already fitted, because the section only ever shrank to its content. It now keeps the height you drag it to, and the empty room stays below the rows. Folding the section away still leaves only its header. This applies to the VS Code sessions pane and the Android drawer.
+
 ## 0.3.20 (preview)
 
 - **An Active section at the bottom of the sessions list.** In a window with two or more folders, the sessions list ends with an **Active (N)** section that collects, across every project, the sessions waiting for you, the ones still running, the ones that failed or finished while you were away, and the most recently active ones: five rows in all, and never fewer than the ones that need you. Each row names its project, opens its session in the folder that owns it, and keeps the rename and delete actions of a normal row. Drag the bar above it to resize it, double-click to go back to the default, or focus it and use Up/Down; the height is remembered, the section shrinks to its content, and a search hides it. The Android drawer has the same section with a finger-sized handle, remembered per server for the collapsed state.
