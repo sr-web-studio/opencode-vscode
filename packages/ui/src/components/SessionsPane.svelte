@@ -3,10 +3,12 @@
   import type { AppState } from "@occ/core/protocol"
   import { statusLabel, unreadCount, type SessionStatus } from "@occ/core/session-status"
   import { applyPaneOrder, clampPaneWidth, filterPane, freezePane, PANE_WIDTH, PaneMemo, paneWidthRange, stepPaneWidth, type FrozenPane, type PaneProject, type PaneRow } from "@occ/core/sessions-pane"
+  import { applyInboxOrder, buildInbox, clampInboxHeight, freezeInbox, inboxCandidates, inboxDefaultHeight, showInbox, type FrozenInbox, type InboxRow } from "@occ/core/sessions-inbox"
   import { workerLabel } from "@occ/core/worker-activity"
   import { useStore } from "../context"
   import { focusGuarded } from "../focus"
   import Codicon from "./Codicon.svelte"
+  import SessionsInbox from "./SessionsInbox.svelte"
 
   /**
    * The sessions list inside the chat, like Copilot Chat's: a column on the left when the view is wide enough, an
@@ -31,6 +33,8 @@
   let toggled = $state<Record<string, boolean>>({})
   let now = $state(Date.now())
   let frozen = $state<FrozenPane>()
+  /** The inbox's own frozen ids: the project list holds its rows still, the inbox holds its shortcut still. */
+  let frozenInbox = $state<FrozenInbox>()
   /** The row whose title is being edited (pencil, F2). */
   let editing = $state<{ id: string; value: string } | undefined>()
   let editInput: HTMLInputElement | undefined = $state()
@@ -109,6 +113,38 @@
     document.body.style.cursor = ""
   })
 
+  /* ---------------------------------------------------------- inbox height */
+
+  /**
+   * The inbox height is remembered in the webview's state, next to the pane width: a saved height is only the user's
+   * choice, and the current view clamps it, so a smaller window does not throw it away.
+   */
+  const INBOX_HEIGHT_KEY = "inboxHeight"
+  const INBOX_COLLAPSED_KEY = "inboxCollapsed"
+  const storedInboxHeight = store.bridge.storage.get<number>(INBOX_HEIGHT_KEY)
+  let wantedInbox = $state(typeof storedInboxHeight === "number" && Number.isFinite(storedInboxHeight) ? storedInboxHeight : inboxDefaultHeight())
+  let inboxCollapsed = $state(store.bridge.storage.get<boolean>(INBOX_COLLAPSED_KEY) ?? false)
+  /** The pane's height and its header's, so the resize range knows how much room the list area really has. */
+  let paneHeight = $state(0)
+  let headHeight = $state(0)
+  const listArea = $derived(Math.max(0, paneHeight - headHeight))
+  const inboxHeight = $derived(clampInboxHeight(wantedInbox, listArea))
+
+  function setInboxHeight(next: number): void {
+    wantedInbox = clampInboxHeight(next, listArea)
+  }
+
+  /** Keep the height the user stopped on; the frames during a drag only move the section. */
+  function commitInboxHeight(next: number): void {
+    setInboxHeight(next)
+    store.bridge.storage.set(INBOX_HEIGHT_KEY, wantedInbox)
+  }
+
+  function toggleInbox(): void {
+    inboxCollapsed = !inboxCollapsed
+    store.bridge.storage.set(INBOX_COLLAPSED_KEY, inboxCollapsed)
+  }
+
   $effect(() => {
     const timer = setInterval(() => (now = Date.now()), 30_000)
     return () => clearInterval(timer)
@@ -129,9 +165,16 @@
     void query
     if (!loadedAll) return
     frozen = untrack(() => freezePane(layout))
+    // The inbox holds its own rows still too, so a session that becomes urgent while the pane is open does not jump.
+    frozenInbox = untrack(() => freezeInbox(inboxRows))
   })
   const ordered = $derived(frozen ? applyPaneOrder(layout, frozen) : layout)
   const shown = $derived(filterPane(ordered, query))
+  /** The inbox reads the same visible rows as the project list; the project list itself keeps every row in place. */
+  const inboxGroups = $derived(shown.kind === "projects" ? shown.projects.map((project) => ({ name: project.name, rows: project.sessions.map((row) => ({ ...row, last: row.updated })) })) : [])
+  const inboxRows = $derived(buildInbox(inboxCandidates(inboxGroups)))
+  const inbox = $derived(frozenInbox ? applyInboxOrder(inboxRows, frozenInbox) : inboxRows)
+  const inboxShown = $derived(showInbox(inboxGroups.length, query, inboxRows))
   const anyLoading = $derived(!loadedAll)
   const totalUnread = $derived(
     shown.kind === "sessions"
@@ -142,8 +185,8 @@
   )
   const canRename = $derived(app.features.rename && !app.readOnly)
 
-  function rowLabel(row: PaneRow): string {
-    return [row.title, statusLabel(row.status), workerLabel(row.workers), row.description, row.archived ? "archived" : undefined, row.current ? "current session" : undefined]
+  function rowLabel(row: PaneRow & { project?: string }): string {
+    return [row.title, row.project, statusLabel(row.status), workerLabel(row.workers), row.description, row.archived ? "archived" : undefined, row.current ? "current session" : undefined]
       .filter(Boolean)
       .join(", ")
   }
@@ -285,8 +328,8 @@
   }
 </script>
 
-<div class="pane" class:overlay style:--oc-pane-width={overlay ? undefined : `${width}px`} bind:this={pane} aria-label="Sessions">
-  <header class="head">
+<div class="pane" class:overlay style:--oc-pane-width={overlay ? undefined : `${width}px`} bind:this={pane} bind:clientHeight={paneHeight} aria-label="Sessions">
+  <header class="head" bind:clientHeight={headHeight}>
     <span class="title"
       >Sessions{#if totalUnread > 0}<span class="badge" role="img" aria-label={`${totalUnread} unread`} title={`${totalUnread} unread`}>{totalUnread}</span>{/if}</span
     >
@@ -393,6 +436,9 @@
       {/each}
     {/if}
   </div>
+  {#if inboxShown}
+    <SessionsInbox rows={inbox} collapsed={inboxCollapsed} height={inboxHeight} viewHeight={listArea} ontoggle={toggleInbox} onheight={setInboxHeight} oncommit={commitInboxHeight} row={sessionRow} />
+  {/if}
   {#if !overlay}
     <!-- A resize sash is a real ARIA separator widget: focusable, with a value, and resized by the arrow keys. -->
     <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
@@ -430,7 +476,7 @@
   </span>
 {/snippet}
 
-{#snippet sessionRow(row: PaneRow)}
+{#snippet sessionRow(row: PaneRow & { project?: string })}
   <div
     class="row"
     class:current={row.current}
@@ -457,6 +503,7 @@
       />
     {:else}
       <span class="text">{row.title}</span>
+      {#if row.project}<span class="proj" title={row.project}>{row.project}</span>{/if}
       {#if row.workers > 0}
         <span class="workers" title={workerLabel(row.workers)} aria-hidden="true"><Codicon name="organization" /></span>
       {/if}
@@ -775,6 +822,19 @@
   .when {
     flex: none;
     font-size: 0.85em;
+  }
+  /* The inbox mixes projects, so its rows carry a small project name. It gives way before the title does. */
+  .proj {
+    flex: none;
+    max-width: 8em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.78em;
+    color: var(--oc-muted);
+  }
+  .row.current .proj {
+    color: var(--oc-selected-fg);
   }
   .del,
   .ren {
