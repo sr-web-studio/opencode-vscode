@@ -247,7 +247,12 @@ describe("inbox wiring", () => {
     expect(inbox).toContain("ondblclick={() => {")
     expect(inbox).toContain("oncommit(next)")
     expect(inbox).toContain("cursor: row-resize")
-    expect(inbox).toContain("max-height: var(--oc-inbox-height)")
+    // A fixed height, not a max-height: a max-height never grows past the rows, so dragging up looked dead.
+    expect(inbox).toContain("height: var(--oc-inbox-height)")
+    expect(inbox).not.toContain("max-height: var(--oc-inbox-height)")
+    expect(inbox).toMatch(/\.inbox\.collapsed \{\s*height: auto;/)
+    expect(drawer).not.toContain("max-height: var(--oc-inbox-height)")
+    expect(drawer).toContain(`class="inbox" class:collapsed={inboxCollapsed}`)
     expect(inbox).toContain("{@render row(entry)}")
   })
 

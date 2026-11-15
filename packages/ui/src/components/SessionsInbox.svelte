@@ -187,9 +187,13 @@
     display: flex;
     flex-direction: column;
     min-height: 0;
-    /* The section shrinks to its content and scrolls inside once the content is taller than the chosen height. */
-    max-height: var(--oc-inbox-height);
+    /* The section keeps the height the user dragged it to, empty room included, and scrolls inside past that. */
+    height: var(--oc-inbox-height);
     border-top: 1px solid var(--oc-hairline);
+  }
+  /* Folded away, only the header remains, whatever height was chosen. */
+  .inbox.collapsed {
+    height: auto;
   }
   .ihead {
     flex: none;
@@ -217,6 +221,7 @@
     white-space: nowrap;
   }
   .ilist {
+    flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
     padding-bottom: 0.25em;

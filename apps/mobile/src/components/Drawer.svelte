@@ -473,7 +473,7 @@
           <span class="grip" aria-hidden="true"></span>
         </div>
       {/if}
-      <section class="inbox" style:--oc-inbox-height={`${inboxHeight}px`} aria-label="Active sessions">
+      <section class="inbox" class:collapsed={inboxCollapsed} style:--oc-inbox-height={`${inboxHeight}px`} aria-label="Active sessions">
         <button class="ihead" onclick={toggleInbox} aria-expanded={!inboxCollapsed}>
           <Codicon name={inboxCollapsed ? "chevron-right" : "chevron-down"} />
           <span>Active ({inbox.length})</span>
@@ -764,14 +764,18 @@
   .isash:focus-visible {
     outline: none;
   }
-  /* The section shrinks to its content and scrolls inside once the content is taller than the chosen height. */
+  /* The section keeps the height the user dragged it to, empty room included, and scrolls inside past that. */
   .inbox {
     flex: none;
     display: flex;
     flex-direction: column;
     min-height: 0;
-    max-height: var(--oc-inbox-height);
+    height: var(--oc-inbox-height);
     border-top: 1px solid var(--oc-hairline);
+  }
+  /* Folded away, only the header remains, whatever height was chosen. */
+  .inbox.collapsed {
+    height: auto;
   }
   .ihead {
     flex: none;
@@ -787,6 +791,7 @@
     background: var(--oc-hover);
   }
   .ilist {
+    flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
