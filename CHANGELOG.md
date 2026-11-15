@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.20 (preview)
+
+- **An Active section at the bottom of the sessions list.** In a window with two or more folders, the sessions list ends with an **Active (N)** section that collects, across every project, the sessions waiting for you, the ones still running, the ones that failed or finished while you were away, and the most recently active ones: five rows in all, and never fewer than the ones that need you. Each row names its project, opens its session in the folder that owns it, and keeps the rename and delete actions of a normal row. Drag the bar above it to resize it, double-click to go back to the default, or focus it and use Up/Down; the height is remembered, the section shrinks to its content, and a search hides it. The Android drawer has the same section with a finger-sized handle, remembered per server for the collapsed state.
+
 ## 0.3.19 (preview)
 
 - **The sessions list beside the chat can be resized.** Drag the handle on its right edge, double-click it to go back to the default width, or focus it and use Left/Right (Shift for larger steps). It never gets narrower than a project header needs to show its folder, status, badge and name, and never wider than 60% of the view or the point where the chat would drop below its own usable width. The width is remembered per window, and a narrower window clamps it without losing the choice; on a narrow view the list still overlays the chat, with no handle.
