@@ -221,4 +221,19 @@
     overflow-y: auto;
     padding-bottom: 0.25em;
   }
+  /*
+   * An inbox row already carries a project name, so its rename and delete buttons wait for hover or keyboard focus:
+   * the title keeps their width instead of being cut to "Ship the s…". The project list above keeps its own rows as
+   * they are, because these rules only reach inside this section.
+   */
+  .inbox :global(.row .icon.ren),
+  .inbox :global(.row .icon.del) {
+    display: none;
+  }
+  .inbox :global(.row:hover .icon.ren),
+  .inbox :global(.row:hover .icon.del),
+  .inbox :global(.row:focus-within .icon.ren),
+  .inbox :global(.row:focus-within .icon.del) {
+    display: inline-flex;
+  }
 </style>
