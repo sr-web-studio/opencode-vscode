@@ -288,10 +288,10 @@ describe("inbox wiring", () => {
     expect(drawer).toContain("{@render sessionRow(session, session.directory, session.project)}")
   })
 
-  test("the changelog announces it for both hosts under Unreleased", () => {
-    const unreleased = changelog.indexOf("## Unreleased")
-    expect(unreleased).toBeGreaterThan(-1)
-    expect(unreleased).toBeLessThan(changelog.indexOf("## 0.3.19 (preview)"))
-    expect(changelog).toContain("An Active section at the bottom of the sessions list")
+  test("the changelog announces it in a section newer than 0.3.19", () => {
+    // Checks the position, not the heading, so the test survives "Unreleased" becoming a version at release time.
+    const entry = changelog.indexOf("An Active section at the bottom of the sessions list")
+    expect(entry).toBeGreaterThan(-1)
+    expect(entry).toBeLessThan(changelog.indexOf("## 0.3.19 (preview)"))
   })
 })
