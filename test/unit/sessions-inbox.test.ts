@@ -58,20 +58,44 @@ describe("inbox contents", () => {
   })
 
   test("more than five urgent sessions all stay; the recent group gets no room", () => {
-    const urgent = [...Array.from({ length: 6 }, (_, i) => row(`waiting-${i}`, "waiting", now - i * m)), ...Array.from({ length: 3 }, (_, i) => row(`running-${i}`, "running", now - (10 + i) * m))]
+    const urgent = [
+      ...Array.from({ length: 6 }, (_, i) => row(`waiting-${i}`, "waiting", now - i * m)),
+      ...Array.from({ length: 3 }, (_, i) => row(`running-${i}`, "running", now - (10 + i) * m)),
+      ...Array.from({ length: 2 }, (_, i) => row(`failed-${i}`, "failed", now - (20 + i) * m)),
+    ]
     const inbox = buildInbox([...urgent, row("read", "read", now)])
-    expect(inbox).toHaveLength(9)
+    expect(inbox).toHaveLength(11)
     expect(inbox.map((entry) => entry.id)).not.toContain("read")
   })
 
-  test("a failed turn fills by recency, like the existing status model says", () => {
-    // `failed` is not one of the three urgent groups: it is a finished turn, so it fills the recent rows.
-    expect(inboxRank({ status: "failed" })).toBe(3)
-    expect(inboxRank({ status: "read" })).toBe(3)
-    expect(inboxRank({ status: "unread" })).toBe(2)
-    expect(inboxRank({ status: "running" })).toBe(1)
+  test("failed sits between running and unread, in the shared status order", () => {
+    // The same order a project's badge uses (`STATUS_RANK`), so the two never disagree about what is urgent.
     expect(inboxRank({ status: "waiting" })).toBe(0)
-    expect(buildInbox([row("failed", "failed", now), row("unread", "unread", now - m)]).map((entry) => entry.id)).toEqual(["unread", "failed"])
+    expect(inboxRank({ status: "running" })).toBe(1)
+    expect(inboxRank({ status: "failed" })).toBe(2)
+    expect(inboxRank({ status: "unread" })).toBe(3)
+    expect(inboxRank({ status: "read" })).toBe(4)
+    expect(buildInbox([row("read", "read", now), row("unread", "unread", now - m), row("failed", "failed", now - 2 * m), row("running", "running", now - 3 * m)]).map((entry) => entry.id)).toEqual([
+      "running",
+      "failed",
+      "unread",
+      "read",
+    ])
+  })
+
+  test("a failed session is never cut, even when the urgent groups overflow", () => {
+    const rows = [
+      row("waiting", "waiting", now),
+      row("running", "running", now - m),
+      row("failed", "failed", now - 2 * m),
+      row("unread", "unread", now - 3 * m),
+      ...Array.from({ length: 5 }, (_, i) => row(`read-${i}`, "read", now - (4 + i) * m)),
+    ]
+    const inbox = buildInbox(rows)
+    expect(inbox).toHaveLength(INBOX_ROWS)
+    expect(inbox.map((entry) => entry.id)).toEqual(["waiting", "running", "failed", "unread", "read-0"])
+    // With four urgent rows and room for one, a second read row would push the failed row out if it were cuttable.
+    expect(buildInbox(rows, 3).map((entry) => entry.id)).toEqual(["waiting", "running", "failed", "unread"])
   })
 
   test("each row carries its project's name, because the inbox mixes projects", () => {
@@ -225,6 +249,14 @@ describe("inbox wiring", () => {
     expect(inbox).toContain("cursor: row-resize")
     expect(inbox).toContain("max-height: var(--oc-inbox-height)")
     expect(inbox).toContain("{@render row(entry)}")
+  })
+
+  test("the editor's inbox rows reveal their actions on hover or focus, so the title keeps the room", () => {
+    // Scoped inside the section: the project list above keeps its always-visible buttons.
+    expect(inbox).toContain(".inbox :global(.row .icon.ren),")
+    expect(inbox).toContain(".inbox :global(.row:hover .icon.ren),")
+    expect(inbox).toContain(".inbox :global(.row:focus-within .icon.ren),")
+    expect(inbox).toContain(".inbox :global(.row .icon.del) {")
   })
 
   test("the phone remembers the height per app and the collapse per server", () => {

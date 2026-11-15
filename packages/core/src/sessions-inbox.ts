@@ -9,11 +9,13 @@
  *
  *   1. `waiting` — a permission request or a question is open.
  *   2. `running` — a turn is busy or retrying.
- *   3. `unread`  — the last turn finished and the user has not looked at it since.
- *   4. everything else, newest activity first.
+ *   3. `failed`  — the last turn ended `failed` and the user has not looked at it since.
+ *   4. `unread`  — the last turn finished and the user has not looked at it since.
+ *   5. everything else, newest activity first.
  *
- * Groups 1–3 are never cut: a morning with six blocked sessions shows six rows. Only group 4 fills the rest up to
- * `INBOX_ROWS`, so a quiet inbox stays short.
+ * Groups 1–4 are never cut: a morning with six blocked sessions shows six rows. Only group 5 fills the rest up to
+ * `INBOX_ROWS`, so a quiet inbox stays short. The order is the shared status order (`STATUS_RANK`), so the inbox and
+ * a project's own badge agree on what needs the user most.
  *
  * Placement is frozen while the pane or drawer is open, exactly like the project list: rows already in the inbox keep
  * their place when a live event makes one urgent, new rows are slotted in by the current order and gone ones disappear.
@@ -27,6 +29,9 @@ import { stableOrder } from "./stable-order"
 
 /** How many rows the inbox holds when the urgent groups leave room for the recent ones. */
 export const INBOX_ROWS = 5
+
+/** The rank that starts the cuttable tail: `read` and nothing else. */
+const TAIL_RANK = 4
 
 /** The parts of a row the inbox reads: its identity, its title, its status and when it last changed. */
 export type InboxItem = { id: string; title: string; status: SessionStatus; last: number }
@@ -42,16 +47,17 @@ export function inboxCandidates<T extends InboxItem>(groups: readonly InboxGroup
   return groups.flatMap((group) => group.rows.map((row) => ({ ...row, project: group.name })))
 }
 
-/** Lower is listed earlier: what needs the user, what runs, what finished unseen, then everything else. */
+/** Lower is listed earlier: what needs the user, what runs, what failed unseen, what finished unseen, then the rest. */
 export function inboxRank(row: Pick<InboxItem, "status">): number {
   const status: SessionStatus = row.status
   if (status === "waiting") return 0
   if (status === "running") return 1
-  if (status === "unread") return 2
-  return 3
+  if (status === "failed") return 2
+  if (status === "unread") return 3
+  return TAIL_RANK
 }
 
-/** The inbox's own order: the four groups above, newest activity first inside each, then title and id. */
+/** The inbox's own order: the five groups above, newest activity first inside each, then title and id. */
 function compareInbox<T extends InboxItem>(a: InboxRow<T>, b: InboxRow<T>): number {
   const byRank = inboxRank(a) - inboxRank(b)
   if (byRank) return byRank
@@ -62,13 +68,13 @@ function compareInbox<T extends InboxItem>(a: InboxRow<T>, b: InboxRow<T>): numb
 }
 
 /**
- * The rows the inbox shows. Groups 1–3 all stay; group 4 is cut so the whole list holds `total` rows. A row that is
+ * The rows the inbox shows. Groups 1–4 all stay; group 5 is cut so the whole list holds `total` rows. A row that is
  * no longer in `rows` (archived, deleted, filtered by the host) is not invented here.
  */
 export function buildInbox<T extends InboxItem>(rows: readonly InboxRow<T>[], total = INBOX_ROWS): InboxRow<T>[] {
   const sorted = [...rows].sort(compareInbox)
-  const urgent = sorted.filter((row) => inboxRank(row) < 3)
-  const rest = sorted.filter((row) => inboxRank(row) === 3)
+  const urgent = sorted.filter((row) => inboxRank(row) < TAIL_RANK)
+  const rest = sorted.filter((row) => inboxRank(row) === TAIL_RANK)
   const room = Math.max(0, total - urgent.length)
   return [...urgent, ...rest.slice(0, room)]
 }
