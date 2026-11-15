@@ -3,6 +3,7 @@
 ## Unreleased
 
 - **The Active section can be made taller.** Dragging the bar above it upwards did nothing while its rows already fitted, because the section only ever shrank to its content. It now keeps the height you drag it to, and the empty room stays below the rows. Folding the section away still leaves only its header. This applies to the VS Code sessions pane and the Android drawer.
+- **The agent list no longer spreads across the window when an agent has a long description.** The popover stays inside the prompt box column instead of growing past it and adding a horizontal scrollbar, each agent shows its name with the description on a muted second line clamped to two lines (the full text is in the row's tooltip), and the model list shortens a long name with an ellipsis rather than overflowing. This applies to the VS Code extension and the Android app.
 
 ## 0.3.20 (preview)
 

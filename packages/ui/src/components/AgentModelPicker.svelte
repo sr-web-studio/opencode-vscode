@@ -126,11 +126,23 @@
     <div class="pop scroll" role="listbox" tabindex="0" bind:this={list} onkeydown={onkey}>
       {#each app.agents as a, i (a.id)}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <div class="row" class:sel={i === index} role="option" tabindex="-1" aria-selected={a.id === app.agent} onclick={() => chooseAgent(a.id)} onmousemove={() => (index = i)}>
+        <div
+          class="row agent"
+          class:sel={i === index}
+          role="option"
+          tabindex="-1"
+          aria-selected={a.id === app.agent}
+          title={a.description || undefined}
+          onclick={() => chooseAgent(a.id)}
+          onmousemove={() => (index = i)}
+        >
           <span class="check"
             >{#if a.id === app.agent}<Codicon name="check" />{/if}</span
           >
-          <span class="n">{displayName(a.name || a.id)}</span>{#if a.description}<span class="muted d"> — {a.description}</span>{/if}
+          <span class="txt">
+            <span class="n">{displayName(a.name || a.id)}</span>
+            {#if a.description}<span class="muted d">{a.description}</span>{/if}
+          </span>
         </div>
       {:else}
         <div class="muted pad">No agents available</div>
@@ -162,7 +174,7 @@
               <span class="check"
                 >{#if current}<Codicon name="check" />{/if}</span
               >
-              <span class="n">{m.name}</span>
+              <span class="n mname" title={m.name}>{m.name}</span>
               <button
                 class="pin"
                 class:on={isPinned}
@@ -248,8 +260,10 @@
     bottom: 100%;
     left: 0;
     z-index: 30;
-    min-width: 18em;
-    max-width: calc(100vw - 1.5em);
+    /* Never wider than the prompt column it hangs from: a long agent description used to push it past the editor. */
+    width: max-content;
+    min-width: min(18em, 100%);
+    max-width: 100%;
     margin-bottom: 0.3em;
     background: var(--oc-popover);
     border: 1px solid var(--oc-hairline);
@@ -275,32 +289,61 @@
   .group {
     font-size: 0.9em;
     padding: 0.45em 0.8em 0.1em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .row {
     display: flex;
     align-items: baseline;
     gap: 0.4em;
     padding: 0.2em 0.8em;
+    min-height: var(--oc-popup-row, 24px);
     cursor: pointer;
   }
   .row.sel {
     background: var(--oc-hover);
+  }
+  .row.agent {
+    align-items: flex-start;
   }
   .check {
     width: 1em;
     color: var(--oc-accent);
     flex: none;
   }
+  /* The agent's name over its description, both inside the row's width so the popover cannot grow sideways. */
+  .txt {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
   .d {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    line-height: 1.4;
+  }
+  .n {
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .n {
-    white-space: nowrap;
+  /* The model's name keeps a readable width; the variants move to a second line instead of squeezing it away. */
+  .mname {
+    min-width: 6em;
   }
   .vars {
     margin-left: auto;
+    flex: 0 1 auto;
+    min-width: 0;
+    flex-wrap: wrap;
+    justify-content: flex-end;
     display: flex;
     gap: 0.5em;
     padding-left: 1em;
@@ -308,6 +351,7 @@
   .var {
     color: var(--oc-muted);
     font-size: 0.92em;
+    white-space: nowrap;
   }
   .var:hover {
     color: var(--oc-fg);
