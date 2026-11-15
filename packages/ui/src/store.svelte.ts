@@ -1,5 +1,5 @@
 import type { Action, AppState, FolderSessions, ToWebview } from "@occ/core/protocol"
-import { applyStatePatch, type StatePatch } from "@occ/core/state-post"
+import { applyFolderSessions, applyStatePatch, type StatePatch } from "@occ/core/state-post"
 import type { HostBridge } from "./bridge"
 
 /** Reactive view of the host's state plus a typed `dispatch`. One per webview. */
@@ -21,7 +21,7 @@ export class Store {
       else if (m.type === "folders") {
         // A folder the view is not showing changed: only the dropdown's dots need the update, not the active state.
         if (this.state) this.state = { ...this.state, folders: m.folders }
-      } else if (m.type === "folderSessions") this.folderSessions = m.folders
+      } else if (m.type === "folderSessions") this.folderSessions = applyFolderSessions(this.folderSessions, m.folders, m.partial === true)
       else if (m.type === "command" && m.name === "newSession") this.newSessionTick++
       else if (m.type === "command" && m.name === "toggleSessions") this.sessionsTick++
       else if (m.type === "dictation") for (const h of this.dictationHandlers) h(m)

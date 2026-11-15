@@ -4,6 +4,7 @@
 
 - **The Active section can be made taller.** Dragging the bar above it upwards did nothing while its rows already fitted, because the section only ever shrank to its content. It now keeps the height you drag it to, and the empty room stays below the rows. Folding the section away still leaves only its header. This applies to the VS Code sessions pane and the Android drawer.
 - **The agent list no longer spreads across the window when an agent has a long description.** The popover stays inside the prompt box column instead of growing past it and adding a horizontal scrollbar, each agent shows its name with the description on a muted second line clamped to two lines (the full text is in the row's tooltip), and the model list shortens a long name with an ellipsis rather than overflowing. This applies to the VS Code extension and the Android app.
+- **Much less traffic between VS Code and the chat while a session streams.** An answer used to send its whole growing text to the chat on every update (about 9 kB, twenty times a second); now only the new words travel, and the sessions list sends only the folders whose list changed. In a measured eight-folder window a ten-second stream went from 2.2 MB (215 kB/s) to 88 kB (8.6 kB/s). This matters most when VS Code runs on a remote machine and the chat is on your own computer over a slow connection.
 
 ## 0.3.20 (preview)
 

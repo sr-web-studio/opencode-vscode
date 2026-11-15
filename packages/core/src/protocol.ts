@@ -254,7 +254,15 @@ export type ToWebview =
   /** A light refresh of the folder dropdown (busy/attention dots) when a folder the view is not showing changes. */
   | { type: "folders"; folders: FolderInfo[] }
   /** The root sessions of every folder, for the in-chat sessions pane (multi-root windows). */
-  | { type: "folderSessions"; folders: FolderSessions[] }
+  | {
+      type: "folderSessions"
+      folders: FolderSessions[]
+      /**
+       * Only the folders whose summary changed; the webview swaps those into the list it holds. Absent for a full post:
+       * the first one, one after the view was hidden, and whenever a folder was added or removed.
+       */
+      partial?: boolean
+    }
   | { type: "command"; name: "newSession" | "toggleSessions" }
   | { type: "picked"; requestID: string; files: PickedFile[] }
   /** The answer to `imageData`: a `data:` URI, or nothing when the image is gone or unreadable. */
