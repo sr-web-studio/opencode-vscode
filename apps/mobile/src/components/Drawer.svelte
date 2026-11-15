@@ -6,12 +6,47 @@
   import type { ActivityState } from "@occ/core/activity-order"
   import { statusLabel, type SessionStatus } from "@occ/core/session-status"
   import { workerLabel } from "@occ/core/worker-activity"
-  import { applyFrozenOrder, buildOverview, filterOverview, freezeOrder, splitEmptyProjects, type FrozenOrder, type OverviewGroup } from "../lib/overview"
-  import { expandedKey, isExpanded, parseExpanded, parseShowEmpty, serializeShowEmpty, setExpanded, showEmptyKey } from "../lib/drawer-prefs"
+  import {
+    applyInboxOrder,
+    buildInbox,
+    clampInboxHeight,
+    freezeInbox,
+    inboxCandidates,
+    inboxDefaultHeight,
+    inboxHeightRange,
+    showInbox,
+    stepInboxHeight,
+    type FrozenInbox,
+    type InboxSizing,
+  } from "@occ/core/sessions-inbox"
+  import { applyFrozenOrder, buildOverview, filterOverview, freezeOrder, splitEmptyProjects, type FrozenOrder, type OverviewGroup, type OverviewSessionRow } from "../lib/overview"
+  import {
+    expandedKey,
+    inboxCollapsedKey,
+    isExpanded,
+    parseExpanded,
+    parseInboxCollapsed,
+    parseInboxHeight,
+    parseShowEmpty,
+    serializeInboxCollapsed,
+    serializeInboxHeight,
+    serializeShowEmpty,
+    setExpanded,
+    showEmptyKey,
+    INBOX_HEIGHT_KEY,
+  } from "../lib/drawer-prefs"
   import { model } from "../model.svelte"
 
   /** What one opening of the drawer holds still: the row ids, and which projects were open by default then. */
   type Freeze = { order: FrozenOrder; open: Record<string, boolean> }
+
+  /**
+   * The phone's rows are finger-sized, so the inbox is measured from them instead of the editor's 28 px rows: five
+   * rows plus the header by default, two rows at least, and the 48 dp handle shares the room with the list. An inbox
+   * row always carries the project name on its second line, so it measures about 58 px (the 50 px row plus that line
+   * and its border); 59 leaves the last row's border visible.
+   */
+  const PHONE_INBOX: InboxSizing = { row: 59, header: 48, minRows: 2, rows: 5, projectMin: 120, sash: 48 }
 
   /** The one list of every project and its root sessions, opened from the top bar. */
   let query = $state("")
@@ -24,6 +59,26 @@
   /** Archived sessions are the exception, not the rule: hidden on every start, like the editor's sessions pane. */
   let showArchived = $state(false)
   let frozen = $state<Freeze>()
+  /** The inbox holds its own rows still, separately from the project list. */
+  let frozenInbox = $state<FrozenInbox>()
+  /** The inbox's height and collapse, remembered like the rest of the drawer's answers. */
+  let inboxHeightWanted = $state(readInboxHeight())
+  let inboxCollapsed = $state(false)
+  /** The drawer's height and its chrome, so the resize range knows how much room the list area really has. */
+  let drawerHeight = $state(0)
+  let headHeight = $state(0)
+  let searchHeight = $state(0)
+  let footHeight = $state(0)
+  const listArea = $derived(Math.max(0, drawerHeight - headHeight - searchHeight - footHeight))
+  const inboxHeight = $derived(clampInboxHeight(inboxHeightWanted, listArea, PHONE_INBOX))
+
+  function readInboxHeight(): number {
+    try {
+      return parseInboxHeight(localStorage.getItem(INBOX_HEIGHT_KEY)) ?? inboxDefaultHeight(PHONE_INBOX)
+    } catch {
+      return inboxDefaultHeight(PHONE_INBOX)
+    }
+  }
 
   const reduce = typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
   const duration = reduce ? 0 : 200
@@ -35,6 +90,12 @@
   const matched = $derived(filterOverview(groups, query))
   /** A search looks everywhere; without one the folders with no sessions wait behind the toggle at the end. */
   const split = $derived(query.trim() ? { listed: matched, empty: [] as OverviewGroup[] } : splitEmptyProjects(matched, model.currentDirectory))
+  /** The inbox reads the same rows the drawer lists; the project list keeps every row where it was. */
+  const inboxGroups = $derived(groups.map((group) => ({ name: group.title, rows: group.sessions })))
+  const inboxRows = $derived(buildInbox(inboxCandidates(inboxGroups)))
+  const inbox = $derived(frozenInbox ? applyInboxOrder(inboxRows, frozenInbox) : inboxRows)
+  /** Two or more project groups, no search, and something to show: otherwise the drawer is unchanged. */
+  const inboxShown = $derived(showInbox(groups.length, query, inboxRows))
 
   $effect(() => {
     const timer = setInterval(() => (now = Date.now()), 30_000)
@@ -62,6 +123,17 @@
     }
     showEmpty = parseShowEmpty(raw)
   })
+  // And for the inbox's collapse: one server's list can be long while another's is not.
+  $effect(() => {
+    const key = inboxCollapsedKey(model.profile?.id ?? "")
+    let raw: string | null = null
+    try {
+      raw = localStorage.getItem(key)
+    } catch {
+      // Storage blocked: the section still collapses for this visit.
+    }
+    inboxCollapsed = parseInboxCollapsed(raw)
+  })
   $effect(() => {
     if (model.drawerOpen) void tick().then(() => panel?.focus())
     // Opening the drawer always shows every project; a filter left from last time would hide them without a reason.
@@ -81,12 +153,15 @@
   $effect(() => {
     if (!model.drawerOpen) {
       frozen = undefined
+      frozenInbox = undefined
       return
     }
     void query
     // Before the first snapshot there is no order to hold; take it as soon as the list exists.
     if (!hasData) return
     frozen = untrack(() => freeze(liveGroups))
+    // The inbox keeps its own rows still too: an urgent session does not jump under the finger mid-tap.
+    frozenInbox = untrack(() => freezeInbox(inboxRows))
   })
 
   function freeze(list: ReadonlyArray<OverviewGroup>): Freeze {
@@ -131,6 +206,75 @@
       // The switch still works for this visit.
     }
   }
+
+  /** Collapse or expand the Active section; the answer is remembered for this server. */
+  function toggleInbox(): void {
+    inboxCollapsed = !inboxCollapsed
+    try {
+      localStorage.setItem(inboxCollapsedKey(model.profile?.id ?? ""), serializeInboxCollapsed(inboxCollapsed))
+    } catch {
+      // The section still collapses for this visit.
+    }
+  }
+
+  let inboxSash = $state<HTMLDivElement>()
+  let inboxDrag: { pointer: number; startY: number; startHeight: number } | undefined
+  let inboxDragging = $state(false)
+  /** The drag's latest height, applied once per animation frame so a fast finger never relayouts twice in a frame. */
+  let inboxPending = 0
+  let inboxFrame = 0
+
+  function startInboxDrag(e: PointerEvent): void {
+    if (e.button !== 0) return
+    // Capture keeps the drag on the handle and touch-action: none keeps the drawer from scrolling under it.
+    e.preventDefault()
+    inboxDrag = { pointer: e.pointerId, startY: e.clientY, startHeight: inboxHeight }
+    inboxPending = inboxHeight
+    inboxDragging = true
+    inboxSash?.setPointerCapture(e.pointerId)
+  }
+
+  function moveInboxDrag(e: PointerEvent): void {
+    if (!inboxDrag || e.pointerId !== inboxDrag.pointer) return
+    // Dragging towards the top makes the section taller, like the editor's handle.
+    inboxPending = clampInboxHeight(inboxDrag.startHeight + inboxDrag.startY - e.clientY, listArea, PHONE_INBOX)
+    if (inboxFrame) return
+    inboxFrame = requestAnimationFrame(() => {
+      inboxFrame = 0
+      inboxHeightWanted = inboxPending
+    })
+  }
+
+  function endInboxDrag(): void {
+    if (!inboxDrag) return
+    inboxDrag = undefined
+    inboxDragging = false
+    if (inboxFrame) cancelAnimationFrame(inboxFrame)
+    inboxFrame = 0
+    // Persist once, on release: the frames in between only move the section.
+    setInboxHeight(inboxPending)
+  }
+
+  function inboxKey(e: KeyboardEvent): void {
+    if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return
+    e.preventDefault()
+    e.stopPropagation()
+    setInboxHeight(stepInboxHeight(inboxHeight, e.key === "ArrowUp" ? 1 : -1, listArea, e.shiftKey, PHONE_INBOX))
+  }
+
+  /** Back to the header plus five rows, like a double-click on the editor's handle. */
+  function resetInboxHeight(): void {
+    setInboxHeight(inboxDefaultHeight(PHONE_INBOX))
+  }
+
+  function setInboxHeight(next: number): void {
+    inboxHeightWanted = clampInboxHeight(next, listArea, PHONE_INBOX)
+    try {
+      localStorage.setItem(INBOX_HEIGHT_KEY, serializeInboxHeight(inboxHeightWanted))
+    } catch {
+      // The height still applies for this visit.
+    }
+  }
 </script>
 
 {#snippet stateIcon(status: SessionStatus)}
@@ -141,6 +285,58 @@
     {:else if status === "unread"}<Codicon name="circle-filled" />
     {:else}<Codicon name="check" />{/if}
   </span>
+{/snippet}
+
+{#snippet sessionRow(session: OverviewSessionRow, directory: string, project?: string)}
+  <div class="srow-wrap" class:archived={session.archived}>
+    <button
+      class="srow"
+      onclick={() => model.openSession(directory, session.id)}
+      aria-label={`${session.title}, ${project ? `${project}, ` : ""}${statusLabel(session.status)}${session.workers > 0 ? `, ${workerLabel(session.workers)}` : ""}${session.archived ? ", archived" : ""}`}
+    >
+      {@render stateIcon(session.status)}
+      <span class="main">
+        <span class="t" class:unread={session.status === "unread"}>{session.title}</span>
+        {#if project || session.workers > 0 || statusText(session.status)}
+          <span class="s">
+            {#if project}<span class="proj">{project}</span>{/if}
+            {#if project && (session.workers > 0 || statusText(session.status))}
+              ·
+            {/if}
+            {#if session.workers > 0}<span class="workers"><Codicon name="organization" /> {workerLabel(session.workers)}</span>{/if}
+            {#if session.workers > 0 && statusText(session.status)}
+              ·
+            {/if}
+            {statusText(session.status) ?? ""}
+          </span>
+        {/if}
+      </span>
+      <span class="end">{relativeTime(session.last, now)}</span>
+    </button>
+    <button class="iconbtn more" onclick={() => (actionsFor = actionsFor === session.id ? undefined : session.id)} aria-expanded={actionsFor === session.id} aria-label={`Actions for ${session.title}`}
+      ><Codicon name="kebab-vertical" /></button
+    >
+  </div>
+  {#if actionsFor === session.id}
+    <div class="rowactions">
+      <button
+        class="abtn"
+        onclick={() => {
+          actionsFor = undefined
+          void model.renameSession(session.id, session.title)
+        }}><Codicon name="edit" /> Rename</button
+      >
+      {#if session.state === "idle"}
+        <button
+          class="abtn danger"
+          onclick={() => {
+            actionsFor = undefined
+            void model.deleteSession(directory, session.id, session.title)
+          }}><Codicon name="trash" /> Delete</button
+        >
+      {/if}
+    </div>
+  {/if}
 {/snippet}
 
 {#snippet project(group: OverviewGroup)}
@@ -173,54 +369,7 @@
         <div class="empty">{group.sessionCount === 0 ? "No sessions yet" : "No active sessions"}</div>
       {:else}
         {#each group.sessions as session (session.id)}
-          <div class="srow-wrap" class:archived={session.archived}>
-            <button
-              class="srow"
-              onclick={() => model.openSession(group.directory, session.id)}
-              aria-label={`${session.title}, ${statusLabel(session.status)}${session.workers > 0 ? `, ${workerLabel(session.workers)}` : ""}${session.archived ? ", archived" : ""}`}
-            >
-              {@render stateIcon(session.status)}
-              <span class="main">
-                <span class="t" class:unread={session.status === "unread"}>{session.title}</span>
-                {#if session.workers > 0 || statusText(session.status)}
-                  <span class="s">
-                    {#if session.workers > 0}<span class="workers"><Codicon name="organization" /> {workerLabel(session.workers)}</span>{/if}
-                    {#if session.workers > 0 && statusText(session.status)}
-                      ·
-                    {/if}
-                    {statusText(session.status) ?? ""}
-                  </span>
-                {/if}
-              </span>
-              <span class="end">{relativeTime(session.last, now)}</span>
-            </button>
-            <button
-              class="iconbtn more"
-              onclick={() => (actionsFor = actionsFor === session.id ? undefined : session.id)}
-              aria-expanded={actionsFor === session.id}
-              aria-label={`Actions for ${session.title}`}><Codicon name="kebab-vertical" /></button
-            >
-          </div>
-          {#if actionsFor === session.id}
-            <div class="rowactions">
-              <button
-                class="abtn"
-                onclick={() => {
-                  actionsFor = undefined
-                  void model.renameSession(session.id, session.title)
-                }}><Codicon name="edit" /> Rename</button
-              >
-              {#if session.state === "idle"}
-                <button
-                  class="abtn danger"
-                  onclick={() => {
-                    actionsFor = undefined
-                    void model.deleteSession(group.directory, session.id, session.title)
-                  }}><Codicon name="trash" /> Delete</button
-                >
-              {/if}
-            </div>
-          {/if}
+          {@render sessionRow(session, group.directory)}
         {/each}
       {/if}
     {/if}
@@ -236,10 +385,11 @@
     aria-label="Projects and sessions"
     tabindex="-1"
     bind:this={panel}
+    bind:clientHeight={drawerHeight}
     transition:fly={{ x: -340, duration }}
     onkeydown={(e) => e.key === "Escape" && model.closeDrawer()}
   >
-    <header class="head">
+    <header class="head" bind:clientHeight={headHeight}>
       <div class="who">
         <span class="srv">{model.profile?.name ?? "Server"}</span>
         <span class="cap">Projects and sessions</span>
@@ -258,7 +408,7 @@
       <button class="iconbtn" onclick={() => model.closeDrawer()} aria-label="Close menu"><Codicon name="close" /></button>
     </header>
 
-    <div class="search">
+    <div class="search" bind:clientHeight={searchHeight}>
       <Codicon name="search" />
       <input type="search" bind:value={query} placeholder="Search projects and sessions" aria-label="Search projects and sessions" autocomplete="off" />
     </div>
@@ -296,7 +446,49 @@
       {/if}
     </div>
 
-    <footer class="foot">
+    {#if inboxShown}
+      <!-- The phone's handle is a finger-sized strip, not the editor's 6 px sash: a drag needs a real target. -->
+      {#if !inboxCollapsed}
+        <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
+        <div
+          class="isash"
+          class:dragging={inboxDragging}
+          role="separator"
+          tabindex="0"
+          aria-orientation="horizontal"
+          aria-label="Resize active sessions"
+          aria-valuenow={inboxHeight}
+          aria-valuemin={inboxHeightRange(listArea, PHONE_INBOX).min}
+          aria-valuemax={inboxHeightRange(listArea, PHONE_INBOX).max}
+          aria-valuetext={`${inboxHeight} pixels`}
+          bind:this={inboxSash}
+          onpointerdown={startInboxDrag}
+          onpointermove={moveInboxDrag}
+          onpointerup={endInboxDrag}
+          onpointercancel={endInboxDrag}
+          onlostpointercapture={endInboxDrag}
+          onkeydown={inboxKey}
+          ondblclick={resetInboxHeight}
+        >
+          <span class="grip" aria-hidden="true"></span>
+        </div>
+      {/if}
+      <section class="inbox" style:--oc-inbox-height={`${inboxHeight}px`} aria-label="Active sessions">
+        <button class="ihead" onclick={toggleInbox} aria-expanded={!inboxCollapsed}>
+          <Codicon name={inboxCollapsed ? "chevron-right" : "chevron-down"} />
+          <span>Active ({inbox.length})</span>
+        </button>
+        {#if !inboxCollapsed}
+          <div class="ilist">
+            {#each inbox as session (session.id)}
+              {@render sessionRow(session, session.directory, session.project)}
+            {/each}
+          </div>
+        {/if}
+      </section>
+    {/if}
+
+    <footer class="foot" bind:clientHeight={footHeight}>
       <div class="srvname"><Codicon name="server" /> {model.profile?.name ?? "Server"}</div>
       <div class="fbtns">
         <button class="fbtn" onclick={() => model.openSettings()}><Codicon name="settings-gear" /> Settings</button>
@@ -548,6 +740,61 @@
   }
   .emptyrow:active {
     background: var(--oc-hover);
+  }
+  /* The Active section's handle: a 48 dp strip with a short grip, so it is both discoverable and draggable. */
+  .isash {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: var(--touch);
+    touch-action: none;
+    cursor: row-resize;
+  }
+  .grip {
+    width: 44px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--oc-hairline);
+  }
+  .isash.dragging .grip,
+  .isash:focus-visible .grip {
+    background: var(--vscode-sash-hoverBorder, var(--vscode-focusBorder));
+  }
+  .isash:focus-visible {
+    outline: none;
+  }
+  /* The section shrinks to its content and scrolls inside once the content is taller than the chosen height. */
+  .inbox {
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    max-height: var(--oc-inbox-height);
+    border-top: 1px solid var(--oc-hairline);
+  }
+  .ihead {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: var(--touch);
+    padding: 4px 12px;
+    text-align: left;
+    font-weight: 600;
+  }
+  .ihead:active {
+    background: var(--oc-hover);
+  }
+  .ilist {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  /* The inbox mixes projects, so its rows name theirs in the second line. */
+  .proj {
+    color: var(--oc-muted);
   }
   .end {
     flex: none;

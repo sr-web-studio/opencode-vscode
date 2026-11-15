@@ -55,3 +55,39 @@ export function parseShowEmpty(raw: string | null | undefined): boolean {
 export function serializeShowEmpty(show: boolean): string {
   return show ? "1" : "0"
 }
+
+/**
+ * The drawer's inbox height. It belongs to the app rather than to one server: the screen it has to fit in is the
+ * phone's, and every server's drawer has the same rows.
+ */
+export const INBOX_HEIGHT_KEY = "occ.drawer.inboxHeight"
+
+/** Read the saved height: only a positive finite number counts, so a stale value falls back to the default. */
+export function parseInboxHeight(raw: string | null | undefined): number | undefined {
+  if (!raw) return undefined
+  const value = Number(raw)
+  return Number.isFinite(value) && value > 0 ? value : undefined
+}
+
+/** The value to store for the height, in whole pixels. */
+export function serializeInboxHeight(height: number): string {
+  return String(Math.round(height))
+}
+
+/**
+ * Whether the drawer's inbox is collapsed, remembered per saved server like the project expansion answers: the useful
+ * part of one server's list says nothing about another's.
+ */
+export function inboxCollapsedKey(profileID: string): string {
+  return `occ.drawer.inbox.${profileID}`
+}
+
+/** Read the saved collapse: only the exact value the drawer writes counts, anything else is "expanded". */
+export function parseInboxCollapsed(raw: string | null | undefined): boolean {
+  return raw === "1"
+}
+
+/** The value to store for the collapse. */
+export function serializeInboxCollapsed(collapsed: boolean): string {
+  return collapsed ? "1" : "0"
+}
