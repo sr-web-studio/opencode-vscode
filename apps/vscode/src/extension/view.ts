@@ -2,7 +2,7 @@ import * as vscode from "vscode"
 import type { Controller } from "@occ/core/controller"
 import type { FolderRegistry } from "@occ/core/folders"
 import type { AppState, FolderSessions, ToHost, ToWebview, WebviewMetrics } from "@occ/core/protocol"
-import { diffState } from "@occ/core/state-post"
+import { diffState, sameFolderSessions } from "@occ/core/state-post"
 import type { HostActions, Surface } from "./host"
 import type { MinWidth } from "./min-width"
 import { webviewHtml } from "./html"
@@ -28,6 +28,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   private sessionsTimer?: ReturnType<typeof setTimeout>
   /** The last state posted to the webview, so the next one can be a patch instead of the whole thing. */
   private lastState?: AppState
+  /** The per-folder summaries last posted, so a refresh carries only the folders whose list changed. */
+  private lastFolderSessions?: FolderSessions[]
   private readonly subs: vscode.Disposable[] = []
   private readonly offActive: () => void
   private readonly offChange: () => void
@@ -113,7 +115,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   private syncVisible(): void {
     const active = this.folders.active
     // A hidden view keeps no live DOM: the next state it gets must be a full one.
-    if (!this.visible) this.lastState = undefined
+    if (!this.visible) {
+      this.lastState = undefined
+      this.lastFolderSessions = undefined
+    }
     for (const controller of this.folders.controllers()) controller.setVisible(controller === active && this.visible)
   }
 
@@ -162,11 +167,21 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   /**
    * The sessions pane needs every folder's root sessions, not only the active one's `AppState`. It is a separate,
    * light message so the main state stays small; the controllers already hold the lists, so this never asks the server.
+   *
+   * Only a folder whose summary changed is sent, as a partial message the webview merges: a busy background folder no
+   * longer makes every other folder's list travel again.
    */
   private postFolderSessions(): void {
-    if (!this.visible) return
+    if (!this.visible) {
+      // A hidden view has no live DOM: the next post it gets must be a full one.
+      this.lastFolderSessions = undefined
+      return
+    }
     const list = this.folders.foldersState()
-    if (list.length <= 1) return
+    if (list.length <= 1) {
+      this.lastFolderSessions = undefined
+      return
+    }
     const folders: FolderSessions[] = list.map((folder) => {
       const controller = this.folders.controllerAt(folder.directory)
       // The light summary, not the whole snapshot: this runs for every folder on every refresh.
@@ -180,7 +195,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         loaded: summary?.loaded ?? false,
       }
     })
-    this.post({ type: "folderSessions", folders })
+    const prev = this.lastFolderSessions
+    this.lastFolderSessions = folders
+    // A first post, a folder that joined or left: the webview cannot merge that into what it holds.
+    if (!prev || !sameFolderList(prev, folders)) {
+      this.post({ type: "folderSessions", folders })
+      return
+    }
+    const changed = folders.filter((folder, index) => !sameFolderSessions(prev[index]!, folder))
+    if (changed.length > 0) this.post({ type: "folderSessions", folders: changed, partial: true })
   }
 
   /**
@@ -222,7 +245,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       if (m.action.type === "switchFolder") this.folders.setActive(m.action.directory)
       else {
         // `ready`: the webview has no state (a fresh or reloaded view) or lost track of it, so the next post is full.
-        if (m.action.type === "ready") this.lastState = undefined
+        if (m.action.type === "ready") {
+          this.lastState = undefined
+          this.lastFolderSessions = undefined
+        }
         await this.folders.active.dispatch(m.action)
       }
       return
@@ -285,4 +311,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     for (const off of this.others.values()) off()
     this.others.clear()
   }
+}
+
+/** The same folders in the same order: a partial post only fits that list. */
+function sameFolderList(a: readonly FolderSessions[], b: readonly FolderSessions[]): boolean {
+  return a.length === b.length && a.every((folder, index) => folder.directory === b[index]!.directory)
 }

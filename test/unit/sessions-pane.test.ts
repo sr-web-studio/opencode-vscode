@@ -541,11 +541,16 @@ describe("sessions pane wiring", () => {
 
   test("the host posts one light message with every folder's root sessions", () => {
     expect(protocol).toContain(`export type FolderSessions = {`)
-    expect(protocol).toContain(`{ type: "folderSessions"; folders: FolderSessions[] }`)
+    expect(protocol).toContain(`type: "folderSessions"`)
+    // A refresh carries only the folders whose list changed; a full post is the first one, one after the view was
+    // hidden, and one whenever a folder joined or left.
+    expect(protocol).toContain(`partial?: boolean`)
     expect(store).toContain(`m.type === "folderSessions"`)
+    expect(store).toContain(`applyFolderSessions(this.folderSessions, m.folders, m.partial === true)`)
     expect(view).toContain(`this.post({ type: "folderSessions", folders })`)
+    expect(view).toContain(`this.post({ type: "folderSessions", folders: changed, partial: true })`)
     // Only a multi-root window needs it; a single folder already arrives in the app state.
-    expect(view).toMatch(/if \(list\.length <= 1\) return/)
+    expect(view).toMatch(/if \(list\.length <= 1\)/)
     // The lists come from the light summary of the controllers the window already holds, never from a new server call.
     expect(view).toMatch(/const controller = this\.folders\.controllerAt\(folder\.directory\)/)
     expect(view).toMatch(/const summary = controller\?\.folderSessions\(\)/)
