@@ -449,6 +449,11 @@
     background: var(--oc-selected);
     color: var(--oc-selected-fg);
   }
+  /* A running, waiting or failed tab carries its icon besides the close button's slot: a higher floor keeps some of
+     its title readable (the fit then hides a tab sooner rather than squeezing every title away). */
+  .tab:not(.active):is([data-status="running"], [data-status="waiting"], [data-status="failed"]) {
+    min-width: 8em;
+  }
   .tab:not(.active):hover {
     background: var(--oc-hover);
     color: var(--oc-fg);
@@ -536,7 +541,8 @@
   /* A finger has no hover: only the tab on screen offers its close button, and it is full size. */
   @media (hover: none) {
     /* A phone is narrow: smaller floors let a second tab sit next to the one on screen instead of only the arrow. */
-    .tab {
+    .tab,
+    .tab:not(.active):is([data-status="running"], [data-status="waiting"], [data-status="failed"]) {
       min-width: 4.5em;
       flex-shrink: 4;
     }
@@ -578,5 +584,9 @@
   }
   .measure > :global(*) {
     flex: none;
+  }
+  /* The close button's own `visibility: visible` would otherwise show through the hidden copies. */
+  .clip :global(*) {
+    visibility: hidden !important;
   }
 </style>
