@@ -134,6 +134,19 @@ describe("agent models", () => {
     expect(calls[0]![1].model).toEqual({ id: "sonnet", providerID: "cli", variant: "low" })
   })
 
+  test("the folder's default_agent wins over the global one (config documents come lowest priority first)", async () => {
+    const config = [
+      { type: "document", info: { default_agent: "review" } },
+      { type: "document", info: { default_agent: "plain" } },
+      { type: "document", info: {} },
+      { type: "directory", info: { default_agent: "build" } },
+    ]
+    const { ctl, calls } = await ready({ config })
+    expect(ctl.snapshot().agent).toBe("plain")
+    await ctl.dispatch({ type: "send", text: "hi" })
+    expect(calls[0]![1].agent).toBe("plain")
+  })
+
   test("a session without a model shows its agent's model and variant", async () => {
     const { ctl } = await ready({ sessions: [session("ses_a", { agent: "review" })] }, "ses_a")
     expect(ctl.snapshot().agent).toBe("review")

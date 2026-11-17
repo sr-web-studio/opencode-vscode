@@ -1810,11 +1810,16 @@ const skillsInput = (skills: ReadonlyArray<{ id: string }>) => (skills.length > 
 
 const filesInput = (files: readonly PromptFile[]) => (files.length > 0 ? { files: toPromptFiles(files as never) } : {})
 
-/** `config.get` returns an array of documents; the first document that sets `default_agent` wins. */
+/**
+ * `config.get` lists the location's config documents from lowest to highest priority (the global `opencode.json`
+ * first, the folder's later), so the last document that sets `default_agent` wins, as on the server.
+ */
 function readDefaultAgent(config: unknown): string | undefined {
   const docs: unknown[] = Array.isArray(config) ? config : []
-  for (const doc of docs) {
-    const v = (doc as { info?: { default_agent?: unknown } } | undefined)?.info?.default_agent
+  for (let i = docs.length - 1; i >= 0; i--) {
+    const doc = docs[i] as { type?: unknown; info?: { default_agent?: unknown } } | undefined
+    if (doc?.type !== undefined && doc.type !== "document") continue
+    const v = doc?.info?.default_agent
     if (typeof v === "string" && v) return v
   }
   return undefined
