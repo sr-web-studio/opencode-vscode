@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Session tabs at the top of the chat, like OpenCode Desktop.** Every session you open gets a tab with its project's letter, its title and the sessions list's status icon (running, needs you, failed, new reply), the most recently active first and the current one highlighted; tabs keep their places while the pointer is on the strip. Tabs that do not fit go behind an arrow whose list also offers every session with a filter, and the search button opens it with the filter ready. Closing a tab (its ×, middle-click or Delete) only takes it off the strip and never deletes or archives the session. The strip's first button toggles the sessions list and its `+` starts a new session, so the header below it keeps just the project and title. The tabs are remembered per window and drop sessions that were deleted on the server. The Android app has the same strip under the app bar, with finger-sized tabs, the drawer behind the first button and the tabs remembered per server.
+
 ## 0.3.21 (preview)
 
 - **The Active section can be made taller.** Dragging the bar above it upwards did nothing while its rows already fitted, because the section only ever shrank to its content. It now keeps the height you drag it to, and the empty room stays below the rows. Folding the section away still leaves only its header. This applies to the VS Code sessions pane and the Android drawer.
