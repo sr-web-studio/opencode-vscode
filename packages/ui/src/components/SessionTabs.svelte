@@ -20,6 +20,7 @@
     type TabSession,
   } from "@occ/core/session-tabs"
   import { useStore } from "../context"
+  import { registerBackOverlay } from "../back-overlay"
   import { restoreFocus } from "../focus"
   import type { TabsHost } from "../tabs-host"
   import Codicon from "./Codicon.svelte"
@@ -237,6 +238,12 @@
     menu = undefined
     store.dispatch({ type: "newDraft", hasText: hasDraftText })
   }
+
+  // While the menu is open, a hardware Back button (Android) closes it like Escape does.
+  $effect(() => {
+    if (!menu) return
+    return registerBackOverlay(() => dismiss(true))
+  })
 
   function toggleMenu(kind: "overflow" | "search"): void {
     menu = menu === kind ? undefined : kind
