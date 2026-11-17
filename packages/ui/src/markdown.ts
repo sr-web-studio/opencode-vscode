@@ -1,15 +1,18 @@
 import DOMPurify from "dompurify"
 import { marked } from "marked"
 import { codeLanguage } from "@occ/core/code-block"
+import { keepFileHref } from "@occ/core/file-links"
 import { looksLikePath } from "@occ/core/paths"
 import { wrapTables } from "./markdown-tables"
 
 marked.setOptions({ gfm: true, breaks: false })
 
-/** DOMPurify's default link schemes plus `file:`, which the click handler turns into "open this file" (never navigated). */
-const ALLOWED_URI = /^(?:(?:(?:f|ht)tps?|file|mailto|tel|callto|sms|cid|xmpp|matrix):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i
-
 const purify = DOMPurify(window)
+// `file:` links are kept on anchors only: the click handler turns them into "open this file" and never navigates.
+// An `<img src="file:…">` or any other element keeps the default URI rules.
+purify.addHook("uponSanitizeAttribute", (node, data) => {
+  if (keepFileHref(node.tagName, data.attrName, data.attrValue)) data.forceKeepAttr = true
+})
 purify.addHook("afterSanitizeAttributes", (node) => {
   if (node.tagName === "A") {
     node.setAttribute("rel", "noopener noreferrer")
@@ -23,7 +26,7 @@ purify.addHook("afterSanitizeAttributes", (node) => {
  */
 export function renderMarkdown(text: string): string {
   const raw = marked.parse(text, { async: false }) as string
-  const clean = purify.sanitize(raw, { FORBID_ATTR: ["style"], FORBID_TAGS: ["style", "form", "input", "button"], ALLOWED_URI_REGEXP: ALLOWED_URI })
+  const clean = purify.sanitize(raw, { FORBID_ATTR: ["style"], FORBID_TAGS: ["style", "form", "input", "button"] })
   const tpl = document.createElement("template")
   // Added after sanitizing on purpose, like the code-block wrapper below: the sanitizer keeps forbidding `button`,
   // and a wide table must not reach the transcript's scroll width.

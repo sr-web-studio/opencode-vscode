@@ -15,7 +15,8 @@ export type FileLinkContext = {
 
 export type FileLink = { candidates: string[]; line?: number; column?: number }
 
-const SCHEME = /^[a-z][a-z0-9+.-]*:/i
+/** A URI scheme (`mailto:`, `javascript:`), not `name.ext:12` (a file with a line number). */
+const SCHEME = /^[a-z][a-z0-9+.-]*:(?!\d+(?::\d+)?(?:[#?].*)?$)/i
 const DRIVE = /^[A-Za-z]:[\\/]/
 
 /** Join `rel` onto `base`, resolving `.` and `..`, in the separator style of `base`. */
@@ -64,12 +65,14 @@ const decode = (s: string): string => {
   }
 }
 
-/** `file:///a/b%20c`, `file:///C:/x`, `file://localhost/a` → the plain path. */
+/** `file:///a/b%20c`, `file:///C:/x`, `file://localhost/a` → the plain path; `file://srv/share/x` → `\\srv\share\x` (UNC). */
 function fromFileUrl(url: string): string {
-  let rest = url.replace(/^file:\/\//i, "")
-  if (!rest.startsWith("/")) rest = rest.replace(/^[^/]*/, "") || "/"
-  rest = decode(rest)
-  return /^\/[A-Za-z]:[\\/]/.test(rest) ? rest.slice(1) : rest
+  const rest = url.replace(/^file:\/\//i, "")
+  const slash = rest.indexOf("/")
+  const host = decode(slash < 0 ? rest : rest.slice(0, slash))
+  const path = decode(slash < 0 ? "/" : rest.slice(slash))
+  if (host && host.toLowerCase() !== "localhost") return `\\\\${host}${path.replace(/\//g, "\\")}`
+  return /^\/[A-Za-z]:[\\/]/.test(path) ? path.slice(1) : path
 }
 
 type Parsed = { path: string; line?: number; column?: number }
@@ -86,14 +89,14 @@ function parse(raw: string): Parsed {
   }
   text = stripTrailing(text)
 
+  // `#L10`, `#L10-L20`, `#L10C3` give the position; any other `#anchor` and any `?query` belong to the link, not the file.
   const hash = /#L(\d+)(?:C(\d+))?(?:-L?\d+(?:C\d+)?)?$/i.exec(text)
   if (hash) {
     line = Number(hash[1])
     if (hash[2]) column = Number(hash[2])
     text = text.slice(0, hash.index)
-  } else if (/^file:/i.test(text)) {
-    text = text.replace(/[#?].*$/, "")
   }
+  text = text.replace(/#.*$/, "").replace(/\?.*$/, "")
 
   if (/^file:\/\//i.test(text)) text = fromFileUrl(text)
 
@@ -152,6 +155,11 @@ export function resolveFileLink(raw: string, ctx: FileLinkContext = {}): FileLin
     if (root) bases.push(...ancestorsUpTo(session, root))
   }
   return { candidates: unique(bases.map((b) => joinPath(b, path))), ...position }
+}
+
+/** The sanitizer keeps a `file:` href on an anchor (and nowhere else: not on `<img src>`). */
+export function keepFileHref(tag: string, attribute: string, value: string): boolean {
+  return tag.toUpperCase() === "A" && attribute.toLowerCase() === "href" && /^file:\/\//i.test(value.trim())
 }
 
 /**

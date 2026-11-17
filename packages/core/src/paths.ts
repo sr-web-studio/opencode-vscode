@@ -3,7 +3,7 @@
 const normalize = (p: string) => p.replace(/\\/g, "/")
 
 export function isAbsolutePath(p: string): boolean {
-  return p.startsWith("/") || /^[A-Za-z]:[\\/]/.test(p)
+  return p.startsWith("/") || p.startsWith("\\\\") || /^[A-Za-z]:[\\/]/.test(p)
 }
 
 /** Path relative to `cwd` when it lives inside it, otherwise unchanged. */

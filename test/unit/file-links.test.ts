@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { fileHrefTarget, joinPath, resolveFileLink } from "../../packages/core/src/file-links"
+import { fileHrefTarget, joinPath, keepFileHref, resolveFileLink } from "../../packages/core/src/file-links"
 import { looksLikePath } from "../../packages/core/src/paths"
 
 const ctx = {
@@ -69,9 +69,31 @@ describe("resolveFileLink", () => {
   })
 
   test("a missing file lists every place that was tried", () => {
-    const { candidates } = resolveFileLink("gone/x.md", ctx)
-    expect(candidates.length).toBe(4)
-    expect(new Set(candidates).size).toBe(4)
+    expect(resolveFileLink("gone/x.md", ctx).candidates).toEqual(["/work/site/design/briefs/gone/x.md", "/work/site/gone/x.md", "/work/other/gone/x.md", "/work/site/design/gone/x.md"])
+  })
+
+  test("a #anchor or ?query is not part of the file name", () => {
+    expect(resolveFileLink("docs/guide.md#install", { roots: ["/p"] })).toEqual({ candidates: ["/p/docs/guide.md"] })
+    expect(resolveFileLink("/abs/a.md#section", {})).toEqual({ candidates: ["/abs/a.md"] })
+    expect(resolveFileLink("a.md?plain=1", { roots: ["/p"] })).toEqual({ candidates: ["/p/a.md"] })
+    expect(resolveFileLink("/abs/a.md?x=1#L7", {})).toEqual({ candidates: ["/abs/a.md"], line: 7 })
+    expect(resolveFileLink("file:///abs/a.md#top", {})).toEqual({ candidates: ["/abs/a.md"] })
+  })
+
+  test("UNC paths are absolute and file://host/share keeps the host", () => {
+    expect(resolveFileLink("\\\\srv\\share\\a.md:3", { roots: ["/p"] })).toEqual({ candidates: ["\\\\srv\\share\\a.md"], line: 3 })
+    expect(resolveFileLink("file://srv/share/x%20y.md", {}).candidates).toEqual(["\\\\srv\\share\\x y.md"])
+    expect(resolveFileLink("file://localhost/a/b.md", {}).candidates).toEqual(["/a/b.md"])
+  })
+})
+
+describe("keepFileHref", () => {
+  test("file: is kept on anchors only", () => {
+    expect(keepFileHref("A", "href", "file:///a/b.md")).toBe(true)
+    expect(keepFileHref("a", "HREF", " FILE:///a/b.md")).toBe(true)
+    expect(keepFileHref("IMG", "src", "file:///a/b.png")).toBe(false)
+    expect(keepFileHref("A", "src", "file:///a/b.png")).toBe(false)
+    expect(keepFileHref("A", "href", "javascript:alert(1)")).toBe(false)
   })
 })
 
@@ -85,6 +107,10 @@ describe("fileHrefTarget", () => {
     expect(fileHrefTarget("README.md")).toBe("README.md")
     expect(fileHrefTarget("my%20docs/a.md")).toBe("my docs/a.md")
     expect(fileHrefTarget("C:\\x\\a.md")).toBe("C:\\x\\a.md")
+    expect(fileHrefTarget("a.ts:12")).toBe("a.ts:12")
+    expect(fileHrefTarget("a.ts:12:3")).toBe("a.ts:12:3")
+    expect(fileHrefTarget("docs/guide.md#install")).toBe("docs/guide.md#install")
+    expect(fileHrefTarget("\\\\srv\\share\\a.md")).toBe("\\\\srv\\share\\a.md")
     expect(fileHrefTarget("https://example.com/a.md")).toBeUndefined()
     expect(fileHrefTarget("mailto:a@b.c")).toBeUndefined()
     expect(fileHrefTarget("javascript:alert(1)")).toBeUndefined()
