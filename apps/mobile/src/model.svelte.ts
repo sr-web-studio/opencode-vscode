@@ -43,7 +43,7 @@ import { ProjectNames } from "./lib/project-names"
 import { buildOverview } from "./lib/overview"
 import { OverviewStore } from "./lib/overview.svelte"
 import { guessHome, projectFolders, type ProjectLike } from "./lib/projects"
-import { launchUrl, onHardwareBack, onPause, onResume, onUrlOpen, openInBrowser } from "./lib/platform"
+import { hideKeyboard, launchUrl, onHardwareBack, onPause, onResume, onUrlOpen, openInBrowser } from "./lib/platform"
 import { ProfileStore, type Profile, type ProfileInput } from "./lib/profiles"
 import { secureKV } from "./lib/secure"
 import { REVERT_BUTTON, REVERT_DETAIL, REVERT_TITLE } from "./lib/texts"
@@ -1056,6 +1056,7 @@ class AppModel {
         return picked.files
       },
       exportSession: () => void this.exportSession(directory),
+      hideKeyboard,
       confirmRevert: () => this.confirm({ title: REVERT_TITLE, detail: REVERT_DETAIL, confirm: REVERT_BUTTON, danger: true }),
       confirmDeleteSession: (title) => this.confirm({ title: deleteQuestion(title), detail: DELETE_DETAIL, confirm: DELETE_BUTTON, danger: true }),
       openExternal: (url) => void openInBrowser(url),

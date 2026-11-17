@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- **Android app: a more compact prompt box, and the keyboard closes after you send.** The send, stop, attach and enhance buttons are now 34 dp circles that still have a 48 dp touch area, and the box has tighter padding and line spacing, so more of the conversation stays on screen when you hold the phone low. Tapping send hides the keyboard. The VS Code extension looks and behaves exactly as before.
+- **Android app: a more compact prompt box, and the keyboard closes after you send.** The send, stop, attach and enhance buttons are now 34 dp circles with a touch area of about 40 × 48 dp, the empty box is one line tall, the agent and model row under it is slimmer, and the box has tighter padding and line spacing, so more of the conversation stays on screen when you hold the phone low. Tapping send hides the keyboard. The VS Code extension looks and behaves exactly as before.
 
 ## 0.3.21 (preview)
 

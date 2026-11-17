@@ -22,6 +22,8 @@ export interface HostCapabilities {
   enterSends?: boolean
   /** Sending leaves the prompt box without focus, so a phone's soft keyboard closes and the conversation is visible. Default false. */
   blurAfterSend?: boolean
+  /** The empty prompt box is one text line tall instead of two (it still grows with the text). Default false. */
+  compactPrompt?: boolean
   /** What a shell block offers: a terminal that mirrors the command (default), or a screen with its output. */
   shellView?: "terminal" | "output"
   /**
@@ -87,6 +89,11 @@ export interface HostBridge {
    * and saves it; hosts without a project list (the phone) leave this out. VS Code shows it in the folder dropdown.
    */
   renameProject?(directory: string): void
+  /**
+   * Close the soft keyboard. Called after a send when `capabilities.blurAfterSend` is on: tapping the send button moves
+   * focus to the button, so blurring the textarea alone may not close it. Hosts without a soft keyboard leave it out.
+   */
+  hideKeyboard?(): void
   /** Open a web link outside the app. */
   openExternal(url: string): void
   /**

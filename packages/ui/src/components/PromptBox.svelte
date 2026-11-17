@@ -43,7 +43,7 @@
   const store = useStore()
   const caps = store.bridge.capabilities ?? {}
 
-  const MIN_LINES = 2
+  const MIN_LINES = caps.compactPrompt ? 1 : 2
   const MAX_LINES = 12
 
   let area: HTMLTextAreaElement | undefined = $state()
@@ -375,6 +375,7 @@
     void tick().then(() => {
       resize()
       afterSend(area, caps.blurAfterSend === true)
+      if (caps.blurAfterSend === true) store.bridge.hideKeyboard?.()
     })
   }
 
@@ -664,7 +665,7 @@
         }}
         onkeyup={syncCaret}
         onclick={syncCaret}
-        rows="2"
+        rows={MIN_LINES}
         placeholder={running ? "Steer: OpenCode reads it at its next step" : "Ask OpenCode, or type / for commands"}
         aria-label="Message"
         role="combobox"
@@ -719,7 +720,17 @@
         {#if running}
           <button class="stop" onclick={() => store.dispatch({ type: "stop" })} title="Stop (Esc)" aria-label="Stop"><span class="sq"></span></button>
         {/if}
-        <button class="send" onclick={send} disabled={!canSend} title={caps.enterSends === false ? "Send" : "Send (Enter)"} aria-label="Send"><Codicon name="arrow-up" /></button>
+        <button
+          class="send"
+          onclick={(e) => {
+            // A tap moves focus to the button; where the keyboard should close, the button must not keep it either.
+            if (caps.blurAfterSend === true) e.currentTarget.blur()
+            send()
+          }}
+          disabled={!canSend}
+          title={caps.enterSends === false ? "Send" : "Send (Enter)"}
+          aria-label="Send"><Codicon name="arrow-up" /></button
+        >
       </div>
     </div>
   </div>

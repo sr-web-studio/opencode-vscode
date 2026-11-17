@@ -269,7 +269,7 @@ describe("in-process bridge", () => {
   test("capabilities: no mic, no config editor, no MCP sign-in; Enter adds a line; shell output screen; no in-chat sessions pane", () => {
     const b = createBridge({ subscribe: () => () => {}, dispatch: async () => {}, sessionID: () => undefined }, recordingHost().host, memoryStore())
     expect(b.capabilities).toEqual(MOBILE_CAPABILITIES)
-    expect(MOBILE_CAPABILITIES).toEqual({ voice: false, editConfig: false, mcpSignIn: false, enterSends: false, blurAfterSend: true, shellView: "output", sessionsPane: false })
+    expect(MOBILE_CAPABILITIES).toEqual({ voice: false, editConfig: false, mcpSignIn: false, enterSends: false, blurAfterSend: true, compactPrompt: true, shellView: "output", sessionsPane: false })
   })
 
   test("the pause signal is passed on only when the app supplies one", () => {

@@ -316,8 +316,9 @@ body {
     min-height: 40px;
     min-width: 40px;
   }
-  /* Primary actions in the composer: a compact 34px circle to the eye, a 48px target for the finger (the invisible
-     `::after` reaches 7px past the circle; sideways only 3px, so neighbours do not fight over the same touch). */
+  /* Primary actions in the composer: a compact 34px circle to the eye. The invisible `::after` reaches 7px above and
+     below (48px tall in all) and 3px to each side; with the 6px gap between buttons the hit areas meet but never
+     overlap, so each is 40px wide. */
   .screen > .chat .box .actions button.send,
   .screen > .chat .box .actions button.stop,
   .screen > .chat .box .actions button.clip,
@@ -456,7 +457,26 @@ body {
   line-height: 1.4;
 }
 .screen > .chat .box .actions {
-  gap: 0.2em;
+  gap: 6px;
+}
+/* The agent / model / MCP row under the box: about 30px tall to the eye. The generic 44px minimum is dropped and the
+   hit area is restored with an invisible `::after` (5px above and below, 4px to each side). */
+@media (pointer: coarse) {
+  .screen > .chat .picker .foot {
+    align-items: center;
+    gap: 0 10px;
+  }
+  .screen > .chat .picker .foot button {
+    position: relative;
+    min-height: 30px;
+    min-width: 0;
+    padding: 0;
+  }
+  .screen > .chat .picker .foot button::after {
+    content: "";
+    position: absolute;
+    inset: -5px -4px;
+  }
 }
 /* Composer icons are tapped, not read: 20px is the smallest that still looks like a button. */
 .screen > .chat .box .clip,
