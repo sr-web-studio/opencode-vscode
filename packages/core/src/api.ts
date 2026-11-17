@@ -17,6 +17,8 @@ export type SlimModel = {
   variants: ReadonlyArray<{ id: string }>
   /** `capabilities.input` (`text`, `image`, …). Undefined when the server does not report it. */
   input?: ReadonlyArray<string>
+  /** The model's context window in tokens (`limit.context`), for the context usage percentage. */
+  contextLimit?: number
 }
 
 export type SlimProvider = { id: string; name: string }

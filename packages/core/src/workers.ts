@@ -209,7 +209,18 @@ const minTime = (a: number | undefined, b: number | undefined): number | undefin
 
 export type BackgroundSummary = { workers: number; running: number; shells: number }
 
-/** Counts for the slim "Background · 2 workers, 1 shell" row. */
+/** Counts for the background-work chip above the prompt box. */
 export function backgroundSummary(workers: readonly Worker[], shells: number): BackgroundSummary {
   return { workers: workers.length, running: workers.filter((w) => w.status === "running").length, shells }
+}
+
+/**
+ * The chip's words, as OpenCode's own chip puts them: "3 subagents", "1 subagent · 1 running", "2 shells",
+ * "3 subagents · 1 shell". Nothing running adds nothing.
+ */
+export function backgroundLabel(summary: BackgroundSummary): string {
+  const count = (n: number, one: string) => `${n} ${n === 1 ? one : `${one}s`}`
+  const parts = [summary.workers ? count(summary.workers, "subagent") : "", summary.shells ? count(summary.shells, "shell") : ""]
+  if (summary.running > 0 && summary.workers > 0) parts.push(`${summary.running} running`)
+  return parts.filter(Boolean).join(" · ")
 }
