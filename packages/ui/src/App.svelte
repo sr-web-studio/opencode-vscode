@@ -302,7 +302,7 @@
     display: flex;
     align-items: center;
     gap: 0.5em;
-    padding: 0.5em var(--oc-side);
+    padding: 0.5em var(--oc-edge);
     border-bottom: 1px solid var(--oc-hairline);
     font-weight: 600;
   }

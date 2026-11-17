@@ -24,6 +24,8 @@
      centred; backgrounds and borders still span the full width. */
   --oc-max: 860px;
   --oc-side: max(16px, calc((100vw - var(--oc-max)) / 2));
+  /* The chrome rows (tab strip, header) span the view and sit at its edge instead of in that column. */
+  --oc-edge: 12px;
   --oc-turn-gap: 40px;
   --oc-popover: var(--vscode-editorWidget-background);
   --oc-code-bg: var(--vscode-textCodeBlock-background);

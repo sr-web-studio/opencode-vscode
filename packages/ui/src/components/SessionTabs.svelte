@@ -393,7 +393,7 @@
     display: flex;
     align-items: center;
     gap: 2px;
-    padding: 3px calc(var(--oc-side) - 6px) 3px calc(var(--oc-side) - 6px);
+    padding: 3px calc(var(--oc-edge) - 4px);
     border-bottom: 1px solid var(--oc-hairline);
     min-width: 0;
   }
