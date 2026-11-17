@@ -34,11 +34,11 @@
 </script>
 
 {#if variant === "label"}
-  <button class="lbl" disabled={pending} onclick={stop} aria-label="Stop worker" title="Stop this worker (the lead keeps running)">
+  <button class="lbl" disabled={pending} onclick={stop} aria-label="Stop subagent" title="Stop this subagent (the lead keeps running)">
     <Codicon name={pending ? "loading" : "debug-stop"} spin={pending} /><span>{pending ? "Stopping…" : "Stop"}</span>
   </button>
 {:else}
-  <button class="ico muted" class:reveal class:pending disabled={pending} onclick={stop} aria-label="Stop worker" title="Stop this worker (the lead keeps running)">
+  <button class="ico muted" class:reveal class:pending disabled={pending} onclick={stop} aria-label="Stop subagent" title="Stop this subagent (the lead keeps running)">
     <Codicon name={pending ? "loading" : "debug-stop"} spin={pending} />
   </button>
 {/if}
