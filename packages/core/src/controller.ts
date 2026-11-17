@@ -55,6 +55,8 @@ export type Observer = {
 }
 
 const EMIT_MS = 30
+/** How long a burst of config events is collected before the catalog reloads once. */
+export const CATALOG_MS = 200
 const LAST_SESSION_KEY = "lastSession"
 /** How long a deliberate (quiet) reconnect may keep the last connection state on screen. */
 export const RESUME_QUIET_MS = 5000
@@ -124,6 +126,9 @@ export class Controller {
    * pick made for it again, like OpenCode's web app.
    */
   private draftModels = new Map<string, ModelSelection>()
+  private catalogTimer?: ReturnType<typeof setTimeout>
+  private catalogRun?: Promise<void>
+  private catalogAgain = false
   private error?: string
   /** The error the transcript load left on screen, so the next successful load can take it away again. */
   private transcriptError?: string
@@ -601,6 +606,9 @@ export class Controller {
     this.enhanceAbort?.abort()
     this.enhanceAbort = undefined
     this.enhance = undefined
+    if (this.catalogTimer) clearTimeout(this.catalogTimer)
+    this.catalogTimer = undefined
+    this.catalogAgain = false
     this.client = undefined
     this.mcp.reset()
   }
@@ -731,6 +739,17 @@ export class Controller {
       case "skill.updated":
         this.catalog.invalidateSkills()
         changed = true
+        break
+      case "agent.updated":
+      case "config.updated":
+      case "model.updated":
+      case "provider.updated":
+      case "integration.updated":
+      case "credential.updated":
+      case "credential.switched":
+      case "models-dev.refreshed":
+        // The state changes once the reload has answered; it emits then.
+        if (this.ownsLocation(ev.location?.directory)) this.scheduleCatalog()
         break
       case "shell.created": {
         const info = d.info
@@ -1072,6 +1091,54 @@ export class Controller {
     this.defaultModel = dm ? { id: dm.id, providerID: dm.providerID } : undefined
     this.configModel = configuredModel(config)
     this.defaultAgent = readDefaultAgent(config) ?? this.agents.find((a) => a.id === "build")?.id ?? this.agents[0]?.id
+  }
+
+  /**
+   * A catalog event concerns this folder: it names exactly this folder (in any spelling), or no folder at all (a
+   * credential or the models.dev list changed for every location). A subfolder that is a workspace folder of its own
+   * has its own controller, which reloads for it. A change to the global `~/.config/opencode` reaches every location
+   * the server has open, each with its own folder, so every folder of a window reloads once for it.
+   */
+  private ownsLocation(directory: string | undefined): boolean {
+    return !directory || sameDirectory(directory, this.dir) || sameDirectory(directory, this.opts.directory)
+  }
+
+  /**
+   * Reload the agents, models, providers and defaults after a config change. A save emits a burst (`config.updated`,
+   * `provider.updated` and several `model.updated` within a millisecond), so the events are collected for a moment and
+   * cause one reload; an event that arrives while a reload runs causes one more after it.
+   */
+  private scheduleCatalog(): void {
+    if (this.catalogTimer) clearTimeout(this.catalogTimer)
+    this.catalogTimer = setTimeout(() => {
+      this.catalogTimer = undefined
+      void this.reloadCatalog()
+    }, CATALOG_MS)
+  }
+
+  private async reloadCatalog(): Promise<void> {
+    const client = this.client
+    if (!client) return
+    if (this.catalogRun) {
+      this.catalogAgain = true
+      return
+    }
+    const run = this.loadCatalog(client).then(
+      () => {
+        if (this.client === client) this.emit()
+      },
+      (e) => this.opts.log?.(`Reloading agents and models failed: ${message(e)}. Keeping the previous lists.`),
+    )
+    this.catalogRun = run
+    try {
+      await run
+    } finally {
+      this.catalogRun = undefined
+      if (this.catalogAgain) {
+        this.catalogAgain = false
+        this.scheduleCatalog()
+      }
+    }
   }
 
   /** Load the transcript since the last compaction, the children (workers) and any staged revert. */
