@@ -8,6 +8,7 @@ import type { EventEnvelope } from "@occ/core/api"
 import { dataUri } from "@occ/core/attachments"
 import { ImageCache } from "@occ/core/image-cache"
 import { safeImageMime, type ImageRef } from "@occ/core/images"
+import { resolveFileLink } from "@occ/core/file-links"
 import { folderName, shortenHome } from "@occ/core/paths"
 import type { ModelSelection } from "@occ/core/models"
 import { defaultViewSettings, type ViewSettings } from "@occ/core/protocol"
@@ -22,6 +23,7 @@ import { parseDeepLink, routeDeepLink } from "./lib/deep-link"
 import { saveExport } from "./lib/export-file"
 import { LinkGate } from "./lib/link-gate"
 import { chooseLanding, lastUsedKey, parseLastUsed } from "./lib/landing"
+import { closeBackOverlay, hasBackOverlay } from "@occ/ui/back-overlay"
 import { backAction, canPop, directoriesInUse, pop, popKey, push, stackForSession, stackForWorker, type Entry, type Screen } from "./lib/nav"
 import { settleWithin, startIntent } from "./lib/start"
 import { DEFAULT_NOTIFY, NO_STATUS, NOTIFY_VERSION, nativeServers, parseNotifySettings, visibleSessionOf, type NotifySettings, type NotifyStatus } from "./lib/notify"
@@ -43,7 +45,7 @@ import { ProjectNames } from "./lib/project-names"
 import { buildOverview } from "./lib/overview"
 import { OverviewStore } from "./lib/overview.svelte"
 import { guessHome, projectFolders, type ProjectLike } from "./lib/projects"
-import { launchUrl, onHardwareBack, onPause, onResume, onUrlOpen, openInBrowser } from "./lib/platform"
+import { hideKeyboard, launchUrl, onHardwareBack, onPause, onResume, onUrlOpen, openInBrowser } from "./lib/platform"
 import { ProfileStore, type Profile, type ProfileInput } from "./lib/profiles"
 import { secureKV } from "./lib/secure"
 import { REVERT_BUTTON, REVERT_DETAIL, REVERT_TITLE } from "./lib/texts"
@@ -274,9 +276,10 @@ class AppModel {
     this.setStack(this.stack.map((e) => (e.key === key ? { key, screen } : e)))
   }
 
-  /** Android back: a dialog first, then the drawer, then Settings, then the top screen. False at the bottom: the app leaves. */
+  /** Android back: an open tabs list first, then a dialog, the drawer, Settings, then the top screen. False at the bottom: the app leaves. */
   back(): boolean {
-    const action = backAction({ modal: !!this.modal, drawer: this.drawerOpen, settings: this.settingsOpen, canPop: canPop(this.stack) })
+    const action = backAction({ overlay: hasBackOverlay(), modal: !!this.modal, drawer: this.drawerOpen, settings: this.settingsOpen, canPop: canPop(this.stack) })
+    if (action === "overlay") return closeBackOverlay()
     if (action === "modal") {
       this.answer(false)
       return true
@@ -1043,7 +1046,13 @@ class AppModel {
   /** What the editor did for the VS Code UI, as this app's screens. */
   hostFor(directory: string): MobileHost {
     return {
-      openFile: (path, line) => this.push({ kind: "file", directory, path, line }),
+      openFile: (path, line) => {
+        const ctl = this.workspace?.get(directory)
+        const sessionDirectory = ctl?.currentSessionID ? ctl.sessionMeta(ctl.currentSessionID)?.directory : undefined
+        const link = resolveFileLink(path, { home: this.home, sessionDirectory, roots: [directory] })
+        const candidates = link.candidates.length > 0 ? link.candidates : [path]
+        this.push({ kind: "file", directory, path: candidates[0]!, candidates, line: link.line ?? line })
+      },
       imageData: (sessionID, ref) => this.imageUri(directory, sessionID, ref),
       openImage: (sessionID, ref, name) => this.push({ kind: "image", directory, sessionID, ref, name }),
       openDiff: (file, patches) => this.push({ kind: "diff", directory, file, patches }),
@@ -1056,6 +1065,7 @@ class AppModel {
         return picked.files
       },
       exportSession: () => void this.exportSession(directory),
+      hideKeyboard,
       confirmRevert: () => this.confirm({ title: REVERT_TITLE, detail: REVERT_DETAIL, confirm: REVERT_BUTTON, danger: true }),
       confirmDeleteSession: (title) => this.confirm({ title: deleteQuestion(title), detail: DELETE_DETAIL, confirm: DELETE_BUTTON, danger: true }),
       openExternal: (url) => void openInBrowser(url),

@@ -52,7 +52,8 @@ export class WorkerPanels implements vscode.Disposable {
     })
     const sub = panel.webview.onDidReceiveMessage(async (m: ToHost) => {
       if (m.type === "action") await tab.dispatch(m.action as Action)
-      else if (m.type === "host") await this.host().handle(m.request, { post, act: () => undefined, sessionID: () => sessionID, directory: () => controller.directory })
+      else if (m.type === "host")
+        await this.host().handle(m.request, { post, act: () => undefined, sessionID: () => sessionID, directory: () => controller.directory, sessionDirectory: () => tab.sessionDirectory })
     })
     panel.onDidDispose(() => {
       off()

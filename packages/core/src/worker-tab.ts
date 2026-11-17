@@ -53,6 +53,11 @@ export class WorkerTab {
     return t ? `${t}` : "Worker"
   }
 
+  /** The folder this worker runs in (known once `start` has fetched the session), for relative file links. */
+  get sessionDirectory(): string | undefined {
+    return this.info?.location?.directory
+  }
+
   /** Fetch the session and its history. Safe to call again (reconnect). */
   async start(): Promise<void> {
     const client = this.controller.api

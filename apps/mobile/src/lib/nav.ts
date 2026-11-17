@@ -20,7 +20,7 @@ export type Screen =
    * project's controller has synced.
    */
   | { kind: "chat"; directory: string; sessionID?: string; draft?: boolean; title?: string }
-  | { kind: "file"; directory: string; path: string; line?: number }
+  | { kind: "file"; directory: string; path: string; candidates?: string[]; line?: number }
   | { kind: "diff"; directory: string; file: string; patches: string[] }
   | { kind: "changes"; directory: string; title: string; files: Array<{ file: string; patches: string[] }> }
   | { kind: "shell"; directory: string; shellID: string; title?: string; sessionID?: string }
@@ -36,11 +36,15 @@ export const pop = (stack: ReadonlyArray<Entry>): Entry[] => (stack.length > 1 ?
 
 export const canPop = (stack: ReadonlyArray<Entry>): boolean => stack.length > 1
 
-/** What Android's back button should close: the dialog, then the drawer, then Settings, then the top screen. */
-export type BackContext = { modal: boolean; drawer: boolean; settings: boolean; canPop: boolean }
-export type BackAction = "modal" | "drawer" | "settings" | "pop" | "exit"
+/**
+ * What Android's back button should close: an open dropdown (the session tabs' list), then the dialog, the drawer,
+ * Settings and finally the top screen.
+ */
+export type BackContext = { overlay?: boolean; modal: boolean; drawer: boolean; settings: boolean; canPop: boolean }
+export type BackAction = "overlay" | "modal" | "drawer" | "settings" | "pop" | "exit"
 
 export function backAction(context: BackContext): BackAction {
+  if (context.overlay) return "overlay"
   if (context.modal) return "modal"
   if (context.drawer) return "drawer"
   if (context.settings) return "settings"

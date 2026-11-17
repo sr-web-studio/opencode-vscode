@@ -114,6 +114,11 @@ export async function scanQr(): Promise<ScanResult> {
   }
 }
 
+/** Close the soft keyboard. Does nothing in a desktop browser, where blurring the field is all there is. */
+export function hideKeyboard(): void {
+  if (isNative()) void Keyboard.hide().catch(() => {})
+}
+
 /** Keep the prompt box visible when the keyboard opens, and match the status bar icons to the theme. */
 export function setupChrome(): void {
   if (isNative()) {

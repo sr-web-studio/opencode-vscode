@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy, untrack } from "svelte"
-  import { splitLine } from "@occ/core/paths"
+  import { fileHrefTarget } from "@occ/core/file-links"
   import { copyCodeBlock } from "../code-copy"
   import { useStore } from "../context"
   import { renderDue, STREAM_RENDER_MS } from "../markdown-stream"
@@ -57,12 +57,18 @@
     e.preventDefault()
     const path = a.dataset.path
     if (path) {
-      const ref = splitLine(path)
-      store.bridge.openFile(ref.path, ref.line)
+      // The position (`:12:3`, `#L10`) stays in the text; the resolver reads it.
+      store.bridge.openFile(path)
       return
     }
     const href = a.getAttribute("href") ?? ""
-    if (/^https?:\/\//i.test(href)) store.bridge.openExternal(href)
+    if (/^https?:\/\//i.test(href)) {
+      store.bridge.openExternal(href)
+      return
+    }
+    // A link to a file: the host (or the phone) finds it and reads the position out of the text.
+    const file = fileHrefTarget(href)
+    if (file) store.bridge.openFile(file)
   }
 </script>
 

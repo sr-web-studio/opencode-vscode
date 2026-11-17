@@ -1,4 +1,5 @@
 import { canTakeFocus, type FocusEnv } from "@occ/core/focus"
+import { focusAfterSend } from "./after-send"
 
 const isEditable = (el: Element | null): boolean =>
   !!el && (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement || (el as HTMLElement).isContentEditable === true)
@@ -20,6 +21,17 @@ export function focusGuarded(el: HTMLElement | null | undefined): boolean {
   if (!el || !canTakeFocus(readFocusEnv(el))) return false
   el.focus()
   return true
+}
+
+/**
+ * What the prompt box does with focus once a prompt left it: keep it there (the editor), or give it up so a phone's
+ * soft keyboard closes (`dismiss`). Blurring only touches the element when it actually has focus.
+ */
+export function afterSend(el: HTMLElement | null | undefined, dismiss: boolean): void {
+  if (!el) return
+  const what = focusAfterSend(dismiss, document.activeElement === el)
+  if (what === "focus") focusGuarded(el)
+  else if (what === "blur") el.blur()
 }
 
 /**

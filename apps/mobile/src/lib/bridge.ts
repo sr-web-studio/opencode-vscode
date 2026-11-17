@@ -35,6 +35,8 @@ export interface MobileHost {
   confirmRevert(): Promise<boolean>
   confirmDeleteSession(title: string): Promise<boolean>
   openExternal(url: string): void
+  /** Close the soft keyboard (a no-op where there is none). */
+  hideKeyboard?(): void
   notify(level: "info" | "warning" | "error", message: string): void
   /** "Try again" of the connection screen: reconnect the project. */
   reconnect(): void
@@ -50,6 +52,10 @@ export const MOBILE_CAPABILITIES: HostCapabilities = {
   editConfig: false,
   mcpSignIn: false,
   enterSends: false,
+  // After a send the keyboard goes away: the answer is what the user wants to see next.
+  blurAfterSend: true,
+  // An empty composer is one line; it grows with the text.
+  compactPrompt: true,
   shellView: "output",
   // The phone's own drawer already lists every project and session; the chat keeps its full width.
   sessionsPane: false,
@@ -147,6 +153,7 @@ export function createBridge(
       void host.confirmDeleteSession(title).then((ok) => (ok ? surface.dispatch({ type: "deleteSession", sessionID }) : undefined))
     },
     openExternal: (url) => host.openExternal(url),
+    hideKeyboard: () => host.hideKeyboard?.(),
     voice: () => host.notify("info", VOICE_LATER),
     voiceLanguage: () => host.notify("info", VOICE_LATER),
     notify: (level, message) => host.notify(level, message),

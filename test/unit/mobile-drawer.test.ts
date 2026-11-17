@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { expandedKey, isExpanded, parseExpanded, parseShowEmpty, serializeShowEmpty, setExpanded, showEmptyKey } from "../../apps/mobile/src/lib/drawer-prefs"
 import { backAction } from "../../apps/mobile/src/lib/nav"
+import { closeBackOverlay, hasBackOverlay, registerBackOverlay } from "../../packages/ui/src/back-overlay"
 
 describe("drawer expansion memory", () => {
   test("a folder's explicit answer wins over the default", () => {
@@ -38,6 +39,23 @@ describe("Android back order", () => {
     expect(backAction({ modal: false, drawer: true, settings: true, canPop: true })).toBe("drawer")
     expect(backAction({ modal: false, drawer: false, settings: true, canPop: true })).toBe("settings")
     expect(backAction({ modal: false, drawer: false, settings: false, canPop: true })).toBe("pop")
+  })
+
+  test("an open dropdown closes before everything else", () => {
+    expect(backAction({ overlay: true, modal: true, drawer: true, settings: true, canPop: true })).toBe("overlay")
+    expect(backAction({ overlay: true, modal: false, drawer: false, settings: false, canPop: false })).toBe("overlay")
+    expect(backAction({ overlay: false, modal: false, drawer: true, settings: false, canPop: true })).toBe("drawer")
+  })
+
+  test("the overlay registry closes the latest open overlay and unregisters", () => {
+    const closed: string[] = []
+    expect(closeBackOverlay()).toBe(false)
+    const off = registerBackOverlay(() => closed.push("a"))
+    expect(hasBackOverlay()).toBe(true)
+    expect(closeBackOverlay()).toBe(true)
+    off()
+    expect(hasBackOverlay()).toBe(false)
+    expect(closed).toEqual(["a"])
   })
 
   test("at the bottom, back leaves the app", () => {

@@ -2,7 +2,9 @@ import type { EventEnvelope, FormInfo, OpenCodeClient, PermissionRequest, Sessio
 import { initialTarget, planNewSession, type ViewTarget } from "./draft"
 import { SessionFeed } from "./feed"
 import { detectFeatures, isUnsupported } from "./features"
-import { primaryAgents, type ModelSelection } from "./models"
+import { agentModel, configuredModel, inheritedVariant, normalizeModelSelection, primaryAgents, resolveModel, sameModel, usableModel, withoutDefaultVariant, type ModelSelection } from "./models"
+import { ALL_PARTS, CatalogReload, catalogParts, type CatalogPart } from "./catalog-reload"
+import { sameValue } from "./state-post"
 import { normalizePins, togglePin } from "./pins"
 import { defaultViewSettings, type Action, type AgentSummary, type AppState, type ConnectionState, type EnhanceState, type FolderSession, type PromptRestore, type ViewSettings } from "./protocol"
 import { isRoot, upsertSession } from "./sessions"
@@ -109,12 +111,24 @@ export class Controller {
   private restoreTick = 0
   private restore?: PromptRestore
   private agents: AgentSummary[] = []
+  /** Every agent's own model (subagents and hidden ones too): a session can run with any of them. */
+  private agentModels = new Map<string, ModelSelection>()
   private models: SlimModel[] = []
   private providers: { id: string; name: string }[] = []
   private defaultAgent?: string
+  /** The server's default model (`model.default`). It never carries a variant. */
   private defaultModel?: ModelSelection
+  /** The `model` the location's config sets, with its variant (`provider/model#variant`). */
+  private configModel?: ModelSelection
   private draftAgent?: string
-  private draftModel?: ModelSelection
+  /**
+   * The draft's model picks, per agent. Switching the agent shows that agent's own model; switching back finds the
+   * pick made for it again, like OpenCode's web app.
+   */
+  private draftModels = new Map<string, ModelSelection>()
+  /** The `default_agent` the location's config sets. */
+  private configAgent?: string
+  private readonly reloads = new CatalogReload((parts, epoch) => this.reloadCatalog(parts, epoch))
   private error?: string
   /** The error the transcript load left on screen, so the next successful load can take it away again. */
   private transcriptError?: string
@@ -194,8 +208,8 @@ export class Controller {
       agents: this.agents,
       models: this.models,
       providers: this.providers,
-      agent: id ? (current?.agent ?? this.defaultAgent) : (this.draftAgent ?? this.defaultAgent),
-      model: id ? (current?.model ?? this.defaultModel) : (this.draftModel ?? this.defaultModel),
+      agent: this.shownAgent(current),
+      model: this.shownModel(current),
       error: this.error,
       sending: this.sending,
       focusTick: this.focusTick,
@@ -225,6 +239,30 @@ export class Controller {
 
   private pins(): string[] {
     return normalizePins(this.opts.pins?.get())
+  }
+
+  /** The draft's agent while this location still offers it; otherwise the default agent. */
+  private draftAgentNow(): string | undefined {
+    const picked = this.draftAgent
+    if (picked && (this.agents.length === 0 || this.agents.some((a) => a.id === picked))) return picked
+    return this.defaultAgent
+  }
+
+  private shownAgent(session: SessionInfo | undefined): string | undefined {
+    return this.currentSessionID ? (session?.agent ?? this.defaultAgent) : this.draftAgentNow()
+  }
+
+  /**
+   * The model the footer shows and a new session is created with. A session runs with its recorded model, or with its
+   * agent's model when it has none (the server does the same). A draft shows the pick made for its agent, else that
+   * agent's model, else the configured default.
+   */
+  private shownModel(session: SessionInfo | undefined): ModelSelection | undefined {
+    const agent = this.shownAgent(session)
+    const base = { agent: agent ? this.agentModels.get(agent) : undefined, configured: this.configModel, fallback: this.defaultModel, models: this.models }
+    if (this.currentSessionID) return resolveModel({ ...base, explicit: normalizeModelSelection(session?.model) })
+    const pick = this.draftModels.get(agent ?? "")
+    return resolveModel({ ...base, explicit: usableModel(this.models, pick) ? pick : undefined, explicitInherits: true })
   }
 
   /** Sessions of this folder with a permission or a form waiting for the user. */
@@ -568,6 +606,7 @@ export class Controller {
     this.enhanceAbort?.abort()
     this.enhanceAbort = undefined
     this.enhance = undefined
+    this.reloads.cancel()
     this.client = undefined
     this.mcp.reset()
   }
@@ -699,6 +738,21 @@ export class Controller {
         this.catalog.invalidateSkills()
         changed = true
         break
+      case "agent.updated":
+      case "config.updated":
+      case "model.updated":
+      case "provider.updated":
+      case "integration.updated":
+      case "credential.updated":
+      case "credential.switched":
+      case "models-dev.refreshed": {
+        // The state changes once the reload has answered; it emits then. An event without a location reaches every
+        // folder of the window at once, so the folders in the background wait their turn as they do on a reconnect.
+        const directory = ev.location?.directory
+        const parts = catalogParts(ev.type, !!directory)
+        if (parts && this.ownsLocation(directory)) this.reloads.request(parts, directory || this.active ? 0 : (this.opts.syncStaggerMs ?? 0))
+        break
+      }
       case "shell.created": {
         const info = d.info
         if (info?.id) {
@@ -847,6 +901,8 @@ export class Controller {
       await this.resolveDirectory(client)
       this.catalog.invalidateCommands()
       this.catalog.invalidateSkills()
+      // This loads the whole catalog: a reload still waiting or in flight is superseded and must not write over it.
+      this.reloads.cancel()
       await Promise.all([
         this.loadSessions(),
         this.loadPending(client),
@@ -1012,31 +1068,88 @@ export class Controller {
     for (const f of forms.data) this.forms.set(f.sessionID, [...(this.forms.get(f.sessionID) ?? []), f])
   }
 
-  private async loadCatalog(client: OpenCodeClient): Promise<void> {
+  /**
+   * Fetch the parts of the catalog asked for and keep them. Returns whether anything the view shows changed. Nothing is
+   * written when the answer is stale: the client changed, the controller detached, or a full sync superseded this load
+   * (`epoch`). The default model and the config are optional extras: a failed `model.default` or `config.get` keeps the
+   * previous value instead of dropping the user's defaults for one bad answer.
+   */
+  private async loadCatalog(client: OpenCodeClient, parts: Iterable<CatalogPart> = ALL_PARTS, epoch = this.reloads.epoch): Promise<boolean> {
+    const want = new Set(parts)
     const location = { directory: this.dir }
+    const optional = <T>(p: Promise<T>) => p.catch((e: unknown) => (this.opts.log?.(`Loading OpenCode defaults failed: ${message(e)}. Keeping the previous ones.`), undefined))
     const [agents, models, providers, def, config] = await Promise.all([
-      client.agent.list({ location }),
-      client.model.list({ location }),
-      client.provider.list({ location }),
-      client.model.default({ location }).catch(() => undefined),
-      client.config.get({ location }).catch(() => undefined),
+      want.has("agents") ? client.agent.list({ location }) : undefined,
+      want.has("models") ? client.model.list({ location }) : undefined,
+      want.has("providers") ? client.provider.list({ location }) : undefined,
+      want.has("defaultModel") ? optional(client.model.default({ location })) : undefined,
+      want.has("config") ? optional(client.config.get({ location })) : undefined,
     ])
-    this.agents = primaryAgents(agents.data).map((a) => ({ id: a.id, name: a.name, description: a.description }))
+    if (this.client !== client || epoch !== this.reloads.epoch) return false
+    const before = this.catalogState()
+    if (agents) {
+      this.agentModels = new Map(agents.data.flatMap((a) => (agentModel(a) ? [[a.id, agentModel(a)!] as const] : [])))
+      this.agents = primaryAgents(agents.data).map((a) => ({ id: a.id, name: a.name, description: a.description, ...(this.agentModels.has(a.id) ? { model: this.agentModels.get(a.id) } : {}) }))
+    }
     // Only what the pickers need. Provider settings, headers and keys never leave this method.
-    this.models = models.data.map((m) => ({
-      id: m.id,
-      modelID: m.modelID,
-      providerID: m.providerID,
-      name: m.name,
-      enabled: m.enabled,
-      status: m.status,
-      variants: m.variants.map((v) => ({ id: v.id })),
-      input: m.capabilities?.input,
-    }))
-    this.providers = providers.data.map((p) => ({ id: p.id, name: p.name }))
-    const dm = def?.data
-    this.defaultModel = dm ? { id: dm.id, providerID: dm.providerID } : undefined
-    this.defaultAgent = readDefaultAgent(config) ?? this.agents.find((a) => a.id === "build")?.id ?? this.agents[0]?.id
+    if (models)
+      this.models = models.data.map((m) => ({
+        id: m.id,
+        modelID: m.modelID,
+        providerID: m.providerID,
+        name: m.name,
+        enabled: m.enabled,
+        status: m.status,
+        variants: m.variants.map((v) => ({ id: v.id })),
+        input: m.capabilities?.input,
+      }))
+    if (providers) this.providers = providers.data.map((p) => ({ id: p.id, name: p.name }))
+    if (def) this.defaultModel = def.data ? { id: def.data.id, providerID: def.data.providerID } : undefined
+    if (config) {
+      this.configModel = configuredModel(config)
+      this.configAgent = readDefaultAgent(config)
+    }
+    this.defaultAgent = this.configAgent ?? this.agents.find((a) => a.id === "build")?.id ?? this.agents[0]?.id
+    const after = this.catalogState()
+    const changed = !sameValue(before, after)
+    // A list that did not really change keeps its old reference, so the view's diff has nothing to send for it.
+    if (sameValue(before.agents, after.agents)) this.agents = before.agents
+    if (sameValue(before.models, after.models)) this.models = before.models
+    if (sameValue(before.providers, after.providers)) this.providers = before.providers
+    return changed
+  }
+
+  private catalogState() {
+    return {
+      agents: this.agents,
+      agentModels: [...this.agentModels],
+      models: this.models,
+      providers: this.providers,
+      defaultModel: this.defaultModel,
+      configModel: this.configModel,
+      defaultAgent: this.defaultAgent,
+    }
+  }
+
+  /**
+   * A catalog event concerns this folder: it names exactly this folder (in any spelling), or no folder at all (a
+   * credential or the models.dev list changed for every location). A subfolder that is a workspace folder of its own
+   * has its own controller, which reloads for it. A change to the global `~/.config/opencode` reaches every location
+   * the server has open, each with its own folder, so every folder of a window reloads once for it.
+   */
+  private ownsLocation(directory: string | undefined): boolean {
+    return !directory || sameDirectory(directory, this.dir) || sameDirectory(directory, this.opts.directory)
+  }
+
+  /** One reload for a burst of catalog events, emitting only when the lists or defaults really changed. */
+  private async reloadCatalog(parts: ReadonlySet<CatalogPart>, epoch: number): Promise<void> {
+    const client = this.client
+    if (!client) return
+    try {
+      if (await this.loadCatalog(client, parts, epoch)) this.emit()
+    } catch (e) {
+      this.opts.log?.(`Reloading agents and models failed: ${message(e)}. Keeping the previous lists.`)
+    }
   }
 
   /** Load the transcript since the last compaction, the children (workers) and any staged revert. */
@@ -1292,7 +1405,7 @@ export class Controller {
   private openDraft() {
     this.target = { kind: "draft" }
     this.draftAgent = undefined
-    this.draftModel = undefined
+    this.draftModels = new Map()
     this.feed.reset()
     this.children.clear()
     this.restore = undefined
@@ -1333,10 +1446,11 @@ export class Controller {
       // First prompt of a draft: create the session, then prompt. This is the only place a session is created.
       this.sending = true
       this.emitNow()
+      // The agent and model the footer shows, variant included, like OpenCode's web app: the session then keeps them.
       const created = await client.session.create({
         location: { directory: this.dir },
-        agent: this.draftAgent ?? null,
-        model: this.draftModel ?? null,
+        agent: this.draftAgentNow() ?? null,
+        model: this.shownModel(undefined) ?? null,
       })
       this.sessions = this.sort(upsertSession(this.sessions, { ...created, location: created.location ?? { directory: this.dir } } as SessionInfo))
       this.target = { kind: "session", id: created.id }
@@ -1586,18 +1700,36 @@ export class Controller {
       this.emitNow()
       return
     }
-    this.sessions = this.sessions.map((s) => (s.id === id ? { ...s, agent } : s))
+    // The server's `switchAgent` leaves the session's model alone. An agent that names its own model brings it along,
+    // variant included, as OpenCode's web app does; one without keeps the session's model.
+    const own = this.agentModels.get(agent)
+    const model = own && usableModel(this.models, own) ? resolveModel({ agent: own, configured: this.configModel, models: this.models }) : undefined
+    this.sessions = this.sessions.map((s) => (s.id === id ? { ...s, agent, ...(model ? { model } : {}) } : s))
     this.emitNow()
-    await this.need().session.switchAgent({ sessionID: id, agent })
+    const client = this.need()
+    await client.session.switchAgent({ sessionID: id, agent })
+    if (model) await client.session.switchModel({ sessionID: id, model })
   }
 
-  private async pickModel(model: ModelSelection): Promise<void> {
+  private async pickModel(picked: ModelSelection): Promise<void> {
     const id = this.currentSessionID
     if (!id) {
-      this.draftModel = model
+      // The pick belongs to the agent on screen. That agent is pinned too, so a config reload that changes the default
+      // agent does not take the user's choice away.
+      this.draftAgent = this.draftAgentNow()
+      this.draftModels.set(this.draftAgent ?? "", picked)
       this.emitNow()
       return
     }
+    // A session records its variant. Another model picked without one gets the variant it would inherit (the agent's or
+    // the configured one for that model), as OpenCode's web app commits it; the model on screen keeps what it shows. An
+    // explicit "Default" is recorded as no variant, which the server runs as the model's default.
+    const session = this.sessions.find((s) => s.id === id) ?? this.archived.find((s) => s.id === id)
+    const shown = this.shownModel(session)
+    const agent = this.shownAgent(session)
+    const inherit = !picked.variant && !sameModel(shown, picked)
+    const variant = inherit ? inheritedVariant({ model: picked, models: this.models, agent: agent ? this.agentModels.get(agent) : undefined, configured: this.configModel }) : undefined
+    const model: ModelSelection = variant ? { ...picked, variant } : withoutDefaultVariant(picked)
     this.sessions = this.sessions.map((s) => (s.id === id ? { ...s, model } : s))
     this.emitNow()
     await this.need().session.switchModel({ sessionID: id, model })
@@ -1678,11 +1810,16 @@ const skillsInput = (skills: ReadonlyArray<{ id: string }>) => (skills.length > 
 
 const filesInput = (files: readonly PromptFile[]) => (files.length > 0 ? { files: toPromptFiles(files as never) } : {})
 
-/** `config.get` returns an array of documents; the first document that sets `default_agent` wins. */
+/**
+ * `config.get` lists the location's config documents from lowest to highest priority (the global `opencode.json`
+ * first, the folder's later), so the last document that sets `default_agent` wins, as on the server.
+ */
 function readDefaultAgent(config: unknown): string | undefined {
   const docs: unknown[] = Array.isArray(config) ? config : []
-  for (const doc of docs) {
-    const v = (doc as { info?: { default_agent?: unknown } } | undefined)?.info?.default_agent
+  for (let i = docs.length - 1; i >= 0; i--) {
+    const doc = docs[i] as { type?: unknown; info?: { default_agent?: unknown } } | undefined
+    if (doc?.type !== undefined && doc.type !== "document") continue
+    const v = doc?.info?.default_agent
     if (typeof v === "string" && v) return v
   }
   return undefined
