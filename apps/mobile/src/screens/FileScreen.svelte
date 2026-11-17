@@ -39,6 +39,8 @@
     const tried: string[] = []
     try {
       let bytes: Uint8Array | undefined
+      // Any failure moves on to the next place; the last error that was not "not found" is what the user sees.
+      let otherError: unknown
       let lastError: unknown
       for (const candidate of places) {
         try {
@@ -46,12 +48,12 @@
           shownPath = candidate
           break
         } catch (e) {
-          if ((e as { _tag?: string } | undefined)?._tag !== "FileNotFoundError") throw e
           tried.push(candidate)
           lastError = e
+          if ((e as { _tag?: string } | undefined)?._tag !== "FileNotFoundError") otherError = e
         }
       }
-      if (!bytes) throw lastError
+      if (!bytes) throw otherError ?? lastError
       const c = classifyFile(shownPath, bytes)
       if (c.kind === "image") image = dataUri(c.mime, base64(bytes))
       content = c
