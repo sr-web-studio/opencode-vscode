@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **File links in answers open the file.** A path or link the agent writes (absolute, `~/…`, relative to the session's folder or the project, with `:12`, `:12:3` or `#L10`, in backticks or as a markdown link, `file://` too) is looked up in the session's folder, the workspace folders and the folders above the session's, and opens even when it lies outside the project. When nothing matches, the message lists every place that was tried, with a Copy paths action. This applies to the VS Code extension and the Android app.
+
 ## 0.3.21 (preview)
 
 - **The Active section can be made taller.** Dragging the bar above it upwards did nothing while its rows already fitted, because the section only ever shrank to its content. It now keeps the height you drag it to, and the empty room stays below the rows. Folding the section away still leaves only its header. This applies to the VS Code sessions pane and the Android drawer.

@@ -6,6 +6,9 @@ import { wrapTables } from "./markdown-tables"
 
 marked.setOptions({ gfm: true, breaks: false })
 
+/** DOMPurify's default link schemes plus `file:`, which the click handler turns into "open this file" (never navigated). */
+const ALLOWED_URI = /^(?:(?:(?:f|ht)tps?|file|mailto|tel|callto|sms|cid|xmpp|matrix):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i
+
 const purify = DOMPurify(window)
 purify.addHook("afterSanitizeAttributes", (node) => {
   if (node.tagName === "A") {
@@ -20,7 +23,7 @@ purify.addHook("afterSanitizeAttributes", (node) => {
  */
 export function renderMarkdown(text: string): string {
   const raw = marked.parse(text, { async: false }) as string
-  const clean = purify.sanitize(raw, { FORBID_ATTR: ["style"], FORBID_TAGS: ["style", "form", "input", "button"] })
+  const clean = purify.sanitize(raw, { FORBID_ATTR: ["style"], FORBID_TAGS: ["style", "form", "input", "button"], ALLOWED_URI_REGEXP: ALLOWED_URI })
   const tpl = document.createElement("template")
   // Added after sanitizing on purpose, like the code-block wrapper below: the sanitizer keeps forbidding `button`,
   // and a wide table must not reach the transcript's scroll width.

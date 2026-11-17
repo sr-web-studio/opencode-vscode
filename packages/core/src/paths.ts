@@ -99,7 +99,7 @@ const KNOWN_EXT = new Set([
 /** Conservative check for inline text that is probably a file reference. */
 export function looksLikePath(text: string): boolean {
   if (text.length > 260 || /\s/.test(text) || /^[a-z][a-z0-9+.-]*:\/\//i.test(text)) return false
-  const { path } = splitLine(text)
+  const { path } = splitLine(text.replace(/#L\d+(?:C\d+)?(?:-L?\d+(?:C\d+)?)?$/i, ""))
   if (!/^[\w@.~\-/\\:]+$/.test(path)) return false
   const name = normalize(path).split("/").pop() ?? ""
   const ext = name.includes(".") ? name.split(".").pop()!.toLowerCase() : ""
