@@ -3,6 +3,8 @@ import { initialTarget, planNewSession, type ViewTarget } from "./draft"
 import { SessionFeed } from "./feed"
 import { detectFeatures, isUnsupported } from "./features"
 import { agentModel, configuredModel, inheritedVariant, normalizeModelSelection, primaryAgents, resolveModel, sameModel, usableModel, withoutDefaultVariant, type ModelSelection } from "./models"
+import { ALL_PARTS, CatalogReload, catalogParts, type CatalogPart } from "./catalog-reload"
+import { sameValue } from "./state-post"
 import { normalizePins, togglePin } from "./pins"
 import { defaultViewSettings, type Action, type AgentSummary, type AppState, type ConnectionState, type EnhanceState, type FolderSession, type PromptRestore, type ViewSettings } from "./protocol"
 import { isRoot, upsertSession } from "./sessions"
@@ -55,8 +57,6 @@ export type Observer = {
 }
 
 const EMIT_MS = 30
-/** How long a burst of config events is collected before the catalog reloads once. */
-export const CATALOG_MS = 200
 const LAST_SESSION_KEY = "lastSession"
 /** How long a deliberate (quiet) reconnect may keep the last connection state on screen. */
 export const RESUME_QUIET_MS = 5000
@@ -126,9 +126,9 @@ export class Controller {
    * pick made for it again, like OpenCode's web app.
    */
   private draftModels = new Map<string, ModelSelection>()
-  private catalogTimer?: ReturnType<typeof setTimeout>
-  private catalogRun?: Promise<void>
-  private catalogAgain = false
+  /** The `default_agent` the location's config sets. */
+  private configAgent?: string
+  private readonly reloads = new CatalogReload((parts, epoch) => this.reloadCatalog(parts, epoch))
   private error?: string
   /** The error the transcript load left on screen, so the next successful load can take it away again. */
   private transcriptError?: string
@@ -606,9 +606,7 @@ export class Controller {
     this.enhanceAbort?.abort()
     this.enhanceAbort = undefined
     this.enhance = undefined
-    if (this.catalogTimer) clearTimeout(this.catalogTimer)
-    this.catalogTimer = undefined
-    this.catalogAgain = false
+    this.reloads.cancel()
     this.client = undefined
     this.mcp.reset()
   }
@@ -747,10 +745,14 @@ export class Controller {
       case "integration.updated":
       case "credential.updated":
       case "credential.switched":
-      case "models-dev.refreshed":
-        // The state changes once the reload has answered; it emits then.
-        if (this.ownsLocation(ev.location?.directory)) this.scheduleCatalog()
+      case "models-dev.refreshed": {
+        // The state changes once the reload has answered; it emits then. An event without a location reaches every
+        // folder of the window at once, so the folders in the background wait their turn as they do on a reconnect.
+        const directory = ev.location?.directory
+        const parts = catalogParts(ev.type, !!directory)
+        if (parts && this.ownsLocation(directory)) this.reloads.request(parts, directory || this.active ? 0 : (this.opts.syncStaggerMs ?? 0))
         break
+      }
       case "shell.created": {
         const info = d.info
         if (info?.id) {
@@ -899,6 +901,8 @@ export class Controller {
       await this.resolveDirectory(client)
       this.catalog.invalidateCommands()
       this.catalog.invalidateSkills()
+      // This loads the whole catalog: a reload still waiting or in flight is superseded and must not write over it.
+      this.reloads.cancel()
       await Promise.all([
         this.loadSessions(),
         this.loadPending(client),
@@ -1064,33 +1068,67 @@ export class Controller {
     for (const f of forms.data) this.forms.set(f.sessionID, [...(this.forms.get(f.sessionID) ?? []), f])
   }
 
-  private async loadCatalog(client: OpenCodeClient): Promise<void> {
+  /**
+   * Fetch the parts of the catalog asked for and keep them. Returns whether anything the view shows changed. Nothing is
+   * written when the answer is stale: the client changed, the controller detached, or a full sync superseded this load
+   * (`epoch`). The default model and the config are optional extras: a failed `model.default` or `config.get` keeps the
+   * previous value instead of dropping the user's defaults for one bad answer.
+   */
+  private async loadCatalog(client: OpenCodeClient, parts: Iterable<CatalogPart> = ALL_PARTS, epoch = this.reloads.epoch): Promise<boolean> {
+    const want = new Set(parts)
     const location = { directory: this.dir }
+    const optional = <T>(p: Promise<T>) => p.catch((e: unknown) => (this.opts.log?.(`Loading OpenCode defaults failed: ${message(e)}. Keeping the previous ones.`), undefined))
     const [agents, models, providers, def, config] = await Promise.all([
-      client.agent.list({ location }),
-      client.model.list({ location }),
-      client.provider.list({ location }),
-      client.model.default({ location }).catch(() => undefined),
-      client.config.get({ location }).catch(() => undefined),
+      want.has("agents") ? client.agent.list({ location }) : undefined,
+      want.has("models") ? client.model.list({ location }) : undefined,
+      want.has("providers") ? client.provider.list({ location }) : undefined,
+      want.has("defaultModel") ? optional(client.model.default({ location })) : undefined,
+      want.has("config") ? optional(client.config.get({ location })) : undefined,
     ])
-    this.agentModels = new Map(agents.data.flatMap((a) => (agentModel(a) ? [[a.id, agentModel(a)!] as const] : [])))
-    this.agents = primaryAgents(agents.data).map((a) => ({ id: a.id, name: a.name, description: a.description, ...(this.agentModels.has(a.id) ? { model: this.agentModels.get(a.id) } : {}) }))
+    if (this.client !== client || epoch !== this.reloads.epoch) return false
+    const before = this.catalogState()
+    if (agents) {
+      this.agentModels = new Map(agents.data.flatMap((a) => (agentModel(a) ? [[a.id, agentModel(a)!] as const] : [])))
+      this.agents = primaryAgents(agents.data).map((a) => ({ id: a.id, name: a.name, description: a.description, ...(this.agentModels.has(a.id) ? { model: this.agentModels.get(a.id) } : {}) }))
+    }
     // Only what the pickers need. Provider settings, headers and keys never leave this method.
-    this.models = models.data.map((m) => ({
-      id: m.id,
-      modelID: m.modelID,
-      providerID: m.providerID,
-      name: m.name,
-      enabled: m.enabled,
-      status: m.status,
-      variants: m.variants.map((v) => ({ id: v.id })),
-      input: m.capabilities?.input,
-    }))
-    this.providers = providers.data.map((p) => ({ id: p.id, name: p.name }))
-    const dm = def?.data
-    this.defaultModel = dm ? { id: dm.id, providerID: dm.providerID } : undefined
-    this.configModel = configuredModel(config)
-    this.defaultAgent = readDefaultAgent(config) ?? this.agents.find((a) => a.id === "build")?.id ?? this.agents[0]?.id
+    if (models)
+      this.models = models.data.map((m) => ({
+        id: m.id,
+        modelID: m.modelID,
+        providerID: m.providerID,
+        name: m.name,
+        enabled: m.enabled,
+        status: m.status,
+        variants: m.variants.map((v) => ({ id: v.id })),
+        input: m.capabilities?.input,
+      }))
+    if (providers) this.providers = providers.data.map((p) => ({ id: p.id, name: p.name }))
+    if (def) this.defaultModel = def.data ? { id: def.data.id, providerID: def.data.providerID } : undefined
+    if (config) {
+      this.configModel = configuredModel(config)
+      this.configAgent = readDefaultAgent(config)
+    }
+    this.defaultAgent = this.configAgent ?? this.agents.find((a) => a.id === "build")?.id ?? this.agents[0]?.id
+    const after = this.catalogState()
+    const changed = !sameValue(before, after)
+    // A list that did not really change keeps its old reference, so the view's diff has nothing to send for it.
+    if (sameValue(before.agents, after.agents)) this.agents = before.agents
+    if (sameValue(before.models, after.models)) this.models = before.models
+    if (sameValue(before.providers, after.providers)) this.providers = before.providers
+    return changed
+  }
+
+  private catalogState() {
+    return {
+      agents: this.agents,
+      agentModels: [...this.agentModels],
+      models: this.models,
+      providers: this.providers,
+      defaultModel: this.defaultModel,
+      configModel: this.configModel,
+      defaultAgent: this.defaultAgent,
+    }
   }
 
   /**
@@ -1103,41 +1141,14 @@ export class Controller {
     return !directory || sameDirectory(directory, this.dir) || sameDirectory(directory, this.opts.directory)
   }
 
-  /**
-   * Reload the agents, models, providers and defaults after a config change. A save emits a burst (`config.updated`,
-   * `provider.updated` and several `model.updated` within a millisecond), so the events are collected for a moment and
-   * cause one reload; an event that arrives while a reload runs causes one more after it.
-   */
-  private scheduleCatalog(): void {
-    if (this.catalogTimer) clearTimeout(this.catalogTimer)
-    this.catalogTimer = setTimeout(() => {
-      this.catalogTimer = undefined
-      void this.reloadCatalog()
-    }, CATALOG_MS)
-  }
-
-  private async reloadCatalog(): Promise<void> {
+  /** One reload for a burst of catalog events, emitting only when the lists or defaults really changed. */
+  private async reloadCatalog(parts: ReadonlySet<CatalogPart>, epoch: number): Promise<void> {
     const client = this.client
     if (!client) return
-    if (this.catalogRun) {
-      this.catalogAgain = true
-      return
-    }
-    const run = this.loadCatalog(client).then(
-      () => {
-        if (this.client === client) this.emit()
-      },
-      (e) => this.opts.log?.(`Reloading agents and models failed: ${message(e)}. Keeping the previous lists.`),
-    )
-    this.catalogRun = run
     try {
-      await run
-    } finally {
-      this.catalogRun = undefined
-      if (this.catalogAgain) {
-        this.catalogAgain = false
-        this.scheduleCatalog()
-      }
+      if (await this.loadCatalog(client, parts, epoch)) this.emit()
+    } catch (e) {
+      this.opts.log?.(`Reloading agents and models failed: ${message(e)}. Keeping the previous lists.`)
     }
   }
 
