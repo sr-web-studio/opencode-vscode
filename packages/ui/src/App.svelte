@@ -9,6 +9,8 @@
   import { visibleWorkers } from "@occ/core/worker-hidden"
   import { paneMode } from "@occ/core/sessions-pane"
   import type { HostBridge } from "./bridge"
+  import type { TabsHost } from "./tabs-host"
+  import { chatTabsHost } from "./chat-tabs.svelte"
   import { provideStore, provideTranscript } from "./context"
   import { DraftWriter } from "./draft-persist"
   import { Store } from "./store.svelte"
@@ -17,6 +19,7 @@
   import PromptBox from "./components/PromptBox.svelte"
   import QuestionPrompt from "./components/QuestionPrompt.svelte"
   import SessionSwitcher from "./components/SessionSwitcher.svelte"
+  import SessionTabs from "./components/SessionTabs.svelte"
   import SessionsPane from "./components/SessionsPane.svelte"
   import StopWorkerButton from "./components/StopWorkerButton.svelte"
   import Setup from "./components/Setup.svelte"
@@ -27,8 +30,12 @@
   /**
    * `workerForm`: the phone's worker screen shows the worker's own pending question and answers it. The VS Code worker
    * tab passes nothing and stays transcript-only, as before.
+   *
+   * `tabs`: where the session tab strip gets its sessions and how a tab opens, when that is not the chat's own data.
+   * The phone passes one (its tabs span every project of the server); VS Code passes none and the strip follows the
+   * sessions pane.
    */
-  let { bridge, workerForm = false }: { bridge: HostBridge; workerForm?: boolean } = $props()
+  let { bridge, workerForm = false, tabs }: { bridge: HostBridge; workerForm?: boolean; tabs?: TabsHost } = $props()
   // The bridge is fixed for the lifetime of the webview.
   // svelte-ignore state_referenced_locally
   const store = new Store(bridge)
@@ -83,6 +90,11 @@
     paneOpen = open
     store.bridge.storage.set("sessionsPane", open)
   }
+
+  /** The session tab strip: the host's own when it brings one (the phone), otherwise built on the sessions pane's data. */
+  // svelte-ignore state_referenced_locally
+  const tabsHost: TabsHost = tabs ?? chatTabsHost(store, { available: () => paneAvailable, open: () => paneOpen, toggle: () => setPane(!paneOpen) })
+  onDestroy(() => tabsHost.list.flush())
   // The title-bar button is a host command; the webview owns the open/closed state and remembers it per window.
   $effect(() => {
     const tick = store.sessionsTick
@@ -196,7 +208,8 @@
             {#if workerRunning && app.target.kind === "session"}<StopWorkerButton sessionID={app.target.id} running variant="label" />{/if}
           </header>
         {:else}
-          <SessionSwitcher {app} hasDraftText={draft.text.trim().length > 0} {paneCapable} {paneOpen} showProject={paneCapable} onTogglePane={() => setPane(!paneOpen)}>
+          <SessionTabs {app} host={tabsHost} hasDraftText={draft.text.trim().length > 0} />
+          <SessionSwitcher {app} showProject={paneCapable}>
             {#snippet extra()}
               {#if shownWorkers > 0 || app.runningShells > 0}
                 <WorkersRow workers={app.workers} hidden={app.hiddenWorkers} models={app.models} shells={app.runningShells} />
