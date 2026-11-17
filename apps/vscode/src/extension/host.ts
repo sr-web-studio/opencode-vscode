@@ -23,6 +23,8 @@ export type Surface = {
   sessionID(): string | undefined
   /** The project folder the surface shows, for relative paths. Defaults to the active folder. */
   directory?(): string | undefined
+  /** The folder the shown session itself works in, when the surface knows it (a worker tab). Else the controller is asked. */
+  sessionDirectory?(): string | undefined
 }
 
 /** Host-side effects the webview asks for. Everything here needs `vscode`, so it cannot live in core/ or ui/. */
@@ -136,7 +138,7 @@ export class HostActions {
   private async openFile(path: string, line: number | undefined, surface: Surface): Promise<void> {
     const folder = this.folder(surface)
     const sessionID = surface.sessionID()
-    const sessionDirectory = (sessionID && this.controllerAt(folder)?.sessionMeta(sessionID)?.directory) || undefined
+    const sessionDirectory = surface.sessionDirectory?.() || (sessionID && this.controllerAt(folder)?.sessionMeta(sessionID)?.directory) || undefined
     const roots = [folder, ...(vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath)]
     const link = resolveFileLink(path, { home: homedir(), sessionDirectory, roots })
     let uri: vscode.Uri | undefined
