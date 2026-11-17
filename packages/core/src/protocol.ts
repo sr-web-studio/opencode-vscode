@@ -62,7 +62,8 @@ export type EnhanceState = {
   error?: string
 }
 
-export type AgentSummary = { id: string; name: string; description?: string }
+/** A primary agent the picker offers. `model` is the agent's own model and variant, when its file names one. */
+export type AgentSummary = { id: string; name: string; description?: string; model?: ModelSelection }
 
 /**
  * One workspace folder of a multi-root window. Only the VS Code host fills `AppState.folders`, and only when the window

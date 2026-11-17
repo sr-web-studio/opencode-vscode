@@ -2,7 +2,7 @@ import type { EventEnvelope, FormInfo, OpenCodeClient, PermissionRequest, Sessio
 import { initialTarget, planNewSession, type ViewTarget } from "./draft"
 import { SessionFeed } from "./feed"
 import { detectFeatures, isUnsupported } from "./features"
-import { primaryAgents, type ModelSelection } from "./models"
+import { agentModel, configuredModel, inheritedVariant, normalizeModelSelection, primaryAgents, resolveModel, sameModel, usableModel, type ModelSelection } from "./models"
 import { normalizePins, togglePin } from "./pins"
 import { defaultViewSettings, type Action, type AgentSummary, type AppState, type ConnectionState, type EnhanceState, type FolderSession, type PromptRestore, type ViewSettings } from "./protocol"
 import { isRoot, upsertSession } from "./sessions"
@@ -109,12 +109,21 @@ export class Controller {
   private restoreTick = 0
   private restore?: PromptRestore
   private agents: AgentSummary[] = []
+  /** Every agent's own model (subagents and hidden ones too): a session can run with any of them. */
+  private agentModels = new Map<string, ModelSelection>()
   private models: SlimModel[] = []
   private providers: { id: string; name: string }[] = []
   private defaultAgent?: string
+  /** The server's default model (`model.default`). It never carries a variant. */
   private defaultModel?: ModelSelection
+  /** The `model` the location's config sets, with its variant (`provider/model#variant`). */
+  private configModel?: ModelSelection
   private draftAgent?: string
-  private draftModel?: ModelSelection
+  /**
+   * The draft's model picks, per agent. Switching the agent shows that agent's own model; switching back finds the
+   * pick made for it again, like OpenCode's web app.
+   */
+  private draftModels = new Map<string, ModelSelection>()
   private error?: string
   /** The error the transcript load left on screen, so the next successful load can take it away again. */
   private transcriptError?: string
@@ -194,8 +203,8 @@ export class Controller {
       agents: this.agents,
       models: this.models,
       providers: this.providers,
-      agent: id ? (current?.agent ?? this.defaultAgent) : (this.draftAgent ?? this.defaultAgent),
-      model: id ? (current?.model ?? this.defaultModel) : (this.draftModel ?? this.defaultModel),
+      agent: this.shownAgent(current),
+      model: this.shownModel(current),
       error: this.error,
       sending: this.sending,
       focusTick: this.focusTick,
@@ -225,6 +234,30 @@ export class Controller {
 
   private pins(): string[] {
     return normalizePins(this.opts.pins?.get())
+  }
+
+  /** The draft's agent while this location still offers it; otherwise the default agent. */
+  private draftAgentNow(): string | undefined {
+    const picked = this.draftAgent
+    if (picked && (this.agents.length === 0 || this.agents.some((a) => a.id === picked))) return picked
+    return this.defaultAgent
+  }
+
+  private shownAgent(session: SessionInfo | undefined): string | undefined {
+    return this.currentSessionID ? (session?.agent ?? this.defaultAgent) : this.draftAgentNow()
+  }
+
+  /**
+   * The model the footer shows and a new session is created with. A session runs with its recorded model, or with its
+   * agent's model when it has none (the server does the same). A draft shows the pick made for its agent, else that
+   * agent's model, else the configured default.
+   */
+  private shownModel(session: SessionInfo | undefined): ModelSelection | undefined {
+    const agent = this.shownAgent(session)
+    const base = { agent: agent ? this.agentModels.get(agent) : undefined, configured: this.configModel, fallback: this.defaultModel, models: this.models }
+    if (this.currentSessionID) return resolveModel({ ...base, explicit: normalizeModelSelection(session?.model) })
+    const pick = this.draftModels.get(agent ?? "")
+    return resolveModel({ ...base, explicit: usableModel(this.models, pick) ? pick : undefined, explicitInherits: true })
   }
 
   /** Sessions of this folder with a permission or a form waiting for the user. */
@@ -1021,7 +1054,8 @@ export class Controller {
       client.model.default({ location }).catch(() => undefined),
       client.config.get({ location }).catch(() => undefined),
     ])
-    this.agents = primaryAgents(agents.data).map((a) => ({ id: a.id, name: a.name, description: a.description }))
+    this.agentModels = new Map(agents.data.flatMap((a) => (agentModel(a) ? [[a.id, agentModel(a)!] as const] : [])))
+    this.agents = primaryAgents(agents.data).map((a) => ({ id: a.id, name: a.name, description: a.description, ...(this.agentModels.has(a.id) ? { model: this.agentModels.get(a.id) } : {}) }))
     // Only what the pickers need. Provider settings, headers and keys never leave this method.
     this.models = models.data.map((m) => ({
       id: m.id,
@@ -1036,6 +1070,7 @@ export class Controller {
     this.providers = providers.data.map((p) => ({ id: p.id, name: p.name }))
     const dm = def?.data
     this.defaultModel = dm ? { id: dm.id, providerID: dm.providerID } : undefined
+    this.configModel = configuredModel(config)
     this.defaultAgent = readDefaultAgent(config) ?? this.agents.find((a) => a.id === "build")?.id ?? this.agents[0]?.id
   }
 
@@ -1292,7 +1327,7 @@ export class Controller {
   private openDraft() {
     this.target = { kind: "draft" }
     this.draftAgent = undefined
-    this.draftModel = undefined
+    this.draftModels = new Map()
     this.feed.reset()
     this.children.clear()
     this.restore = undefined
@@ -1333,10 +1368,11 @@ export class Controller {
       // First prompt of a draft: create the session, then prompt. This is the only place a session is created.
       this.sending = true
       this.emitNow()
+      // The agent and model the footer shows, variant included, like OpenCode's web app: the session then keeps them.
       const created = await client.session.create({
         location: { directory: this.dir },
-        agent: this.draftAgent ?? null,
-        model: this.draftModel ?? null,
+        agent: this.draftAgentNow() ?? null,
+        model: this.shownModel(undefined) ?? null,
       })
       this.sessions = this.sort(upsertSession(this.sessions, { ...created, location: created.location ?? { directory: this.dir } } as SessionInfo))
       this.target = { kind: "session", id: created.id }
@@ -1586,18 +1622,35 @@ export class Controller {
       this.emitNow()
       return
     }
-    this.sessions = this.sessions.map((s) => (s.id === id ? { ...s, agent } : s))
+    // The server's `switchAgent` leaves the session's model alone. An agent that names its own model brings it along,
+    // variant included, as OpenCode's web app does; one without keeps the session's model.
+    const own = this.agentModels.get(agent)
+    const model = own && usableModel(this.models, own) ? resolveModel({ agent: own, configured: this.configModel, models: this.models }) : undefined
+    this.sessions = this.sessions.map((s) => (s.id === id ? { ...s, agent, ...(model ? { model } : {}) } : s))
     this.emitNow()
-    await this.need().session.switchAgent({ sessionID: id, agent })
+    const client = this.need()
+    await client.session.switchAgent({ sessionID: id, agent })
+    if (model) await client.session.switchModel({ sessionID: id, model })
   }
 
-  private async pickModel(model: ModelSelection): Promise<void> {
+  private async pickModel(picked: ModelSelection): Promise<void> {
     const id = this.currentSessionID
     if (!id) {
-      this.draftModel = model
+      // The pick belongs to the agent on screen. That agent is pinned too, so a config reload that changes the default
+      // agent does not take the user's choice away.
+      this.draftAgent = this.draftAgentNow()
+      this.draftModels.set(this.draftAgent ?? "", picked)
       this.emitNow()
       return
     }
+    // A session records its variant. Another model picked without one gets the variant it would inherit (the agent's or
+    // the configured one for that model), as OpenCode's web app commits it; the model on screen keeps what it shows.
+    const session = this.sessions.find((s) => s.id === id) ?? this.archived.find((s) => s.id === id)
+    const shown = this.shownModel(session)
+    const agent = this.shownAgent(session)
+    const inherit = !picked.variant && !sameModel(shown, picked)
+    const variant = inherit ? inheritedVariant({ model: picked, models: this.models, agent: agent ? this.agentModels.get(agent) : undefined, configured: this.configModel }) : undefined
+    const model: ModelSelection = variant ? { ...picked, variant } : picked
     this.sessions = this.sessions.map((s) => (s.id === id ? { ...s, model } : s))
     this.emitNow()
     await this.need().session.switchModel({ sessionID: id, model })
