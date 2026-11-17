@@ -1,5 +1,7 @@
 import type { HostBridge } from "@occ/ui/bridge"
 import type { HostRequest, PickedFile, ToHost, ToWebview, WebviewMetrics } from "@occ/core/protocol"
+import type { TabLookup } from "@occ/core/session-tabs"
+import { isTabCheckAnswer, type TabCheckRequest } from "@occ/core/tab-check"
 
 type VsCodeApi = { postMessage(message: unknown): void; getState(): unknown; setState(state: unknown): void }
 declare function acquireVsCodeApi(): VsCodeApi
@@ -11,6 +13,30 @@ const vsCodeApi = (): VsCodeApi => (sharedApi ??= acquireVsCodeApi())
 /** Post the webview's own size and focus to the host. VS Code only; the Android bridge never sends this. */
 export function postViewMetrics(message: WebviewMetrics): void {
   vsCodeApi().postMessage(message)
+}
+
+let tabCheckSeq = 0
+
+/**
+ * Ask the extension whether a session still exists, for the tab strip (the webview has no client of its own). No answer
+ * within `timeoutMs` counts as "unknown", which keeps the tab.
+ */
+export function lookupTabSession(sessionID: string, timeoutMs = 20_000): Promise<TabLookup> {
+  return new Promise<TabLookup>((resolve) => {
+    const requestID = `tab-${++tabCheckSeq}`
+    const done = (result: TabLookup) => {
+      window.removeEventListener("message", listener)
+      clearTimeout(timer)
+      resolve(result)
+    }
+    const listener = (e: MessageEvent<unknown>) => {
+      if (isTabCheckAnswer(e.data) && e.data.requestID === requestID) done(e.data.result)
+    }
+    const timer = setTimeout(() => done({ state: "unknown" }), timeoutMs)
+    window.addEventListener("message", listener)
+    const request: TabCheckRequest = { type: "tabCheck", requestID, sessionID }
+    vsCodeApi().postMessage(request)
+  })
 }
 
 /** `HostBridge` for a VS Code webview: messages go over `postMessage`, storage is the webview state. */

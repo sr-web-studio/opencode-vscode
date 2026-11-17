@@ -7,8 +7,9 @@
   import Codicon from "./Codicon.svelte"
 
   /**
-   * The chat's one slim header row: the sessions-pane toggle, the project the chat is in, the current session's title
-   * (click, F2 or double-click renames it), the background-workers chip and `+` for a new session.
+   * The chat's breadcrumb under the session tab strip: the project the chat is in, the current session's title (click,
+   * F2 or double-click renames it) and the background-workers chip. The sessions-pane toggle and `+` live on the tab
+   * strip above it.
    *
    * The folder and session dropdowns that used to live here are gone: the sessions pane lists every folder and
    * session, and the phone's drawer does the same. The file kept its old name because this is still the header the
@@ -16,20 +17,12 @@
    */
   let {
     app,
-    hasDraftText,
     extra,
-    paneCapable = false,
-    paneOpen = false,
     showProject = false,
-    onTogglePane,
   }: {
     app: AppState
-    hasDraftText: boolean
     extra?: Snippet
-    paneCapable?: boolean
-    paneOpen?: boolean
     showProject?: boolean
-    onTogglePane?: () => void
   } = $props()
   const store = useStore()
 
@@ -86,16 +79,6 @@
 </script>
 
 <header class="switcher">
-  {#if paneCapable}
-    <button
-      class="pane-btn muted"
-      class:on={paneOpen}
-      onclick={() => onTogglePane?.()}
-      title="Sessions (OpenCode: Toggle Sessions)"
-      aria-label={paneOpen ? "Hide sessions" : "Show sessions"}
-      aria-expanded={paneOpen}><Codicon name="layout-sidebar-left" /></button
-    >
-  {/if}
   {#if showProject && project}
     <span class="project muted" title={projectTitle}>{project}</span>
     <span class="sep muted" aria-hidden="true">/</span>
@@ -120,7 +103,6 @@
     {/if}
   </div>
   {@render extra?.()}
-  <button class="plus muted" onclick={() => store.dispatch({ type: "newDraft", hasText: hasDraftText })} title="New session" aria-label="New session"><Codicon name="add" /></button>
 </header>
 
 <style>
@@ -132,9 +114,7 @@
     border-bottom: 1px solid var(--oc-hairline);
     gap: 0.4em;
   }
-  .pane-btn,
-  .pencil,
-  .plus {
+  .pencil {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -142,9 +122,6 @@
     padding: 0.2em 0.3em;
     border-radius: 4px;
   }
-  .pane-btn.on,
-  .pane-btn:hover,
-  .plus:hover,
   .pencil:hover {
     color: var(--oc-fg);
     background: var(--oc-hover);
