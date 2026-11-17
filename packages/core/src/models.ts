@@ -119,12 +119,15 @@ export function inheritedVariant(args: { model: { id: string; providerID: string
   return v && v !== "default" && found.variants.some((x) => x.id === v) ? v : undefined
 }
 
-/** A model the pickers can use. Before the catalog has loaded nothing can be checked, so everything passes. */
+/**
+ * A model the pickers can use: listed, enabled and not deprecated (the pickers hide the others). Before the catalog has
+ * loaded nothing can be checked, so everything passes.
+ */
 export function usableModel(models: ReadonlyArray<SlimModel>, ref: { id: string; providerID: string } | undefined): boolean {
   if (!ref) return false
   if (models.length === 0) return true
   const found = findModel(models, ref)
-  return !!found && found.enabled
+  return !!found && found.enabled && found.status !== "deprecated"
 }
 
 /** A pick as the server records it: the explicit "Default" becomes no variant. */

@@ -154,9 +154,10 @@ describe("model resolution", () => {
     expect(withoutDefaultVariant(opusHigh)).toBe(opusHigh)
   })
 
-  test("usable models: enabled and listed, anything before the catalog loads", () => {
+  test("usable models: enabled, listed and not deprecated, anything before the catalog loads", () => {
     expect(usableModel(models, { id: "opus", providerID: "cli" })).toBe(true)
     expect(usableModel(models, { id: "off", providerID: "cli" })).toBe(false)
+    expect(usableModel([...models, m("old", "cli", "Old", { status: "deprecated" })], { id: "old", providerID: "cli" })).toBe(false)
     expect(usableModel(models, { id: "gone", providerID: "cli" })).toBe(false)
     expect(usableModel([], { id: "gone", providerID: "cli" })).toBe(true)
     expect(usableModel(models, undefined)).toBe(false)
