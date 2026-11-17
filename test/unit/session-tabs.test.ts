@@ -18,7 +18,6 @@ import {
   fitTabs,
   heldOrder,
   lookupTab,
-  measureKey,
   moveTab,
   nextAfterClose,
   openTab,
@@ -332,31 +331,45 @@ describe("tab order", () => {
 })
 
 describe("fitting tabs", () => {
-  const opts = { gap: 2, overflow: 30 }
+  const opts = { gap: 2, overflow: 30, min: 100, max: 200 }
 
-  test("everything fits: nothing is hidden and no overflow button is reserved", () => {
-    expect(fitTabs([100, 100], 202, opts)).toEqual({ visible: [0, 1], hidden: [] })
-    expect(fitTabs([], 10, opts)).toEqual({ visible: [], hidden: [] })
+  test("everything fits: one equal width, nothing hidden and no overflow button reserved", () => {
+    expect(fitTabs(2, 302, opts)).toEqual({ visible: [0, 1], hidden: [], width: 150 })
+    expect(fitTabs(3, 304, opts)).toEqual({ visible: [0, 1, 2], hidden: [], width: 100 })
+    expect(fitTabs(0, 10, opts)).toEqual({ visible: [], hidden: [], width: 100 })
   })
 
-  test("what does not fit goes to the overflow, which takes its own room", () => {
-    // 3 × 100 + gaps = 304 > 250; with the overflow button (30 + gap) only two fit.
-    expect(fitTabs([100, 100, 100], 250, opts)).toEqual({ visible: [0, 1], hidden: [2] })
+  test("a wide strip caps every tab at the maximum", () => {
+    expect(fitTabs(3, 2000, opts)).toEqual({ visible: [0, 1, 2], hidden: [], width: 200 })
   })
 
-  test("tabs shrink to their minimum before any is hidden", () => {
-    expect(fitTabs([200, 200, 200], 310, { ...opts, min: 100 })).toEqual({ visible: [0, 1, 2], hidden: [] })
-    expect(fitTabs([200, 200, 200], 250, { ...opts, min: [100, 100, 100] })).toEqual({ visible: [0, 1], hidden: [2] })
+  test("what does not fit at the minimum goes to the overflow instead of squeezing, and the rest share the room evenly", () => {
+    // 3 tabs need 304 at the minimum; 250 leaves 218 beside the overflow button: two tabs of 108.
+    expect(fitTabs(3, 250, opts)).toEqual({ visible: [0, 1], hidden: [2], width: 108 })
+    // Narrow or not, no visible tab is ever below the minimum while another could be hidden.
+    for (let available = 100; available < 700; available += 7) {
+      for (const active of [undefined, 0, 2, 5]) {
+        const fit = fitTabs(6, available, { ...opts, active })
+        if (fit.visible.length > 1) expect(fit.width).toBeGreaterThanOrEqual(100)
+        expect(fit.width).toBeLessThanOrEqual(200)
+        expect(fit.visible.length + fit.hidden.length).toBe(6)
+        // The drawn tabs, the gaps and (when something is hidden) the overflow button fit in the room.
+        const used = fit.visible.length * fit.width + (fit.visible.length - 1) * opts.gap + (fit.hidden.length ? opts.overflow + opts.gap : 0)
+        if (fit.visible.length > 1) expect(used).toBeLessThanOrEqual(available + 1e-9)
+        if (active !== undefined) expect(fit.visible).toContain(active)
+      }
+    }
   })
 
-  test("the active tab is never hidden: tabs before it make room and it takes the last place", () => {
-    expect(fitTabs([100, 100, 100, 100], 250, { ...opts, active: 3 })).toEqual({ visible: [0, 3], hidden: [1, 2] })
-    expect(fitTabs([100, 100, 100, 100], 250, { ...opts, active: 1 })).toEqual({ visible: [0, 1], hidden: [2, 3] })
+  test("the active tab is never hidden: tabs before it make room and it takes the last place, at the same width", () => {
+    expect(fitTabs(4, 250, { ...opts, active: 3 })).toEqual({ visible: [0, 3], hidden: [1, 2], width: 108 })
+    expect(fitTabs(4, 250, { ...opts, active: 1 })).toEqual({ visible: [0, 1], hidden: [2, 3], width: 108 })
   })
 
-  test("at least one tab is drawn even when nothing fits", () => {
-    expect(fitTabs([300, 300], 100, opts)).toEqual({ visible: [0], hidden: [1] })
-    expect(fitTabs([300, 300], 100, { ...opts, active: 1 })).toEqual({ visible: [1], hidden: [0] })
+  test("one tab is drawn when even one does not fit at the minimum, and it takes the room there is", () => {
+    expect(fitTabs(2, 70, opts)).toEqual({ visible: [0], hidden: [1], width: 38 })
+    expect(fitTabs(2, 70, { ...opts, active: 1 })).toEqual({ visible: [1], hidden: [0], width: 38 })
+    expect(fitTabs(1, 70, opts)).toEqual({ visible: [0], hidden: [], width: 70 })
   })
 })
 
@@ -382,7 +395,7 @@ describe("a streamed answer costs the strip nothing", () => {
     } as unknown as AppState
   }
 
-  test("a patch that replaces the state but no list gives back the same catalog, entries and width key", () => {
+  test("a patch that replaces the state but no list gives back the same catalog and entries", () => {
     const catalogs = new ChatTabCatalog()
     const memo = new OwnSessionsMemo()
     const folders: FolderSessions[] = []
@@ -393,7 +406,7 @@ describe("a streamed answer costs the strip nothing", () => {
       const own = memo.get(s.sessions, s.archived)
       const sessions = tabSessions(tabs, byId, own, { untitled: "Untitled", project: (d) => d })
       const entries: TabEntry[] = orderTabs(tabs, (id) => sessions.get(id)).map((id) => ({ kind: "session", session: sessions.get(id)! }))
-      return { catalog, own, sessions, key: measureKey(entries, "a") }
+      return { catalog, own, sessions, entries }
     }
     const before = state()
     const first = derive(before)
@@ -402,27 +415,14 @@ describe("a streamed answer costs the strip nothing", () => {
     const second = derive(streamed)
     expect(second.catalog).toBe(first.catalog)
     expect(second.own).toBe(first.own)
-    expect(second.key).toBe(first.key)
+    expect(second.entries).toEqual(first.entries)
     expect([...second.sessions.values()]).toEqual([...first.sessions.values()])
     // The archived session and the unlisted tab still read right.
     expect(first.sessions.get("z")!.title).toBe("Z")
     expect(first.sessions.get("x")!.title).toBe("Remembered")
-    // A real change (a renamed session) does give a new catalog and a new width key.
+    // A real change (a renamed session) does give a new catalog.
     const renamed = derive({ ...before, sessions: [info("a", 5, "Renamed"), info("b", 9)] })
     expect(renamed.catalog).not.toBe(first.catalog)
-    expect(renamed.key).not.toBe(first.key)
-  })
-
-  test("the width key ignores what cannot change a width: activity times and a plain status change", () => {
-    const row = (over: Partial<TabSession> = {}): TabEntry => ({ kind: "session", session: { id: "a", directory: "/w", title: "A", project: "p", status: "read", last: 1, ...over } })
-    const key = measureKey([row()], "a")
-    expect(measureKey([row({ last: 99 })], "a")).toBe(key)
-    // Running adds an icon beside the close button, unread makes the title bold: both change the width.
-    expect(measureKey([row({ status: "running" })], "a")).not.toBe(key)
-    expect(measureKey([row({ status: "unread" })], "a")).not.toBe(key)
-    expect(measureKey([row({ status: "running" })], "a")).toBe(measureKey([row({ status: "waiting" })], "a"))
-    expect(measureKey([row()], undefined)).not.toBe(key)
-    expect(measureKey([{ kind: "draft" }, row()], "a")).not.toBe(key)
   })
 
   test("measurements are compared before they are stored", () => {

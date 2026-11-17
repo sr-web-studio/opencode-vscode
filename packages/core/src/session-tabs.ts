@@ -325,22 +325,8 @@ export function tabSessions(
 /** A status that keeps its own icon beside the close button (running, needs the user, failed). The rest share its slot. */
 export const attentionStatus = (status: SessionStatus): boolean => status === "running" || status === "waiting" || status === "failed"
 
-/** The part of a status that changes a tab's width: an extra icon (attention), a bold title (unread), or neither. */
-const statusShape = (status: SessionStatus): string => (attentionStatus(status) ? "a" : status === "unread" ? "u" : "")
-
 /** One drawn tab, as the strip lists them: the draft's "New session" tab, or a session's. */
 export type TabEntry = { kind: "draft" } | { kind: "session"; session: TabSession }
-
-/**
- * What the strip's widths depend on: which tabs are drawn, in which order, with which titles, which status shape and
- * which one is active. The strip measures again only when this changes (or the row itself is resized). Hovering never
- * changes it: the close button and the plain status icon share one fixed slot.
- */
-export function measureKey(entries: readonly TabEntry[], activeID: string | undefined): string {
-  return [activeID ?? "", ...entries.map((entry) => (entry.kind === "draft" ? "\u0000draft" : `${entry.session.id}\u0001${entry.session.title}\u0001${statusShape(entry.session.status)}`))].join(
-    "\u0002",
-  )
-}
 
 /** Two measurements are the same: lets the strip skip a state write (and a re-fit) when nothing moved. */
 export const sameNumbers = (a: readonly number[], b: readonly number[]): boolean => a.length === b.length && a.every((value, i) => value === b[i])
@@ -385,53 +371,45 @@ export function heldOrder(frozen: readonly string[] | undefined, live: readonly 
   return frozen ? stableOrder(frozen, live) : [...live]
 }
 
-/** How the strip splits its tabs: the indexes that are drawn, and the rest that the overflow dropdown lists. */
-export type TabFit = { visible: number[]; hidden: number[] }
+/**
+ * How the strip splits its tabs: the indexes that are drawn, the rest that the overflow dropdown lists, and the one
+ * width (px) every drawn tab has.
+ */
+export type TabFit = { visible: number[]; hidden: number[]; width: number }
 
-/** How the strip measures: the space between two tabs, the overflow button, and the narrowest a tab may shrink to. */
+/** How the strip measures, all in px: the space between two tabs, the overflow button, and the narrowest and widest tab. */
 export type FitOptions = {
   gap: number
   /** Width of the overflow button, which only appears once a tab is hidden. */
   overflow: number
-  /**
-   * A tab may shrink to this width (its title ellipsized) before one more tab is hidden: one width for every tab, or
-   * one per tab in strip order (the active tab carries its close button, so it needs more). Default: no shrinking.
-   */
-  min?: number | readonly number[]
+  /** No tab is drawn narrower than this (its title stays readable) unless even one tab does not fit. */
+  min: number
+  /** No tab is drawn wider than this: a wide strip leaves room after the last tab instead. */
+  max: number
   /** The index of the active tab, which is never hidden. */
   active?: number
 }
 
 /**
- * Which tabs fit in `available` px. `widths` are the tabs' natural widths (already capped at the tab's maximum) in
- * strip order. Tabs shrink down to `min` before any is hidden, so a narrow strip still shows several. The active tab
- * is always drawn: when it would be hidden, tabs at the end make room for it and it takes the last place. At least
- * one tab is drawn while there are tabs, even when nothing fits (it then shrinks further).
+ * Which of `count` tabs fit in `available` px, and how wide each is. Every drawn tab has the same width, the active
+ * one included: the room shared out evenly, never below `min` and never above `max`. When the tabs do not fit at
+ * `min`, the rest go behind the overflow button instead of being squeezed. The active tab is always drawn: when it
+ * would be hidden, the tabs at the end make room for it and it takes the last place. At least one tab is drawn while
+ * there are tabs; when even one does not fit at `min` it takes all the room there is.
  */
-export function fitTabs(widths: readonly number[], available: number, options: FitOptions): TabFit {
-  const count = widths.length
-  const all = widths.map((_, index) => index)
-  if (count === 0) return { visible: [], hidden: [] }
-  const floor = (index: number): number | undefined => (typeof options.min === "number" ? options.min : options.min?.[index])
-  const size = (index: number): number => {
-    const min = floor(index)
-    return min === undefined ? widths[index]! : Math.min(widths[index]!, min)
-  }
-  const span = (indexes: readonly number[]): number => indexes.reduce((sum, index, i) => sum + size(index) + (i > 0 ? options.gap : 0), 0)
-  if (span(all) <= available) return { visible: all, hidden: [] }
+export function fitTabs(count: number, available: number, options: FitOptions): TabFit {
+  const all = Array.from({ length: count }, (_, index) => index)
+  if (count === 0) return { visible: [], hidden: [], width: options.min }
+  const share = (room: number, n: number): number => Math.max(0, (room - options.gap * (n - 1)) / n)
+  const size = (room: number, n: number): number => Math.min(options.max, share(room, n))
+  if (count === 1 || share(available, count) >= options.min) return { visible: all, hidden: [], width: size(available, count) }
   const budget = available - options.overflow - options.gap
-  let fits = 0
-  while (fits < count && span(all.slice(0, fits + 1)) <= budget) fits++
+  let fits = 1
+  while (fits < count && share(budget, fits + 1) >= options.min) fits++
   const active = options.active !== undefined && options.active >= 0 && options.active < count ? options.active : undefined
-  let visible: number[]
-  if (active === undefined || active < fits) {
-    visible = all.slice(0, Math.max(fits, 1))
-  } else {
-    while (fits > 0 && span([...all.slice(0, fits), active]) > budget) fits--
-    visible = [...all.slice(0, fits), active]
-  }
+  const visible = active === undefined || active < fits ? all.slice(0, fits) : [...all.slice(0, fits - 1), active]
   const shown = new Set(visible)
-  return { visible, hidden: all.filter((index) => !shown.has(index)) }
+  return { visible, hidden: all.filter((index) => !shown.has(index)), width: size(budget, visible.length) }
 }
 
 /** The avatar letter of a project: the first letter or digit of its name, upper-cased. */

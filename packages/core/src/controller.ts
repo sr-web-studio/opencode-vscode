@@ -1102,6 +1102,7 @@ export class Controller {
         status: m.status,
         variants: m.variants.map((v) => ({ id: v.id })),
         input: m.capabilities?.input,
+        ...(m.limit?.context ? { contextLimit: m.limit.context } : {}),
       }))
     if (providers) this.providers = providers.data.map((p) => ({ id: p.id, name: p.name }))
     if (def) this.defaultModel = def.data ? { id: def.data.id, providerID: def.data.providerID } : undefined

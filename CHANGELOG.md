@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- **Session tabs all have the same width, and the ones that do not fit go behind the arrow.** The tabs no longer squeeze to a few letters at different widths: every tab, the current one included, is as wide as the others and keeps a readable title. This applies to the VS Code extension and the Android app.
+- **The tabs and the header span the full width.** In a wide view (the OpenCode view in an editor tab) the tab strip and the session title are aligned to the left edge, while the conversation and the prompt box keep their centred column. This applies to the VS Code extension and the Android app.
+- **Context usage in the header.** The right end of the header line shows how much of the model's context the conversation uses (`12k · 6%`, with the exact numbers on hover). It is left out until the first answer, and the percentage when the model's window is not known.
+- **Subagents are a small chip above the prompt box.** "3 subagents · 1 running" (and shells) replaces the wide panel under the header; it floats above the prompt box without moving the conversation and opens its list upward. In the Android app the chip sits at the right edge, and Back closes the open list.
+
 ## 0.3.22 (preview)
 
 - **Android app: Back closes the open tabs list** and returns focus to its button, before it closes the drawer, Settings or the screen.

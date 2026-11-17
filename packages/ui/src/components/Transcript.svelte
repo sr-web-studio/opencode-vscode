@@ -17,8 +17,12 @@
   import PermissionPrompt from "./PermissionPrompt.svelte"
   import Turn from "./Turn.svelte"
 
-  /** `children` is the floating area over the bottom of the transcript (the todo bar). */
-  let { app, children }: { app: AppState; children?: Snippet } = $props()
+  /**
+   * `children` is the floating area over the bottom of the transcript (the todo bar). `lane` is the row of pills under
+   * it, just above the prompt box (the subagents chip): it floats out of flow like the todo bar, and the transcript
+   * pads its tail by the measured height, so it never covers the last message.
+   */
+  let { app, children, lane }: { app: AppState; children?: Snippet; lane?: Snippet } = $props()
   const store = useStore()
 
   let box: HTMLDivElement | undefined = $state()
@@ -66,6 +70,26 @@
     ro.observe(el)
     floatH = el.offsetHeight
     return () => ro.disconnect()
+  })
+  // A lane that appears or grows takes room at the tail: a view that follows the end stays at the end, so the chip
+  // never covers the last message.
+  let lastFloatH = 0
+  $effect(() => {
+    const h = floatH
+    if (h === lastFloatH) return
+    lastFloatH = h
+    if (box && scroll.follow) void tick().then(() => box && (box.scrollTop = box.scrollHeight))
+  })
+  /** The subagents list is open: the floating area rises above the jump button and the sticky prompt. */
+  let laneOpen = $state(false)
+  $effect(() => {
+    const el = floatEl
+    if (!el) return
+    const update = () => (laneOpen = !!el.querySelector(".panel"))
+    update()
+    const mo = new MutationObserver(update)
+    mo.observe(el, { childList: true, subtree: true })
+    return () => mo.disconnect()
   })
 
   // Sticky prompt: an IntersectionObserver reports where each bubble is; the pure helper picks the current one.
@@ -247,7 +271,10 @@
     {/if}
   </div>
 
-  <div class="float" bind:this={floatEl}>{@render children?.()}</div>
+  <div class="float" class:open={laneOpen} bind:this={floatEl}>
+    {@render children?.()}
+    {@render lane?.()}
+  </div>
 
   {#if showJump(scroll) && !app.loadingView}
     <button
@@ -289,6 +316,10 @@
     right: 0;
     bottom: 0;
     z-index: 3;
+  }
+  /* An open subagents list draws over the jump button (5) and the sticky prompt (4). */
+  .float.open {
+    z-index: 6;
   }
   .sticky {
     position: absolute;
