@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.23 (preview)
 
 - **Session tabs all have the same width, and the ones that do not fit go behind the arrow.** The tabs no longer squeeze to a few letters at different widths: every tab, the current one included, is as wide as the others and keeps a readable title. This applies to the VS Code extension and the Android app.
 - **The tabs and the header span the full width.** In a wide view (the OpenCode view in an editor tab) the tab strip and the session title are aligned to the left edge, while the conversation and the prompt box keep their centred column. This applies to the VS Code extension and the Android app.
