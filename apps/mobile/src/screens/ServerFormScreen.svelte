@@ -5,6 +5,7 @@
   import { looksLikePairingLink } from "../lib/pairing-link"
   import { openInBrowser, scanQr } from "../lib/platform"
   import { hostOf } from "../lib/profiles"
+  import { forgetProfileTabs } from "../lib/session-tabs.svelte"
   import { ADDRESS_HELP, SCAN_HELP, SETUP_GUIDE_LABEL, SETUP_GUIDE_URL } from "../lib/texts"
   import { model } from "../model.svelte"
 
@@ -86,6 +87,7 @@
     })
     if (!ok) return
     await model.removeProfile(existing.id)
+    forgetProfileTabs(existing.id, localStorage)
     model.close(key)
   }
 </script>

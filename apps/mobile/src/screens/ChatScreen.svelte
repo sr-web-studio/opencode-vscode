@@ -39,11 +39,13 @@
 
   /**
    * The session tabs span every project of this server: one list per server profile, the drawer's sessions in the
-   * dropdown, a tab opened through the drawer's path, and the strip's first button opens the drawer.
+   * dropdown, a tab opened through the drawer's path, and the strip's first button opens the drawer. A tab closes on
+   * its own only when the server says its session is gone.
    */
   const tabs = phoneTabsHost(profileTabs(model.profile?.id ?? "", localStorage), {
     overview: () => ({ data: model.overview.data, loading: model.overview.loading }),
     names: () => ({ resolved: model.projectIDs, titles: model.projectTitles }),
+    getSession: (sessionID) => model.client.session.get({ sessionID }),
     openSession: (dir, id) => model.openSession(dir, id),
     openDrawer: () => model.openDrawer(),
   })
