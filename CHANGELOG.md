@@ -2,8 +2,8 @@
 
 ## Unreleased
 
-- **Changes to agents and OpenCode settings show up without reloading the window.** Saving an agent file or an `opencode.json` (in the project or in your global OpenCode folder), or switching an account, now refreshes the agent and model lists and the default agent and model a moment later. The agent and model you picked for the next message stay as they are while they still exist. This applies to the VS Code extension and the Android app.
-- **An agent's own model is used.** An agent whose file sets a model, such as `model: provider/model#high`, now shows that model and variant in the footer when you pick it, starts new sessions with it, and switches an open session to it, the same as OpenCode's own app. A model you pick for one agent in a new session no longer sticks when you switch to another agent. The variant set with the `model` in your OpenCode settings applies to the default model too. This applies to the VS Code extension and the Android app.
+- **Changes to agents and OpenCode settings show up without reloading the window.** Saving an agent file or an `opencode.json`, or switching an account, refreshes the agents, models and defaults a moment later. What you picked for the next message stays while it still exists. This applies to the VS Code extension and the Android app.
+- **An agent's own model is used.** An agent whose file sets `model: provider/model#high` shows that model and variant when you pick it and switches an open session to it. A new session now records the agent and model it was started with, like the OpenCode web app. The model picker has a **Default** choice for running a model without a variant. This applies to the VS Code extension and the Android app.
 
 ## 0.3.21 (preview)
 
