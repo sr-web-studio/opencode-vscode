@@ -7,6 +7,7 @@
   import { createBridge } from "../lib/bridge"
   import { onPause } from "../lib/platform"
   import { liveState } from "../lib/live.svelte"
+  import { phoneTabsHost, profileTabs } from "../lib/session-tabs.svelte"
   import { chatVisible, CHAT_OPEN_TIMEOUT_MS } from "../lib/start"
   import { model } from "../model.svelte"
 
@@ -35,6 +36,17 @@
     // Android tells us when the app is paused; the draft is saved then, before the system may kill the view.
     (handler) => onPause(handler),
   )
+
+  /**
+   * The session tabs span every project of this server: one list per server profile, the drawer's sessions in the
+   * dropdown, a tab opened through the drawer's path, and the strip's first button opens the drawer.
+   */
+  const tabs = phoneTabsHost(profileTabs(model.profile?.id ?? "", localStorage), {
+    overview: () => ({ data: model.overview.data, loading: model.overview.loading }),
+    names: () => ({ resolved: model.projectIDs, titles: model.projectTitles }),
+    openSession: (dir, id) => model.openSession(dir, id),
+    openDrawer: () => model.openDrawer(),
+  })
 
   // The controller's first sync picks the newest session; ask for ours only after it, or the sync would undo it.
   let opened = false
@@ -93,7 +105,7 @@
 
 {#if onTarget}
   <div class="chat grow">
-    <App {bridge} />
+    <App {bridge} {tabs} />
   </div>
 {:else}
   <div class="body">
