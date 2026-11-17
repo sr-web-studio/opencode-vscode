@@ -20,7 +20,7 @@ export type Screen =
    * project's controller has synced.
    */
   | { kind: "chat"; directory: string; sessionID?: string; draft?: boolean; title?: string }
-  | { kind: "file"; directory: string; path: string; line?: number }
+  | { kind: "file"; directory: string; path: string; candidates?: string[]; line?: number }
   | { kind: "diff"; directory: string; file: string; patches: string[] }
   | { kind: "changes"; directory: string; title: string; files: Array<{ file: string; patches: string[] }> }
   | { kind: "shell"; directory: string; shellID: string; title?: string; sessionID?: string }

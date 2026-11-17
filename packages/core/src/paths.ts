@@ -3,7 +3,7 @@
 const normalize = (p: string) => p.replace(/\\/g, "/")
 
 export function isAbsolutePath(p: string): boolean {
-  return p.startsWith("/") || /^[A-Za-z]:[\\/]/.test(p)
+  return p.startsWith("/") || p.startsWith("\\\\") || /^[A-Za-z]:[\\/]/.test(p)
 }
 
 /** Path relative to `cwd` when it lives inside it, otherwise unchanged. */
@@ -99,7 +99,7 @@ const KNOWN_EXT = new Set([
 /** Conservative check for inline text that is probably a file reference. */
 export function looksLikePath(text: string): boolean {
   if (text.length > 260 || /\s/.test(text) || /^[a-z][a-z0-9+.-]*:\/\//i.test(text)) return false
-  const { path } = splitLine(text)
+  const { path } = splitLine(text.replace(/#L\d+(?:C\d+)?(?:-L?\d+(?:C\d+)?)?$/i, ""))
   if (!/^[\w@.~\-/\\:]+$/.test(path)) return false
   const name = normalize(path).split("/").pop() ?? ""
   const ext = name.includes(".") ? name.split(".").pop()!.toLowerCase() : ""

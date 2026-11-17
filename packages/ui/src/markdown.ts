@@ -1,12 +1,18 @@
 import DOMPurify from "dompurify"
 import { marked } from "marked"
 import { codeLanguage } from "@occ/core/code-block"
+import { keepFileHref } from "@occ/core/file-links"
 import { looksLikePath } from "@occ/core/paths"
 import { wrapTables } from "./markdown-tables"
 
 marked.setOptions({ gfm: true, breaks: false })
 
 const purify = DOMPurify(window)
+// `file:` links are kept on anchors only: the click handler turns them into "open this file" and never navigates.
+// An `<img src="file:…">` or any other element keeps the default URI rules.
+purify.addHook("uponSanitizeAttribute", (node, data) => {
+  if (keepFileHref(node.tagName, data.attrName, data.attrValue)) data.forceKeepAttr = true
+})
 purify.addHook("afterSanitizeAttributes", (node) => {
   if (node.tagName === "A") {
     node.setAttribute("rel", "noopener noreferrer")

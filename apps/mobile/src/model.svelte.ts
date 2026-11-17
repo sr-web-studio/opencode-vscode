@@ -8,6 +8,7 @@ import type { EventEnvelope } from "@occ/core/api"
 import { dataUri } from "@occ/core/attachments"
 import { ImageCache } from "@occ/core/image-cache"
 import { safeImageMime, type ImageRef } from "@occ/core/images"
+import { resolveFileLink } from "@occ/core/file-links"
 import { folderName, shortenHome } from "@occ/core/paths"
 import type { ModelSelection } from "@occ/core/models"
 import { defaultViewSettings, type ViewSettings } from "@occ/core/protocol"
@@ -1043,7 +1044,13 @@ class AppModel {
   /** What the editor did for the VS Code UI, as this app's screens. */
   hostFor(directory: string): MobileHost {
     return {
-      openFile: (path, line) => this.push({ kind: "file", directory, path, line }),
+      openFile: (path, line) => {
+        const ctl = this.workspace?.get(directory)
+        const sessionDirectory = ctl?.currentSessionID ? ctl.sessionMeta(ctl.currentSessionID)?.directory : undefined
+        const link = resolveFileLink(path, { home: this.home, sessionDirectory, roots: [directory] })
+        const candidates = link.candidates.length > 0 ? link.candidates : [path]
+        this.push({ kind: "file", directory, path: candidates[0]!, candidates, line: link.line ?? line })
+      },
       imageData: (sessionID, ref) => this.imageUri(directory, sessionID, ref),
       openImage: (sessionID, ref, name) => this.push({ kind: "image", directory, sessionID, ref, name }),
       openDiff: (file, patches) => this.push({ kind: "diff", directory, file, patches }),
