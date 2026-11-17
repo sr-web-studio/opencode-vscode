@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.22 (preview)
 
 - **Android app: Back closes the open tabs list** and returns focus to its button, before it closes the drawer, Settings or the screen.
 - **Changes to agents and OpenCode settings show up without reloading the window.** Saving an agent file or an `opencode.json`, or switching an account, refreshes the agents, models and defaults a moment later. What you picked for the next message stays while it still exists. This applies to the VS Code extension and the Android app.
