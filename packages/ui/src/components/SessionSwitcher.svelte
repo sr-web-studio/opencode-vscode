@@ -1,29 +1,23 @@
 <script lang="ts">
-  import { tick, type Snippet } from "svelte"
+  import { tick } from "svelte"
   import type { AppState } from "@occ/core/protocol"
+  import { contextLabel, contextTitle, contextUsage } from "@occ/core/context-usage"
   import { DRAFT_TITLE, UNTITLED } from "@occ/core/sessions"
+  import { registerBackOverlay } from "../back-overlay"
   import { useStore } from "../context"
   import { focusGuarded } from "../focus"
   import Codicon from "./Codicon.svelte"
 
   /**
    * The chat's breadcrumb under the session tab strip: the project the chat is in, the current session's title (click,
-   * F2 or double-click renames it) and the background-workers chip. The sessions-pane toggle and `+` live on the tab
-   * strip above it.
+   * F2 or double-click renames it) and, at the right edge, the context usage ("12k · 6%"). Like the tab strip it spans the view and sits at its edge; the conversation below
+   * keeps its centred column. The sessions-pane toggle and `+` live on the tab strip above it.
    *
    * The folder and session dropdowns that used to live here are gone: the sessions pane lists every folder and
    * session, and the phone's drawer does the same. The file kept its old name because this is still the header the
    * session switcher used to be.
    */
-  let {
-    app,
-    extra,
-    showProject = false,
-  }: {
-    app: AppState
-    extra?: Snippet
-    showProject?: boolean
-  } = $props()
+  let { app, showProject = false }: { app: AppState; showProject?: boolean } = $props()
   const store = useStore()
 
   /** Only the title is editable here; renaming another session is the pane's job. */
@@ -36,6 +30,27 @@
   const title = $derived(app.target.kind === "draft" ? DRAFT_TITLE : sessions.find((s) => s.id === currentID)?.title?.trim() || UNTITLED)
   const canRename = $derived(app.features.rename && !app.readOnly && !!currentID)
   const project = $derived(app.projectName?.trim() || app.folderName)
+  const usage = $derived(contextUsage(app.view, app.models))
+  /** The count's full numbers: shown on tap or click (a title needs a mouse), closed by Escape, an outside tap or Back. */
+  let usageOpen = $state(false)
+  let usageRoot: HTMLElement | undefined = $state()
+  function usageOutside(e: PointerEvent): void {
+    const t = e.target as Node | null
+    if (usageOpen && t && !usageRoot?.contains(t)) usageOpen = false
+  }
+  function usageKey(e: KeyboardEvent): void {
+    if (usageOpen && e.key === "Escape") {
+      usageOpen = false
+      e.preventDefault()
+    }
+  }
+  $effect(() => {
+    if (!usageOpen) return
+    return registerBackOverlay(() => (usageOpen = false))
+  })
+  $effect(() => {
+    if (!usage) usageOpen = false
+  })
   const projectTitle = $derived(app.projectName ? `${app.projectName} — ${app.folderName} (${app.directory})` : app.displayPath)
 
   async function startEdit(): Promise<void> {
@@ -102,15 +117,62 @@
       {/if}
     {/if}
   </div>
-  {@render extra?.()}
+  {#if usage}
+    <span class="usagewrap" bind:this={usageRoot}>
+      <button
+        class="usage muted small"
+        class:on={usageOpen}
+        onclick={() => (usageOpen = !usageOpen)}
+        aria-expanded={usageOpen}
+        aria-haspopup="true"
+        title={contextTitle(usage)}
+        aria-label="Context usage: {contextTitle(usage)}">{contextLabel(usage)}</button
+      >
+      {#if usageOpen}
+        <div class="usagetip" role="status">{contextTitle(usage)}</div>
+      {/if}
+    </span>
+  {/if}
 </header>
 
+<svelte:window onpointerdown={usageOutside} onkeydown={usageKey} />
+
 <style>
-  .switcher {
+  .usagewrap {
     position: relative;
+    flex: none;
+    margin-left: auto;
+  }
+  .usage {
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    padding: 0.1em 0.4em;
+    border-radius: 4px;
+    min-height: var(--oc-hit, 24px);
+  }
+  .usage:hover,
+  .usage.on {
+    color: var(--oc-fg);
+    background: var(--oc-hover);
+  }
+  /* The full numbers, for a finger that cannot hover. */
+  .usagetip {
+    position: absolute;
+    z-index: 30;
+    right: 0;
+    top: calc(100% + 4px);
+    white-space: nowrap;
+    padding: 0.4em 0.7em;
+    font-size: 0.9em;
+    background: var(--oc-popover);
+    border: 1px solid var(--oc-hairline);
+    border-radius: 6px;
+    box-shadow: 0 4px 16px var(--vscode-widget-shadow);
+  }
+  .switcher {
     display: flex;
     align-items: center;
-    padding: 0.4em var(--oc-side);
+    padding: 0.4em var(--oc-edge);
     border-bottom: 1px solid var(--oc-hairline);
     gap: 0.4em;
   }
