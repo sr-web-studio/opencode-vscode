@@ -316,14 +316,30 @@ body {
     min-height: 40px;
     min-width: 40px;
   }
-  /* Primary actions in the composer. */
-  .chat button.send,
-  .chat button.stop,
-  .chat button.clip,
-  .chat button.spark,
-  .chat button.mic {
-    min-height: 48px;
-    min-width: 48px;
+  /* Primary actions in the composer: a compact 34px circle to the eye, a 48px target for the finger (the invisible
+     `::after` reaches 7px past the circle; sideways only 3px, so neighbours do not fight over the same touch). */
+  .screen > .chat .box .actions button.send,
+  .screen > .chat .box .actions button.stop,
+  .screen > .chat .box .actions button.clip,
+  .screen > .chat .box .actions button.spark,
+  .screen > .chat .box .actions button.mic {
+    position: relative;
+    min-height: 0;
+    min-width: 0;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    justify-content: center;
+    border-radius: 50%;
+  }
+  .screen > .chat .box .actions button.send::after,
+  .screen > .chat .box .actions button.stop::after,
+  .screen > .chat .box .actions button.clip::after,
+  .screen > .chat .box .actions button.spark::after,
+  .screen > .chat .box .actions button.mic::after {
+    content: "";
+    position: absolute;
+    inset: -7px -3px;
   }
   .chat .link {
     display: inline-block;
@@ -424,6 +440,23 @@ body {
 /* The language chip above the prompt box is read at a glance: keep it at secondary-text size. */
 .screen > .chat .box .lang {
   font-size: 0.87em;
+}
+/* A compact composer leaves the screen to the conversation: tighter paddings and gaps, and a slightly shorter line. */
+.screen > .chat .box {
+  padding-top: 0.15em;
+  padding-bottom: 0.35em;
+  gap: 0.2em;
+}
+.screen > .chat .box .input {
+  gap: 0.1em;
+  padding: 0.3em 0.45em 0.2em;
+  border-radius: 18px;
+}
+.screen > .chat .box textarea {
+  line-height: 1.4;
+}
+.screen > .chat .box .actions {
+  gap: 0.2em;
 }
 /* Composer icons are tapped, not read: 20px is the smallest that still looks like a button. */
 .screen > .chat .box .clip,

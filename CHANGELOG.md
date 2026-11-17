@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Android app: a more compact prompt box, and the keyboard closes after you send.** The send, stop, attach and enhance buttons are now 34 dp circles that still have a 48 dp touch area, and the box has tighter padding and line spacing, so more of the conversation stays on screen when you hold the phone low. Tapping send hides the keyboard. The VS Code extension looks and behaves exactly as before.
+
 ## 0.3.21 (preview)
 
 - **The Active section can be made taller.** Dragging the bar above it upwards did nothing while its rows already fitted, because the section only ever shrank to its content. It now keeps the height you drag it to, and the empty room stays below the rows. Folding the section away still leaves only its header. This applies to the VS Code sessions pane and the Android drawer.

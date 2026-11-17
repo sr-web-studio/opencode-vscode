@@ -24,7 +24,7 @@
     type Suggestion,
   } from "@occ/core/slash"
   import { isRunning } from "@occ/core/transcript/reducer"
-  import { focusGuarded, focusWhenAllowed, readFocusEnv } from "../focus"
+  import { afterSend, focusGuarded, focusWhenAllowed, readFocusEnv } from "../focus"
   import { useStore } from "../context"
   import AgentModelPicker from "./AgentModelPicker.svelte"
   import Chip from "./Chip.svelte"
@@ -374,7 +374,7 @@
     enhanceError = ""
     void tick().then(() => {
       resize()
-      focusGuarded(area)
+      afterSend(area, caps.blurAfterSend === true)
     })
   }
 

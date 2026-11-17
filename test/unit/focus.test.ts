@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { readdirSync, readFileSync, statSync } from "node:fs"
 import { join } from "node:path"
 import { canTakeFocus, shouldFocusPrompt, type FocusEnv } from "@occ/core/focus"
+import { focusAfterSend } from "@occ/ui/after-send"
 
 const here: FocusEnv = { webviewFocused: true, otherEditableActive: false }
 const elsewhere: FocusEnv = { webviewFocused: false, otherEditableActive: false }
@@ -35,6 +36,21 @@ describe("shouldFocusPrompt", () => {
   test("both conditions together, and a decreasing counter (state reset) is still just a change", () => {
     expect(canTakeFocus({ webviewFocused: false, otherEditableActive: true })).toBe(false)
     expect(shouldFocusPrompt(3, 1, here)).toBe(true)
+  })
+})
+
+describe("focusAfterSend", () => {
+  test("a phone drops focus from the prompt box so the soft keyboard closes", () => {
+    expect(focusAfterSend(true, true)).toBe("blur")
+  })
+
+  test("a phone leaves a box that is not focused alone", () => {
+    expect(focusAfterSend(true, false)).toBe("none")
+  })
+
+  test("the editor keeps focusing the box after a send", () => {
+    expect(focusAfterSend(false, true)).toBe("focus")
+    expect(focusAfterSend(false, false)).toBe("focus")
   })
 })
 

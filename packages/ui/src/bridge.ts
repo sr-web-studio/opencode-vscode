@@ -20,6 +20,8 @@ export interface HostCapabilities {
   mcpSignIn?: boolean
   /** Plain Enter sends the prompt. False on a phone: Enter adds a new line and the send button sends. Default true. */
   enterSends?: boolean
+  /** Sending leaves the prompt box without focus, so a phone's soft keyboard closes and the conversation is visible. Default false. */
+  blurAfterSend?: boolean
   /** What a shell block offers: a terminal that mirrors the command (default), or a screen with its output. */
   shellView?: "terminal" | "output"
   /**

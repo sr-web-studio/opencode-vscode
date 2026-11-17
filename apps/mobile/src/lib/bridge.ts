@@ -50,6 +50,8 @@ export const MOBILE_CAPABILITIES: HostCapabilities = {
   editConfig: false,
   mcpSignIn: false,
   enterSends: false,
+  // After a send the keyboard goes away: the answer is what the user wants to see next.
+  blurAfterSend: true,
   shellView: "output",
   // The phone's own drawer already lists every project and session; the chat keeps its full width.
   sessionsPane: false,
