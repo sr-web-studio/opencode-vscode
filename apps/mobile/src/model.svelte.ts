@@ -23,6 +23,7 @@ import { parseDeepLink, routeDeepLink } from "./lib/deep-link"
 import { saveExport } from "./lib/export-file"
 import { LinkGate } from "./lib/link-gate"
 import { chooseLanding, lastUsedKey, parseLastUsed } from "./lib/landing"
+import { closeBackOverlay, hasBackOverlay } from "@occ/ui/back-overlay"
 import { backAction, canPop, directoriesInUse, pop, popKey, push, stackForSession, stackForWorker, type Entry, type Screen } from "./lib/nav"
 import { settleWithin, startIntent } from "./lib/start"
 import { DEFAULT_NOTIFY, NO_STATUS, NOTIFY_VERSION, nativeServers, parseNotifySettings, visibleSessionOf, type NotifySettings, type NotifyStatus } from "./lib/notify"
@@ -275,9 +276,10 @@ class AppModel {
     this.setStack(this.stack.map((e) => (e.key === key ? { key, screen } : e)))
   }
 
-  /** Android back: a dialog first, then the drawer, then Settings, then the top screen. False at the bottom: the app leaves. */
+  /** Android back: an open tabs list first, then a dialog, the drawer, Settings, then the top screen. False at the bottom: the app leaves. */
   back(): boolean {
-    const action = backAction({ modal: !!this.modal, drawer: this.drawerOpen, settings: this.settingsOpen, canPop: canPop(this.stack) })
+    const action = backAction({ overlay: hasBackOverlay(), modal: !!this.modal, drawer: this.drawerOpen, settings: this.settingsOpen, canPop: canPop(this.stack) })
+    if (action === "overlay") return closeBackOverlay()
     if (action === "modal") {
       this.answer(false)
       return true
