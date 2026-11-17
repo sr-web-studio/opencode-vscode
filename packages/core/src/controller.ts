@@ -2,7 +2,7 @@ import type { EventEnvelope, FormInfo, OpenCodeClient, PermissionRequest, Sessio
 import { initialTarget, planNewSession, type ViewTarget } from "./draft"
 import { SessionFeed } from "./feed"
 import { detectFeatures, isUnsupported } from "./features"
-import { agentModel, configuredModel, inheritedVariant, normalizeModelSelection, primaryAgents, resolveModel, sameModel, usableModel, type ModelSelection } from "./models"
+import { agentModel, configuredModel, inheritedVariant, normalizeModelSelection, primaryAgents, resolveModel, sameModel, usableModel, withoutDefaultVariant, type ModelSelection } from "./models"
 import { normalizePins, togglePin } from "./pins"
 import { defaultViewSettings, type Action, type AgentSummary, type AppState, type ConnectionState, type EnhanceState, type FolderSession, type PromptRestore, type ViewSettings } from "./protocol"
 import { isRoot, upsertSession } from "./sessions"
@@ -1711,13 +1711,14 @@ export class Controller {
       return
     }
     // A session records its variant. Another model picked without one gets the variant it would inherit (the agent's or
-    // the configured one for that model), as OpenCode's web app commits it; the model on screen keeps what it shows.
+    // the configured one for that model), as OpenCode's web app commits it; the model on screen keeps what it shows. An
+    // explicit "Default" is recorded as no variant, which the server runs as the model's default.
     const session = this.sessions.find((s) => s.id === id) ?? this.archived.find((s) => s.id === id)
     const shown = this.shownModel(session)
     const agent = this.shownAgent(session)
     const inherit = !picked.variant && !sameModel(shown, picked)
     const variant = inherit ? inheritedVariant({ model: picked, models: this.models, agent: agent ? this.agentModels.get(agent) : undefined, configured: this.configModel }) : undefined
-    const model: ModelSelection = variant ? { ...picked, variant } : picked
+    const model: ModelSelection = variant ? { ...picked, variant } : withoutDefaultVariant(picked)
     this.sessions = this.sessions.map((s) => (s.id === id ? { ...s, model } : s))
     this.emitNow()
     await this.need().session.switchModel({ sessionID: id, model })

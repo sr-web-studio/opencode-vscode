@@ -22,7 +22,7 @@ const session = (id: string, extra: Record<string, unknown> = {}) => ({ id, titl
 const OPUS_HIGH = { id: "opus", providerID: "cli", variant: "high" }
 const SONNET = { id: "sonnet", providerID: "cli" }
 
-function server(opts: { sessions?: unknown[]; config?: unknown[] } = {}) {
+function server(opts: { sessions?: unknown[]; config?: unknown[]; agents?: unknown[] } = {}) {
   const calls: Array<[string, any]> = []
   const rec = (name: string, result?: unknown) => async (input?: any) => (calls.push([name, input]), result)
   const unsupported = () => Promise.reject(new Error("404 not found"))
@@ -51,6 +51,7 @@ function server(opts: { sessions?: unknown[]; config?: unknown[] } = {}) {
           agent("review", { model: OPUS_HIGH }),
           agent("plain", { model: { id: "plain", providerID: "cli" } }),
           agent("worker", { mode: "subagent", model: { id: "opus", providerID: "cli", variant: "low" } }),
+          ...(opts.agents ?? []),
         ],
       }),
     },
@@ -171,5 +172,43 @@ describe("agent models", () => {
     const { ctl, calls } = await ready({ sessions: [session("ses_a", { agent: "review" })] }, "ses_a")
     await ctl.dispatch({ type: "pickModel", model: { id: "opus", providerID: "cli" } })
     expect(calls).toEqual([["session.switchModel", { sessionID: "ses_a", model: { id: "opus", providerID: "cli" } }]])
+  })
+
+  test("existing session: an agent with a model switches a session that recorded none; one without a model does not", async () => {
+    const { ctl, calls } = await ready({ sessions: [session("ses_a", { agent: "build", model: null })] }, "ses_a")
+    await ctl.dispatch({ type: "pickAgent", id: "review" })
+    expect(calls).toEqual([
+      ["session.switchAgent", { sessionID: "ses_a", agent: "review" }],
+      ["session.switchModel", { sessionID: "ses_a", model: OPUS_HIGH }],
+    ])
+    const other = await ready({ sessions: [session("ses_b", { agent: "review", model: null })] }, "ses_b")
+    await other.ctl.dispatch({ type: "pickAgent", id: "build" })
+    expect(other.calls).toEqual([["session.switchAgent", { sessionID: "ses_b", agent: "build" }]])
+  })
+
+  test("an agent variant the model does not list runs without a variant", async () => {
+    const { ctl, calls } = await ready({ agents: [agent("odd", { model: { id: "opus", providerID: "cli", variant: "turbo" } })] })
+    await ctl.dispatch({ type: "pickAgent", id: "odd" })
+    expect(ctl.snapshot().model).toEqual({ id: "opus", providerID: "cli" })
+    await ctl.dispatch({ type: "send", text: "hi" })
+    expect(calls[0]![1].model).toEqual({ id: "opus", providerID: "cli" })
+  })
+})
+
+describe("the explicit Default variant", () => {
+  test("draft: Default shows and creates the session without a variant, not the agent's", async () => {
+    const { ctl, calls } = await ready()
+    await ctl.dispatch({ type: "pickAgent", id: "review" })
+    await ctl.dispatch({ type: "pickModel", model: { id: "opus", providerID: "cli", variant: "default" } })
+    expect(ctl.snapshot().model).toEqual({ id: "opus", providerID: "cli" })
+    await ctl.dispatch({ type: "send", text: "hi" })
+    expect(calls[0]).toEqual(["session.create", { location: { directory: "/w" }, agent: "review", model: { id: "opus", providerID: "cli" } }])
+  })
+
+  test("existing session: Default is recorded as no variant and not inherited again", async () => {
+    const { ctl, calls } = await ready({ sessions: [session("ses_a", { agent: "review", model: SONNET })] }, "ses_a")
+    await ctl.dispatch({ type: "pickModel", model: { id: "opus", providerID: "cli", variant: "default" } })
+    expect(calls).toEqual([["session.switchModel", { sessionID: "ses_a", model: { id: "opus", providerID: "cli" } }]])
+    expect(ctl.snapshot().model).toEqual({ id: "opus", providerID: "cli" })
   })
 })

@@ -57,6 +57,13 @@ export function modelSections(input: ModelQueryInput & { pins: ReadonlyArray<str
 
 export type ModelSelection = { id: string; providerID: string; variant?: string }
 
+/**
+ * The variant id of an explicit "Default" pick: the model runs without a variant, and the agent's or the configured
+ * variant is not inherited. OpenCode itself treats `default` as no variant. It only travels from the picker to the
+ * controller; the server and the footer never see it.
+ */
+export const DEFAULT_VARIANT = "default"
+
 /** A stored selection (host storage may be stale or hand-edited), or nothing when it is not a model reference. */
 export function normalizeModelSelection(raw: unknown): ModelSelection | undefined {
   const o = raw as { id?: unknown; providerID?: unknown; variant?: unknown } | null | undefined
@@ -120,15 +127,20 @@ export function usableModel(models: ReadonlyArray<SlimModel>, ref: { id: string;
   return !!found && found.enabled
 }
 
+/** A pick as the server records it: the explicit "Default" becomes no variant. */
+export function withoutDefaultVariant(model: ModelSelection): ModelSelection {
+  return model.variant === DEFAULT_VARIANT ? { id: model.id, providerID: model.providerID } : model
+}
+
 /**
  * The model and variant a session or draft runs with, in OpenCode's web app order: the explicit choice (the session's
  * recorded model, or the draft's pick), then the agent's model, then the configured default, then the server's default
  * model. The explicit choice is kept even when the catalog no longer lists it (the session still names it); the agent's
  * and the configured model are skipped when this server does not offer them.
  *
- * The variant: an explicit choice that names one keeps it while the model lists it. A session's recorded model without
- * a variant runs with none. Everything else (a draft pick that named no variant, the agent's, the configured or the
- * server's default model) inherits one through `inheritedVariant`.
+ * The variant: an explicit choice that names one keeps it while the model lists it, and an explicit `DEFAULT_VARIANT`
+ * means none. A session's recorded model without a variant runs with none. Everything else (a draft pick that named no
+ * variant, the agent's, the configured or the server's default model) inherits one through `inheritedVariant`.
  */
 export function resolveModel(args: {
   explicit?: ModelSelection
@@ -161,10 +173,14 @@ export function footerLabel(args: { agent?: string; model?: ModelSelection; mode
   }
 }
 
-/** Step to the next/previous variant of a model, wrapping. */
+/**
+ * Step to the next/previous variant of a model, wrapping through "Default" (no variant, `undefined`) between the last
+ * and the first, like OpenCode's web app (`cycleModelVariant`).
+ */
 export function cycleVariant(model: SlimModel, current: string | undefined, step = 1): string | undefined {
   const ids = model.variants.map((v) => v.id)
   if (ids.length === 0) return undefined
-  const i = current ? ids.indexOf(current) : -1
-  return ids[(i + step + ids.length * 2) % ids.length]
+  const positions: Array<string | undefined> = [undefined, ...ids]
+  const i = current && ids.includes(current) ? positions.indexOf(current) : 0
+  return positions[(i + step + positions.length * 2) % positions.length]
 }

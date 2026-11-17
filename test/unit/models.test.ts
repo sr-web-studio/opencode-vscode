@@ -1,5 +1,18 @@
 import { describe, expect, test } from "bun:test"
-import { agentModel, configuredModel, cycleAgent, cycleVariant, footerLabel, groupModels, inheritedVariant, primaryAgents, resolveModel, usableModel } from "@occ/core/models"
+import {
+  agentModel,
+  configuredModel,
+  cycleAgent,
+  cycleVariant,
+  DEFAULT_VARIANT,
+  footerLabel,
+  groupModels,
+  inheritedVariant,
+  primaryAgents,
+  resolveModel,
+  usableModel,
+  withoutDefaultVariant,
+} from "@occ/core/models"
 import type { SlimModel } from "@occ/core/api"
 
 const m = (id: string, providerID: string, name: string, extra: Partial<SlimModel> = {}): SlimModel => ({
@@ -59,7 +72,14 @@ describe("model groups", () => {
     expect(footerLabel({ model: { id: "s", providerID: "anthropic", variant: "xhigh" }, models }).variant).toBe("X-High")
     expect(footerLabel({ models: [] }).model).toBe("model")
     expect(cycleVariant(models[0]!, "low")).toBe("high")
-    expect(cycleVariant(models[0]!, "high")).toBe("low")
+  })
+  test("variant cycling passes through Default (no variant) between the last and the first, both ways", () => {
+    expect(cycleVariant(models[0]!, "high")).toBeUndefined()
+    expect(cycleVariant(models[0]!, undefined)).toBe("low")
+    expect(cycleVariant(models[0]!, "low", -1)).toBeUndefined()
+    expect(cycleVariant(models[0]!, undefined, -1)).toBe("high")
+    expect(cycleVariant(models[0]!, "turbo")).toBe("low")
+    expect(cycleVariant(m("p", "cli", "Plain", { variants: [] }), undefined)).toBeUndefined()
   })
 })
 
@@ -125,6 +145,13 @@ describe("model resolution", () => {
 
   test("a session's recorded model is kept even when the catalog no longer lists it", () => {
     expect(resolveModel({ explicit: { id: "gone", providerID: "cli", variant: "high" }, agent: opusHigh, models })).toEqual({ id: "gone", providerID: "cli", variant: "high" })
+  })
+
+  test("an explicit Default pick runs without a variant and inherits none", () => {
+    const opusDefault = { id: "opus", providerID: "cli", variant: DEFAULT_VARIANT }
+    expect(resolveModel({ explicit: opusDefault, explicitInherits: true, agent: opusHigh, models })).toEqual({ id: "opus", providerID: "cli" })
+    expect(withoutDefaultVariant(opusDefault)).toEqual({ id: "opus", providerID: "cli" })
+    expect(withoutDefaultVariant(opusHigh)).toBe(opusHigh)
   })
 
   test("usable models: enabled and listed, anything before the catalog loads", () => {
