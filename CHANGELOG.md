@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- **Changes to agents and OpenCode settings show up without reloading the window.** Saving an agent file or an `opencode.json`, or switching an account, refreshes the agents, models and defaults a moment later. What you picked for the next message stays while it still exists. This applies to the VS Code extension and the Android app.
+- **An agent's own model is used.** An agent whose file sets `model: provider/model#high` shows that model and variant when you pick it and switches an open session to it. A new session now records the agent and model it was started with, like the OpenCode web app. The model picker has a **Default** choice for running a model without a variant. This applies to the VS Code extension and the Android app.
+
 ## 0.3.21 (preview)
 
 - **The Active section can be made taller.** Dragging the bar above it upwards did nothing while its rows already fitted, because the section only ever shrank to its content. It now keeps the height you drag it to, and the empty room stays below the rows. Folding the section away still leaves only its header. This applies to the VS Code sessions pane and the Android drawer.
