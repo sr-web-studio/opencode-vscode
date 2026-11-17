@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Session tabs all have the same width, and the ones that do not fit go behind the arrow.** The tabs no longer squeeze to a few letters at different widths: every tab, the current one included, is as wide as the others and keeps a readable title. This applies to the VS Code extension and the Android app.
+
 ## 0.3.22 (preview)
 
 - **Android app: Back closes the open tabs list** and returns focus to its button, before it closes the drawer, Settings or the screen.

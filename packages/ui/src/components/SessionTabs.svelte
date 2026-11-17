@@ -8,7 +8,6 @@
     attentionStatus,
     fitTabs,
     heldOrder,
-    measureKey,
     nextAfterClose,
     orderTabs,
     OwnSessionsMemo,
@@ -146,23 +145,21 @@
   let area: HTMLDivElement | undefined = $state()
   let measure: HTMLDivElement | undefined = $state()
   let available = $state(Number.POSITIVE_INFINITY)
-  let widths = $state.raw<number[]>([])
-  let mins = $state.raw<number[]>([])
-  let button = $state(0)
+  /** The narrowest and widest a tab may be and the overflow button's width, in px: read once from three hidden probes. */
+  let sizes = $state.raw<number[]>([0, 0, 0])
 
-  /** Read the hidden copies' widths. Each value is written only when it changed, so an unchanged strip does not re-fit. */
+  /**
+   * Read the probes and the row's width. Every tab has the same width, so nothing depends on the titles: only the row's
+   * size and the probes (which follow the font size) matter. The state is written only when a value changed, so an
+   * unchanged strip does not re-fit.
+   */
   function remeasure(): void {
     if (!area || !measure) return
-    const children = [...measure.children] as HTMLElement[]
-    const probe = children.pop()
-    const nextButton = probe?.getBoundingClientRect().width ?? 0
-    const nextWidths = children.map((el) => el.getBoundingClientRect().width)
-    const nextMins = children.map((el) => parseFloat(getComputedStyle(el).minWidth) || 0)
+    const [min, max, more] = [...measure.children].map((el) => el.getBoundingClientRect().width)
+    const next = [min ?? 0, max ?? 0, more ?? 0]
     // The `+` always follows the tabs.
-    const nextAvailable = area.clientWidth - nextButton - GAP
-    if (nextButton !== button) button = nextButton
-    if (!sameNumbers(nextWidths, widths)) widths = nextWidths
-    if (!sameNumbers(nextMins, mins)) mins = nextMins
+    const nextAvailable = area.clientWidth - next[2]! - GAP
+    if (!sameNumbers(next, sizes)) sizes = next
     if (nextAvailable !== available) available = nextAvailable
   }
 
@@ -174,18 +171,17 @@
     remeasure()
     return () => observer.disconnect()
   })
-  // A tab added, closed, renamed, re-ordered or made active changes the widths; the observer only sees the row's size.
-  // The key is a string, so an equal one (a streamed answer, a status that keeps its shape) does not re-run this.
-  const widthKey = $derived(measureKey(entries, draft ? "\u0000draft" : currentID))
+  // The overflow button's width follows its count's digits.
   $effect(() => {
-    void widthKey
+    void entries.length
     queueMicrotask(remeasure)
   })
 
+  const measured = $derived(sizes[1]! > 0)
   const fit = $derived(
-    widths.length === entries.length
-      ? fitTabs(widths, available, { gap: GAP, overflow: button, min: mins, active: activeIndex < 0 ? undefined : activeIndex })
-      : { visible: entries.map((_, i) => i), hidden: [] },
+    measured
+      ? fitTabs(entries.length, available, { gap: GAP, overflow: sizes[2]!, min: sizes[0]!, max: sizes[1]!, active: activeIndex < 0 ? undefined : activeIndex })
+      : { visible: entries.map((_, i) => i), hidden: [], width: 0 },
   )
   const visible = $derived(fit.visible.map((index) => entries[index]!))
   const hiddenSessions = $derived(fit.hidden.flatMap((index) => (entries[index]?.kind === "session" ? [(entries[index] as { session: TabSession }).session] : [])))
@@ -297,7 +293,7 @@
   <div class="area" bind:this={area}>
     <nav class="tabs" aria-label="Open sessions" bind:this={nav}>
       {#each visible as entry (entry.kind === "draft" ? "\u0000draft" : entry.session.id)}
-        {@render tab(entry, false)}
+        {@render tab(entry)}
       {/each}
     </nav>
     {#if hiddenSessions.length > 0}
@@ -314,13 +310,11 @@
     {/if}
     <button class="btn" onclick={newSession} title="New session" aria-label="New session"><Codicon name="add" /></button>
   </div>
-  <!-- Every tab at its natural width, invisible and clipped: what the fit is computed from. The last child is the
-       overflow button's size. -->
+  <!-- Invisible probes the fit is computed from: the narrowest tab, the widest tab, and the overflow button. -->
   <div class="clip" aria-hidden="true" inert>
     <div class="measure" bind:this={measure}>
-      {#each entries as entry (entry.kind === "draft" ? "\u0000draft" : entry.session.id)}
-        {@render tab(entry, true)}
-      {/each}
+      <span class="probe-min"></span>
+      <span class="probe-max"></span>
       <span class="btn more"><Codicon name="chevron-down" /><span class="count">{Math.max(hiddenSessions.length, 1)}</span></span>
     </div>
   </div>
@@ -339,17 +333,17 @@
   {/if}
 </div>
 
-{#snippet tab(entry: TabEntry, probe: boolean)}
+{#snippet tab(entry: TabEntry)}
   {#if entry.kind === "draft"}
-    <div class="tab active" class:probe>
-      <button class="pick" aria-current="page" title={DRAFT_TITLE} tabindex={probe ? -1 : undefined}>
+    <div class="tab active" style:width={fit.width > 0 ? `${fit.width}px` : undefined}>
+      <button class="pick" aria-current="page" title={DRAFT_TITLE}>
         <span class="avatar-new"><Codicon name="edit" /></span>
         <span class="title">{DRAFT_TITLE}</span>
       </button>
       {#if order.length > 0}
         <span class="end">
           <span class="slot">
-            <button class="x" onclick={closeDraft} title="Close tab" aria-label="Close tab {DRAFT_TITLE}" tabindex={probe ? -1 : undefined}><Codicon name="close" /></button>
+            <button class="x" onclick={closeDraft} title="Close tab" aria-label="Close tab {DRAFT_TITLE}"><Codicon name="close" /></button>
           </span>
         </span>
       {/if}
@@ -358,14 +352,13 @@
     {@const session = entry.session}
     {@const active = session.id === currentID}
     {@const attention = attentionStatus(session.status)}
-    <div class="tab" class:active class:probe class:unread={session.status === "unread"} data-status={session.status}>
+    <div class="tab" class:active class:unread={session.status === "unread"} data-status={session.status} style:width={fit.width > 0 ? `${fit.width}px` : undefined}>
       <button
         class="pick"
         data-id={session.id}
         aria-current={active ? "page" : undefined}
         aria-label={tabLabel(session)}
         title={tabLabel(session)}
-        tabindex={probe ? -1 : undefined}
         onclick={() => select(session)}
         onauxclick={(e) => {
           if (e.button !== 1) return
@@ -384,9 +377,7 @@
         {#if attention}<span class="status"><SessionStatusIcon status={session.status} quiet /></span>{/if}
         <span class="slot">
           {#if !attention}<span class="status plain"><SessionStatusIcon status={session.status} quiet /></span>{/if}
-          <button class="x" onclick={() => closeFromStrip(session.id)} title="Close tab (the session is kept)" aria-label="Close tab {session.title}" tabindex={probe ? -1 : undefined}
-            ><Codicon name="close" /></button
-          >
+          <button class="x" onclick={() => closeFromStrip(session.id)} title="Close tab (the session is kept)" aria-label="Close tab {session.title}"><Codicon name="close" /></button>
         </span>
       </span>
     </div>
@@ -442,24 +433,17 @@
   }
   .tab {
     position: relative;
-    flex: 0 1 auto;
+    /* The width is set by the fit: one width for every tab, the active one included. */
+    flex: none;
     display: flex;
     align-items: center;
-    max-width: 14em;
-    min-width: 6.5em;
     height: var(--tab-row);
     border-radius: 4px;
     color: var(--oc-muted);
   }
   .tab.active {
-    min-width: 8.5em;
     background: var(--oc-selected);
     color: var(--oc-selected-fg);
-  }
-  /* A running, waiting or failed tab carries its icon besides the close button's slot: a higher floor keeps some of
-     its title readable (the fit then hides a tab sooner rather than squeezing every title away). */
-  .tab:not(.active):is([data-status="running"], [data-status="waiting"], [data-status="failed"]) {
-    min-width: 8em;
   }
   .tab:not(.active):hover {
     background: var(--oc-hover);
@@ -547,17 +531,6 @@
   }
   /* A finger has no hover: only the tab on screen offers its close button, and it is full size. */
   @media (hover: none) {
-    /* A phone is narrow: smaller floors let a second tab sit next to the one on screen instead of only the arrow. */
-    .tab,
-    .tab:not(.active):is([data-status="running"], [data-status="waiting"], [data-status="failed"]) {
-      min-width: 4.5em;
-      flex-shrink: 4;
-    }
-    /* The tab on screen gives way last, so its title stays readable next to its full-size close button. */
-    .tab.active {
-      min-width: 6.5em;
-      flex-shrink: 1;
-    }
     .tab.active .slot {
       width: var(--tab-row);
       height: var(--tab-row);
@@ -591,6 +564,19 @@
   }
   .measure > :global(*) {
     flex: none;
+  }
+  /* The narrowest tab keeps a readable title: the avatar, about 8 characters and the status or close slot. */
+  .probe-min {
+    width: 9.5em;
+  }
+  .probe-max {
+    width: 14em;
+  }
+  /* A phone is narrow: a smaller narrowest tab (still about 6 characters of title) leaves room for a second tab. */
+  @media (hover: none) {
+    .probe-min {
+      width: 8em;
+    }
   }
   /* The close button's own `visibility: visible` would otherwise show through the hidden copies. */
   .clip :global(*) {
