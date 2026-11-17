@@ -1,6 +1,6 @@
 <script lang="ts">
   import { tick } from "svelte"
-  import { cycleVariant, footerLabel, modelSections, sameModel } from "@occ/core/models"
+  import { cycleVariant, DEFAULT_VARIANT, footerLabel, modelSections, sameModel } from "@occ/core/models"
   import { pinKey } from "@occ/core/pins"
   import { displayName, variantName } from "@occ/core/names"
   import type { AppState } from "@occ/core/protocol"
@@ -55,6 +55,8 @@
     close()
     store.dispatch({ type: "pickModel", model: { id, providerID, variant } })
   }
+  /** The model on screen keeps the variant it shows; none shown is an explicit "Default", so nothing is inherited. */
+  const keptVariant = (m: { id: string; providerID: string }) => (sameModel(app.model, m) ? (app.model?.variant ?? DEFAULT_VARIANT) : undefined)
 
   function onkey(e: KeyboardEvent) {
     const size = popover === "agent" ? app.agents.length : flat.length
@@ -75,7 +77,7 @@
         if (a) chooseAgent(a.id)
       } else {
         const m = flat[index]?.m
-        if (m) chooseModel(m.id, m.providerID, sameModel(app.model, m) ? app.model?.variant : undefined)
+        if (m) chooseModel(m.id, m.providerID, keptVariant(m))
       }
     } else if (popover === "model" && e.key === "p" && e.ctrlKey) {
       const m = flat[index]?.m
@@ -88,7 +90,7 @@
       if (m && m.variants.length) {
         e.preventDefault()
         const v = cycleVariant(m, sameModel(app.model, m) ? app.model?.variant : undefined, e.key === "ArrowRight" ? 1 : -1)
-        chooseModel(m.id, m.providerID, v)
+        chooseModel(m.id, m.providerID, v ?? DEFAULT_VARIANT)
       }
     }
   }
@@ -168,7 +170,7 @@
               role="option"
               tabindex="-1"
               aria-selected={current}
-              onclick={() => chooseModel(m.id, m.providerID, current ? app.model?.variant : undefined)}
+              onclick={() => chooseModel(m.id, m.providerID, keptVariant(m))}
               onmousemove={() => (index = i)}
             >
               <span class="check"
@@ -187,6 +189,17 @@
                 aria-pressed={isPinned}><Codicon name={isPinned ? "pinned" : "pin"} /></button
               >
               <span class="vars">
+                {#if m.variants.length}
+                  <button
+                    class="var"
+                    class:on={current && !app.model?.variant}
+                    title="The model's own default, without a variant"
+                    onclick={(e) => {
+                      e.stopPropagation()
+                      chooseModel(m.id, m.providerID, DEFAULT_VARIANT)
+                    }}>Default</button
+                  >
+                {/if}
                 {#each m.variants as v (v.id)}
                   <button
                     class="var"
