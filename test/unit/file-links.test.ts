@@ -91,6 +91,11 @@ describe("keepFileHref", () => {
   test("file: is kept on anchors only", () => {
     expect(keepFileHref("A", "href", "file:///a/b.md")).toBe(true)
     expect(keepFileHref("a", "HREF", " FILE:///a/b.md")).toBe(true)
+    expect(keepFileHref("A", "href", "a.ts:12")).toBe(true)
+    expect(keepFileHref("A", "href", "a.ts:12:3#L4")).toBe(true)
+    expect(keepFileHref("A", "href", "C:\\x\\a.md")).toBe(true)
+    expect(keepFileHref("A", "href", "mailto:a.b")).toBe(false)
+    expect(keepFileHref("IMG", "src", "a.ts:12")).toBe(false)
     expect(keepFileHref("IMG", "src", "file:///a/b.png")).toBe(false)
     expect(keepFileHref("A", "src", "file:///a/b.png")).toBe(false)
     expect(keepFileHref("A", "href", "javascript:alert(1)")).toBe(false)

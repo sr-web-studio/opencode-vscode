@@ -157,9 +157,14 @@ export function resolveFileLink(raw: string, ctx: FileLinkContext = {}): FileLin
   return { candidates: unique(bases.map((b) => joinPath(b, path))), ...position }
 }
 
-/** The sanitizer keeps a `file:` href on an anchor (and nowhere else: not on `<img src>`). */
+/**
+ * The sanitizer drops hrefs that look like an unknown URI scheme. On an anchor (and nowhere else: not on `<img src>`)
+ * it keeps the ones that are files: `file://…`, a Windows `C:\…` path, and a bare `name.ext:12` with a line number.
+ */
 export function keepFileHref(tag: string, attribute: string, value: string): boolean {
-  return tag.toUpperCase() === "A" && attribute.toLowerCase() === "href" && /^file:\/\//i.test(value.trim())
+  if (tag.toUpperCase() !== "A" || attribute.toLowerCase() !== "href") return false
+  const v = value.trim()
+  return /^file:\/\//i.test(v) || DRIVE.test(v) || /^[^:/\\#?]+\.[A-Za-z0-9]+:\d+(?::\d+)?(?:[#?].*)?$/.test(v)
 }
 
 /**
