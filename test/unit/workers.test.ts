@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { backgroundSummary, deriveWorkers, matchChild, sessionIDFromOutput, toolChildID, type ChildSession } from "@occ/core/workers"
+import { backgroundLabel, backgroundSummary, deriveWorkers, matchChild, sessionIDFromOutput, toolChildID, type ChildSession } from "@occ/core/workers"
 import { applyEvent, viewFromMessages } from "@occ/core/transcript/reducer"
 import { emptyView, type SessionView, type ToolItem } from "@occ/core/transcript/types"
 import fixture from "../fixtures/grep-glob-subagent-question.json"
@@ -125,6 +125,14 @@ describe("deriveWorkers", () => {
   test("summary counts workers, running ones and shells", () => {
     const ws = deriveWorkers({ view: viewOf(tool({ id: "a", status: "running", metadata: { sessionID: "ses_1" } })), children: [child("ses_9", { outcome: "succeeded" })], running: none })
     expect(backgroundSummary(ws, 1)).toEqual({ workers: 2, running: 1, shells: 1 })
+  })
+  test("the chip's label names workers and shells, and the running ones", () => {
+    expect(backgroundLabel({ workers: 3, running: 0, shells: 0 })).toBe("3 subagents")
+    expect(backgroundLabel({ workers: 3, running: 1, shells: 0 })).toBe("3 subagents · 1 running")
+    expect(backgroundLabel({ workers: 1, running: 0, shells: 0 })).toBe("1 subagent")
+    expect(backgroundLabel({ workers: 3, running: 0, shells: 1 })).toBe("3 subagents · 1 shell")
+    expect(backgroundLabel({ workers: 2, running: 2, shells: 1 })).toBe("2 subagents · 1 shell · 2 running")
+    expect(backgroundLabel({ workers: 0, running: 0, shells: 2 })).toBe("2 shells")
   })
 })
 

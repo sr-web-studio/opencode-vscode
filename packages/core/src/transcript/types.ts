@@ -44,6 +44,10 @@ export type StepView = {
   completed?: number
   finish?: string
   error?: string
+  /** The model that ran this step, to look up its context window. */
+  model?: { id: string; providerID: string }
+  /** Total tokens the step reported (input, output, reasoning, cache), for the context usage count. */
+  tokens?: number
   items: StepItem[]
 }
 
@@ -54,7 +58,15 @@ export type Outcome = "succeeded" | "failed" | "interrupted"
  * `status` is unset once it completed. `running`: the summary is still being written (`summary` is the text so far).
  * `failed` / `cancelled` (the user pressed Stop): `error` says why.
  */
-export type CompactionView = { summary: string; reason?: string; created?: number; status?: "running" | "failed" | "cancelled"; error?: string }
+export type CompactionView = {
+  summary: string
+  reason?: string
+  created?: number
+  status?: "running" | "failed" | "cancelled"
+  error?: string
+  /** For a compaction inside a turn: how many of the turn's steps came before it (they are no longer in the context). */
+  stepsBefore?: number
+}
 
 export type TurnView = {
   /** Message id of the user message, or a synthetic id when the turn has none. */

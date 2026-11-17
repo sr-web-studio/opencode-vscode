@@ -1,6 +1,7 @@
 import type { EventEnvelope, SessionMessageInfo } from "../api"
 import { baseName, isFileUri, isImageMime, mimeFromName } from "../attachments"
 import { attachmentSource } from "../images"
+import { tokenTotal } from "../context-usage"
 import { settledTurn } from "./turn"
 import { applyRevertEvent } from "./revert"
 import { toolErrorText } from "./tool-error"
@@ -95,7 +96,17 @@ function stepFromHistory(m: any): StepView {
     completed: m.time?.completed,
     finish: m.finish,
     error: errorText(m.error),
+    ...stepUsage(m.model, m.tokens),
     items,
+  }
+}
+
+/** The model and the token total of a step, for the context usage count. Nothing for a step without them. */
+function stepUsage(model: any, tokens: unknown): Pick<StepView, "model" | "tokens"> {
+  const total = tokenTotal(tokens)
+  return {
+    ...(typeof model?.id === "string" && typeof model?.providerID === "string" ? { model: { id: model.id, providerID: model.providerID } } : {}),
+    ...(total !== undefined ? { tokens: total } : {}),
   }
 }
 
@@ -143,7 +154,7 @@ export function viewFromMessages(messages: ReadonlyArray<SessionMessageInfo>): S
       const view = compactionView(m.summary, m.reason, m.time?.created, historyStatus(m))
       if (current && !current.outcome) {
         // An auto compaction runs inside a turn (prompt, compaction, answer): it is a line of that turn.
-        current.compacted = view
+        current.compacted = { ...view, stepsBefore: current.steps.length }
       } else {
         turns.push(compactionTurn(`compaction:${m.id}`, view))
         current = undefined
@@ -208,7 +219,7 @@ function setCompaction(view: SessionView, next: CompactionView, id: string): Ses
   if (pending) {
     const turn = view.turns[pending.index]!
     const done: TurnView = pending.inTurn
-      ? { ...turn, compacted: next }
+      ? { ...turn, compacted: { ...next, stepsBefore: turn.compacted?.stepsBefore ?? turn.steps.length } }
       : { ...turn, compaction: next, ended: next.status === "running" ? undefined : next.created, outcome: next.status === "running" ? undefined : "succeeded" }
     return { ...view, turns: replaceAt(view.turns, pending.index, done) }
   }
@@ -216,7 +227,7 @@ function setCompaction(view: SessionView, next: CompactionView, id: string): Ses
   // Between turns it is a marker turn of its own.
   const index = view.turns.length - 1
   const last = view.turns[index]
-  if (last && !last.outcome) return { ...view, turns: replaceAt(view.turns, index, { ...last, compacted: next }) }
+  if (last && !last.outcome) return { ...view, turns: replaceAt(view.turns, index, { ...last, compacted: { ...next, stepsBefore: last.steps.length } }) }
   return { ...view, turns: [...view.turns, compactionTurn(`compaction:live:${id}`, next)] }
 }
 
@@ -372,13 +383,13 @@ export function applyEvent(view: SessionView, ev: EventEnvelope): SessionView {
       return { ...view, queued: rest, turns }
     }
     case "session.step.started":
-      return updateStep(view, d.assistantMessageID, d.started ?? t, (s) => ({ ...s, agent: d.agent, started: d.started ?? t }))
+      return updateStep(view, d.assistantMessageID, d.started ?? t, (s) => ({ ...s, agent: d.agent, started: d.started ?? t, ...stepUsage(d.model, undefined) }))
     case "session.step.streamed":
       return updateStep(view, d.assistantMessageID, t, (s) => s)
     case "session.step.ended":
-      return updateStep(view, d.assistantMessageID, t, (s) => ({ ...s, finish: d.finish, completed: t }))
+      return updateStep(view, d.assistantMessageID, t, (s) => ({ ...s, finish: d.finish, completed: t, ...stepUsage(undefined, d.tokens) }))
     case "session.step.failed":
-      return updateStep(view, d.assistantMessageID, t, (s) => ({ ...s, completed: t, error: errorText(d.error) ?? "Step failed" }))
+      return updateStep(view, d.assistantMessageID, t, (s) => ({ ...s, completed: t, error: errorText(d.error) ?? "Step failed", ...stepUsage(undefined, d.tokens) }))
     case "session.text.started":
       return updateStep(view, d.assistantMessageID, t, (s) => patchText(s, "text", d.ordinal, (x) => ({ text: x, streaming: true })))
     case "session.text.delta":

@@ -120,6 +120,19 @@ const ev = (type: string, directory?: string) => ({ type, created: 2, ...(direct
 beforeEach(() => jest.useFakeTimers())
 afterEach(() => jest.useRealTimers())
 
+describe("the model's context window", () => {
+  test("loadCatalog keeps limit.context as contextLimit, and nothing when the model has none", async () => {
+    const { ctl, catalog } = await ready()
+    catalog.models = [{ ...model("big"), limit: { context: 200_000, output: 8000 } }, { ...model("none"), limit: { context: 0, output: 0 } }, model("absent")] as any
+    await ctl.onEvent(ev("model.updated", "/w"))
+    await elapse()
+    const byID = new Map(ctl.snapshot().models.map((m) => [m.id, m]))
+    expect(byID.get("big")?.contextLimit).toBe(200_000)
+    expect(byID.get("none")?.contextLimit).toBeUndefined()
+    expect(byID.get("absent")?.contextLimit).toBeUndefined()
+  })
+})
+
 describe("which events reload which parts", () => {
   test("each event maps to what it changes, like OpenCode's web app", () => {
     expect(catalogParts("agent.updated", true)).toEqual(["agents"])

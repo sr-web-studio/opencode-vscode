@@ -214,13 +214,7 @@
           </header>
         {:else}
           <SessionTabs {app} host={tabsHost} hasDraftText={draft.text.trim().length > 0} />
-          <SessionSwitcher {app} showProject={paneCapable}>
-            {#snippet extra()}
-              {#if shownWorkers > 0 || app.runningShells > 0}
-                <WorkersRow workers={app.workers} hidden={app.hiddenWorkers} models={app.models} shells={app.runningShells} />
-              {/if}
-            {/snippet}
-          </SessionSwitcher>
+          <SessionSwitcher {app} showProject={paneCapable} />
         {/if}
         {#if app.connection.status === "disconnected"}
           <div class="banner muted">Connection lost. Reconnecting…</div>
@@ -232,6 +226,11 @@
             {#if todos && !app.form && !app.readOnly}
               <TodoBar summary={todos} defaultExpanded={app.settings.todoDefaultExpanded} />
             {/if}
+            {#snippet lane()}
+              {#if !app.readOnly && (shownWorkers > 0 || app.runningShells > 0)}
+                <WorkersRow workers={app.workers} hidden={app.hiddenWorkers} models={app.models} shells={app.runningShells} />
+              {/if}
+            {/snippet}
           </Transcript>
         {/if}
         {#if app.error}
@@ -302,7 +301,7 @@
     display: flex;
     align-items: center;
     gap: 0.5em;
-    padding: 0.5em var(--oc-side);
+    padding: 0.5em var(--oc-edge);
     border-bottom: 1px solid var(--oc-hairline);
     font-weight: 600;
   }

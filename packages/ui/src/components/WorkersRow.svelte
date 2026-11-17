@@ -1,20 +1,21 @@
 <script lang="ts">
   import { tick } from "svelte"
   import type { SlimModel } from "@occ/core/api"
-  import { backgroundSummary, modelLabel, modelTitle, quietLabel, type Worker } from "@occ/core/workers"
+  import { backgroundLabel, backgroundSummary, modelLabel, modelTitle, quietLabel, type Worker } from "@occ/core/workers"
   import { clearable, visibleWorkers } from "@occ/core/worker-hidden"
   import { displayName } from "@occ/core/names"
   import { plural } from "@occ/core/format"
-  import { focusOpened } from "../focus"
+  import { registerBackOverlay } from "../back-overlay"
+  import { focusOpened, restoreFocus } from "../focus"
   import { useStore } from "../context"
   import Codicon from "./Codicon.svelte"
   import StopWorkerButton from "./StopWorkerButton.svelte"
 
   /**
-   * Background work as a small chip in the header. The list opens as a floating panel over the transcript, so any
-   * number of workers never takes space from the conversation. The panel is positioned against the header
-   * (`.switcher` is `position: relative`), full width under it. Finished workers can be removed from the list: that
-   * only hides the row here, the session stays on the OpenCode server.
+   * Background work as a compact chip just above the prompt box, in the conversation's column ("3 subagents · 1
+   * running"), like OpenCode's own subagents chip. The list opens upward over the transcript, as wide as the column
+   * at most, so any number of subagents never takes space from the conversation. Finished subagents can be removed
+   * from the list: that only hides the row here, the session stays on the OpenCode server.
    */
   let { workers: all, hidden, models, shells }: { workers: Worker[]; hidden: string[]; models: SlimModel[]; shells: number } = $props()
   const store = useStore()
@@ -28,8 +29,8 @@
   const workers = $derived(visibleWorkers(all, hidden))
   const finished = $derived(clearable(workers))
   const summary = $derived(backgroundSummary(workers, shells))
-  const parts = $derived([summary.workers ? plural(summary.workers, "worker") : "", summary.shells ? plural(summary.shells, "shell") : ""].filter(Boolean).join(", "))
-  const tip = $derived(`Background: ${parts}${summary.running ? `, ${summary.running} running` : ""}`)
+  const text = $derived(backgroundLabel(summary))
+  const tip = $derived(`Background work: ${text}`)
   const label = (s: Worker["status"]) => (s === "running" ? "Running" : s === "done" ? "Done" : s === "failed" ? "Failed" : "Stopped")
 
   /** The clock for "quiet 3m": it only ticks while the panel is open. */
@@ -45,12 +46,27 @@
     const t = e.target as Node | null
     if (open && t && !root?.contains(t) && !panel?.contains(t)) open = false
   }
+  let button: HTMLButtonElement | undefined = $state()
+  /** Close the list; the keyboard goes back to the chip when it was inside the list. */
+  function close(refocus: boolean) {
+    if (refocus) restoreFocus(button, panel)
+    open = false
+  }
   function key(e: KeyboardEvent) {
     if (open && e.key === "Escape") {
-      open = false
+      close(true)
       e.preventDefault()
     }
   }
+  // While the list is open, a hardware Back button (Android) closes it like Escape does.
+  $effect(() => {
+    if (!open) return
+    return registerBackOverlay(() => close(true))
+  })
+  // The last worker leaving the list takes the chip with it: nothing is left to keep open.
+  $effect(() => {
+    if (open && !summary.workers && !summary.shells) open = false
+  })
 
   /** Remove rows. Focus moves to the next row (else the previous one, else the panel head) when the new list arrives. */
   function remove(keys: string[], at: number) {
@@ -76,87 +92,121 @@
 
 <svelte:window onpointerdown={outside} onkeydown={key} />
 
-<span class="chipwrap" bind:this={root}>
-  <button class="chip muted" class:on={open} class:live={summary.running > 0} onclick={() => (open = !open)} aria-expanded={open} aria-haspopup="true" title={tip} aria-label={tip}>
+<div class="dock" bind:this={root}>
+  <button class="chip muted" class:on={open} class:live={summary.running > 0} bind:this={button} onclick={() => (open = !open)} aria-expanded={open} aria-haspopup="true" title={tip} aria-label={tip}>
     {#if summary.running > 0}<Codicon name="loading" spin />{:else if summary.workers}<Codicon name="robot" />{:else}<Codicon name="terminal" />{/if}
-    <span>{summary.running > 0 ? `${summary.running}/${summary.workers || summary.shells}` : summary.workers || summary.shells}</span>
+    <span class="text">{text}</span>
+    <Codicon name={open ? "chevron-down" : "chevron-up"} />
   </button>
-</span>
-{#if open}
-  <div class="panel" bind:this={panel} role="dialog" aria-label="Background work">
-    <div class="headrow">
-      <div class="head muted small" bind:this={head} tabindex="-1">
-        Background · {parts}{#if summary.running > 0}<span class="run">&nbsp;· {summary.running} running</span>{/if}
-      </div>
-      {#if finished.length > 0}
-        <button
-          class="clear muted small"
-          onclick={() =>
-            remove(
-              finished.map((w) => w.key),
-              0,
-            )}
-          title="Remove finished workers from this list. The sessions stay in OpenCode.">Clear done</button
-        >
-      {/if}
-    </div>
-    <ul class="scroll">
-      {#each workers as w, i (w.key)}
-        {@const model = modelLabel(w.model, models, { short: true })}
-        {@const quiet = quietLabel(w, now)}
-        <li class="row" data-key={w.key}>
+  {#if open}
+    <div class="panel" bind:this={panel} role="dialog" aria-label="Background work">
+      <div class="headrow">
+        <div class="head muted small" bind:this={head} tabindex="-1">Background · {text}</div>
+        {#if finished.length > 0}
           <button
-            class="w"
-            disabled={!w.sessionID}
-            title={w.sessionID ? `Open this worker in a tab${w.model ? ` · ${modelTitle(w.model)}` : ""}` : "Waiting for the worker session"}
-            onclick={() => {
-              if (w.sessionID) {
-                open = false
-                store.bridge.openSession(w.sessionID, { readOnly: true })
-              }
-            }}
+            class="clear muted small"
+            onclick={() =>
+              remove(
+                finished.map((w) => w.key),
+                0,
+              )}
+            title="Remove finished subagents from this list. The sessions stay in OpenCode.">Clear done</button
           >
-            <Codicon name="robot" />
-            <span class="a">{displayName(w.agent)}</span>
-            {#if model}<span class="m muted">· {model}</span>{/if}
-            <span class="d muted">{w.description}</span>
-            {#if w.calls > 1}<span class="n muted" title="{w.calls} calls to this worker">×{w.calls}</span>{/if}
-            <span class="s" class:ok={w.status === "done"} class:bad={w.status === "failed"} class:muted={w.status === "running" || w.status === "stopped"}>{label(w.status)}</span>
-            {#if quiet}<span class="q muted" title="No activity from this worker for {quiet.slice(6)}">· {quiet}</span>{/if}
-          </button>
-          {#if w.status !== "running"}
-            <button class="x muted" onclick={() => remove([w.key], i)} aria-label="Remove from list" title="Remove from list (the session stays in OpenCode)"><Codicon name="close" /></button>
-          {:else if w.sessionID}
-            <StopWorkerButton sessionID={w.sessionID} running reveal />
-          {:else}
-            <span class="x spacer" aria-hidden="true"></span>
-          {/if}
-        </li>
-      {/each}
-      {#if shells > 0}<li class="muted small pad">{plural(shells, "shell")} running. Their output opens in a terminal.</li>{/if}
-    </ul>
-  </div>
-{/if}
+        {/if}
+      </div>
+      <ul class="scroll">
+        {#each workers as w, i (w.key)}
+          {@const model = modelLabel(w.model, models, { short: true })}
+          {@const quiet = quietLabel(w, now)}
+          <li class="row" data-key={w.key}>
+            <button
+              class="w"
+              disabled={!w.sessionID}
+              title={w.sessionID ? `Open this subagent in a tab${w.model ? ` · ${modelTitle(w.model)}` : ""}` : "Waiting for the subagent session"}
+              onclick={() => {
+                if (w.sessionID) {
+                  open = false
+                  store.bridge.openSession(w.sessionID, { readOnly: true })
+                }
+              }}
+            >
+              <Codicon name="robot" />
+              <span class="a">{displayName(w.agent)}</span>
+              {#if model}<span class="m muted">· {model}</span>{/if}
+              <span class="d muted">{w.description}</span>
+              {#if w.calls > 1}<span class="n muted" title="{w.calls} calls to this subagent">×{w.calls}</span>{/if}
+              <span class="s" class:ok={w.status === "done"} class:bad={w.status === "failed"} class:muted={w.status === "running" || w.status === "stopped"}>{label(w.status)}</span>
+              {#if quiet}<span class="q muted" title="No activity from this subagent for {quiet.slice(6)}">· {quiet}</span>{/if}
+            </button>
+            {#if w.status !== "running"}
+              <button class="x muted" onclick={() => remove([w.key], i)} aria-label="Remove from list" title="Remove from list (the session stays in OpenCode)"><Codicon name="close" /></button>
+            {:else if w.sessionID}
+              <StopWorkerButton sessionID={w.sessionID} running reveal />
+            {:else}
+              <span class="x spacer" aria-hidden="true"></span>
+            {/if}
+          </li>
+        {/each}
+        {#if shells > 0}<li class="muted small pad">{plural(shells, "shell")} running. Their output opens in a terminal.</li>{/if}
+      </ul>
+    </div>
+  {/if}
+</div>
 
 <style>
-  .chipwrap {
-    display: inline-flex;
-    flex: none;
+  /*
+   * The lane above the prompt box. It sits inside the transcript's floating area, so the chip coming and going never
+   * moves the prompt box, and the transcript reserves its height at the tail. Only the chip and the list take
+   * clicks: the rest of the row lets the transcript underneath scroll. The chip and the list keep the conversation's
+   * column; the list opens upward from the lane.
+   */
+  .dock {
+    position: relative;
+    display: flex;
+    justify-content: flex-start;
+    padding: 0 var(--oc-side) 0.4em;
+    pointer-events: none;
+  }
+  .chip,
+  .panel {
+    pointer-events: auto;
   }
   .chip {
+    position: relative;
     display: inline-flex;
     align-items: center;
-    gap: 0.3em;
-    padding: 0.15em 0.4em;
+    gap: 0.35em;
+    max-width: 100%;
+    min-height: 24px;
+    padding: 0 0.6em;
+    background: var(--oc-popover);
     border-radius: 10px;
     border: 1px solid var(--oc-hairline);
     font-size: 0.9em;
     font-variant-numeric: tabular-nums;
   }
+  .text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   .chip:hover,
   .chip.on {
     color: var(--oc-fg);
     background: var(--oc-hover);
+  }
+  /* A finger needs a bigger target than the small pill: the hit area grows, the pill does not. */
+  @media (hover: none) {
+    .dock {
+      justify-content: flex-end;
+    }
+    .chip::before {
+      content: "";
+      position: absolute;
+      /* Only upward and sideways: the prompt box starts right under the pill and must keep its own touches. */
+      inset: calc(24px - var(--oc-menu-row)) -6px 0;
+    }
   }
   .chip.live {
     color: var(--oc-accent);
@@ -165,9 +215,9 @@
   .panel {
     position: absolute;
     z-index: 20;
-    left: 0.6em;
-    right: 0.6em;
-    top: 100%;
+    left: var(--oc-side);
+    right: var(--oc-side);
+    bottom: calc(100% - 0.4em + 4px);
     background: var(--oc-popover);
     border: 1px solid var(--oc-hairline);
     border-radius: 6px;
@@ -184,7 +234,7 @@
     padding-right: 0.4em;
   }
   .head {
-    padding: 0.45em var(--oc-side) 0.2em;
+    padding: 0.45em 0.7em 0.2em;
     min-width: 0;
   }
   .head:focus-visible {
@@ -200,9 +250,6 @@
   .clear:hover {
     color: var(--oc-fg);
     background: var(--oc-hover);
-  }
-  .run {
-    color: var(--oc-accent);
   }
   ul {
     list-style: none;
