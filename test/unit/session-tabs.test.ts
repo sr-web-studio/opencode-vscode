@@ -348,9 +348,16 @@ describe("fitting tabs", () => {
     expect(fitTabs(3, 250, opts)).toEqual({ visible: [0, 1], hidden: [2], width: 108 })
     // Narrow or not, no visible tab is ever below the minimum while another could be hidden.
     for (let available = 100; available < 700; available += 7) {
-      const fit = fitTabs(6, available, opts)
-      if (fit.visible.length > 1) expect(fit.width).toBeGreaterThanOrEqual(100)
-      expect(fit.visible.length + fit.hidden.length).toBe(6)
+      for (const active of [undefined, 0, 2, 5]) {
+        const fit = fitTabs(6, available, { ...opts, active })
+        if (fit.visible.length > 1) expect(fit.width).toBeGreaterThanOrEqual(100)
+        expect(fit.width).toBeLessThanOrEqual(200)
+        expect(fit.visible.length + fit.hidden.length).toBe(6)
+        // The drawn tabs, the gaps and (when something is hidden) the overflow button fit in the room.
+        const used = fit.visible.length * fit.width + (fit.visible.length - 1) * opts.gap + (fit.hidden.length ? opts.overflow + opts.gap : 0)
+        if (fit.visible.length > 1) expect(used).toBeLessThanOrEqual(available + 1e-9)
+        if (active !== undefined) expect(fit.visible).toContain(active)
+      }
     }
   })
 
