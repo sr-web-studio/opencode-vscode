@@ -1,4 +1,6 @@
+import { homedir } from "node:os"
 import * as vscode from "vscode"
+import { resolveFileLink } from "@occ/core/file-links"
 import type { Controller } from "@occ/core/controller"
 import { mimeFromName } from "@occ/core/attachments"
 import { isAbsolutePath } from "@occ/core/paths"
@@ -70,7 +72,7 @@ export class HostActions {
   private async run(req: HostRequest, surface: Surface): Promise<void> {
     switch (req.type) {
       case "openFile":
-        return this.openFile(req.path, req.line, this.folder(surface))
+        return this.openFile(req.path, req.line, surface)
       case "imageData": {
         const dataUri = await this.images()
           .thumbnail(surface.sessionID(), req.ref)
@@ -131,16 +133,35 @@ export class HostActions {
    * `vscode.open` picks the right editor for the file: text, image preview, PDF, notebook, or a custom editor.
    * `openTextDocument` only handles text and fails on images and other binary files.
    */
-  private async openFile(path: string, line: number | undefined, directory: string): Promise<void> {
-    const uri = this.resolve(path, directory)
-    try {
-      await vscode.workspace.fs.stat(uri)
-    } catch {
-      void vscode.window.showWarningMessage(`File not found: ${path}`)
+  private async openFile(path: string, line: number | undefined, surface: Surface): Promise<void> {
+    const folder = this.folder(surface)
+    const sessionID = surface.sessionID()
+    const sessionDirectory = (sessionID && this.controllerAt(folder)?.sessionMeta(sessionID)?.directory) || undefined
+    const roots = [folder, ...(vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath)]
+    const link = resolveFileLink(path, { home: homedir(), sessionDirectory, roots })
+    let uri: vscode.Uri | undefined
+    for (const candidate of link.candidates) {
+      const target = vscode.Uri.file(candidate)
+      try {
+        await vscode.workspace.fs.stat(target)
+        uri = target
+        break
+      } catch {
+        // Not here: try the next place.
+      }
+    }
+    if (!uri) {
+      const tried = link.candidates.length > 0 ? link.candidates : [path]
+      const copy = "Copy paths"
+      const message = tried.length === 1 ? `File not found: ${tried[0]}` : `File not found. Looked in:\n${tried.join("\n")}`
+      void vscode.window.showWarningMessage(message, copy).then((choice) => {
+        if (choice === copy) void vscode.env.clipboard.writeText(tried.join("\n"))
+      })
       return
     }
+    line = link.line ?? line
     try {
-      const at = line && line > 0 ? new vscode.Position(line - 1, 0) : undefined
+      const at = line && line > 0 ? new vscode.Position(line - 1, Math.max((link.column ?? 1) - 1, 0)) : undefined
       const options: vscode.TextDocumentShowOptions = { preview: true, selection: at ? new vscode.Range(at, at) : undefined }
       await vscode.commands.executeCommand("vscode.open", uri, options)
     } catch (e) {
