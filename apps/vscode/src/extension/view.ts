@@ -2,7 +2,9 @@ import * as vscode from "vscode"
 import type { Controller } from "@occ/core/controller"
 import type { FolderRegistry } from "@occ/core/folders"
 import type { AppState, FolderSessions, ToHost, ToWebview, WebviewMetrics } from "@occ/core/protocol"
+import { lookupTab, type TabLookup } from "@occ/core/session-tabs"
 import { diffState, sameFolderSessions } from "@occ/core/state-post"
+import { isTabCheckRequest, type TabCheckAnswer, type TabCheckRequest } from "@occ/core/tab-check"
 import type { HostActions, Surface } from "./host"
 import type { MinWidth } from "./min-width"
 import { webviewHtml } from "./html"
@@ -60,7 +62,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
 
     this.bind()
     this.subs.push(
-      view.webview.onDidReceiveMessage((m: ToHost | WebviewMetrics) => void this.onMessage(m)),
+      view.webview.onDidReceiveMessage((m: ToHost | WebviewMetrics | TabCheckRequest) => void this.onMessage(m)),
       view.onDidChangeVisibility(() => {
         this.minWidth.noteVisible(view.visible)
         this.syncVisible()
@@ -235,9 +237,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     return projectName ? { ...decorated, projectName } : decorated
   }
 
-  private async onMessage(m: ToHost | WebviewMetrics): Promise<void> {
+  private async onMessage(m: ToHost | WebviewMetrics | TabCheckRequest): Promise<void> {
     if (m.type === "viewMetrics") {
       this.minWidth.metrics(m)
+      return
+    }
+    if (m.type === "tabCheck") {
+      if (isTabCheckRequest(m)) await this.answerTabCheck(m)
       return
     }
     if (m.type === "action") {
@@ -282,6 +288,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       return
     }
     await this.host.handle(m.request, this.surfaceFor(this.folders.active))
+  }
+
+  /**
+   * The tab strip asks whether a tab's session still exists. Only the server's "not found" closes the tab; while the
+   * window is not connected there is no answer, and the tab stays.
+   */
+  private async answerTabCheck(m: TabCheckRequest): Promise<void> {
+    const client = this.folders.connectedClient
+    const result: TabLookup = client ? await lookupTab(() => client.session.get({ sessionID: m.sessionID })) : { state: "unknown" }
+    const answer: TabCheckAnswer = { type: "tabCheckAnswer", requestID: m.requestID, result }
+    void this.view?.webview.postMessage(answer)
   }
 
   /** Bind the host's effects to the controller that was active when the request arrived (a modal can outlive a switch). */

@@ -1,10 +1,24 @@
 <script lang="ts">
-  import { untrack } from "svelte"
+  import { tick, untrack } from "svelte"
   import type { AppState } from "@occ/core/protocol"
   import { folderName } from "@occ/core/paths"
   import { statusLabel } from "@occ/core/session-status"
   import { DRAFT_TITLE, UNTITLED } from "@occ/core/sessions"
-  import { fitTabs, heldOrder, nextAfterClose, orderTabs, type TabSession } from "@occ/core/session-tabs"
+  import {
+    attentionStatus,
+    fitTabs,
+    heldOrder,
+    measureKey,
+    nextAfterClose,
+    orderTabs,
+    OwnSessionsMemo,
+    sameNumbers,
+    tabSessions as buildTabSessions,
+    TabVerifier,
+    type TabEntry,
+    type TabInfo,
+    type TabSession,
+  } from "@occ/core/session-tabs"
   import { useStore } from "../context"
   import { restoreFocus } from "../focus"
   import type { TabsHost } from "../tabs-host"
@@ -16,8 +30,8 @@
   /**
    * The session tab strip at the top of the chat, like OpenCode Desktop's: the sessions list button, search, one tab
    * per open session (project avatar, title, status), the overflow arrow and `+`. Tabs are the sessions the user has
-   * opened; closing one only takes it off the strip. The rules (order, fit, prune) are in `@occ/core/session-tabs`;
-   * the host decides where the sessions come from and how a tab opens (`TabsHost`).
+   * opened; closing one only takes it off the strip. The rules (order, fit, cap, when a tab is gone) are in
+   * `@occ/core/session-tabs`; the host decides where the sessions come from and how a tab opens (`TabsHost`).
    */
   let { app, host, hasDraftText }: { app: AppState; host: TabsHost; hasDraftText: boolean } = $props()
   const store = useStore()
@@ -25,23 +39,29 @@
   /** Space between two tabs, in px; the same as the CSS `gap` below. */
   const GAP = 2
 
+  // The statuses age (a reply stops being new, a turn stops counting as recent) on the sessions pane's own 30 s beat.
+  let now = $state(Date.now())
+  $effect(() => {
+    const timer = setInterval(() => (now = Date.now()), 30_000)
+    return () => clearInterval(timer)
+  })
+
   const currentID = $derived(app.target.kind === "session" ? app.target.id : undefined)
   const draft = $derived(app.target.kind === "draft")
-  const catalog = $derived(host.catalog())
+  const catalog = $derived(host.catalog(now))
   const byId = $derived(new Map(catalog.sessions.map((session) => [session.id, session])))
   const projects = $derived(new Set(catalog.sessions.map((session) => session.directory)).size)
+  // The chat's own records (an archived session is in no host list but still has a title). A streamed answer replaces
+  // `app` without touching these lists, so the memo hands back the same map and nothing below runs again.
+  const ownMemo = new OwnSessionsMemo()
+  const own = $derived(ownMemo.get(app.sessions, app.archived))
 
-  /** The chat's own record of a session: an archived one is not in the host's list but still has a title. */
-  function ownTitle(id: string): string | undefined {
-    return (app.sessions.find((s) => s.id === id) ?? app.archived.find((s) => s.id === id))?.title?.trim() || undefined
-  }
-
-  /** What the strip knows about a session: the host's row, else the chat's record, else what the tab remembered. */
-  function known(id: string): Pick<TabSession, "title" | "last"> | undefined {
+  /** What the strip knows about a session: the host's row, else the chat's record. */
+  function known(id: string): TabInfo | undefined {
     const row = byId.get(id)
-    if (row) return { title: row.title, last: row.last }
-    const own = app.sessions.find((s) => s.id === id) ?? app.archived.find((s) => s.id === id)
-    return own ? { title: own.title?.trim() || UNTITLED, last: Math.max(own.time.updated, own.time.created) } : undefined
+    if (row) return { title: row.title, last: row.last, directory: row.directory }
+    const mine = own.get(id)
+    return mine ? { title: mine.title || UNTITLED, last: mine.last } : undefined
   }
 
   // Opening a session from anywhere (the pane, the drawer, a notification, a link, this strip) adds its tab. Only a
@@ -54,44 +74,54 @@
     if (!id) return
     untrack(() => {
       const info = known(id)
-      host.list.open({ id, directory: byId.get(id)?.directory ?? app.directory, title: info?.title ?? ownTitle(id), last: info?.last })
+      host.list.open({ id, directory: info?.directory ?? app.directory, title: info?.title, last: info?.last }, id)
     })
   })
 
-  // Sessions deleted on the server leave the strip; a list that is loading or cut off proves nothing.
+  // A tab closes on its own only when the server confirms its session deleted. Tabs no list carries are looked up a
+  // few at a time; a session that moved to another folder keeps its tab and opens in its new folder.
+  const verifier = untrack(
+    () =>
+      new TabVerifier(
+        (tab) => host.lookup?.(tab) ?? Promise.resolve({ state: "unknown" as const }),
+        (verdict) => {
+          if (verdict.gone) {
+            if (verdict.id !== currentID) host.list.remove(verdict.id)
+          } else if (verdict.directory) host.list.move(verdict.id, verdict.directory)
+        },
+      ),
+  )
   $effect(() => {
-    const proofs = catalog.proofs
+    if (!host.lookup || catalog.loading) return
+    const tabs = host.list.tabs
+    const listed = catalog.listed
     const keep = new Set(currentID ? [currentID] : [])
-    untrack(() => host.list.prune(proofs, keep))
+    void now
+    untrack(() => verifier.update(tabs, listed, keep))
   })
+  $effect(() => () => verifier.stop())
 
-  // Titles and activity times are kept with the tabs, so a restored strip reads right before the lists arrive.
+  // Titles, activity times and folders are kept with the tabs, so a restored strip reads right before the lists arrive.
   $effect(() => {
     void byId
+    void own
     untrack(() => host.list.remember(known))
   })
 
   /** The strip's sessions, with a fallback for a tab whose session no list carries yet. */
-  const tabSessions = $derived(
-    new Map(
-      host.list.tabs.map((tab): [string, TabSession] => {
-        const row = byId.get(tab.id)
-        if (row) return [tab.id, row]
-        return [tab.id, { id: tab.id, directory: tab.directory, title: ownTitle(tab.id) ?? tab.title ?? UNTITLED, project: folderName(tab.directory), status: "read", last: tab.last ?? 0 }]
-      }),
-    ),
-  )
+  const tabSessions = $derived(buildTabSessions(host.list.tabs, byId, own, { untitled: UNTITLED, project: folderName }))
 
   /* -------------------------------------------------------------- order */
 
-  /** The order is held while the pointer is over the strip or its dropdown is open, so a tab never moves under it. */
+  /** The order is held while the pointer or the keyboard is in the strip, or its dropdown is open: no tab moves then. */
   let frozen = $state<string[] | undefined>()
   let pointerInside = $state(false)
+  let focusInside = $state(false)
   let menu = $state<"overflow" | "search" | undefined>()
   const live = $derived(orderTabs(host.list.tabs, (id) => tabSessions.get(id)))
   const order = $derived(heldOrder(frozen, live))
   $effect(() => {
-    const hold = pointerInside || !!menu
+    const hold = pointerInside || focusInside || !!menu
     untrack(() => {
       if (hold && !frozen) frozen = order
       else if (!hold) frozen = undefined
@@ -99,10 +129,9 @@
   })
 
   /** The tabs in strip order; a draft is the newest, so its "New session" tab comes first. */
-  type Entry = { kind: "draft" } | { kind: "session"; session: TabSession }
-  const entries = $derived<Entry[]>([
+  const entries = $derived<TabEntry[]>([
     ...(draft ? [{ kind: "draft" } as const] : []),
-    ...order.flatMap((id): Entry[] => {
+    ...order.flatMap((id): TabEntry[] => {
       const session = tabSessions.get(id)
       return session ? [{ kind: "session", session }] : []
     }),
@@ -112,22 +141,28 @@
   /* ---------------------------------------------------------------- fit */
 
   let strip: HTMLDivElement | undefined = $state()
+  let nav: HTMLElement | undefined = $state()
   let area: HTMLDivElement | undefined = $state()
   let measure: HTMLDivElement | undefined = $state()
   let available = $state(Number.POSITIVE_INFINITY)
-  let widths = $state<number[]>([])
-  let mins = $state<number[]>([])
+  let widths = $state.raw<number[]>([])
+  let mins = $state.raw<number[]>([])
   let button = $state(0)
 
+  /** Read the hidden copies' widths. Each value is written only when it changed, so an unchanged strip does not re-fit. */
   function remeasure(): void {
     if (!area || !measure) return
     const children = [...measure.children] as HTMLElement[]
     const probe = children.pop()
-    button = probe?.getBoundingClientRect().width ?? 0
-    widths = children.map((el) => el.getBoundingClientRect().width)
-    mins = children.map((el) => parseFloat(getComputedStyle(el).minWidth) || 0)
+    const nextButton = probe?.getBoundingClientRect().width ?? 0
+    const nextWidths = children.map((el) => el.getBoundingClientRect().width)
+    const nextMins = children.map((el) => parseFloat(getComputedStyle(el).minWidth) || 0)
     // The `+` always follows the tabs.
-    available = area.clientWidth - button - GAP
+    const nextAvailable = area.clientWidth - nextButton - GAP
+    if (nextButton !== button) button = nextButton
+    if (!sameNumbers(nextWidths, widths)) widths = nextWidths
+    if (!sameNumbers(nextMins, mins)) mins = nextMins
+    if (nextAvailable !== available) available = nextAvailable
   }
 
   $effect(() => {
@@ -138,10 +173,11 @@
     remeasure()
     return () => observer.disconnect()
   })
-  // A tab added, closed, renamed or re-ordered changes the widths; the observer only sees the row's own size.
+  // A tab added, closed, renamed, re-ordered or made active changes the widths; the observer only sees the row's size.
+  // The key is a string, so an equal one (a streamed answer, a status that keeps its shape) does not re-run this.
+  const widthKey = $derived(measureKey(entries, draft ? "\u0000draft" : currentID))
   $effect(() => {
-    void entries
-    void currentID
+    void widthKey
     queueMicrotask(remeasure)
   })
 
@@ -158,7 +194,7 @@
   function select(session: TabSession): void {
     menu = undefined
     if (session.id === currentID) return
-    host.list.open({ id: session.id, directory: session.directory, title: session.title, last: session.last })
+    host.list.open({ id: session.id, directory: session.directory, title: session.title, last: session.last }, currentID)
     host.open(session.id, session.directory)
   }
 
@@ -173,6 +209,22 @@
       return
     }
     host.list.close(id)
+  }
+
+  /**
+   * Close a tab from the strip itself (its ×, Delete). When the keyboard was on the strip, it moves to the tab that
+   * took the closed one's place, else the last tab, else the search button: never lost to the page.
+   */
+  function closeFromStrip(id: string): void {
+    const picks = [...(nav?.querySelectorAll<HTMLElement>(".pick") ?? [])]
+    const at = picks.findIndex((el) => el.dataset.id === id)
+    const hadFocus = !!strip?.contains(document.activeElement)
+    close(id)
+    if (!hadFocus) return
+    void tick().then(() => {
+      const left = [...(nav?.querySelectorAll<HTMLElement>(".pick") ?? [])]
+      restoreFocus(left[Math.min(Math.max(at, 0), left.length - 1)] ?? strip?.querySelector<HTMLElement>("[data-search]"), strip)
+    })
   }
 
   /** The draft's tab: closing it goes back to the newest open tab. */
@@ -193,15 +245,20 @@
   /** Escape gives the keyboard back to the button that opened the menu (the menu is still in the strip right now). */
   function dismiss(refocus: boolean): void {
     const kind = menu
-    if (refocus) restoreFocus(strip?.querySelector<HTMLElement>(kind === "search" ? "[data-search]" : "[data-overflow]"), strip)
+    if (refocus) restoreFocus(strip?.querySelector<HTMLElement>(kind === "search" ? "[data-search]" : "[data-overflow]") ?? strip?.querySelector<HTMLElement>("[data-search]"), strip)
     menu = undefined
   }
 
   function tabKey(e: KeyboardEvent, id: string): void {
     if (e.key === "Delete") {
       e.preventDefault()
-      close(id)
+      closeFromStrip(id)
     }
+  }
+
+  function focusOut(e: FocusEvent): void {
+    const next = e.relatedTarget as Node | null
+    if (!next || !strip?.contains(next)) focusInside = false
   }
 
   const tabLabel = (session: TabSession): string =>
@@ -209,7 +266,7 @@
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="strip" bind:this={strip} onpointerenter={() => (pointerInside = true)} onpointerleave={() => (pointerInside = false)}>
+<div class="strip" bind:this={strip} onpointerenter={() => (pointerInside = true)} onpointerleave={() => (pointerInside = false)} onfocusin={() => (focusInside = true)} onfocusout={focusOut}>
   {#if host.sessions}
     <button
       class="btn"
@@ -231,7 +288,7 @@
     aria-expanded={menu === "search"}><Codicon name="search" /></button
   >
   <div class="area" bind:this={area}>
-    <nav class="tabs" aria-label="Open sessions">
+    <nav class="tabs" aria-label="Open sessions" bind:this={nav}>
       {#each visible as entry (entry.kind === "draft" ? "\u0000draft" : entry.session.id)}
         {@render tab(entry, false)}
       {/each}
@@ -275,7 +332,7 @@
   {/if}
 </div>
 
-{#snippet tab(entry: Entry, probe: boolean)}
+{#snippet tab(entry: TabEntry, probe: boolean)}
   {#if entry.kind === "draft"}
     <div class="tab active" class:probe>
       <button class="pick" aria-current="page" title={DRAFT_TITLE} tabindex={probe ? -1 : undefined}>
@@ -284,16 +341,20 @@
       </button>
       {#if order.length > 0}
         <span class="end">
-          <button class="x" onclick={closeDraft} title="Close tab" aria-label="Close tab {DRAFT_TITLE}" tabindex={probe ? -1 : undefined}><Codicon name="close" /></button>
+          <span class="slot">
+            <button class="x" onclick={closeDraft} title="Close tab" aria-label="Close tab {DRAFT_TITLE}" tabindex={probe ? -1 : undefined}><Codicon name="close" /></button>
+          </span>
         </span>
       {/if}
     </div>
   {:else}
     {@const session = entry.session}
     {@const active = session.id === currentID}
+    {@const attention = attentionStatus(session.status)}
     <div class="tab" class:active class:probe class:unread={session.status === "unread"} data-status={session.status}>
       <button
         class="pick"
+        data-id={session.id}
         aria-current={active ? "page" : undefined}
         aria-label={tabLabel(session)}
         title={tabLabel(session)}
@@ -309,11 +370,17 @@
         <ProjectAvatar name={session.project} directory={session.directory} />
         <span class="title">{session.title}</span>
       </button>
+      <!-- A running, waiting or failed tab keeps its icon in view, with the close button beside it. Any other status
+           shares one slot with the close button, which is as wide as the button whether it shows or not: the tab
+           keeps its width under the pointer. -->
       <span class="end">
-        <span class="status"><SessionStatusIcon status={session.status} quiet /></span>
-        <button class="x" onclick={() => close(session.id)} title="Close tab (the session is kept)" aria-label="Close tab {session.title}" tabindex={probe ? -1 : undefined}
-          ><Codicon name="close" /></button
-        >
+        {#if attention}<span class="status"><SessionStatusIcon status={session.status} quiet /></span>{/if}
+        <span class="slot">
+          {#if !attention}<span class="status plain"><SessionStatusIcon status={session.status} quiet /></span>{/if}
+          <button class="x" onclick={() => closeFromStrip(session.id)} title="Close tab (the session is kept)" aria-label="Close tab {session.title}" tabindex={probe ? -1 : undefined}
+            ><Codicon name="close" /></button
+          >
+        </span>
       </span>
     </div>
   {/if}
@@ -322,6 +389,7 @@
 <style>
   .strip {
     --tab-row: max(var(--oc-menu-row), 28px);
+    --tab-x: max(calc(var(--tab-row) - 8px), 20px);
     position: relative;
     flex: none;
     display: flex;
@@ -420,7 +488,6 @@
     width: 1.35em;
     height: 1.35em;
   }
-  /* The status sits where the close button appears; the close button replaces it on hover or focus. */
   .end {
     flex: none;
     display: inline-flex;
@@ -431,17 +498,29 @@
     display: inline-flex;
     padding: 0 2px;
   }
+  /* `quiet` draws nothing for a read session. */
   .status:empty {
     display: none;
   }
-  .x {
-    display: none;
+  /* One fixed slot, as wide as the close button, for the plain status or the close button: never a width change. */
+  .slot {
+    position: relative;
+    flex: none;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: max(calc(var(--tab-row) - 8px), 20px);
-    height: max(calc(var(--tab-row) - 8px), 20px);
+    width: var(--tab-x);
+    height: var(--tab-x);
+  }
+  .x {
+    position: absolute;
+    inset: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     border-radius: 3px;
     color: inherit;
+    visibility: hidden;
   }
   .x:hover {
     background: var(--oc-hover);
@@ -449,10 +528,10 @@
   .tab.active .x,
   .tab:hover .x,
   .tab:focus-within .x {
-    display: inline-flex;
+    visibility: visible;
   }
-  .tab:not(.active):is(:hover, :focus-within) .status {
-    display: none;
+  .tab:is(.active, :hover, :focus-within) .plain {
+    visibility: hidden;
   }
   /* A finger has no hover: only the tab on screen offers its close button, and it is full size. */
   @media (hover: none) {
@@ -466,15 +545,19 @@
       min-width: 6.5em;
       flex-shrink: 1;
     }
+    .tab.active .slot {
+      width: var(--tab-row);
+      height: var(--tab-row);
+    }
+    /* Nothing ever replaces an inactive tab's status here, so its slot only takes the status's own room. */
+    .tab:not(.active) .slot {
+      width: auto;
+    }
     .tab:not(.active) .x {
       display: none;
     }
-    .tab:not(.active) .status {
-      display: inline-flex;
-    }
-    .x {
-      width: var(--tab-row);
-      height: var(--tab-row);
+    .tab:not(.active) .plain {
+      visibility: visible;
     }
   }
   .clip {

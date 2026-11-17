@@ -72,16 +72,31 @@
     return [...(menu?.querySelectorAll<HTMLElement>("[data-item]") ?? [])]
   }
 
+  /** Everything Tab can reach inside the dialog, in document order: the filter, then each row and close button. */
+  function focusables(): HTMLElement[] {
+    return [...(menu?.querySelectorAll<HTMLElement>("input, button") ?? [])].filter((el) => !el.hasAttribute("disabled") && el.tabIndex >= 0)
+  }
+
+  // The keyboard is inside the menu, so moving it to another element of the menu is always allowed.
+  const go = (el: HTMLElement | undefined): void => restoreFocus(el, menu)
+
+  /** The row the keyboard is on, or the row whose close button has it. */
+  function currentRow(list: HTMLElement[]): number {
+    const active = document.activeElement as HTMLElement | null
+    const at = list.indexOf(active as HTMLElement)
+    if (at >= 0 || !active?.dataset.close) return at
+    return list.findIndex((el) => el.dataset.id === active.dataset.close)
+  }
+
   function move(step: number): void {
     const list = items()
     if (list.length === 0) return
-    const at = list.indexOf(document.activeElement as HTMLElement)
-    const next = at < 0 ? (step > 0 ? 0 : list.length - 1) : Math.min(list.length - 1, Math.max(0, at + step))
-    // The keyboard is inside the menu, so moving it to another row of the menu is always allowed.
-    restoreFocus(list[next], menu)
+    const at = currentRow(list)
+    go(list[at < 0 ? (step > 0 ? 0 : list.length - 1) : Math.min(list.length - 1, Math.max(0, at + step))])
   }
 
   function key(e: KeyboardEvent): void {
+    const inFilter = document.activeElement === filter
     if (e.key === "Escape") {
       e.preventDefault()
       e.stopPropagation()
@@ -91,9 +106,36 @@
       move(1)
     } else if (e.key === "ArrowUp") {
       e.preventDefault()
-      if (items().indexOf(document.activeElement as HTMLElement) === 0) restoreFocus(filter, menu)
+      if (currentRow(items()) === 0) go(filter)
       else move(-1)
+    } else if ((e.key === "Home" || e.key === "End") && !inFilter) {
+      // In the filter, Home and End move the caret as usual.
+      e.preventDefault()
+      const list = items()
+      go(e.key === "Home" ? list[0] : list.at(-1))
+    } else if (e.key === "Tab") {
+      // A modal dropdown: Tab cycles inside it until Escape or a pick closes it.
+      const list = focusables()
+      if (list.length === 0) return
+      const at = list.indexOf(document.activeElement as HTMLElement)
+      const last = list.length - 1
+      if (e.shiftKey && at <= 0) {
+        e.preventDefault()
+        go(list[last])
+      } else if (!e.shiftKey && (at === last || at < 0)) {
+        e.preventDefault()
+        go(list[0])
+      }
     }
+  }
+
+  /** Close an open tab from the list; the keyboard goes to the next open tab's row, else the previous, else the filter. */
+  function closeRow(id: string, index: number): void {
+    onclose(id)
+    void tick().then(() => {
+      const rows = [...(menu?.querySelectorAll<HTMLElement>("[data-open-tab]") ?? [])]
+      go(rows[Math.min(index, rows.length - 1)] ?? filter)
+    })
   }
 
   function filterKey(e: KeyboardEvent): void {
@@ -108,7 +150,9 @@
     [session.title, showProject ? session.project : undefined, statusLabel(session.status), session.id === currentID ? "current session" : undefined].filter(Boolean).join(", ")
 </script>
 
-<div class="menu" bind:this={menu} role="dialog" aria-label="Open tabs and all sessions" tabindex="-1" onkeydown={key}>
+<!-- A modal dialog of plain lists of buttons: each row is a button that opens its session, and an open tab's row has
+     its close button beside it (not inside it). Up/Down/Home/End move between rows, Tab cycles inside the dialog. -->
+<div class="menu" bind:this={menu} role="dialog" aria-modal="true" aria-label="Open tabs and all sessions" tabindex="-1" onkeydown={key}>
   <div class="filter">
     <Codicon name="search" />
     <input bind:this={filter} bind:value={query} onkeydown={filterKey} placeholder="Filter sessions" aria-label="Filter sessions" />
@@ -116,27 +160,27 @@
   <div class="list">
     {#if hiddenShown.length > 0}
       <div class="head muted" id="tabs-menu-open">Open tabs</div>
-      <div role="listbox" aria-labelledby="tabs-menu-open">
-        {#each hiddenShown as session (session.id)}
-          <div class="rowwrap">
-            {@render row(session)}
-            <button class="x muted" onclick={() => onclose(session.id)} title="Close tab" aria-label="Close tab {session.title}"><Codicon name="close" /></button>
-          </div>
+      <ul aria-labelledby="tabs-menu-open">
+        {#each hiddenShown as session, index (session.id)}
+          <li class="rowwrap">
+            {@render row(session, true)}
+            <button class="x muted" data-close={session.id} onclick={() => closeRow(session.id, index)} title="Close tab" aria-label="Close tab {session.title}"><Codicon name="close" /></button>
+          </li>
         {/each}
-      </div>
+      </ul>
       <div class="divider" role="separator"></div>
     {/if}
     <div class="head muted" id="tabs-menu-all">All sessions</div>
     {#if loading && sessions.length === 0}
-      <div class="note muted"><Codicon name="loading" spin /> Loading sessions…</div>
+      <div class="note muted" role="status"><Codicon name="loading" spin /> Loading sessions…</div>
     {:else if all.length === 0}
-      <div class="note muted">{query.trim() ? "No session matches this filter." : "No sessions yet. Start one with +."}</div>
+      <div class="note muted" role="status">{query.trim() ? "No session matches this filter." : "No sessions yet. Start one with +."}</div>
     {:else}
-      <div role="listbox" aria-labelledby="tabs-menu-all">
+      <ul aria-labelledby="tabs-menu-all">
         {#each all as session (session.id)}
-          {@render row(session)}
+          <li>{@render row(session, false)}</li>
         {/each}
-      </div>
+      </ul>
       {#if more > 0}
         <div class="note muted">{more} more — type to filter.</div>
       {/if}
@@ -144,13 +188,14 @@
   </div>
 </div>
 
-{#snippet row(session: TabSession)}
+{#snippet row(session: TabSession, openTab: boolean)}
   <button
     class="row"
     class:current={session.id === currentID}
     data-item
-    role="option"
-    aria-selected={session.id === currentID}
+    data-id={session.id}
+    data-open-tab={openTab ? "" : undefined}
+    aria-current={session.id === currentID ? "page" : undefined}
     aria-label={label(session)}
     title={label(session)}
     onclick={() => onopen(session)}
@@ -217,6 +262,11 @@
     margin: 0.3em 0;
     background: var(--oc-hairline);
   }
+  ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
   .rowwrap {
     display: flex;
     align-items: stretch;
@@ -233,6 +283,10 @@
     min-height: var(--oc-menu-row);
     padding: 0.2em 0.75em;
     text-align: left;
+  }
+  .x:focus-visible {
+    outline: 1px solid var(--vscode-focusBorder);
+    outline-offset: -1px;
   }
   .row:hover,
   .row:focus-visible,
