@@ -140,6 +140,11 @@ public final class WatchService extends Service {
               }
 
               @Override
+              public boolean openedHere(ServerRef server, String sessionID) {
+                return WatchState.wasOpened(server.serverId, sessionID) || WatchState.wasOpened(server.id, sessionID);
+              }
+
+              @Override
               public void seenChanged(String serialized) {
                 vault.saveSeen(serialized);
               }

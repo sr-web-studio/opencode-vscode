@@ -31,6 +31,9 @@ public class NoticeEngineTest {
   private int answerMissingFirst = 0;
   private final List<Long> pauses = new ArrayList<>();
   private int profiles = 1;
+  private boolean openedHere = false;
+  /** What the server reports once the wait is over (a client stamped the session meanwhile). */
+  private SessionMeta sessionAfterPause = null;
   private NoticeEngine engine;
 
   private NoticeEngine make(String seen) {
@@ -54,6 +57,12 @@ public class NoticeEngineTest {
           @Override
           public void pause(long ms) {
             pauses.add(ms);
+            if (sessionAfterPause != null) sessions.put("ses_probe", sessionAfterPause);
+          }
+
+          @Override
+          public boolean openedHere(ServerRef s, String id) {
+            return openedHere;
           }
 
           @Override
@@ -103,8 +112,124 @@ public class NoticeEngineTest {
     // These tests exercise what an enabled switch does; the default itself is covered by SettingsTest and the
     // worker-off tests below.
     settings = new Settings(true, true, true, true, true, true);
-    sessions.put("ses_root", new SessionMeta("Fix login", null, "/home/a/webapp"));
+    sessions.put("ses_root", new SessionMeta("Fix login", null, "/home/a/webapp", 500L));
     sessions.put("ses_work", new SessionMeta("Read the logs", "ses_root", "/home/a/webapp"));
+    sessions.put("ses_probe", new SessionMeta("Tool probe", null, "/tmp/probe"));
+  }
+
+  private static String turnAt(String evtId, String type, String session, long created) {
+    return "{\"id\":\"" + evtId + "\",\"type\":\"" + type + "\",\"created\":" + created + ",\"data\":{\"sessionID\":\"" + session + "\"}}";
+  }
+
+  private static String viewedEv(String session, long idle) {
+    return "{\"id\":\"evt_v" + idle + "\",\"type\":\"session.viewed\",\"created\":" + (idle + 50) + ",\"data\":{\"sessionID\":\"" + session + "\",\"idle\":" + idle + "}}";
+  }
+
+  @Test
+  public void neverOpenedRootFinishedGivesNoNotice() {
+    engine.handle(SERVER, ev(turn("e1", "session.execution.succeeded", "ses_probe", null)));
+    assertTrue(shown.isEmpty());
+    assertEquals("one extra look at the server before judging", List.of(NoticeEngine.VIEWED_GRACE_MS), pauses);
+  }
+
+  @Test
+  public void neverOpenedRootFailedGivesNoNotice() {
+    engine.handle(SERVER, ev(turn("e1", "session.execution.failed", "ses_probe", "boom")));
+    assertTrue(shown.isEmpty());
+  }
+
+  @Test
+  public void viewedRootStillNotifiesWithoutWaiting() {
+    engine.handle(SERVER, ev(turn("e1", "session.execution.succeeded", "ses_root", null)));
+    assertEquals(1, shown.size());
+    assertTrue("a viewed session is not delayed", !pauses.contains(NoticeEngine.VIEWED_GRACE_MS));
+  }
+
+  @Test
+  public void neverOpenedSessionStillAnnouncesPermissionAndQuestion() {
+    engine.handle(SERVER, ev(permAsked("per_9", "ses_probe", "bash")));
+    engine.handle(SERVER, ev(formCreated("frm_9", "ses_probe")));
+    assertEquals(2, shown.size());
+    assertEquals(Kind.PERMISSION, shown.get(0).kind);
+    assertEquals(Kind.QUESTION, shown.get(1).kind);
+  }
+
+  @Test
+  public void sessionStartedOnThePhoneNotifiesBeforeTheServerHasAStamp() {
+    openedHere = true;
+    engine.handle(SERVER, ev(turn("e1", "session.execution.succeeded", "ses_probe", null)));
+    assertEquals(1, shown.size());
+  }
+
+  @Test
+  public void stampedAfterTheTurnEndIsFoundByTheFreshLookup() {
+    // First lookup (cache miss) sees no stamp; the editor stamps it during the grace wait; the second lookup sees it.
+    sessionAfterPause = new SessionMeta("Tool probe", null, "/tmp/probe", 900L);
+    engine.handle(SERVER, ev(turn("e1", "session.execution.succeeded", "ses_probe", null)));
+    assertEquals(1, shown.size());
+  }
+
+  @Test
+  public void staleNeverViewedCacheDoesNotHideAViewedSession() {
+    sessions.put("ses_new", new SessionMeta("Later", null, "/p"));
+    engine.handle(SERVER, ev(turn("e1", "session.execution.succeeded", "ses_new", null)));
+    assertTrue(shown.isEmpty());
+    // Seconds later the owner opened it; the cache (20 s) still says "never viewed".
+    now += 6_000;
+    sessions.put("ses_new", new SessionMeta("Later", null, "/p", 700L));
+    engine.handle(SERVER, ev(turn("e2", "session.execution.succeeded", "ses_new", null)));
+    assertEquals(1, shown.size());
+  }
+
+  @Test
+  public void viewedAfterAFinishedNoticeCancelsIt() {
+    engine.handle(SERVER, ev(turnAt("e1", "session.execution.succeeded", "ses_root", 1_000)));
+    assertEquals(1, shown.size());
+    engine.handle(SERVER, ev(viewedEv("ses_root", 1_000)));
+    assertEquals(List.of("ses_root"), cancelled);
+  }
+
+  @Test
+  public void viewedAfterAFailedAndAWorkerNoticeCancelsThemToo() {
+    engine.handle(SERVER, ev(turnAt("e1", "session.execution.failed", "ses_root", 1_000)));
+    engine.handle(SERVER, ev(viewedEv("ses_root", 1_000)));
+    engine.handle(SERVER, ev(turnAt("e2", "session.execution.succeeded", "ses_work", 2_000)));
+    engine.handle(SERVER, ev(viewedEv("ses_work", 2_000)));
+    assertEquals(List.of("ses_root", "ses_work"), cancelled);
+  }
+
+  @Test
+  public void viewedOfAnOlderTurnKeepsTheNotice() {
+    engine.handle(SERVER, ev(turnAt("e1", "session.execution.succeeded", "ses_root", 2_000)));
+    engine.handle(SERVER, ev(viewedEv("ses_root", 1_000)));
+    assertTrue(cancelled.isEmpty());
+  }
+
+  @Test
+  public void viewedKeepsAnOpenPermissionAndQuestion() {
+    engine.handle(SERVER, ev(permAsked("per_1", "ses_root", "bash")));
+    engine.handle(SERVER, ev(viewedEv("ses_root", 9_000_000)));
+    assertTrue(cancelled.isEmpty());
+    engine.handle(SERVER, ev("{\"id\":\"e9\",\"type\":\"permission.replied\",\"data\":{\"sessionID\":\"ses_root\",\"requestID\":\"per_1\"}}"));
+    assertEquals(List.of("ses_root"), cancelled);
+  }
+
+  @Test
+  public void viewedWithNothingShowingDoesNothing() {
+    engine.handle(SERVER, ev(viewedEv("ses_root", 1_000)));
+    assertTrue(cancelled.isEmpty());
+  }
+
+  @Test
+  public void viewedEventMarksTheCachedSessionAsViewed() {
+    sessions.put("ses_new", new SessionMeta("Later", null, "/p"));
+    engine.handle(SERVER, ev(turn("e1", "session.execution.succeeded", "ses_new", null)));
+    assertTrue(shown.isEmpty());
+    now += 6_000;
+    sessions.put("ses_new", new SessionMeta("Later", null, "/p"));
+    engine.handle(SERVER, ev(viewedEv("ses_new", 800)));
+    engine.handle(SERVER, ev(turn("e2", "session.execution.succeeded", "ses_new", null)));
+    assertEquals(1, shown.size());
   }
 
   private static JSONObject ev(String json) {

@@ -60,13 +60,15 @@ public final class SessionApi {
     return parse(fetch.get(server, "/api/session/" + URLEncoder.encode(sessionID, "UTF-8"), 8_000, 8_000, 1_000_000));
   }
 
-  /** {@code {"data": {title, parentID, location: {directory}}}}. */
+  /** {@code {"data": {title, parentID, location: {directory}, time: {viewed}}}}. */
   public static SessionMeta parse(String json) throws JSONException {
     JSONObject root = new JSONObject(json);
     JSONObject d = root.optJSONObject("data");
     if (d == null) d = root;
     JSONObject loc = d.optJSONObject("location");
-    return new SessionMeta(d.optString("title", null), d.optString("parentID", null), loc == null ? null : loc.optString("directory", null));
+    JSONObject time = d.optJSONObject("time");
+    Long viewed = time != null && time.has("viewed") && !time.isNull("viewed") ? Long.valueOf(time.optLong("viewed")) : null;
+    return new SessionMeta(d.optString("title", null), d.optString("parentID", null), loc == null ? null : loc.optString("directory", null), viewed);
   }
 
   /** The text of the agent's last answer in the latest turn, or null. Throws on a failed call (the caller falls back). */

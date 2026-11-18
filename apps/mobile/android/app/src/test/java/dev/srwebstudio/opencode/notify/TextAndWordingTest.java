@@ -140,6 +140,20 @@ public class TextAndWordingTest {
   }
 
   @Test
+  public void eventUrlAsksForViewedEvents() {
+    assertTrue(HttpTransport.eventUrl("http://h:4096").contains("types=session.viewed"));
+  }
+
+  @Test
+  public void sessionApiReadsTimeViewed() throws Exception {
+    SessionMeta seen = SessionApi.parse("{\"data\":{\"title\":\"T\",\"time\":{\"created\":1,\"idle\":5,\"viewed\":7}}}");
+    assertEquals(Long.valueOf(7), seen.viewed);
+    assertEquals(null, SessionApi.parse("{\"data\":{\"title\":\"T\",\"time\":{\"created\":1,\"idle\":5}}}").viewed);
+    assertEquals(null, SessionApi.parse("{\"data\":{\"title\":\"T\"}}").viewed);
+    assertEquals(null, SessionApi.parse("{\"data\":{\"time\":{\"viewed\":null}}}").viewed);
+  }
+
+  @Test
   public void backoffGrowsToThirtySeconds() {
     long[] want = {1_000, 2_000, 4_000, 8_000, 16_000, 30_000, 30_000};
     for (int i = 0; i < want.length; i++) assertEquals(want[i], Backoff.delayMs(i));

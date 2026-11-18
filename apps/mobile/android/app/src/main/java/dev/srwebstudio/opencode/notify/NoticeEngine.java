@@ -16,6 +16,8 @@ public final class NoticeEngine {
   public static final long COALESCE_MS = 5_000;
   /** Wait before the one retry of the answer lookup. Measured live: the text was there at the first fetch 5 of 5 times. */
   public static final long ANSWER_RETRY_MS = 700;
+  /** Wait before judging a session that shows no view stamp: an editor with the session open stamps it right after the turn. */
+  public static final long VIEWED_GRACE_MS = 1_500;
   private static final long META_TTL_MS = 20_000;
   private static final int SEEN_MAX = 300;
 
@@ -45,6 +47,15 @@ public final class NoticeEngine {
     /** The app is in the foreground showing exactly this session. */
     boolean isVisible(ServerRef server, String sessionID);
 
+    /**
+     * The owner has had this session on screen in this app since the service started. The server stamps a session as
+     * viewed only after a turn has ended, so a session started on the phone has no stamp yet when its first turn ends:
+     * this is what tells it apart from an agent's own probe session.
+     */
+    default boolean openedHere(ServerRef server, String sessionID) {
+      return false;
+    }
+
     /** The seen set changed: keep it on disk. */
     void seenChanged(String serialized);
 
@@ -56,12 +67,16 @@ public final class NoticeEngine {
   private static final class Shown {
     final Kind kind;
     final String requestID;
+    /** Phone clock: the coalescing window. */
     final long at;
+    /** Server clock: when the turn this notice reports ended ({@code 0} for attention notices or an event without it). */
+    final long endedAt;
 
-    Shown(Kind kind, String requestID, long at) {
+    Shown(Kind kind, String requestID, long at, long endedAt) {
       this.kind = kind;
       this.requestID = requestID;
       this.at = at;
+      this.endedAt = endedAt;
     }
   }
 
@@ -125,6 +140,9 @@ public final class NoticeEngine {
         return;
       case "session.deleted":
         clear(server, d.optString("sessionID", ""), null);
+        return;
+      case "session.viewed":
+        viewed(server, ev, d);
         return;
       default:
     }
@@ -204,7 +222,7 @@ public final class NoticeEngine {
     long t = deps.now();
     String k = key(server, sessionID);
     synchronized (this) {
-      shown.put(k, new Shown(kind, requestID.isEmpty() ? null : requestID, t));
+      shown.put(k, new Shown(kind, requestID.isEmpty() ? null : requestID, t, 0));
     }
     SessionMeta meta = lookup(server, sessionID);
     String dir = meta != null && meta.directory != null ? meta.directory : fallbackDir;
@@ -235,6 +253,20 @@ public final class NoticeEngine {
     }
     boolean worker = meta.parentID != null;
     Kind kind = worker ? Kind.WORKER : failed ? Kind.FAILED : Kind.FINISHED;
+    if (!worker && meta.viewed == null && !deps.openedHere(server, sessionID)) {
+      // The cache may predate the owner's look, and a client that has the session on screen stamps it a moment after
+      // the turn ends (the stamp needs the end of the turn). Give that stamp a short moment, then ask the server
+      // itself, never the cache, before judging.
+      deps.pause(VIEWED_GRACE_MS);
+      SessionMeta fresh = fetch(server, sessionID);
+      if (fresh != null) meta = fresh;
+      if (meta.viewed == null) {
+        // No client ever opened it: a probe or script session the owner does not know about. Attention requests of
+        // such a session still go out ({@link #attention}); only the turn end stays quiet.
+        log("skip " + kind + " (" + sessionID + "): never opened");
+        return;
+      }
+    }
     if (!deps.settings().allows(kind)) {
       log("skip " + kind + " (" + sessionID + "): switched off");
       return;
@@ -252,7 +284,7 @@ public final class NoticeEngine {
         return;
       }
       // The same session finishing the same turn twice with different event ids is caught here as well.
-      shown.put(k, new Shown(kind, null, t));
+      shown.put(k, new Shown(kind, null, t, ev.optLong("created", 0)));
     }
     Detail detail = failed ? Detail.error(errorMessage(d)) : answer(server, sessionID);
     String dir = meta != null && meta.directory != null ? meta.directory : directoryOf(ev);
@@ -301,6 +333,36 @@ public final class NoticeEngine {
     deps.cancel(server, sessionID);
   }
 
+  /**
+   * A client opened the session ({@code session.viewed}, {@code idle} is the end of the turn it looked at). The
+   * session now counts as viewed, and a finished/failed/worker notice for that turn is taken down: the owner has seen
+   * it somewhere else. A look at an earlier turn keeps it, and so does an open permission or question (those clear
+   * only when answered). Both stamps come from the server, so the phone's clock does not matter.
+   */
+  private void viewed(ServerRef server, JSONObject ev, JSONObject d) {
+    String sessionID = d.optString("sessionID", "");
+    if (sessionID.isEmpty()) return;
+    long idle = d.optLong("idle", 0);
+    String k = key(server, sessionID);
+    boolean cancel = false;
+    synchronized (this) {
+      Cached c = metas.get(k);
+      if (c != null && idle > 0) metas.put(k, new Cached(c.meta.withViewed(idle), c.at));
+      Shown s = shown.get(k);
+      if (s == null || s.kind.attention) return;
+      long seenAt = s.endedAt > 0 ? idle : ev.optLong("created", deps.now());
+      long noticeAt = s.endedAt > 0 ? s.endedAt : s.at;
+      if (seenAt >= noticeAt && seenAt > 0) {
+        shown.remove(k);
+        cancel = true;
+      }
+    }
+    if (cancel) {
+      log("cancel " + sessionID + ": seen elsewhere");
+      deps.cancel(server, sessionID);
+    }
+  }
+
   /** The app opened the session or the owner dismissed it: forget what is showing. */
   public void forget(ServerRef server, String sessionID) {
     synchronized (this) {
@@ -314,19 +376,33 @@ public final class NoticeEngine {
     return fresh;
   }
 
-  private SessionMeta lookup(ServerRef server, String sessionID) {
-    String k = key(server, sessionID);
-    long t = deps.now();
+  /** The cached meta when it is still young enough to use, else null. */
+  private SessionMeta cached(ServerRef server, String sessionID) {
     Cached c;
     synchronized (this) {
-      c = metas.get(k);
+      c = metas.get(key(server, sessionID));
     }
-    if (c != null && t - c.at < META_TTL_MS) return c.meta;
+    return c != null && deps.now() - c.at < META_TTL_MS ? c.meta : null;
+  }
+
+  private SessionMeta lookup(ServerRef server, String sessionID) {
+    SessionMeta known = cached(server, sessionID);
+    if (known != null) return known;
+    SessionMeta m = fetch(server, sessionID);
+    if (m != null) return m;
+    synchronized (this) {
+      Cached c = metas.get(key(server, sessionID));
+      return c == null ? null : c.meta;
+    }
+  }
+
+  /** Ask the server (never the cache) and remember the answer. Null when the call failed. */
+  private SessionMeta fetch(ServerRef server, String sessionID) {
     try {
       SessionMeta m = deps.session(server, sessionID);
       if (m != null) {
         synchronized (this) {
-          metas.put(k, new Cached(m, t));
+          metas.put(key(server, sessionID), new Cached(m, deps.now()));
           if (metas.size() > 200) metas.clear();
         }
         return m;
@@ -334,7 +410,7 @@ public final class NoticeEngine {
     } catch (Exception e) {
       log("session lookup failed (" + sessionID + "): " + e.getClass().getSimpleName());
     }
-    return c == null ? null : c.meta;
+    return null;
   }
 
   /** The parent's meta of a worker, or null. */
