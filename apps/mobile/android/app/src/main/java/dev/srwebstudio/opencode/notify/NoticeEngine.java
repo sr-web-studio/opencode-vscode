@@ -56,6 +56,14 @@ public final class NoticeEngine {
       return false;
     }
 
+    /**
+     * Run this off the stream's thread (the never-opened check waits). One at a time, in order. The default runs it
+     * right away, which is what a test without threads wants.
+     */
+    default void defer(Runnable task) {
+      task.run();
+    }
+
     /** The seen set changed: keep it on disk. */
     void seenChanged(String serialized);
 
@@ -253,20 +261,55 @@ public final class NoticeEngine {
     }
     boolean worker = meta.parentID != null;
     Kind kind = worker ? Kind.WORKER : failed ? Kind.FAILED : Kind.FINISHED;
-    if (!worker && meta.viewed == null && !deps.openedHere(server, sessionID)) {
-      // The cache may predate the owner's look, and a client that has the session on screen stamps it a moment after
-      // the turn ends (the stamp needs the end of the turn). Give that stamp a short moment, then ask the server
-      // itself, never the cache, before judging.
-      deps.pause(VIEWED_GRACE_MS);
-      SessionMeta fresh = fetch(server, sessionID);
-      if (fresh != null) meta = fresh;
-      if (meta.viewed == null) {
-        // No client ever opened it: a probe or script session the owner does not know about. Attention requests of
-        // such a session still go out ({@link #attention}); only the turn end stays quiet.
-        log("skip " + kind + " (" + sessionID + "): never opened");
-        return;
-      }
+    if (!worker && !opened(server, sessionID, meta)) {
+      // The wait and the second look at the server must not hold up the stream's thread: a permission request behind
+      // this event would be announced late. The rest of the turn end continues on the deferred thread.
+      final SessionMeta first = meta;
+      deps.defer(
+          new Runnable() {
+            @Override
+            public void run() {
+              try {
+                judgeUnopened(server, ev, d, failed, first, kind);
+              } catch (Exception e) {
+                log("turn end (" + sessionID + ") skipped: " + e.getClass().getSimpleName());
+              }
+            }
+          });
+      return;
     }
+    finishTurnEnd(server, ev, d, failed, meta, kind);
+  }
+
+  /** The owner has opened this session: a client stamped it, this app has it on screen, or this app created it. */
+  private boolean opened(ServerRef server, String sessionID, SessionMeta meta) {
+    return meta.viewed != null || meta.createdHere() || deps.openedHere(server, sessionID);
+  }
+
+  /**
+   * A root session nobody is known to have opened. The cache may predate the owner's look, and a client that has the
+   * session on screen stamps it a moment after the turn ends (the stamp needs the end of the turn): wait a short
+   * moment, then ask the server itself, never the cache. When that read fails the notice goes out: a real turn end
+   * must not be lost to a network blip.
+   */
+  private void judgeUnopened(ServerRef server, JSONObject ev, JSONObject d, boolean failed, SessionMeta first, Kind kind) throws Exception {
+    String sessionID = d.optString("sessionID", "");
+    deps.pause(VIEWED_GRACE_MS);
+    SessionMeta meta = fetch(server, sessionID);
+    if (meta == null) {
+      log("never-opened check (" + sessionID + ") failed, announcing " + kind + " anyway");
+      meta = first;
+    } else if (!opened(server, sessionID, meta)) {
+      // A probe or script session the owner does not know about. Attention requests of such a session still go out
+      // ({@link #attention}); only the turn end stays quiet.
+      log("skip " + kind + " (" + sessionID + "): never opened");
+      return;
+    }
+    finishTurnEnd(server, ev, d, failed, meta, kind);
+  }
+
+  private void finishTurnEnd(ServerRef server, JSONObject ev, JSONObject d, boolean failed, SessionMeta meta, Kind kind) throws Exception {
+    String sessionID = d.optString("sessionID", "");
     if (!deps.settings().allows(kind)) {
       log("skip " + kind + " (" + sessionID + "): switched off");
       return;
@@ -350,9 +393,9 @@ public final class NoticeEngine {
       if (c != null && idle > 0) metas.put(k, new Cached(c.meta.withViewed(idle), c.at));
       Shown s = shown.get(k);
       if (s == null || s.kind.attention) return;
-      long seenAt = s.endedAt > 0 ? idle : ev.optLong("created", deps.now());
-      long noticeAt = s.endedAt > 0 ? s.endedAt : s.at;
-      if (seenAt >= noticeAt && seenAt > 0) {
+      // Without the server's own end-of-turn stamp the two clocks cannot be compared: keep the notice.
+      if (s.endedAt <= 0) return;
+      if (idle >= s.endedAt) {
         shown.remove(k);
         cancel = true;
       }

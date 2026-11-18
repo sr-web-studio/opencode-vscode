@@ -243,7 +243,7 @@ describe("applyFolderSessions", () => {
  */
 describe("the chat view is looked at only while its window has focus", () => {
   /** The provider with a resolved, visible view and recording controllers; `a` is the active folder. */
-  function focusHarness() {
+  function focusHarness(visible = true) {
     const calls: Record<string, boolean[]> = { "/a": [], "/b": [] }
     const make = (path: string) => ({ ...controller(path, () => summary(path, [])), setVisible: ((visible: boolean) => void calls[path]!.push(visible)) as unknown as () => void })
     const folders = [
@@ -252,11 +252,14 @@ describe("the chat view is looked at only while its window has focus", () => {
     ]
     const provider = new ChatViewProvider({ path: "/ext" } as never, registry(folders) as never, {} as never, { noteVisible() {} } as never)
     // A resolved, visible view; the focus rule is all that is under test, so the webview itself is not built.
-    ;(provider as unknown as { view: unknown }).view = { visible: true, webview: { postMessage: () => Promise.resolve(true) } }
+    const view = { visible: visible, webview: { postMessage: () => Promise.resolve(true) } }
+    ;(provider as unknown as { view: unknown }).view = view
     ;(provider as unknown as { syncVisible(): void }).syncVisible()
+    // What the first sync told each controller, kept for the tests; `calls` then records only what follows.
+    const initial = { "/a": [...calls["/a"]!], "/b": [...calls["/b"]!] }
     calls["/a"]!.length = 0
     calls["/b"]!.length = 0
-    return { provider, calls }
+    return { provider, calls, initial, view, sync: () => (provider as unknown as { syncVisible(): void }).syncVisible() }
   }
   const focusChanged = (focused: boolean) => {
     win.focused = focused
@@ -266,7 +269,9 @@ describe("the chat view is looked at only while its window has focus", () => {
   test("losing focus takes the active folder off screen; gaining it puts it back", () => {
     win.focused = true
     windowListeners = []
-    const { calls } = focusHarness()
+    const { calls, initial } = focusHarness()
+    // Focused and visible: the first sync puts the active folder on screen and the other one off.
+    expect(initial).toEqual({ "/a": [true], "/b": [false] })
     focusChanged(false)
     expect(calls["/a"]).toEqual([false])
     expect(calls["/b"]).toEqual([false])
@@ -278,10 +283,27 @@ describe("the chat view is looked at only while its window has focus", () => {
   test("a window that starts unfocused never reports a visible folder", () => {
     win.focused = false
     windowListeners = []
-    const { calls } = focusHarness()
+    const { calls, initial } = focusHarness()
+    // The very first sync already says "off screen" for every folder.
+    expect(initial).toEqual({ "/a": [false], "/b": [false] })
     focusChanged(false)
     expect(calls["/a"]!.every((visible) => !visible)).toBe(true)
-    win.focused = true
+    focusChanged(true)
+    expect(calls["/a"]!.at(-1)).toBe(true)
+  })
+
+  test("the panel becoming visible while the window is unfocused is still not a look", () => {
+    win.focused = false
+    windowListeners = []
+    const { calls, initial, view, sync } = focusHarness(false)
+    expect(initial).toEqual({ "/a": [false], "/b": [false] })
+    view.visible = true
+    sync()
+    expect(calls["/a"]).toEqual([false])
+    expect(calls["/b"]).toEqual([false])
+    focusChanged(true)
+    expect(calls["/a"]!.at(-1)).toBe(true)
+    expect(calls["/b"]!.at(-1)).toBe(false)
   })
 
   test("the window listener is disposed with the provider", () => {

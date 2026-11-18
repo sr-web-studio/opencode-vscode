@@ -34,6 +34,11 @@ public class NoticeEngineTest {
   private boolean openedHere = false;
   /** What the server reports once the wait is over (a client stamped the session meanwhile). */
   private SessionMeta sessionAfterPause = null;
+  /** The server stops answering while the never-opened check waits. */
+  private boolean lookupFailsAfterPause = false;
+  /** True: deferred work runs on the calling thread. False: it queues until the test runs it (a second thread). */
+  private boolean deferInline = true;
+  private final List<Runnable> deferred = new ArrayList<>();
   private NoticeEngine engine;
 
   private NoticeEngine make(String seen) {
@@ -58,6 +63,13 @@ public class NoticeEngineTest {
           public void pause(long ms) {
             pauses.add(ms);
             if (sessionAfterPause != null) sessions.put("ses_probe", sessionAfterPause);
+            if (lookupFailsAfterPause) lookupFails = true;
+          }
+
+          @Override
+          public void defer(Runnable task) {
+            if (deferInline) task.run();
+            else deferred.add(task);
           }
 
           @Override
@@ -179,6 +191,57 @@ public class NoticeEngineTest {
     sessions.put("ses_new", new SessionMeta("Later", null, "/p", 700L));
     engine.handle(SERVER, ev(turn("e2", "session.execution.succeeded", "ses_new", null)));
     assertEquals(1, shown.size());
+  }
+
+  @Test
+  public void sessionCreatedByOurClientCountsAsOpenedWithoutWaiting() {
+    sessions.put("ses_mine", new SessionMeta("Mine", null, "/p", null, "occ"));
+    engine.handle(SERVER, ev(turn("e1", "session.execution.succeeded", "ses_mine", null)));
+    assertEquals(1, shown.size());
+    assertTrue("no grace wait", pauses.isEmpty() || !pauses.contains(NoticeEngine.VIEWED_GRACE_MS));
+    engine.handle(SERVER, ev(turn("e2", "session.execution.failed", "ses_mine", "boom")));
+    assertTrue("coalesced, but never judged as unopened", !pauses.contains(NoticeEngine.VIEWED_GRACE_MS));
+  }
+
+  @Test
+  public void anotherClientsMarkerDoesNotCountAsOpened() {
+    sessions.put("ses_other", new SessionMeta("Other", null, "/p", null, "somebody-else"));
+    engine.handle(SERVER, ev(turn("e1", "session.execution.succeeded", "ses_other", null)));
+    assertTrue(shown.isEmpty());
+  }
+
+  @Test
+  public void aBurstOfNeverOpenedTurnEndsDoesNotDelayAPermissionNotice() {
+    deferInline = false;
+    for (int i = 0; i < 5; i++) {
+      sessions.put("ses_p" + i, new SessionMeta("Probe " + i, null, "/tmp/p"));
+      engine.handle(SERVER, ev(turn("e" + i, "session.execution.succeeded", "ses_p" + i, null)));
+    }
+    assertEquals("the judgements wait on their own thread", 5, deferred.size());
+    assertTrue("and have not waited on the stream's thread", pauses.isEmpty());
+    engine.handle(SERVER, ev(permAsked("per_late", "ses_root", "bash")));
+    assertEquals("the permission is announced at once, behind nothing", 1, shown.size());
+    assertEquals(Kind.PERMISSION, shown.get(0).kind);
+    for (Runnable r : new ArrayList<>(deferred)) r.run();
+    assertEquals("the probes are judged later and stay quiet", 1, shown.size());
+    assertEquals(5, pauses.size());
+  }
+
+  @Test
+  public void aFailedFreshLookupStillAnnouncesTheTurnEnd() {
+    lookupFailsAfterPause = true;
+    engine.handle(SERVER, ev(turn("e1", "session.execution.succeeded", "ses_probe", null)));
+    assertEquals("a network blip must not eat a real turn end", 1, shown.size());
+    assertEquals(Kind.FINISHED, shown.get(0).kind);
+  }
+
+  @Test
+  public void viewedWithoutAServerEndStampKeepsTheNotice() {
+    // The turn-end event carries no `created`: the two clocks cannot be compared, so the notice stays.
+    engine.handle(SERVER, ev(turn("e1", "session.execution.succeeded", "ses_root", null)));
+    assertEquals(1, shown.size());
+    engine.handle(SERVER, ev(viewedEv("ses_root", 9_000_000_000L)));
+    assertTrue(cancelled.isEmpty());
   }
 
   @Test

@@ -154,6 +154,14 @@ public class TextAndWordingTest {
   }
 
   @Test
+  public void sessionApiReadsTheClientMarker() throws Exception {
+    assertEquals("occ", SessionApi.parse("{\"data\":{\"title\":\"T\",\"metadata\":{\"client\":\"occ\"}}}").client);
+    assertTrue(SessionApi.parse("{\"data\":{\"metadata\":{\"client\":\"occ\"}}}").createdHere());
+    assertEquals(null, SessionApi.parse("{\"data\":{\"metadata\":{\"other\":1}}}").client);
+    assertEquals(null, SessionApi.parse("{\"data\":{\"title\":\"T\"}}").client);
+  }
+
+  @Test
   public void backoffGrowsToThirtySeconds() {
     long[] want = {1_000, 2_000, 4_000, 8_000, 16_000, 30_000, 30_000};
     for (int i = 0; i < want.length; i++) assertEquals(want[i], Backoff.delayMs(i));
