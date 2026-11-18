@@ -1468,6 +1468,9 @@ export class Controller {
         location: { directory: this.dir },
         agent: this.draftAgentNow() ?? null,
         model: this.shownModel(undefined) ?? null,
+        // Marks a session a person started here, so the phone's notification service can tell it from an agent's own
+        // probe session before any client has had the chance to view it.
+        metadata: { client: "occ" },
       })
       this.sessions = this.sort(upsertSession(this.sessions, { ...created, location: created.location ?? { directory: this.dir } } as SessionInfo))
       this.target = { kind: "session", id: created.id }

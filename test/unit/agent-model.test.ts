@@ -117,13 +117,13 @@ describe("agent models", () => {
     const { ctl, calls } = await ready()
     await ctl.dispatch({ type: "pickAgent", id: "review" })
     await ctl.dispatch({ type: "send", text: "hi" })
-    expect(calls[0]).toEqual(["session.create", { location: { directory: "/w" }, agent: "review", model: OPUS_HIGH }])
+    expect(calls[0]).toEqual(["session.create", { location: { directory: "/w" }, agent: "review", model: OPUS_HIGH, metadata: { client: "occ" } }])
   })
 
   test("a new session with the default agent gets the default model", async () => {
     const { ctl, calls } = await ready()
     await ctl.dispatch({ type: "send", text: "hi" })
-    expect(calls[0]).toEqual(["session.create", { location: { directory: "/w" }, agent: "build", model: SONNET }])
+    expect(calls[0]).toEqual(["session.create", { location: { directory: "/w" }, agent: "build", model: SONNET, metadata: { client: "occ" } }])
   })
 
   test("the configured model's variant applies to the default model (model.default reports none)", async () => {
@@ -215,7 +215,7 @@ describe("the explicit Default variant", () => {
     await ctl.dispatch({ type: "pickModel", model: { id: "opus", providerID: "cli", variant: "default" } })
     expect(ctl.snapshot().model).toEqual({ id: "opus", providerID: "cli" })
     await ctl.dispatch({ type: "send", text: "hi" })
-    expect(calls[0]).toEqual(["session.create", { location: { directory: "/w" }, agent: "review", model: { id: "opus", providerID: "cli" } }])
+    expect(calls[0]).toEqual(["session.create", { location: { directory: "/w" }, agent: "review", model: { id: "opus", providerID: "cli" }, metadata: { client: "occ" } }])
   })
 
   test("existing session: Default is recorded as no variant and not inherited again", async () => {
