@@ -31,6 +31,22 @@ public class NoticeEngineTest {
   private int answerMissingFirst = 0;
   private final List<Long> pauses = new ArrayList<>();
   private int profiles = 1;
+  private boolean openedHere = false;
+  /** What the server reports once the wait is over (a client stamped the session meanwhile). */
+  private SessionMeta sessionAfterPause = null;
+  /** The server stops answering while the never-opened check waits. */
+  private boolean lookupFailsAfterPause = false;
+  /** The server answers 404 while the never-opened check waits (the session was deleted). */
+  private boolean notFoundAfterPause = false;
+  private boolean notFound = false;
+  /** Runs inside the grace wait, like an event arriving on the stream meanwhile. */
+  private Runnable onPause = null;
+  /** Runs inside the answer lookup. */
+  private Runnable onAnswer = null;
+  private boolean interruptInPause = false;
+  /** True: deferred work runs on the calling thread. False: it queues until the test runs it (a second thread). */
+  private boolean deferInline = true;
+  private final List<Runnable> deferred = new ArrayList<>();
   private NoticeEngine engine;
 
   private NoticeEngine make(String seen) {
@@ -40,12 +56,14 @@ public class NoticeEngineTest {
           public SessionMeta session(ServerRef s, String id) throws Exception {
             lookups++;
             if (lookupFails) throw new java.io.IOException("down");
+            if (notFound) throw new SessionApi.NotFound("HTTP 404");
             return sessions.get(id);
           }
 
           @Override
           public String lastAnswer(ServerRef s, String id) throws Exception {
             answerCalls++;
+            if (onAnswer != null) onAnswer.run();
             if (answerFails) throw new java.net.SocketTimeoutException("slow");
             if (answerCalls <= answerMissingFirst) return null;
             return answers.get(id);
@@ -54,6 +72,22 @@ public class NoticeEngineTest {
           @Override
           public void pause(long ms) {
             pauses.add(ms);
+            if (sessionAfterPause != null) sessions.put("ses_probe", sessionAfterPause);
+            if (lookupFailsAfterPause) lookupFails = true;
+            if (notFoundAfterPause) notFound = true;
+            if (interruptInPause) Thread.currentThread().interrupt();
+            if (onPause != null) onPause.run();
+          }
+
+          @Override
+          public void defer(Runnable task) {
+            if (deferInline) task.run();
+            else deferred.add(task);
+          }
+
+          @Override
+          public boolean openedHere(ServerRef s, String id) {
+            return openedHere;
           }
 
           @Override
@@ -103,8 +137,236 @@ public class NoticeEngineTest {
     // These tests exercise what an enabled switch does; the default itself is covered by SettingsTest and the
     // worker-off tests below.
     settings = new Settings(true, true, true, true, true, true);
-    sessions.put("ses_root", new SessionMeta("Fix login", null, "/home/a/webapp"));
+    sessions.put("ses_root", new SessionMeta("Fix login", null, "/home/a/webapp", 500L));
     sessions.put("ses_work", new SessionMeta("Read the logs", "ses_root", "/home/a/webapp"));
+    sessions.put("ses_probe", new SessionMeta("Tool probe", null, "/tmp/probe"));
+  }
+
+  private static String turnAt(String evtId, String type, String session, long created) {
+    return "{\"id\":\"" + evtId + "\",\"type\":\"" + type + "\",\"created\":" + created + ",\"data\":{\"sessionID\":\"" + session + "\"}}";
+  }
+
+  private static String viewedEv(String session, long idle) {
+    return "{\"id\":\"evt_v" + idle + "\",\"type\":\"session.viewed\",\"created\":" + (idle + 50) + ",\"data\":{\"sessionID\":\"" + session + "\",\"idle\":" + idle + "}}";
+  }
+
+  @Test
+  public void neverOpenedRootFinishedGivesNoNotice() {
+    engine.handle(SERVER, ev(turn("e1", "session.execution.succeeded", "ses_probe", null)));
+    assertTrue(shown.isEmpty());
+    assertEquals("one extra look at the server before judging", List.of(NoticeEngine.VIEWED_GRACE_MS), pauses);
+  }
+
+  @Test
+  public void neverOpenedRootFailedGivesNoNotice() {
+    engine.handle(SERVER, ev(turn("e1", "session.execution.failed", "ses_probe", "boom")));
+    assertTrue(shown.isEmpty());
+  }
+
+  @Test
+  public void viewedRootStillNotifiesWithoutWaiting() {
+    engine.handle(SERVER, ev(turn("e1", "session.execution.succeeded", "ses_root", null)));
+    assertEquals(1, shown.size());
+    assertTrue("a viewed session is not delayed", !pauses.contains(NoticeEngine.VIEWED_GRACE_MS));
+  }
+
+  @Test
+  public void neverOpenedSessionStillAnnouncesPermissionAndQuestion() {
+    engine.handle(SERVER, ev(permAsked("per_9", "ses_probe", "bash")));
+    engine.handle(SERVER, ev(formCreated("frm_9", "ses_probe")));
+    assertEquals(2, shown.size());
+    assertEquals(Kind.PERMISSION, shown.get(0).kind);
+    assertEquals(Kind.QUESTION, shown.get(1).kind);
+  }
+
+  @Test
+  public void sessionStartedOnThePhoneNotifiesBeforeTheServerHasAStamp() {
+    openedHere = true;
+    engine.handle(SERVER, ev(turn("e1", "session.execution.succeeded", "ses_probe", null)));
+    assertEquals(1, shown.size());
+  }
+
+  @Test
+  public void stampedAfterTheTurnEndMeansTheTurnWasSeen() {
+    // First lookup sees no stamp; a client stamps it during the grace wait at or after the turn's end: seen, no notice.
+    sessionAfterPause = new SessionMeta("Tool probe", null, "/tmp/probe", 900L);
+    engine.handle(SERVER, ev(turnAt("e1", "session.execution.succeeded", "ses_probe", 800)));
+    assertTrue(shown.isEmpty());
+  }
+
+  @Test
+  public void aStampOfAnEarlierTurnDoesNotHideTheNewOne() {
+    sessionAfterPause = new SessionMeta("Tool probe", null, "/tmp/probe", 700L);
+    engine.handle(SERVER, ev(turnAt("e1", "session.execution.succeeded", "ses_probe", 800)));
+    assertEquals(1, shown.size());
+  }
+
+  @Test
+  public void viewedDuringTheWaitWithdrawsTheNotice() {
+    sessionAfterPause = new SessionMeta("Tool probe", null, "/tmp/probe", 500L);
+    onPause = () -> engine.handle(SERVER, ev(viewedEv("ses_probe", 1_000)));
+    engine.handle(SERVER, ev(turnAt("e1", "session.execution.succeeded", "ses_probe", 1_000)));
+    assertTrue(shown.isEmpty());
+  }
+
+  @Test
+  public void viewedWhileTheAnswerIsReadWithdrawsTheNotice() {
+    sessionAfterPause = new SessionMeta("Tool probe", null, "/tmp/probe", 500L);
+    answers.put("ses_probe", "All done");
+    onAnswer = () -> engine.handle(SERVER, ev(viewedEv("ses_probe", 1_000)));
+    engine.handle(SERVER, ev(turnAt("e1", "session.execution.succeeded", "ses_probe", 1_000)));
+    assertTrue(shown.isEmpty());
+  }
+
+  @Test
+  public void deletedDuringTheWaitWithdrawsTheNotice() {
+    sessionAfterPause = new SessionMeta("Tool probe", null, "/tmp/probe", 500L);
+    onPause = () -> engine.handle(SERVER, ev("{\"id\":\"evt_d\",\"type\":\"session.deleted\",\"data\":{\"sessionID\":\"ses_probe\"}}"));
+    engine.handle(SERVER, ev(turnAt("e1", "session.execution.succeeded", "ses_probe", 1_000)));
+    assertTrue(shown.isEmpty());
+  }
+
+  @Test
+  public void aNotFoundRereadMeansTheSessionIsGone() {
+    notFoundAfterPause = true;
+    engine.handle(SERVER, ev(turn("e1", "session.execution.succeeded", "ses_probe", null)));
+    assertTrue("a deleted session is not announced", shown.isEmpty());
+  }
+
+  @Test
+  public void aPauseInterruptedByShutdownAnnouncesNothing() {
+    sessionAfterPause = new SessionMeta("Tool probe", null, "/tmp/probe", 500L);
+    interruptInPause = true;
+    engine.handle(SERVER, ev(turn("e1", "session.execution.succeeded", "ses_probe", null)));
+    assertTrue(shown.isEmpty());
+  }
+
+  @Test
+  public void aLateTaskOfAnEarlierTurnDoesNotReplaceTheNewerTurnsNotice() {
+    deferInline = false;
+    sessionAfterPause = new SessionMeta("Tool probe", null, "/tmp/probe", 500L);
+    engine.handle(SERVER, ev(turnAt("e1", "session.execution.succeeded", "ses_probe", 1_000)));
+    engine.handle(SERVER, ev(turnAt("e2", "session.execution.succeeded", "ses_probe", 2_000)));
+    assertEquals(2, deferred.size());
+    deferred.get(1).run();
+    assertEquals(1, shown.size());
+    now += 6_000;
+    deferred.get(0).run();
+    assertEquals("the older turn is not announced after the newer one", 1, shown.size());
+  }
+
+  @Test
+  public void staleNeverViewedCacheDoesNotHideAViewedSession() {
+    sessions.put("ses_new", new SessionMeta("Later", null, "/p"));
+    engine.handle(SERVER, ev(turn("e1", "session.execution.succeeded", "ses_new", null)));
+    assertTrue(shown.isEmpty());
+    // Seconds later the owner opened it; the cache (20 s) still says "never viewed".
+    now += 6_000;
+    sessions.put("ses_new", new SessionMeta("Later", null, "/p", 700L));
+    engine.handle(SERVER, ev(turn("e2", "session.execution.succeeded", "ses_new", null)));
+    assertEquals(1, shown.size());
+  }
+
+  @Test
+  public void sessionCreatedByOurClientCountsAsOpenedWithoutWaiting() {
+    sessions.put("ses_mine", new SessionMeta("Mine", null, "/p", null, "occ"));
+    engine.handle(SERVER, ev(turn("e1", "session.execution.succeeded", "ses_mine", null)));
+    assertEquals(1, shown.size());
+    assertTrue("no grace wait", pauses.isEmpty() || !pauses.contains(NoticeEngine.VIEWED_GRACE_MS));
+    engine.handle(SERVER, ev(turn("e2", "session.execution.failed", "ses_mine", "boom")));
+    assertTrue("coalesced, but never judged as unopened", !pauses.contains(NoticeEngine.VIEWED_GRACE_MS));
+  }
+
+  @Test
+  public void anotherClientsMarkerDoesNotCountAsOpened() {
+    sessions.put("ses_other", new SessionMeta("Other", null, "/p", null, "somebody-else"));
+    engine.handle(SERVER, ev(turn("e1", "session.execution.succeeded", "ses_other", null)));
+    assertTrue(shown.isEmpty());
+  }
+
+  @Test
+  public void aBurstOfNeverOpenedTurnEndsDoesNotDelayAPermissionNotice() {
+    deferInline = false;
+    for (int i = 0; i < 5; i++) {
+      sessions.put("ses_p" + i, new SessionMeta("Probe " + i, null, "/tmp/p"));
+      engine.handle(SERVER, ev(turn("e" + i, "session.execution.succeeded", "ses_p" + i, null)));
+    }
+    assertEquals("the judgements wait on their own thread", 5, deferred.size());
+    assertTrue("and have not waited on the stream's thread", pauses.isEmpty());
+    engine.handle(SERVER, ev(permAsked("per_late", "ses_root", "bash")));
+    assertEquals("the permission is announced at once, behind nothing", 1, shown.size());
+    assertEquals(Kind.PERMISSION, shown.get(0).kind);
+    for (Runnable r : new ArrayList<>(deferred)) r.run();
+    assertEquals("the probes are judged later and stay quiet", 1, shown.size());
+    assertEquals(5, pauses.size());
+  }
+
+  @Test
+  public void aFailedFreshLookupStillAnnouncesTheTurnEnd() {
+    lookupFailsAfterPause = true;
+    engine.handle(SERVER, ev(turn("e1", "session.execution.succeeded", "ses_probe", null)));
+    assertEquals("a network blip must not eat a real turn end", 1, shown.size());
+    assertEquals(Kind.FINISHED, shown.get(0).kind);
+  }
+
+  @Test
+  public void viewedWithoutAServerEndStampKeepsTheNotice() {
+    // The turn-end event carries no `created`: the two clocks cannot be compared, so the notice stays.
+    engine.handle(SERVER, ev(turn("e1", "session.execution.succeeded", "ses_root", null)));
+    assertEquals(1, shown.size());
+    engine.handle(SERVER, ev(viewedEv("ses_root", 9_000_000_000L)));
+    assertTrue(cancelled.isEmpty());
+  }
+
+  @Test
+  public void viewedAfterAFinishedNoticeCancelsIt() {
+    engine.handle(SERVER, ev(turnAt("e1", "session.execution.succeeded", "ses_root", 1_000)));
+    assertEquals(1, shown.size());
+    engine.handle(SERVER, ev(viewedEv("ses_root", 1_000)));
+    assertEquals(List.of("ses_root"), cancelled);
+  }
+
+  @Test
+  public void viewedAfterAFailedAndAWorkerNoticeCancelsThemToo() {
+    engine.handle(SERVER, ev(turnAt("e1", "session.execution.failed", "ses_root", 1_000)));
+    engine.handle(SERVER, ev(viewedEv("ses_root", 1_000)));
+    engine.handle(SERVER, ev(turnAt("e2", "session.execution.succeeded", "ses_work", 2_000)));
+    engine.handle(SERVER, ev(viewedEv("ses_work", 2_000)));
+    assertEquals(List.of("ses_root", "ses_work"), cancelled);
+  }
+
+  @Test
+  public void viewedOfAnOlderTurnKeepsTheNotice() {
+    engine.handle(SERVER, ev(turnAt("e1", "session.execution.succeeded", "ses_root", 2_000)));
+    engine.handle(SERVER, ev(viewedEv("ses_root", 1_000)));
+    assertTrue(cancelled.isEmpty());
+  }
+
+  @Test
+  public void viewedKeepsAnOpenPermissionAndQuestion() {
+    engine.handle(SERVER, ev(permAsked("per_1", "ses_root", "bash")));
+    engine.handle(SERVER, ev(viewedEv("ses_root", 9_000_000)));
+    assertTrue(cancelled.isEmpty());
+    engine.handle(SERVER, ev("{\"id\":\"e9\",\"type\":\"permission.replied\",\"data\":{\"sessionID\":\"ses_root\",\"requestID\":\"per_1\"}}"));
+    assertEquals(List.of("ses_root"), cancelled);
+  }
+
+  @Test
+  public void viewedWithNothingShowingDoesNothing() {
+    engine.handle(SERVER, ev(viewedEv("ses_root", 1_000)));
+    assertTrue(cancelled.isEmpty());
+  }
+
+  @Test
+  public void viewedEventMarksTheCachedSessionAsViewed() {
+    sessions.put("ses_new", new SessionMeta("Later", null, "/p"));
+    engine.handle(SERVER, ev(turn("e1", "session.execution.succeeded", "ses_new", null)));
+    assertTrue(shown.isEmpty());
+    now += 6_000;
+    sessions.put("ses_new", new SessionMeta("Later", null, "/p"));
+    engine.handle(SERVER, ev(viewedEv("ses_new", 800)));
+    engine.handle(SERVER, ev(turn("e2", "session.execution.succeeded", "ses_new", null)));
+    assertEquals(1, shown.size());
   }
 
   private static JSONObject ev(String json) {

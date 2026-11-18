@@ -1,3 +1,4 @@
+import { CLIENT_METADATA } from "./client-marker"
 import type { EventEnvelope, FormInfo, OpenCodeClient, PermissionRequest, SessionInfo, SessionMessageInfo, SlimModel } from "./api"
 import { initialTarget, planNewSession, type ViewTarget } from "./draft"
 import { SessionFeed } from "./feed"
@@ -1468,6 +1469,9 @@ export class Controller {
         location: { directory: this.dir },
         agent: this.draftAgentNow() ?? null,
         model: this.shownModel(undefined) ?? null,
+        // Marks a session a person started here, so the phone's notification service can tell it from an agent's own
+        // probe session before any client has had the chance to view it.
+        metadata: { ...CLIENT_METADATA },
       })
       this.sessions = this.sort(upsertSession(this.sessions, { ...created, location: created.location ?? { directory: this.dir } } as SessionInfo))
       this.target = { kind: "session", id: created.id }

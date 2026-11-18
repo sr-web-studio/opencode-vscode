@@ -64,6 +64,23 @@ public final class WatchService extends Service {
             }
           });
 
+  /**
+   * The never-opened check of a turn end waits and calls the server, so it runs here and not on a stream's thread.
+   * Four threads: a burst of probe sessions cannot queue a real notice behind a long line, and the catch-up thread
+   * stays free for its own work.
+   */
+  private final java.util.concurrent.ExecutorService judges =
+      java.util.concurrent.Executors.newFixedThreadPool(
+          4,
+          new java.util.concurrent.ThreadFactory() {
+            @Override
+            public Thread newThread(Runnable r) {
+              Thread t = new Thread(r, "occ-judge");
+              t.setDaemon(true);
+              return t;
+            }
+          });
+
   /** Start (or reload) the service from anywhere that is allowed to: the app in front, boot, package replaced. */
   public static boolean start(Context context, String reason) {
     Intent i = new Intent(context, WatchService.class).setAction(context.getPackageName() + ".notify." + reason);
@@ -137,6 +154,21 @@ public final class WatchService extends Service {
               public boolean isVisible(ServerRef server, String sessionID) {
                 // The app knows its server by serverId (the deep-link name), the service by profile id: both are compared.
                 return WatchState.isVisible(server.serverId, sessionID) || WatchState.isVisible(server.id, sessionID);
+              }
+
+              @Override
+              public void defer(Runnable task) {
+                try {
+                  judges.execute(task);
+                } catch (java.util.concurrent.RejectedExecutionException e) {
+                  // the service is shutting down: the turn end is dropped, say so
+                  log("turn-end check dropped: the service is shutting down");
+                }
+              }
+
+              @Override
+              public boolean openedHere(ServerRef server, String sessionID) {
+                return WatchState.wasOpened(server.serverId, sessionID) || WatchState.wasOpened(server.id, sessionID);
               }
 
               @Override
@@ -301,6 +333,7 @@ public final class WatchService extends Service {
       watches.clear();
     }
     catchUps.shutdownNow();
+    judges.shutdownNow();
     WatchState.setRunning(false);
     super.onDestroy();
   }
