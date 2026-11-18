@@ -7,8 +7,28 @@ import { applyFolderSessions, sameFolderSessions } from "@occ/core/state-post"
  * the folders whose summary changed are posted, and the webview merges them into the list it holds.
  */
 
+/** The window's focus and the listeners the provider registered for it. Tests flip it with `focusChanged`. */
+const win = { focused: true }
+let windowListeners: Array<() => void> = []
+let windowListenersDisposed = 0
+
 const vscodeMock = {
-  window: { state: { focused: true } },
+  window: {
+    state: {
+      get focused() {
+        return win.focused
+      },
+    },
+    onDidChangeWindowState: (listener: () => void) => {
+      windowListeners.push(listener)
+      return {
+        dispose: () => {
+          windowListenersDisposed++
+          windowListeners = windowListeners.filter((l) => l !== listener)
+        },
+      }
+    },
+  },
   workspace: { workspaceFolders: [] },
   commands: { executeCommand: async () => undefined },
   Uri: { joinPath: (...parts: any[]) => ({ path: parts.map((part) => part?.path ?? part).join("/") }), file: (path: string) => ({ path }) },
@@ -214,5 +234,64 @@ describe("applyFolderSessions", () => {
     const b = summary("/b", [row("b1")])
     expect(applyFolderSessions([a], [b], true)).toEqual([a, b])
     expect(applyFolderSessions([a], [], true)).toEqual([a])
+  })
+})
+
+/**
+ * A visible panel in a window nobody is looking at must not count as "on screen": the controller would stamp every
+ * turn that ends as seen, and the phone would drop the notice the owner still needs.
+ */
+describe("the chat view is looked at only while its window has focus", () => {
+  /** The provider with a resolved, visible view and recording controllers; `a` is the active folder. */
+  function focusHarness() {
+    const calls: Record<string, boolean[]> = { "/a": [], "/b": [] }
+    const make = (path: string) => ({ ...controller(path, () => summary(path, [])), setVisible: ((visible: boolean) => void calls[path]!.push(visible)) as unknown as () => void })
+    const folders = [
+      { directory: "/a", controller: make("/a") },
+      { directory: "/b", controller: make("/b") },
+    ]
+    const provider = new ChatViewProvider({ path: "/ext" } as never, registry(folders) as never, {} as never, { noteVisible() {} } as never)
+    // A resolved, visible view; the focus rule is all that is under test, so the webview itself is not built.
+    ;(provider as unknown as { view: unknown }).view = { visible: true, webview: { postMessage: () => Promise.resolve(true) } }
+    ;(provider as unknown as { syncVisible(): void }).syncVisible()
+    calls["/a"]!.length = 0
+    calls["/b"]!.length = 0
+    return { provider, calls }
+  }
+  const focusChanged = (focused: boolean) => {
+    win.focused = focused
+    for (const listener of [...windowListeners]) listener()
+  }
+
+  test("losing focus takes the active folder off screen; gaining it puts it back", () => {
+    win.focused = true
+    windowListeners = []
+    const { calls } = focusHarness()
+    focusChanged(false)
+    expect(calls["/a"]).toEqual([false])
+    expect(calls["/b"]).toEqual([false])
+    focusChanged(true)
+    expect(calls["/a"]).toEqual([false, true])
+    expect(calls["/b"]).toEqual([false, false])
+  })
+
+  test("a window that starts unfocused never reports a visible folder", () => {
+    win.focused = false
+    windowListeners = []
+    const { calls } = focusHarness()
+    focusChanged(false)
+    expect(calls["/a"]!.every((visible) => !visible)).toBe(true)
+    win.focused = true
+  })
+
+  test("the window listener is disposed with the provider", () => {
+    win.focused = true
+    windowListeners = []
+    windowListenersDisposed = 0
+    const { provider } = focusHarness()
+    expect(windowListeners).toHaveLength(1)
+    provider.dispose()
+    expect(windowListeners).toHaveLength(0)
+    expect(windowListenersDisposed).toBeGreaterThan(0)
   })
 })

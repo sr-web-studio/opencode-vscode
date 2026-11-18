@@ -47,11 +47,19 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     this.offChange = folders.onChange(() => this.bind())
     // A project name changed (our own rename, the browser UI or the phone): only the labels change, no rebind.
     this.offNames = folders.onProjectNames(() => this.postState())
+    // A visible panel in an unfocused window is not being looked at: the user walked away. Focus coming back runs
+    // `setVisible(true)`, which marks what ended meanwhile as seen.
+    this.subs.push(vscode.window.onDidChangeWindowState(() => this.syncVisible()))
   }
 
   /** True when the panel is on screen. Used for notification suppression. */
   get visible(): boolean {
     return this.view?.visible === true
+  }
+
+  /** The panel is on screen and the window has the keyboard focus: someone can actually read the session. */
+  private get lookedAt(): boolean {
+    return this.visible && vscode.window.state.focused
   }
 
   resolveWebviewView(view: vscode.WebviewView): void {
@@ -112,7 +120,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
 
   /**
    * Tell the controllers which of them is on screen. Only the active folder's chat can be looked at; a turn that ends
-   * in a background folder stays "New reply" until the user switches there or opens it.
+   * in a background folder stays "New reply" until the user switches there or opens it. The same goes for the active
+   * folder while the window is unfocused.
    */
   private syncVisible(): void {
     const active = this.folders.active
@@ -121,7 +130,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       this.lastState = undefined
       this.lastFolderSessions = undefined
     }
-    for (const controller of this.folders.controllers()) controller.setVisible(controller === active && this.visible)
+    for (const controller of this.folders.controllers()) controller.setVisible(controller === active && this.lookedAt)
   }
 
   /** Every folder but the active one: a change there only refreshes the dropdown (busy/attention dots). */
