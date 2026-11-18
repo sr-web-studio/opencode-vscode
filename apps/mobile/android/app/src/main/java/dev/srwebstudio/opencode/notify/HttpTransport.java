@@ -26,6 +26,7 @@ public final class HttpTransport implements EventStream.Transport {
     "session.execution.succeeded",
     "session.execution.failed",
     "session.deleted",
+    "session.viewed",
   };
 
   /** The request URL: the base address, the path, and one {@code types=} per event type. */

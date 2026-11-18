@@ -346,6 +346,16 @@ function settledCompaction(turn: TurnView, outcome: Outcome, error: string | und
 }
 
 /**
+ * A `session.inbox.delivered` for a prompt the view has neither as a queued row nor as a turn: `applyEvent` cannot
+ * show it (the text is not in the event), so the owner has to read it from the history.
+ */
+export function isLostDelivery(view: SessionView, ev: EventEnvelope): boolean {
+  if (ev.type !== "session.inbox.delivered") return false
+  const id = ev.data?.inboxID
+  return typeof id === "string" && !view.queued.some((q) => q.id === id) && !view.turns.some((turn) => turn.user?.id === id)
+}
+
+/**
  * Apply one live event to a session view. Returns the same object when the event is irrelevant,
  * so callers can cheaply detect "no change". `sessionID` filtering is the caller's job.
  */

@@ -1,6 +1,6 @@
 import type { EventEnvelope, OpenCodeClient } from "./api"
 import { loadChunk, initialHistory, type Chunk, type FetchPage, type HistoryState, type RawMessage } from "./history"
-import { applyEvent, prependView, queuedFromInbox, viewFromMessages } from "./transcript/reducer"
+import { applyEvent, isLostDelivery, prependView, queuedFromInbox, viewFromMessages } from "./transcript/reducer"
 import { emptyView, type SessionView, type TurnView } from "./transcript/types"
 
 const isDelta = (type: string) => type === "session.text.delta" || type === "session.reasoning.delta" || type === "session.tool.input.delta" || type === "session.compaction.delta"
@@ -96,6 +96,9 @@ export class SessionFeed {
   private buffered: EventEnvelope[] = []
   /** The session whose last load failed, so the load that finally succeeds says so in the log. */
   private failedSession?: string
+  private lostDelivery = false
+  /** Prompts whose row was dropped after a cancel, until the session changes. */
+  private dropped = new Set<string>()
 
   constructor(
     /** `immediate` asks for a prompt redraw (loading state changes); otherwise the owner may batch. */
@@ -123,6 +126,8 @@ export class SessionFeed {
     this.stash = []
     this.history = initialHistory
     this.buffered = []
+    this.lostDelivery = false
+    this.dropped.clear()
     this.sessionID = undefined
     this.loadError = undefined
   }
@@ -269,13 +274,45 @@ export class SessionFeed {
   /** Apply a live event of this session. Returns true when the view changed. */
   apply(ev: EventEnvelope): boolean {
     if (this.loading) {
+      // No lost-delivery check here: the load that is running reads the history after these events happened, so a
+      // prompt delivered meanwhile is already in it (and the load reset what was dropped).
       this.buffered.push(ev)
       return false
     }
+    // Only a row this client dropped early can come back as a delivery: other ids (synthetic items) never had a row.
+    if (isLostDelivery(this.view, ev) && this.dropped.has(ev.data.inboxID)) this.lostDelivery = true
     const next = applyEvent(this.view, ev)
     if (next === this.view) return false
     this.view = next
     if (ev.type === "session.compaction.ended" && next.turns.length > 1) this.trimPending = true
+    return true
+  }
+
+  /**
+   * Make a queued row the turn it became, the way the `delivered` event does (the server has it in the history now).
+   * Returns true when the view changed.
+   */
+  deliverQueued(inboxID: string, at: number): boolean {
+    if (!this.view.queued.some((q) => q.id === inboxID)) return false
+    this.view = applyEvent(this.view, { type: "session.inbox.delivered", created: at, data: { inboxID } } as EventEnvelope)
+    return true
+  }
+
+  /**
+   * Take the flag set by a `delivered` event for a prompt the view knows nothing about (its row was dropped early, or
+   * it came from another client before the load). Its text is only in the history, so the owner reloads.
+   */
+  takeLostDelivery(): boolean {
+    const lost = this.lostDelivery
+    this.lostDelivery = false
+    return lost
+  }
+
+  /** Take a prompt off the queued list (cancelled on the server). Returns true when the view changed. */
+  dropQueued(inboxID: string): boolean {
+    if (!this.view.queued.some((q) => q.id === inboxID)) return false
+    this.dropped.add(inboxID)
+    this.view = { ...this.view, queued: this.view.queued.filter((q) => q.id !== inboxID) }
     return true
   }
 

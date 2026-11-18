@@ -130,6 +130,28 @@ public final class WatchState {
   public static void setVisible(String serverId, String sessionID) {
     visibleServerId = serverId == null || serverId.isEmpty() ? null : serverId;
     visibleSessionID = sessionID == null || sessionID.isEmpty() ? null : sessionID;
+    if (visibleServerId != null && visibleSessionID != null) {
+      synchronized (OPENED) {
+        if (OPENED.size() >= OPENED_MAX) OPENED.clear();
+        OPENED.add(visibleServerId + "|" + visibleSessionID);
+      }
+    }
+  }
+
+  /** Sessions the owner had on screen in this app since the process started. */
+  private static final java.util.Set<String> OPENED = new java.util.HashSet<>();
+
+  private static final int OPENED_MAX = 200;
+
+  /**
+   * True when this session was on screen in this app. The server only stamps a session as viewed after a turn has
+   * ended, so a session started here has no stamp yet when its first turn ends.
+   */
+  public static boolean wasOpened(String serverId, String sessionID) {
+    if (serverId == null || sessionID == null) return false;
+    synchronized (OPENED) {
+      return OPENED.contains(serverId + "|" + sessionID);
+    }
   }
 
   /** True only while the app is in front and this exact session is on screen. */

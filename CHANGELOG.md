@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.24 (preview)
+
+- **Remove on a queued message checks with the server.** After you click Remove, the row goes away once the server confirms the message was cancelled, becomes a normal message if it was already sent, and shows a message when the server cannot say or still holds it. A double click sends one request. This applies to the VS Code extension and the Android app.
+- **Android app: fewer notifications you did not ask for.** A session that no one has opened (for example one a script or another agent started) no longer announces "finished" or "failed"; its permission requests and questions still do. Sessions started from the VS Code extension or the app are always announced. A finished or failed notice disappears from the phone once you open that session in another client. Sessions started in the OpenCode TUI or web, or with `opencode run`, are announced only after you have opened them once.
+- **The VS Code chat counts as read only while its window has focus.** A turn that ends while VS Code is in the background stays "New reply" until you come back, so it is not marked as seen elsewhere either.
+
 ## 0.3.23 (preview)
 
 - **Session tabs all have the same width, and the ones that do not fit go behind the arrow.** The tabs no longer squeeze to a few letters at different widths: every tab, the current one included, is as wide as the others and keeps a readable title. This applies to the VS Code extension and the Android app.

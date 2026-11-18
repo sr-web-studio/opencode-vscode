@@ -1,3 +1,4 @@
+import { CLIENT_METADATA } from "./client-marker"
 import type { EventEnvelope, FormInfo, OpenCodeClient, PermissionRequest, SessionInfo, SessionMessageInfo, SlimModel } from "./api"
 import { initialTarget, planNewSession, type ViewTarget } from "./draft"
 import { SessionFeed } from "./feed"
@@ -12,7 +13,7 @@ import { isWindowsPath, sameDirectory, withinDirectory } from "./paths"
 import { isRunning } from "./transcript/reducer"
 import { applyRevertEvent, revertFromServer, revertedPrompt } from "./transcript/revert"
 import { toPromptFiles, type PromptFile } from "./attachments"
-import { errorMessage as message, isGone } from "./errors"
+import { errorMessage as message, isGone, isMessageGone } from "./errors"
 import { buildEnhancePrompt, cleanEnhanced, enhanceError, ENHANCE_UNSUPPORTED, type EnhanceMode } from "./enhance"
 import { NOT_DELETABLE, STOP_FIRST, WAITING_FOR_USER, WORKER_RUNNING } from "./delete-session"
 import { CommandCatalog } from "./commands"
@@ -45,6 +46,8 @@ export type ControllerOptions = {
   syncStaggerMs?: number
   /** Diagnostics for the output channel. Never given secrets or message text. */
   log?: (line: string) => void
+  /** The pause before a transcript load is retried. Tests replace it, so a retry does not cost a real second. */
+  sleep?: (ms: number) => Promise<void>
   /** What `/mcps` needs from the machine we run on: open a browser, forward a port, ask for a code, confirm. */
   mcp?: McpHost
 }
@@ -57,6 +60,10 @@ export type Observer = {
 }
 
 const EMIT_MS = 30
+/** Shown when the server still holds a queued prompt after a cancel. */
+export const QUEUED_NOT_REMOVED = "Could not remove this message; it may already be on its way to the agent."
+/** Shown when the check after a cancel failed, so nobody knows what became of the prompt. */
+export const QUEUED_UNKNOWN = "Could not check whether this message was removed. Try again."
 const LAST_SESSION_KEY = "lastSession"
 /** How long a deliberate (quiet) reconnect may keep the last connection state on screen. */
 export const RESUME_QUIET_MS = 5000
@@ -103,6 +110,7 @@ export class Controller {
     },
     // A failed transcript load must leave a line in the host's log: the view only says "could not load".
     (line) => this.opts.log?.(line),
+    (ms) => (this.opts.sleep ? this.opts.sleep(ms) : new Promise((resolve) => setTimeout(resolve, ms))),
   )
   private observers = new Set<Observer>()
   private shells = new Map<string, { sessionID?: string; running: boolean }>()
@@ -133,6 +141,8 @@ export class Controller {
   /** The error the transcript load left on screen, so the next successful load can take it away again. */
   private transcriptError?: string
   private sending = false
+  /** Queued prompts whose cancel request is out. */
+  private cancelling = new Set<string>()
   private focusTick = 0
   private draftEpoch = 0
   private abort?: AbortController
@@ -867,7 +877,14 @@ export class Controller {
         changed = true
         break
     }
-    if (sessionID && sessionID === this.currentSessionID && ev.type.startsWith("session.")) changed = this.feed.apply(ev) || changed
+    if (sessionID && sessionID === this.currentSessionID && ev.type.startsWith("session.")) {
+      changed = this.feed.apply(ev) || changed
+      // A prompt dropped after a cancel that the server delivered after all: its text is only in the history.
+      if (this.feed.takeLostDelivery() && this.client) {
+        await this.reloadTranscript(this.client, sessionID)
+        changed = true
+      }
+    }
     return changed
   }
 
@@ -1452,6 +1469,9 @@ export class Controller {
         location: { directory: this.dir },
         agent: this.draftAgentNow() ?? null,
         model: this.shownModel(undefined) ?? null,
+        // Marks a session a person started here, so the phone's notification service can tell it from an agent's own
+        // probe session before any client has had the chance to view it.
+        metadata: { ...CLIENT_METADATA },
       })
       this.sessions = this.sort(upsertSession(this.sessions, { ...created, location: created.location ?? { directory: this.dir } } as SessionInfo))
       this.target = { kind: "session", id: created.id }
@@ -1563,8 +1583,69 @@ export class Controller {
     const id = this.currentSessionID
     if (!id) return
     const client = this.need()
-    if (op === "steer") await client.session.inbox.update({ sessionID: id, inboxID, delivery: "steer" })
-    else await client.session.inbox.cancel({ sessionID: id, inboxID })
+    if (op === "steer") {
+      await client.session.inbox.update({ sessionID: id, inboxID, delivery: "steer" })
+      return
+    }
+    // A second click while the first request is out must not send a second cancel.
+    if (this.cancelling.has(inboxID)) return
+    this.cancelling.add(inboxID)
+    try {
+      await client.session.inbox.cancel({ sessionID: id, inboxID })
+      await this.settleCancelled(client, id, inboxID)
+    } finally {
+      this.cancelling.delete(inboxID)
+    }
+  }
+
+  /**
+   * The server answers a cancel with success even when it had nothing to cancel (the prompt was already handed to the
+   * model), and then sends no `session.inbox.cancelled` event. So the row is settled from what the server holds now:
+   * gone from the inbox and from the history means cancelled (drop the row at once, without waiting for the event);
+   * delivered means the prompt now belongs to the transcript (the row becomes its turn); still pending means it cannot
+   * be removed. A check that fails says nothing about the prompt: the row stays and the user is told to try again.
+   */
+  private async settleCancelled(client: OpenCodeClient, sessionID: string, inboxID: string): Promise<void> {
+    // An event (`cancelled`, `delivered`) or a session switch during the awaits already settled the row.
+    const settled = () => this.currentSessionID !== sessionID || !this.feed.view.queued.some((q) => q.id === inboxID)
+    let pending: boolean
+    try {
+      const items = (await client.session.inbox.list({ sessionID })) as Array<{ id?: string }>
+      pending = items.some((item) => item.id === inboxID)
+    } catch {
+      if (settled()) return
+      throw new Error(QUEUED_UNKNOWN)
+    }
+    if (settled()) return
+    if (pending) throw new Error(QUEUED_NOT_REMOVED)
+    let created: number | undefined
+    let newest = false
+    let delivered = true
+    try {
+      const found = (await client.session.message.get({ sessionID, messageID: inboxID })) as { time?: { created?: number } }
+      created = found.time?.created
+      // Is anything after it? The `delivered` path adds the turn at the end and settles a running last turn, which is
+      // only right for a prompt handed over just now. A missed event can leave the prompt long answered.
+      const latest = (await client.message.list({ sessionID, order: "desc", limit: 1 })) as { data?: Array<{ id?: string }> }
+      newest = latest.data?.[0]?.id === inboxID
+    } catch (e) {
+      if (!isMessageGone(e)) {
+        if (settled()) return
+        throw new Error(QUEUED_UNKNOWN)
+      }
+      delivered = false
+    }
+    if (settled()) return
+    if (!delivered) this.feed.dropQueued(inboxID)
+    else if (newest) this.feed.deliverQueued(inboxID, created ?? Date.now())
+    else await this.reloadTranscript(client, sessionID)
+    this.emitNow()
+  }
+
+  /** Read the transcript again (a prompt landed somewhere the live path cannot place it) and show its error, if any. */
+  private async reloadTranscript(client: OpenCodeClient, sessionID: string): Promise<void> {
+    await this.feed.load(client, sessionID)
+    if (this.currentSessionID === sessionID) this.setTranscriptError(this.feed.loadError)
   }
 
   /* ----------------------------------------------------------- title, pins */
