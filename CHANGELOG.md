@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Remove on a queued message checks with the server.** After you click Remove, the row goes away once the server confirms the message was cancelled, becomes a normal message if it was already sent, and shows a message when the server cannot say or still holds it. A double click sends one request. This applies to the VS Code extension and the Android app.
+
 ## 0.3.23 (preview)
 
 - **Session tabs all have the same width, and the ones that do not fit go behind the arrow.** The tabs no longer squeeze to a few letters at different widths: every tab, the current one included, is as wide as the others and keeps a readable title. This applies to the VS Code extension and the Android app.
