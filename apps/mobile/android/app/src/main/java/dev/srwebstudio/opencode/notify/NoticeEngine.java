@@ -102,6 +102,10 @@ public final class NoticeEngine {
   private final SeenSet seen = new SeenSet(SEEN_MAX);
   private final Map<String, Shown> shown = new HashMap<>();
   private final Map<String, Cached> metas = new HashMap<>();
+  /** Session key → newest server {@code idle} a client viewed. A turn end still in flight checks it before showing. */
+  private final Map<String, Long> viewedAt = new HashMap<>();
+  /** Sessions deleted since the service started (bounded). */
+  private final java.util.Set<String> deleted = new java.util.HashSet<>();
 
   public NoticeEngine(Deps deps, String seenState) {
     this.deps = deps;
@@ -294,8 +298,23 @@ public final class NoticeEngine {
    */
   private void judgeUnopened(ServerRef server, JSONObject ev, JSONObject d, boolean failed, SessionMeta first, Kind kind) throws Exception {
     String sessionID = d.optString("sessionID", "");
+    long created = ev.optLong("created", 0);
     deps.pause(VIEWED_GRACE_MS);
-    SessionMeta meta = fetch(server, sessionID);
+    // The service is shutting down (the pause was interrupted): announce nothing.
+    if (Thread.interrupted()) {
+      log("turn end (" + sessionID + ") dropped: interrupted");
+      return;
+    }
+    SessionMeta meta;
+    try {
+      meta = fetchOrThrow(server, sessionID);
+    } catch (SessionApi.NotFound e) {
+      log("skip " + kind + " (" + sessionID + "): session no longer exists");
+      return;
+    } catch (Exception e) {
+      meta = null;
+      log("session lookup failed (" + sessionID + "): " + e.getClass().getSimpleName());
+    }
     if (meta == null) {
       log("never-opened check (" + sessionID + ") failed, announcing " + kind + " anyway");
       meta = first;
@@ -304,12 +323,31 @@ public final class NoticeEngine {
       // ({@link #attention}); only the turn end stays quiet.
       log("skip " + kind + " (" + sessionID + "): never opened");
       return;
+    } else if (created > 0 && meta.viewed != null && meta.viewed >= created) {
+      // A client looked at this turn while the check waited.
+      log("skip " + kind + " (" + sessionID + "): seen while waiting");
+      return;
     }
     finishTurnEnd(server, ev, d, failed, meta, kind);
   }
 
+  /** True when the turn that ended at {@code created} (server clock) was seen or its session deleted since the event arrived. */
+  private boolean withdrawn(String k, long created) {
+    if (deleted.contains(k)) return true;
+    Long at = viewedAt.get(k);
+    return created > 0 && at != null && at >= created;
+  }
+
   private void finishTurnEnd(ServerRef server, JSONObject ev, JSONObject d, boolean failed, SessionMeta meta, Kind kind) throws Exception {
     String sessionID = d.optString("sessionID", "");
+    long created = ev.optLong("created", 0);
+    String k = key(server, sessionID);
+    synchronized (this) {
+      if (withdrawn(k, created)) {
+        log("skip " + kind + " (" + sessionID + "): seen or deleted while waiting");
+        return;
+      }
+    }
     if (!deps.settings().allows(kind)) {
       log("skip " + kind + " (" + sessionID + "): switched off");
       return;
@@ -319,19 +357,35 @@ public final class NoticeEngine {
       return;
     }
     long t = deps.now();
-    String k = key(server, sessionID);
+    Shown mine;
     synchronized (this) {
       Shown prior = shown.get(k);
+      if (prior != null && !prior.kind.attention && prior.endedAt > 0 && created > 0 && prior.endedAt > created) {
+        // A late task of an earlier turn: a newer turn already has its notice.
+        log("skip " + kind + " (" + sessionID + "): a newer turn was announced");
+        return;
+      }
       if (prior != null && t - prior.at < COALESCE_MS) {
         log("skip " + kind + " (" + sessionID + "): a " + prior.kind + " notice went out " + (t - prior.at) + " ms ago");
         return;
       }
       // The same session finishing the same turn twice with different event ids is caught here as well.
-      shown.put(k, new Shown(kind, null, t, ev.optLong("created", 0)));
+      mine = new Shown(kind, null, t, created);
+      shown.put(k, mine);
     }
     Detail detail = failed ? Detail.error(errorMessage(d)) : answer(server, sessionID);
     String dir = meta != null && meta.directory != null ? meta.directory : directoryOf(ev);
-    deps.show(Wording.build(server, sessionID, kind, meta, parent(server, meta), detail, dir, multiServer(), failed));
+    Notice notice = Wording.build(server, sessionID, kind, meta, parent(server, meta), detail, dir, multiServer(), failed);
+    // Last look, under the lock a session.viewed / session.deleted takes: the turn may have been seen or the session
+    // deleted while the answer was read. Showing inside the lock keeps a later cancel behind the notice.
+    synchronized (this) {
+      if (withdrawn(k, created) || Thread.currentThread().isInterrupted()) {
+        if (shown.get(k) == mine) shown.remove(k);
+        log("skip " + kind + " (" + sessionID + "): withdrawn before it was shown");
+        return;
+      }
+      deps.show(notice);
+    }
   }
 
   private static String errorMessage(JSONObject d) {
@@ -371,7 +425,11 @@ public final class NoticeEngine {
       Shown s = shown.get(k);
       if (requestID != null && (s == null || s.requestID == null || !s.requestID.equals(requestID))) return;
       shown.remove(k);
-      if (requestID == null) metas.remove(k);
+      if (requestID == null) {
+        metas.remove(k);
+        if (deleted.size() >= 500) deleted.clear();
+        deleted.add(k);
+      }
     }
     deps.cancel(server, sessionID);
   }
@@ -391,6 +449,11 @@ public final class NoticeEngine {
     synchronized (this) {
       Cached c = metas.get(k);
       if (c != null && idle > 0) metas.put(k, new Cached(c.meta.withViewed(idle), c.at));
+      if (idle > 0) {
+        if (viewedAt.size() >= 500) viewedAt.clear();
+        Long old = viewedAt.get(k);
+        if (old == null || old < idle) viewedAt.put(k, idle);
+      }
       Shown s = shown.get(k);
       if (s == null || s.kind.attention) return;
       // Without the server's own end-of-turn stamp the two clocks cannot be compared: keep the notice.
@@ -442,18 +505,23 @@ public final class NoticeEngine {
   /** Ask the server (never the cache) and remember the answer. Null when the call failed. */
   private SessionMeta fetch(ServerRef server, String sessionID) {
     try {
-      SessionMeta m = deps.session(server, sessionID);
-      if (m != null) {
-        synchronized (this) {
-          metas.put(key(server, sessionID), new Cached(m, deps.now()));
-          if (metas.size() > 200) metas.clear();
-        }
-        return m;
-      }
+      return fetchOrThrow(server, sessionID);
     } catch (Exception e) {
       log("session lookup failed (" + sessionID + "): " + e.getClass().getSimpleName());
     }
     return null;
+  }
+
+  /** Like {@link #fetch} but lets the failure through ({@link SessionApi.NotFound}: the session is gone). */
+  private SessionMeta fetchOrThrow(ServerRef server, String sessionID) throws Exception {
+    SessionMeta m = deps.session(server, sessionID);
+    if (m != null) {
+      synchronized (this) {
+        metas.put(key(server, sessionID), new Cached(m, deps.now()));
+        if (metas.size() > 200) metas.clear();
+      }
+    }
+    return m;
   }
 
   /** The parent's meta of a worker, or null. */

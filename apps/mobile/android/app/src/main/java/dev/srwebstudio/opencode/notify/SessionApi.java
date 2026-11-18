@@ -18,6 +18,13 @@ import org.json.JSONObject;
 public final class SessionApi {
   private SessionApi() {}
 
+  /** The server answered 404: the thing asked for does not exist (a deleted session). */
+  public static final class NotFound extends IOException {
+    public NotFound(String message) {
+      super(message);
+    }
+  }
+
   /** One authenticated GET. Swapped in tests. */
   public interface Fetch {
     String get(ServerRef server, String path, int connectTimeoutMs, int readTimeoutMs, int maxBytes) throws IOException;
@@ -37,6 +44,7 @@ public final class SessionApi {
             String auth = Auth.basic(server.password);
             if (auth != null) http.setRequestProperty("Authorization", auth);
             int status = http.getResponseCode();
+            if (status == 404) throw new NotFound("HTTP 404");
             if (status != 200) throw new IOException("HTTP " + status);
             return read(http.getInputStream(), maxBytes);
           } finally {

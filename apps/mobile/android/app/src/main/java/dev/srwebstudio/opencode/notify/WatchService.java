@@ -160,8 +160,9 @@ public final class WatchService extends Service {
               public void defer(Runnable task) {
                 try {
                   judges.execute(task);
-                } catch (java.util.concurrent.RejectedExecutionException ignored) {
-                  // the service is shutting down
+                } catch (java.util.concurrent.RejectedExecutionException e) {
+                  // the service is shutting down: the turn end is dropped, say so
+                  log("turn-end check dropped: the service is shutting down");
                 }
               }
 

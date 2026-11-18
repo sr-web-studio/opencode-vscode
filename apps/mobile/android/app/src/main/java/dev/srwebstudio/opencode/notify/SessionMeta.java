@@ -13,7 +13,10 @@ public final class SessionMeta {
   /** {@code metadata.client}: who created the session (this app and the VS Code extension write {@value #CLIENT}). */
   public final String client;
 
-  /** The value of {@code metadata.client} that the clients of this repository put on the sessions they create. */
+  /**
+   * The value of {@code metadata.client} that the clients of this repository put on the sessions they create. Keep in
+   * step with {@code CLIENT_MARKER} in {@code packages/core/src/client-marker.ts}.
+   */
   public static final String CLIENT = "occ";
 
   public SessionMeta(String title, String parentID, String directory) {

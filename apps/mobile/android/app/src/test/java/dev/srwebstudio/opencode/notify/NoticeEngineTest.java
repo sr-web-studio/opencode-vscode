@@ -36,6 +36,14 @@ public class NoticeEngineTest {
   private SessionMeta sessionAfterPause = null;
   /** The server stops answering while the never-opened check waits. */
   private boolean lookupFailsAfterPause = false;
+  /** The server answers 404 while the never-opened check waits (the session was deleted). */
+  private boolean notFoundAfterPause = false;
+  private boolean notFound = false;
+  /** Runs inside the grace wait, like an event arriving on the stream meanwhile. */
+  private Runnable onPause = null;
+  /** Runs inside the answer lookup. */
+  private Runnable onAnswer = null;
+  private boolean interruptInPause = false;
   /** True: deferred work runs on the calling thread. False: it queues until the test runs it (a second thread). */
   private boolean deferInline = true;
   private final List<Runnable> deferred = new ArrayList<>();
@@ -48,12 +56,14 @@ public class NoticeEngineTest {
           public SessionMeta session(ServerRef s, String id) throws Exception {
             lookups++;
             if (lookupFails) throw new java.io.IOException("down");
+            if (notFound) throw new SessionApi.NotFound("HTTP 404");
             return sessions.get(id);
           }
 
           @Override
           public String lastAnswer(ServerRef s, String id) throws Exception {
             answerCalls++;
+            if (onAnswer != null) onAnswer.run();
             if (answerFails) throw new java.net.SocketTimeoutException("slow");
             if (answerCalls <= answerMissingFirst) return null;
             return answers.get(id);
@@ -64,6 +74,9 @@ public class NoticeEngineTest {
             pauses.add(ms);
             if (sessionAfterPause != null) sessions.put("ses_probe", sessionAfterPause);
             if (lookupFailsAfterPause) lookupFails = true;
+            if (notFoundAfterPause) notFound = true;
+            if (interruptInPause) Thread.currentThread().interrupt();
+            if (onPause != null) onPause.run();
           }
 
           @Override
@@ -174,11 +187,72 @@ public class NoticeEngineTest {
   }
 
   @Test
-  public void stampedAfterTheTurnEndIsFoundByTheFreshLookup() {
-    // First lookup (cache miss) sees no stamp; the editor stamps it during the grace wait; the second lookup sees it.
+  public void stampedAfterTheTurnEndMeansTheTurnWasSeen() {
+    // First lookup sees no stamp; a client stamps it during the grace wait at or after the turn's end: seen, no notice.
     sessionAfterPause = new SessionMeta("Tool probe", null, "/tmp/probe", 900L);
-    engine.handle(SERVER, ev(turn("e1", "session.execution.succeeded", "ses_probe", null)));
+    engine.handle(SERVER, ev(turnAt("e1", "session.execution.succeeded", "ses_probe", 800)));
+    assertTrue(shown.isEmpty());
+  }
+
+  @Test
+  public void aStampOfAnEarlierTurnDoesNotHideTheNewOne() {
+    sessionAfterPause = new SessionMeta("Tool probe", null, "/tmp/probe", 700L);
+    engine.handle(SERVER, ev(turnAt("e1", "session.execution.succeeded", "ses_probe", 800)));
     assertEquals(1, shown.size());
+  }
+
+  @Test
+  public void viewedDuringTheWaitWithdrawsTheNotice() {
+    sessionAfterPause = new SessionMeta("Tool probe", null, "/tmp/probe", 500L);
+    onPause = () -> engine.handle(SERVER, ev(viewedEv("ses_probe", 1_000)));
+    engine.handle(SERVER, ev(turnAt("e1", "session.execution.succeeded", "ses_probe", 1_000)));
+    assertTrue(shown.isEmpty());
+  }
+
+  @Test
+  public void viewedWhileTheAnswerIsReadWithdrawsTheNotice() {
+    sessionAfterPause = new SessionMeta("Tool probe", null, "/tmp/probe", 500L);
+    answers.put("ses_probe", "All done");
+    onAnswer = () -> engine.handle(SERVER, ev(viewedEv("ses_probe", 1_000)));
+    engine.handle(SERVER, ev(turnAt("e1", "session.execution.succeeded", "ses_probe", 1_000)));
+    assertTrue(shown.isEmpty());
+  }
+
+  @Test
+  public void deletedDuringTheWaitWithdrawsTheNotice() {
+    sessionAfterPause = new SessionMeta("Tool probe", null, "/tmp/probe", 500L);
+    onPause = () -> engine.handle(SERVER, ev("{\"id\":\"evt_d\",\"type\":\"session.deleted\",\"data\":{\"sessionID\":\"ses_probe\"}}"));
+    engine.handle(SERVER, ev(turnAt("e1", "session.execution.succeeded", "ses_probe", 1_000)));
+    assertTrue(shown.isEmpty());
+  }
+
+  @Test
+  public void aNotFoundRereadMeansTheSessionIsGone() {
+    notFoundAfterPause = true;
+    engine.handle(SERVER, ev(turn("e1", "session.execution.succeeded", "ses_probe", null)));
+    assertTrue("a deleted session is not announced", shown.isEmpty());
+  }
+
+  @Test
+  public void aPauseInterruptedByShutdownAnnouncesNothing() {
+    sessionAfterPause = new SessionMeta("Tool probe", null, "/tmp/probe", 500L);
+    interruptInPause = true;
+    engine.handle(SERVER, ev(turn("e1", "session.execution.succeeded", "ses_probe", null)));
+    assertTrue(shown.isEmpty());
+  }
+
+  @Test
+  public void aLateTaskOfAnEarlierTurnDoesNotReplaceTheNewerTurnsNotice() {
+    deferInline = false;
+    sessionAfterPause = new SessionMeta("Tool probe", null, "/tmp/probe", 500L);
+    engine.handle(SERVER, ev(turnAt("e1", "session.execution.succeeded", "ses_probe", 1_000)));
+    engine.handle(SERVER, ev(turnAt("e2", "session.execution.succeeded", "ses_probe", 2_000)));
+    assertEquals(2, deferred.size());
+    deferred.get(1).run();
+    assertEquals(1, shown.size());
+    now += 6_000;
+    deferred.get(0).run();
+    assertEquals("the older turn is not announced after the newer one", 1, shown.size());
   }
 
   @Test
