@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.25 (preview)
 
 - **Copy a message.** A copy button sits on every prompt bubble (on hover) and after every answer, next to its time. An answer is copied as Markdown, without the tool steps. This applies to the VS Code extension and the Android app.
 - **Your own Polish and Rewrite instructions.** The Settings page has an **Enhance prompt** section with both instructions in editable boxes. An edit applies to the next enhancement; clearing a box or Reset brings back the built-in text.
