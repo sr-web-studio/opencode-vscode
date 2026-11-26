@@ -17,7 +17,7 @@ import { VscodeNotifier } from "./notifier"
 import { pairMobileCommand } from "./pair-mobile"
 import { ProjectNames } from "./project-names"
 import { renameProjectCommand } from "./rename-project"
-import { affectsConnection, affectsView, readConnectionSettings, readNotificationSettings, readTerminalSettings, readViewSettings } from "./settings"
+import { affectsConnection, affectsView, readConnectionSettings, readEnhanceRules, readNotificationSettings, readTerminalSettings, readViewSettings } from "./settings"
 import { registerSettingsPage } from "./settings-page"
 import { ShellTerminals } from "./terminal"
 import { ImagePreviews } from "./images"
@@ -85,6 +85,7 @@ export function activate(context: vscode.ExtensionContext): void {
           get: () => normalizeModelSelection(context.globalState.get<unknown>(ENHANCE_MODEL_KEY)),
           set: (model) => void context.globalState.update(ENHANCE_MODEL_KEY, model),
         },
+        enhanceRules: readEnhanceRules,
         log: (line) => output.info(line),
         mcp: createMcpHost((line) => output.info(line)),
       })
@@ -371,6 +372,7 @@ export function activate(context: vscode.ExtensionContext): void {
       if (e.affectsConfiguration("opencode.voice.localLanguages") || e.affectsConfiguration("opencode.voice.localLanguage") || e.affectsConfiguration("opencode.voice.maxLanguages"))
         voice.syncLanguages()
       if (affectsView(e)) folders.setSettings(readViewSettings())
+      if (e.affectsConfiguration("opencode.terminal")) terminals.applySettings()
       if (affectsConnection(e)) void start()
     }),
   )

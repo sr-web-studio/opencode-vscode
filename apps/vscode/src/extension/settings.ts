@@ -1,6 +1,7 @@
 import * as vscode from "vscode"
 import { defaultNotificationSettings, type NotificationSettings } from "@occ/core/notifications/types"
 import type { ViewSettings } from "@occ/core/protocol"
+import { POLISH_RULES, REWRITE_RULES, type EnhanceRules } from "@occ/core/enhance"
 
 const cfg = () => vscode.workspace.getConfiguration("opencode")
 
@@ -51,6 +52,19 @@ export function readNotificationSettings(): NotificationSettings {
     whenFocused: c.get<string>("notifications.whenFocused", d.whenFocused) === "always" ? "always" : "never",
     os: c.get<string>("notifications.os", d.os) === "off" ? "off" : "auto",
   }
+}
+
+/**
+ * The user's Polish and Rewrite instructions. A value equal to the built-in default (VS Code returns the schema
+ * default when nothing is saved) is passed on as unset, so a later built-in improvement still reaches the user.
+ */
+export function readEnhanceRules(): EnhanceRules {
+  const c = cfg()
+  const own = (key: string, builtIn: string) => {
+    const value = c.get<string>(key, "")
+    return typeof value === "string" && value.trim() && value.trim() !== builtIn.trim() ? value : undefined
+  }
+  return { polish: own("enhance.polishPrompt", POLISH_RULES), rewrite: own("enhance.rewritePrompt", REWRITE_RULES) }
 }
 
 export const readConnectionSettings = () => ({

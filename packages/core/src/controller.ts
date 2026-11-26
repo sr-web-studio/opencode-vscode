@@ -14,7 +14,7 @@ import { isRunning } from "./transcript/reducer"
 import { applyRevertEvent, revertFromServer, revertedPrompt } from "./transcript/revert"
 import { toPromptFiles, type PromptFile } from "./attachments"
 import { errorMessage as message, isGone, isMessageGone } from "./errors"
-import { buildEnhancePrompt, cleanEnhanced, enhanceError, ENHANCE_UNSUPPORTED, type EnhanceMode } from "./enhance"
+import { buildEnhancePrompt, cleanEnhanced, enhanceError, ENHANCE_UNSUPPORTED, type EnhanceMode, type EnhanceRules } from "./enhance"
 import { NOT_DELETABLE, STOP_FIRST, WAITING_FOR_USER, WORKER_RUNNING } from "./delete-session"
 import { CommandCatalog } from "./commands"
 import { McpManager, type McpHost } from "./mcp"
@@ -39,6 +39,8 @@ export type ControllerOptions = {
    * written to OpenCode config. `undefined` means the server's default model.
    */
   enhanceModel?: { get(): ModelSelection | undefined; set(model: ModelSelection | undefined): void }
+  /** The user's own enhancement instructions, read on every request so an edit applies at once. */
+  enhanceRules?: () => EnhanceRules
   /**
    * Wait this long after `server.connected` before `sync()`, while this folder is not the one on screen. A multi-root
    * window otherwise sends every folder's session list, catalog and shell list in one burst on every reconnect.
@@ -1860,7 +1862,7 @@ export class Controller {
       const client = this.need()
       const generate = client.experimental?.generate?.text
       if (typeof generate !== "function") throw new Error(ENHANCE_UNSUPPORTED)
-      const answer = await generate({ prompt: buildEnhancePrompt(mode, text), model: model ?? null }, { signal: abort.signal })
+      const answer = await generate({ prompt: buildEnhancePrompt(mode, text, this.opts.enhanceRules?.()), model: model ?? null }, { signal: abort.signal })
       if (abort.signal.aborted || this.enhance?.tick !== tick) return
       const cleaned = cleanEnhanced(answer?.text ?? "")
       if (!cleaned) throw new Error("The model returned an empty answer. Try again.")

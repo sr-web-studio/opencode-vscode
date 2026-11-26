@@ -112,6 +112,16 @@ describe("buildEnhancePrompt", () => {
     expect(buildEnhancePrompt("polish", "x")).not.toBe(buildEnhancePrompt("rewrite", "x"))
   })
 
+  test("custom instructions replace the built-in rules of their mode only; the markers stay", () => {
+    const prompt = buildEnhancePrompt("polish", "fix it", { polish: "Only fix typos.", rewrite: "Other." })
+    expect(prompt).toBe("Only fix typos.\n\n<<<PROMPT\nfix it\nPROMPT>>>")
+    expect(buildEnhancePrompt("rewrite", "x", { polish: "Only fix typos." })).toMatch(/Understand the intent/)
+  })
+
+  test("blank custom instructions fall back to the built-in rules", () => {
+    expect(buildEnhancePrompt("polish", "x", { polish: "  \n" })).toBe(buildEnhancePrompt("polish", "x"))
+  })
+
   test("the text is not trimmed or escaped: what the user typed is what the model reads", () => {
     const text = "  keep  spaces\nand\n\nblank lines  "
     expect(buildEnhancePrompt("polish", text)).toContain(text)

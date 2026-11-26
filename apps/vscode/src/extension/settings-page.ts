@@ -5,6 +5,7 @@ import {
   buildSettingsSections,
   coerceSettingValue,
   configurationProperties,
+  effectiveLevel,
   resolveWriteTarget,
   type ActionRow,
   type ConfigurationSchema,
@@ -255,8 +256,10 @@ export function registerSettingsPage(context: vscode.ExtensionContext): vscode.D
           if (!found) return toast("error", "That setting is not part of OpenCode (unofficial).")
           const result = coerceSettingValue(found.property, message.value)
           if (!result.ok) return toast("error", result.error)
-          const target = resolveWriteTarget(found.property) === "workspace" ? vscode.ConfigurationTarget.Workspace : vscode.ConfigurationTarget.Global
-          await configuration().update(found.shortKey, result.value, target)
+          const cfg = configuration()
+          const level = effectiveLevel(found.property, cfg.inspect(found.shortKey) ?? {})
+          const target = level === "workspaceFolder" ? vscode.ConfigurationTarget.WorkspaceFolder : level === "workspace" ? vscode.ConfigurationTarget.Workspace : vscode.ConfigurationTarget.Global
+          await cfg.update(found.shortKey, result.value, target)
           await push()
           return
         }
