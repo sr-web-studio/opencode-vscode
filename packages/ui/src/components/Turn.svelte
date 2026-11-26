@@ -11,6 +11,7 @@
   import { useStore, useTranscript } from "../context"
   import SentFiles from "./SentFiles.svelte"
   import Codicon from "./Codicon.svelte"
+  import CopyButton from "./CopyButton.svelte"
   import Markdown from "./Markdown.svelte"
   import StepList from "./StepList.svelte"
 
@@ -69,7 +70,10 @@
             onclick={() => store.bridge.confirmRevert(turn.user!.id)}><Codicon name="discard" /></button
           >
         {/if}
-        {#if turn.user.text}<div class="text">{turn.user.text}</div>{/if}
+        {#if turn.user.text}
+          <CopyButton class="ucopy" label="Copy message" text={() => turn.user?.text ?? ""} />
+          <div class="text">{turn.user.text}</div>
+        {/if}
         {#if turn.user.files?.length}<SentFiles files={turn.user.files} />{/if}
       </div>
     </div>
@@ -110,7 +114,12 @@
   {/if}
   {#if turn.outcome === "failed" && turn.error}<div class="err">{turn.error}</div>{/if}
   {#if turn.outcome === "interrupted"}<div class="muted small">Stopped</div>{/if}
-  {#if stamp}<div class="stamp muted small" title={stamp.title}>{stamp.text}</div>{/if}
+  {#if stamp || split.answer}
+    <div class="meta">
+      {#if stamp}<span class="stamp muted small" title={stamp.title}>{stamp.text}</span>{/if}
+      {#if split.answer}<CopyButton label="Copy answer (Markdown)" text={() => split.answer?.text ?? ""} />{/if}
+    </div>
+  {/if}
 </section>
 
 <style>
@@ -210,8 +219,30 @@
   .answer {
     margin-top: 0.2em;
   }
-  .stamp {
+  .meta {
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
     margin-top: -0.1em;
+  }
+  /* On the bubble's top-right corner, only on hover (like Revert on the left). */
+  .user :global(.ucopy) {
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    border-radius: 50%;
+    background: var(--oc-popover);
+    border: 1px solid var(--oc-hairline);
+    opacity: 0;
+  }
+  .user:hover :global(.ucopy),
+  .user :global(.ucopy:focus-visible) {
+    opacity: 1;
+  }
+  @media (hover: none) {
+    .user :global(.ucopy) {
+      opacity: 1;
+    }
   }
   /* About 12px between the bubble and the agent's part (the 4px margin plus the 0.5em gap). */
   .uwrap + :global(*) {
