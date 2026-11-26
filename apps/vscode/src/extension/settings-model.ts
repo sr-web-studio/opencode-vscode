@@ -17,6 +17,7 @@ export type PropertySchema = {
   description?: string
   scope?: string
   deprecationMessage?: string
+  editPresentation?: string
 }
 
 export type ConfigurationSchema = { title?: string; properties?: Record<string, PropertySchema> }
@@ -29,7 +30,7 @@ export type SettingSnapshot = {
   workspaceFolderValue?: unknown
 }
 
-export type ControlKind = "boolean" | "number" | "string" | "enum" | "stringList" | "enumList"
+export type ControlKind = "boolean" | "number" | "string" | "text" | "enum" | "stringList" | "enumList"
 
 export type SettingOption = { value: string; label: string; description?: string }
 
@@ -102,11 +103,12 @@ const SECTION_TITLES: Record<string, string> = {
   notifications: "Notifications",
   terminal: "Terminal",
   voice: "Voice",
+  enhance: "Enhance prompt",
   view: "View",
 }
 
 /** Known sections first; a new `opencode.*` section appears after them, in schema order. */
-const SECTION_ORDER = ["connection", "transcript", "todo", "notifications", "terminal", "voice", "view"]
+const SECTION_ORDER = ["connection", "transcript", "todo", "enhance", "notifications", "terminal", "voice", "view"]
 
 const ACRONYMS = new Set(["url", "cli", "os", "api", "mcp", "id", "ui", "json", "cpu"])
 
@@ -147,6 +149,7 @@ export function controlKind(property: PropertySchema): ControlKind {
   if (type === "number" || type === "integer") return "number"
   if (type === "array") return property.items?.enum?.length ? "enumList" : "stringList"
   if (type === "string" && property.enum?.length) return "enum"
+  if (property.editPresentation === "multilineText") return "text"
   return "string"
 }
 
@@ -168,6 +171,7 @@ export function defaultValueFor(property: PropertySchema): unknown {
     case "number":
       return 0
     case "string":
+    case "text":
       return ""
     case "enum":
       return property.enum?.[0] ?? ""
@@ -207,10 +211,6 @@ export function resolveWriteTarget(property: PropertySchema, requested: "user" |
   return requested === "workspace" ? "workspace" : "global"
 }
 
-export function controlFor(fullKey: string, property: PropertySchema, snapshot: SettingSnapshot): SettingsControl {
-  const shortKey = shortKeyOf(fullKey)
-  const value = snapshot.value !== undefined ? snapshot.value : snapshot.defaultValue !== undefined ? snapshot.defaultValue : defaultValueFor(property)
-  return {
 /**
  * Where a change from the page must be written to take effect. A value saved in the workspace (or a workspace folder)
  * wins over User settings, so writing to User settings alone would change nothing: the page updates that value instead.
@@ -222,6 +222,10 @@ export function effectiveLevel(property: PropertySchema, snapshot: SettingSnapsh
   return "global"
 }
 
+export function controlFor(fullKey: string, property: PropertySchema, snapshot: SettingSnapshot): SettingsControl {
+  const shortKey = shortKeyOf(fullKey)
+  const value = snapshot.value !== undefined ? snapshot.value : snapshot.defaultValue !== undefined ? snapshot.defaultValue : defaultValueFor(property)
+  return {
     key: fullKey,
     shortKey,
     label: humanizeKey(shortKey),
@@ -279,6 +283,7 @@ export function coerceSettingValue(property: PropertySchema, raw: unknown): Coer
       return { ok: true, value }
     }
     case "string":
+    case "text":
       return typeof raw === "string" ? { ok: true, value: raw } : fail("Enter text.")
     case "enum": {
       if (typeof raw !== "string") return fail("Choose one of the listed values.")

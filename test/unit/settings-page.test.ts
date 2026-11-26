@@ -44,7 +44,7 @@ describe("configuration schema", () => {
     expect(view?.controls[0]).toMatchObject({ key: "opencode.view.minWidth", kind: "number", min: 0, defaultValue: 380 })
   })
   test("sections are grouped in a stable, readable order", () => {
-    expect(buildSettingsSections(schema, {}).map((section) => section.id)).toEqual(["connection", "transcript", "todo", "notifications", "terminal", "voice", "view"])
+    expect(buildSettingsSections(schema, {}).map((section) => section.id)).toEqual(["connection", "transcript", "todo", "enhance", "notifications", "terminal", "voice", "view"])
   })
 })
 
