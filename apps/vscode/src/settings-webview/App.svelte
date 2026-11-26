@@ -31,7 +31,6 @@
   })
   const companionCommands = $derived((settings?.companion.commands ?? []).filter((row) => matchesQuery(`${row.label} ${row.description}`, query)))
   const aboutLinks = $derived((settings?.about.links ?? []).filter((link) => matchesQuery(`${link.label} ${link.description ?? ""}`, query)))
-  const enhanceVisible = $derived(!!settings && (!query.trim() || matchesQuery("Enhance prompt model sparkle reset server default", query)))
   const companionVisible = $derived(!!settings && (!query.trim() || matchesQuery("Voice companion microphone log downloaded languages attention", query) || companionCommands.length > 0))
   const aboutVisible = $derived(!!settings && (!query.trim() || matchesQuery("About version marketplace GitHub issues mobile setup unofficial", query) || aboutLinks.length > 0))
   const hasAccess = $derived(secrets.length > 0 || actions.length > 0)
@@ -39,7 +38,6 @@
   const nav: NavItem[] = $derived.by(() => {
     const items: NavItem[] = sections.map((section) => ({ id: `settings-${section.id}`, title: section.title }))
     if (hasAccess) items.push({ id: "access", title: "Access & actions" })
-    if (enhanceVisible) items.push({ id: "enhance", title: "Enhance prompt" })
     if (companionVisible) items.push({ id: "companion", title: "Voice companion" })
     if (aboutVisible) items.push({ id: "about", title: "About" })
     return items
@@ -117,7 +115,9 @@
         <button class="clear" type="button" aria-label="Clear search" onclick={() => (query = "")}><span class="codicon codicon-close" aria-hidden="true"></span></button>
       {/if}
     </div>
-    <span class="scope-note" title="Machine settings are always saved in User settings.">Saved in User settings</span>
+    <span class="scope-note" title="A value this workspace already overrides is changed in the workspace, so the change takes effect. Machine settings are always saved in User settings."
+      >Saved in User settings</span
+    >
   </div>
 </header>
 
@@ -151,6 +151,24 @@
 
       {#each sections as section (section.id)}
         <Section id={`settings-${section.id}`} title={section.title}>
+          {#if section.id === "enhance"}
+            <div class="row custom">
+              <div class="text">
+                <div class="label">Enhance prompt model</div>
+                <p class="desc">
+                  {#if settings.enhance}
+                    <code>{settings.enhance.providerID}/{settings.enhance.id}</code>{#if settings.enhance.variant}<span class="muted"> · {settings.enhance.variant}</span>{/if}
+                  {:else}
+                    Using the server's default model.
+                  {/if}
+                </p>
+                <p class="hint">Choose the model from the sparkle (✦) menu in the chat's prompt box. This page can only reset it.</p>
+              </div>
+              <div class="buttons">
+                <button type="button" disabled={!settings.enhance} onclick={() => send({ type: "resetEnhance" })}>Reset to server default</button>
+              </div>
+            </div>
+          {/if}
           {#each section.controls as control (control.key)}
             <Control {control} />
           {/each}
@@ -197,27 +215,6 @@
               </div>
             {/each}
           {/each}
-        </Section>
-      {/if}
-
-      {#if enhanceVisible}
-        <Section id="enhance" title="Enhance prompt">
-          <div class="row custom">
-            <div class="text">
-              <div class="label">Enhance prompt model</div>
-              <p class="desc">
-                {#if settings.enhance}
-                  <code>{settings.enhance.providerID}/{settings.enhance.id}</code>{#if settings.enhance.variant}<span class="muted"> · {settings.enhance.variant}</span>{/if}
-                {:else}
-                  Using the server's default model.
-                {/if}
-              </p>
-              <p class="hint">Choose the model from the sparkle (✦) menu in the chat's prompt box. This page can only reset it.</p>
-            </div>
-            <div class="buttons">
-              <button type="button" disabled={!settings.enhance} onclick={() => send({ type: "resetEnhance" })}>Reset to server default</button>
-            </div>
-          </div>
         </Section>
       {/if}
 

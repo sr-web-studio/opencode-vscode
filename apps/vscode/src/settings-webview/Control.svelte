@@ -19,7 +19,7 @@
     if (raw !== "") commit(Number(raw))
   }
   function onText(event: Event) {
-    commit((event.currentTarget as HTMLInputElement).value)
+    commit((event.currentTarget as HTMLInputElement | HTMLTextAreaElement).value)
   }
   function onSelect(event: Event) {
     commit((event.currentTarget as HTMLSelectElement).value)
@@ -38,7 +38,7 @@
   }
 </script>
 
-<div class="row setting">
+<div class="row setting" class:wide={control.kind === "text"}>
   <div class="text">
     <label class="label" for={inputId}>
       {control.label}
@@ -70,6 +70,8 @@
           <button type="button" onclick={() => send({ type: "command", command: control.action?.command ?? "" })}>{control.action.label}</button>
         {/if}
       </div>
+    {:else if control.kind === "text"}
+      <textarea id={inputId} rows="12" value={String(control.value ?? "")} onchange={onText} spellcheck="false"></textarea>
     {:else if control.kind === "stringList"}
       <input id={inputId} type="text" value={listValue.join(", ")} onchange={onList} placeholder="Comma-separated" spellcheck="false" />
     {:else if control.kind === "enumList"}

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.25 (preview)
+
+- **Copy a message.** A copy button sits on every prompt bubble (on hover) and after every answer, next to its time. An answer is copied as Markdown, without the tool steps. This applies to the VS Code extension and the Android app.
+- **Your own Polish and Rewrite instructions.** The Settings page has an **Enhance prompt** section with both instructions in editable boxes. An edit applies to the next enhancement; clearing a box or Reset brings back the built-in text.
+- **Terminal settings apply at once.** Setting Terminal reveal to `off` closes the mirrored terminals (the commands keep running on the server), turning it back on shows the commands still running, and a lower Max open closes the extra idle terminals straight away.
+- **The Settings page changes the value that is in effect.** A setting this workspace already overrides is changed in the workspace, instead of in User settings where the change had no effect.
+
 ## 0.3.24 (preview)
 
 - **Remove on a queued message checks with the server.** After you click Remove, the row goes away once the server confirms the message was cancelled, becomes a normal message if it was already sent, and shows a message when the server cannot say or still holds it. A double click sends one request. This applies to the VS Code extension and the Android app.

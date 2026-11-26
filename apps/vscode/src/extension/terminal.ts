@@ -61,14 +61,39 @@ export class ShellTerminals implements vscode.Disposable {
   private readonly offFolders: () => void
   private readonly subs: vscode.Disposable[] = []
   private counter = 0
+  private reveal: TerminalSettings["reveal"]
 
   constructor(
     private readonly folders: FolderRegistry<Controller>,
     private readonly settings: () => TerminalSettings,
   ) {
+    this.reveal = settings().reveal
     this.syncFolders()
     this.offFolders = folders.onChange(() => this.syncFolders())
     this.subs.push(vscode.window.onDidCloseTerminal((t) => this.forget(t)))
+  }
+
+  /**
+   * A terminal setting changed. Most of them are read when the next command starts; these act on what is open now:
+   * `off` closes the mirrors (the commands keep running on the server), turning it back on mirrors the commands that
+   * are still running, and a lower `maxOpen` trims at once.
+   */
+  applySettings(): void {
+    const before = this.reveal
+    this.reveal = this.settings().reveal
+    if (this.reveal === "off" && before !== "off") {
+      for (const t of this.terms.splice(0)) {
+        t.closing = true
+        t.current?.pager?.stop()
+        t.terminal.dispose()
+      }
+      this.seen.clear()
+      return
+    }
+    if (this.reveal !== "off" && before === "off") {
+      for (const controller of this.folders.controllers()) void this.reattach(controller)
+    }
+    this.trim()
   }
 
   /** Follow the event streams of every folder: a shell command of any project gets its terminal. */
