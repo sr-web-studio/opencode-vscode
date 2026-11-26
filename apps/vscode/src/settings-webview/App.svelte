@@ -117,7 +117,9 @@
         <button class="clear" type="button" aria-label="Clear search" onclick={() => (query = "")}><span class="codicon codicon-close" aria-hidden="true"></span></button>
       {/if}
     </div>
-    <span class="scope-note" title="Machine settings are always saved in User settings.">Saved in User settings</span>
+    <span class="scope-note" title="A value this workspace already overrides is changed in the workspace, so the change takes effect. Machine settings are always saved in User settings."
+      >Saved in User settings</span
+    >
   </div>
 </header>
 

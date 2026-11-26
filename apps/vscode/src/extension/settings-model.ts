@@ -211,6 +211,17 @@ export function controlFor(fullKey: string, property: PropertySchema, snapshot: 
   const shortKey = shortKeyOf(fullKey)
   const value = snapshot.value !== undefined ? snapshot.value : snapshot.defaultValue !== undefined ? snapshot.defaultValue : defaultValueFor(property)
   return {
+/**
+ * Where a change from the page must be written to take effect. A value saved in the workspace (or a workspace folder)
+ * wins over User settings, so writing to User settings alone would change nothing: the page updates that value instead.
+ */
+export function effectiveLevel(property: PropertySchema, snapshot: SettingSnapshot): "global" | "workspace" | "workspaceFolder" {
+  if (isMachineScoped(property)) return "global"
+  if (snapshot.workspaceFolderValue !== undefined) return "workspaceFolder"
+  if (snapshot.workspaceValue !== undefined) return "workspace"
+  return "global"
+}
+
     key: fullKey,
     shortKey,
     label: humanizeKey(shortKey),

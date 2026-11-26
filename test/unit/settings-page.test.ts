@@ -5,6 +5,7 @@ import {
   coerceSettingValue,
   configurationProperties,
   controlKind,
+  effectiveLevel,
   filterSections,
   humanizeKey,
   markdownLite,
@@ -103,6 +104,13 @@ describe("where a value is written", () => {
     expect(resolveWriteTarget(property({ scope: "window" }), "workspace")).toBe("workspace")
     expect(resolveWriteTarget(property({ scope: "resource" }), "workspace")).toBe("workspace")
     expect(resolveWriteTarget(property({ scope: "window" }))).toBe("global")
+  })
+  test("a change goes where the winning value is saved, so it takes effect", () => {
+    expect(effectiveLevel(property({}), {})).toBe("global")
+    expect(effectiveLevel(property({}), { globalValue: "a" })).toBe("global")
+    expect(effectiveLevel(property({}), { globalValue: "a", workspaceValue: "b" })).toBe("workspace")
+    expect(effectiveLevel(property({}), { workspaceValue: "b", workspaceFolderValue: "c" })).toBe("workspaceFolder")
+    expect(effectiveLevel(property({ scope: "machine" }), { workspaceValue: "b" })).toBe("global")
   })
 })
 

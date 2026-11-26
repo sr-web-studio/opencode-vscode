@@ -372,6 +372,7 @@ export function activate(context: vscode.ExtensionContext): void {
         voice.syncLanguages()
       if (affectsView(e)) folders.setSettings(readViewSettings())
       if (affectsConnection(e)) void start()
+      if (e.affectsConfiguration("opencode.terminal")) terminals.applySettings()
     }),
   )
 
