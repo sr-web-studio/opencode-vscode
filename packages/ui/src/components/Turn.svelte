@@ -148,7 +148,8 @@
     text-align: right;
     font-size: 0.85em;
     line-height: 1.4;
-    margin: 0 2px 2px;
+    /* Clear of the copy button on the bubble's top-right corner. */
+    margin: 0 22px 2px 2px;
     opacity: 0;
     transition: opacity 0.12s;
   }
