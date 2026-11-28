@@ -16,6 +16,7 @@ import { toPromptFiles, type PromptFile } from "./attachments"
 import { errorMessage as message, isGone, isMessageGone } from "./errors"
 import { buildEnhancePrompt, cleanEnhanced, enhanceError, ENHANCE_UNSUPPORTED, type EnhanceMode, type EnhanceRules } from "./enhance"
 import { NOT_DELETABLE, STOP_FIRST, WAITING_FOR_USER, WORKER_RUNNING } from "./delete-session"
+import { NOT_ARCHIVABLE } from "./archive-session"
 import { CommandCatalog } from "./commands"
 import { McpManager, type McpHost } from "./mcp"
 import { commandBlock, isClientCommand, isEmptySession, parseSlash } from "./slash"
@@ -1268,6 +1269,8 @@ export class Controller {
           return this.togglePin(action.key)
         case "deleteSession":
           return await this.deleteSession(action.sessionID)
+        case "archiveSession":
+          return await this.archiveSession(action.sessionID, action.archived)
         case "hideWorkers":
           return this.hideWorkers(action.keys)
         case "revert":
@@ -1693,6 +1696,41 @@ export class Controller {
     }
     // `session.deleted` follows; apply it now so the row disappears at once. The event handler does the same, idempotently.
     await this.forget(id)
+    this.emitNow()
+  }
+
+  /**
+   * Archive (or unarchive) a session on the server. Reversible, so unlike deletion it needs no host confirmation and
+   * stays available while the session runs: the row simply moves between the visible list and "Show archived".
+   * Refused, with a line on the error state and no server call, for workers and unknown sessions. The
+   * `session.archived` / `session.unarchived` events reconcile the same way, idempotently.
+   */
+  private async archiveSession(id: string, archived: boolean): Promise<void> {
+    const client = this.need()
+    const known = this.sessions.find((s) => s.id === id) ?? this.archived.find((s) => s.id === id)
+    if (!known || !isRoot(known) || this.children.has(id)) return this.refuse(NOT_ARCHIVABLE)
+    try {
+      await client.session.update({ sessionID: id, archived })
+    } catch (e) {
+      if (isGone(e)) {
+        await this.forget(id)
+        this.emitNow()
+        return
+      }
+      throw e
+    }
+    const at = Date.now()
+    if (archived) {
+      this.sessions = this.sessions.filter((s) => s.id !== id)
+      if (!this.archived.some((s) => s.id === id)) {
+        this.archived = [...this.archived, { ...known, time: { ...known.time, archived: at } }]
+      }
+    } else {
+      this.archived = this.archived.filter((s) => s.id !== id)
+      if (!this.sessions.some((s) => s.id === id)) {
+        this.sessions = [...this.sessions, { ...known, time: { ...known.time, archived: undefined, updated: at } }]
+      }
+    }
     this.emitNow()
   }
 

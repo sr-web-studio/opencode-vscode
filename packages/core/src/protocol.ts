@@ -214,6 +214,11 @@ export type Action =
    * (`confirmDeleteSession`); the controller refuses running, waiting, worker and unknown sessions.
    */
   | { type: "deleteSession"; sessionID: string }
+  /**
+   * Archive (or unarchive) a root session on the server, for every client. Reversible via the opposite value, so no
+   * host confirmation is asked; the controller still refuses worker and unknown sessions.
+   */
+  | { type: "archiveSession"; sessionID: string; archived: boolean }
   | { type: "redo" }
   /** `/compact` and `/fork` on the current session. */
   | { type: "compact" }
@@ -305,6 +310,11 @@ export type HostRequest =
    * comes from the row, so a row that moved folders in the meantime cannot rename the wrong session.
    */
   | { type: "renameSession"; sessionID: string; directory: string; title: string }
+  /**
+   * A session row's archive toggle: (un)archive it in the folder that owns it, without switching the chat there.
+   * The directory comes from the row, so a row that moved folders in the meantime cannot archive the wrong session.
+   */
+  | { type: "archiveSession"; sessionID: string; directory: string; archived: boolean }
   /** The sessions pane's refresh: re-post the lists the controllers already hold, never a server call. */
   | { type: "refreshSessions" }
   | { type: "openExternal"; url: string }
