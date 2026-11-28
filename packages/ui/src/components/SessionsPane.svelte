@@ -39,6 +39,28 @@
   let editing = $state<{ id: string; value: string } | undefined>()
   let editInput: HTMLInputElement | undefined = $state()
 
+  /* ------------------------------------------------------------ row menu */
+
+  $effect(() => {
+    if (!menu) return
+    const outside = (e: PointerEvent) => {
+      const target = e.target as Node | null
+      if (target && !menuEl?.contains(target)) closeMenu()
+    }
+    const esc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation()
+        closeMenu()
+      }
+    }
+    window.addEventListener("pointerdown", outside, true)
+    window.addEventListener("keydown", esc, true)
+    return () => {
+      window.removeEventListener("pointerdown", outside, true)
+      window.removeEventListener("keydown", esc, true)
+    }
+  })
+
   /* ------------------------------------------------------------ pane width */
 
   /** Remembered next to the open/closed answer, in the webview's own state, so it survives a reload and a re-created view. */
@@ -231,6 +253,47 @@
 
   function askDelete(row: PaneRow): void {
     store.bridge.confirmDeleteSession(row.id, row.title, row.directory)
+  }
+
+  /** The row menu (right-click): copy the id, archive/unarchive where it lives, or delete with confirmation. */
+  let menu: { row: PaneRow & { project?: string }; x: number; y: number } | undefined = $state()
+  let menuEl: HTMLDivElement | undefined = $state()
+  let copiedId: string | undefined = $state()
+  let copyTimer: ReturnType<typeof setTimeout> | undefined
+
+  function openMenu(e: MouseEvent, row: PaneRow & { project?: string }): void {
+    e.preventDefault()
+    e.stopPropagation()
+    clearTimeout(copyTimer)
+    copiedId = undefined
+    menu = { row, x: Math.min(e.clientX, window.innerWidth - 240), y: Math.min(e.clientY, window.innerHeight - 160) }
+    void tick().then(() => {
+      const first = menuEl?.querySelector<HTMLElement>("button:not([disabled])")
+      if (first) focusGuarded(first)
+    })
+  }
+
+  function closeMenu(): void {
+    menu = undefined
+    clearTimeout(copyTimer)
+  }
+
+  async function copyRowId(row: PaneRow): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(row.id)
+      copiedId = row.id
+      copyTimer = setTimeout(() => {
+        if (copiedId === row.id) copiedId = undefined
+      }, 1600)
+    } catch {
+      copiedId = undefined
+    }
+  }
+
+  function askArchive(row: PaneRow & { project?: string }): void {
+    const archived = !row.archived
+    closeMenu()
+    store.bridge.archiveSession?.(row.id, row.directory, archived)
   }
 
   /**
@@ -439,6 +502,35 @@
   {#if inboxShown}
     <SessionsInbox rows={inbox} collapsed={inboxCollapsed} height={inboxHeight} viewHeight={listArea} ontoggle={toggleInbox} onheight={setInboxHeight} oncommit={commitInboxHeight} row={sessionRow} />
   {/if}
+  {#if menu}
+    {@const item = menu}
+    <div class="rowmenu" role="menu" aria-label="Session actions" bind:this={menuEl} style:left={`${item.x}px`} style:top={`${item.y}px`}>
+      <button
+        role="menuitem"
+        onclick={() => void copyRowId(item.row)}
+        title="Copy the session id"
+        aria-label="Copy session ID {item.row.title}"><Codicon name={copiedId === item.row.id ? "check" : "copy"} /><span>{copiedId === item.row.id ? "Copied" : "Copy session ID"}</span></button
+      >
+      {#if store.bridge.archiveSession}
+        <button
+          role="menuitem"
+          onclick={() => askArchive(item.row)}
+          title={item.row.archived ? "Show the session in the list again" : "Hide the session from the list (reversible)"}
+          aria-label="{item.row.archived ? "Unarchive" : "Archive"} {item.row.title}"><Codicon name="archive" /><span>{item.row.archived ? "Unarchive session" : "Archive session"}</span></button
+        >
+      {/if}
+      <button
+        role="menuitem"
+        onclick={() => {
+          const row = item.row
+          closeMenu()
+          askDelete(row)
+        }}
+        title="Delete session…"
+        aria-label="Delete {item.row.title}"><Codicon name="trash" /><span>Delete session…</span></button
+      >
+    </div>
+  {/if}
   {#if !overlay}
     <!-- A resize sash is a real ARIA separator widget: focusable, with a value, and resized by the arrow keys. -->
     <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
@@ -488,6 +580,7 @@
     aria-label={rowLabel(row)}
     title={rowLabel(row)}
     onclick={() => editing?.id === row.id || open(row)}
+    oncontextmenu={(e) => openMenu(e, row)}
     onkeydown={(e) => rowKey(e, row)}
   >
     {@render statusIcon(row.status)}
@@ -864,5 +957,39 @@
     .pencil {
       opacity: 1;
     }
+  }
+  /* Right-click row menu: Copy session ID, Archive/Unarchive, Delete. Fixed so it can overflow the pane. */
+  .rowmenu {
+    position: fixed;
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    min-width: 200px;
+    padding: 4px;
+    border-radius: 8px;
+    border: 1px solid var(--oc-hairline);
+    background: var(--vscode-editorWidget-background);
+    color: var(--oc-fg);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  }
+  .rowmenu button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 6px 10px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: 0.86em;
+    text-align: left;
+    cursor: pointer;
+  }
+  .rowmenu button:hover,
+  .rowmenu button:focus-visible {
+    background: var(--oc-hover);
+    outline: none;
   }
 </style>
