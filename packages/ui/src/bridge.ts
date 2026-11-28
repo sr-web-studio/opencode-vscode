@@ -82,6 +82,11 @@ export interface HostBridge {
    * hosts without the pane leave it out.
    */
   renameSession?(sessionID: string, directory: string, title: string): void
+  /**
+   * Archive (or unarchive) a session of any folder where it lives, without switching the chat there. The sessions
+   * pane's row menu uses this; hosts without the pane leave it out.
+   */
+  archiveSession?(sessionID: string, directory: string, archived: boolean): void
   /** The sessions pane's refresh: re-post the lists the host already holds. Hosts without the pane leave it out. */
   refreshSessions?(): void
   /**

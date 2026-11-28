@@ -287,6 +287,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       await controller.dispatch({ type: "rename", id: m.request.sessionID, title: m.request.title })
       return
     }
+    // A session row's menu: (un)archive it where it lives, without switching the chat there either.
+    if (m.request.type === "archiveSession") {
+      const controller = this.folders.controllerAt(m.request.directory) ?? this.folders.forSession(m.request.sessionID)
+      await controller.dispatch({ type: "archiveSession", sessionID: m.request.sessionID, archived: m.request.archived })
+      return
+    }
     // A project header's `+`: show that folder first, so the new draft lands there and not in the folder the chat had.
     if (m.request.type === "newSessionIn") {
       const controller = this.folders.controllerAt(m.request.directory)

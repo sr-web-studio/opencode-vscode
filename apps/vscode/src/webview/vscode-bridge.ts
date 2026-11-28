@@ -74,6 +74,7 @@ export function createVsCodeBridge(): HostBridge {
     openSessionInFolder: (sessionID, directory) => host({ type: "openSessionInFolder", sessionID, directory }),
     newSessionIn: (directory) => host({ type: "newSessionIn", directory }),
     renameSession: (sessionID, directory, title) => host({ type: "renameSession", sessionID, directory, title }),
+    archiveSession: (sessionID, directory, archived) => host({ type: "archiveSession", sessionID, directory, archived }),
     refreshSessions: () => host({ type: "refreshSessions" }),
     confirmRevert: (messageID) => host({ type: "confirmRevert", messageID }),
     confirmDeleteSession: (sessionID, title, directory) => host({ type: "confirmDeleteSession", sessionID, title, directory }),
